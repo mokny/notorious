@@ -110,7 +110,12 @@ if ask_yes_no "Generate a VAPID key pair now for Web Push notifications?" y; the
 fi
 
 log "Building"
-npm run build
+# Bundling mermaid + its diagram-layout dependencies is memory-hungry; V8
+# sometimes auto-detects a conservative heap ceiling (well under 1GB) on
+# small VPS instances that in practice have more RAM/swap available than
+# that. Raising the cap explicitly is the standard fix - see
+# docs/DEPLOYMENT.md#build-memory-requirements if it still runs out.
+NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}" npm run build
 
 log "Running database migrations"
 npm run migrate

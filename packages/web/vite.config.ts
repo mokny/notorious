@@ -49,7 +49,14 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    // Off in production: generating sourcemaps for the minified
+    // "vendor-diagrams" chunk (mermaid + friends) alone produced a ~12MB map
+    // file, and that char-by-char source-position tracking through
+    // minification is a major memory multiplier during the build - a
+    // meaningful contributor to running memory-constrained servers out of
+    // heap. `vite dev` is unaffected (it always serves unminified ESM with
+    // its own inline sourcemaps, regardless of this setting).
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

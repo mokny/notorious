@@ -178,10 +178,23 @@ See `.env.example` for the full list with defaults. The only one without a safe 
 
 ## Build memory requirements
 
-`npm run build` (specifically the frontend's `vite build`) needs roughly 1-1.5GB of free RAM on a
-small VPS. If it's killed with "JavaScript heap out of memory", either build on a machine with more
-RAM and copy over `packages/web/dist`, or add a swap file temporarily:
+`npm run build` (specifically the frontend's `vite build`, which bundles Mermaid and its
+diagram-layout dependencies) needs roughly 1-2GB of free RAM/swap on a small VPS. `install.sh` and
+`update.sh` already run the build with `NODE_OPTIONS=--max-old-space-size=2048`, since V8 sometimes
+auto-detects a conservative default heap ceiling (well under 1GB) on small VMs that in practice have
+more RAM or swap available than that - if you run `npm run build` by hand, do the same:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=2048 npm run build
+```
+
+If it still gets killed with "JavaScript heap out of memory" (or a lower-level "process out of
+memory" once V8 itself has more room to ask for), the box genuinely doesn't have enough physical
+RAM+swap for the build. Either add a swap file:
 
 ```bash
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
 ```
+
+or build on a machine with more RAM and copy over `packages/web/dist` (and `packages/server/dist`,
+`packages/shared/dist`) instead of building on the server at all.
