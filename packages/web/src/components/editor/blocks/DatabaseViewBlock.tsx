@@ -19,7 +19,7 @@ export function DatabaseViewBlock({ content, workspaceId, onSave }: DatabaseView
       <div className="rounded-lg border border-dashed border-border p-3">
         <p className="mb-2 text-sm text-ink-muted">Choose a view to embed:</p>
         <select
-          onChange={(e) => onSave({ viewId: e.target.value })}
+          onChange={(e) => onSave({ ...content, viewId: e.target.value })}
           defaultValue=""
           className="w-full rounded-lg border border-border bg-surface px-2 py-1 text-sm"
         >

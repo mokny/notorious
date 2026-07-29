@@ -22,7 +22,7 @@ export function ToggleBlock({ content, onSave, children }: ToggleBlockProps) {
           <RichTextEditor
             markdown={content.summaryMarkdown ?? ""}
             placeholder="Toggle"
-            onSave={(summaryMarkdown) => onSave({ summaryMarkdown })}
+            onSave={(summaryMarkdown) => onSave({ ...content, summaryMarkdown })}
           />
         </div>
       </div>

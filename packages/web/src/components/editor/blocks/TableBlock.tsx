@@ -14,7 +14,7 @@ export function TableBlock({
   const rows = content.rows ?? [];
 
   function setColumn(index: number, value: string) {
-    save({ columns: columns.map((c, i) => (i === index ? value : c)), rows });
+    save({ ...content, columns: columns.map((c, i) => (i === index ? value : c)), rows });
   }
 
   function setCell(rowIndex: number, colIndex: number, value: string) {
@@ -29,15 +29,15 @@ export function TableBlock({
       paddedRow[colIndex] = value;
       return paddedRow;
     });
-    save({ columns, rows: nextRows });
+    save({ ...content, columns, rows: nextRows });
   }
 
   function addColumn() {
-    save({ columns: [...columns, `Column ${columns.length + 1}`], rows: rows.map((row) => [...row, ""]) });
+    save({ ...content, columns: [...columns, `Column ${columns.length + 1}`], rows: rows.map((row) => [...row, ""]) });
   }
 
   function addRow() {
-    save({ columns, rows: [...rows, columns.map(() => "")] });
+    save({ ...content, columns, rows: [...rows, columns.map(() => "")] });
   }
 
   return (

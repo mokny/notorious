@@ -105,5 +105,5 @@ export function EmbedBlock({ content, onSave }: { content: EmbedContent; onSave:
       />
     );
   }
-  return <UrlPrompt label="page to embed" onSave={(url) => onSave({ url })} />;
+  return <UrlPrompt label="page to embed" onSave={(url) => onSave({ ...content, url })} />;
 }

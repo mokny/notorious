@@ -21,7 +21,7 @@ export function ColumnsBlock({ content, onSave, renderColumn }: ColumnsBlockProp
         ))}
       </div>
       <button
-        onClick={() => onSave({ columnCount: columnCount + 1 })}
+        onClick={() => onSave({ ...content, columnCount: columnCount + 1 })}
         className="mt-1 flex items-center gap-1 text-xs text-ink-muted hover:text-accent"
       >
         <Icon name="plus" className="h-3 w-3" /> Add column

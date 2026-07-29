@@ -24,7 +24,7 @@ export function ParagraphBlock({
     <RichTextEditor
       markdown={content.markdown ?? ""}
       className="tiptap prose-p:my-0 text-sm leading-relaxed"
-      onSave={(markdown) => onSave({ markdown })}
+      onSave={(markdown) => onSave({ ...content, markdown })}
       onEnter={onEnter}
       onBackspaceEmpty={onBackspaceEmpty}
       onSlashSelect={onSlashSelect}

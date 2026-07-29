@@ -162,7 +162,7 @@ function SubObjectPicker({ workspaceId, hostObjectId, onPicked }: { workspaceId:
 
 export function SubObjectBlock({ content, workspaceId, hostObjectId, onSave }: SubObjectBlockProps) {
   if (!content.objectId) {
-    return <SubObjectPicker workspaceId={workspaceId} hostObjectId={hostObjectId} onPicked={(objectId) => onSave({ objectId })} />;
+    return <SubObjectPicker workspaceId={workspaceId} hostObjectId={hostObjectId} onPicked={(objectId) => onSave({ ...content, objectId })} />;
   }
   return <SubObjectRow workspaceId={workspaceId} objectId={content.objectId} depth={0} />;
 }

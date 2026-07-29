@@ -103,7 +103,16 @@ export async function updateBlock(blockId: string, input: UpdateBlockInput): Pro
   if (!row) throw notFound("Block not found");
 
   const updatedAt = nowIso();
-  const content = input.content !== undefined ? JSON.stringify(input.content) : row.content;
+  // Shallow-merged with the existing content, not replaced outright: a
+  // block's content can carry fields its own type-specific editor doesn't
+  // know about and never round-trips through its onSave payload - notably
+  // `columnIndex`, stamped onto a block when it's created inside a Columns
+  // block's column, but absent from what e.g. ParagraphBlock's onSave sends
+  // (`{ markdown }`). A wholesale replace silently dropped it on the first
+  // edit, which orphaned the block from every column's filtered view -
+  // exactly the "typing makes the block vanish" bug this guards against.
+  const content =
+    input.content !== undefined ? JSON.stringify({ ...JSON.parse(row.content), ...input.content }) : row.content;
   await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
   await touchObject(row.objectId);
 

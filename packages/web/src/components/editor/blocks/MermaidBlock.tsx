@@ -44,7 +44,7 @@ export function MermaidBlock({
     <div className="space-y-2 rounded-lg border border-border p-3">
       <textarea
         value={content.code ?? ""}
-        onChange={(e) => save({ code: e.target.value })}
+        onChange={(e) => save({ ...content, code: e.target.value })}
         placeholder={"graph TD\n  A --> B"}
         rows={4}
         className="w-full resize-y border-none bg-transparent font-mono text-sm outline-none"

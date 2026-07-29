@@ -24,7 +24,7 @@ export function MathBlock({
     <div className="space-y-2 rounded-lg border border-border p-3">
       <textarea
         value={content.latex ?? ""}
-        onChange={(e) => save({ latex: e.target.value })}
+        onChange={(e) => save({ ...content, latex: e.target.value })}
         placeholder="e.g. E = mc^2"
         rows={2}
         className="w-full resize-none border-none bg-transparent font-mono text-sm outline-none"
