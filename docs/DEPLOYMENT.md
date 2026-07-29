@@ -12,7 +12,7 @@ via Docker Compose. Both read the same `.env` file and the same `data/` director
 ### First-time setup (scripted)
 
 ```bash
-git clone <your-repo-url> notorious
+git clone https://github.com/mokny/notorious.git
 cd notorious
 ./scripts/install.sh
 ```
@@ -27,7 +27,7 @@ to do it by hand if you'd rather not run a script with `sudo`.
 ### First-time setup (manual)
 
 ```bash
-git clone <your-repo-url> notorious
+git clone https://github.com/mokny/notorious.git
 cd notorious
 npm install
 cp .env.example .env

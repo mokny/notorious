@@ -8,6 +8,16 @@ per-workspace ZIP backups, and Web Push notifications - all backed by a single S
 There are no pre-created accounts - register your own via the `/register` page, or create one from
 the shell with `npm run create-user` (see [Creating user accounts](#creating-user-accounts)).
 
+## Getting the code
+
+```bash
+git clone https://github.com/mokny/notorious.git
+cd notorious
+```
+
+From here, either follow [Quick start](#quick-start-local-development) below to run it locally, or
+[Installing on your own Linux server](#installing-on-your-own-linux-server) to deploy it.
+
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - how the system is put together and why
@@ -47,7 +57,7 @@ npm run generate-vapid-keys --workspace=packages/server
 ## Installing on your own Linux server
 
 ```bash
-git clone <your-repo-url> notorious
+git clone https://github.com/mokny/notorious.git
 cd notorious
 ./scripts/install.sh
 ```
