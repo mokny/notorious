@@ -8,7 +8,15 @@ import { useBlockEditor } from "./BlockEditorContext.js";
 import { Icon } from "../ui/Icon.js";
 
 export function BlockItem({ block }: { block: BlockNode }) {
-  const { workspaceId, objectId, createBlockAfter, updateBlockContent, deleteBlock } = useBlockEditor();
+  const {
+    workspaceId,
+    objectId,
+    createBlockAfter,
+    updateBlockContent,
+    deleteBlock,
+    pendingFocusBlockId,
+    clearPendingFocus,
+  } = useBlockEditor();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -44,6 +52,8 @@ export function BlockItem({ block }: { block: BlockNode }) {
           onSlashSelect={(type: BlockType) => createBlockAfter(block.parentBlockId, block.id, type)}
           renderColumn={renderColumn}
           toggleChildren={<BlockList blocks={block.children} parentBlockId={block.id} />}
+          autoFocus={block.id === pendingFocusBlockId}
+          onAutoFocused={clearPendingFocus}
         />
       </div>
 

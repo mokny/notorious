@@ -17,7 +17,10 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId }: B
   const navigate = useNavigate();
   const mutations = useObjectMutations(workspaceId);
   const pivot = properties.find((p) => p.id === pivotPropertyId);
-  const options: PropertyOption[] = pivot && "options" in pivot.config ? pivot.config.options : [];
+  const options: PropertyOption[] = useMemo(
+    () => (pivot && "options" in pivot.config ? pivot.config.options : []),
+    [pivot],
+  );
 
   const columns = useMemo(() => {
     const groups = new Map<string, ObjectRecord[]>([UNASSIGNED, ...options.map((o) => o.id)].map((id) => [id, []]));

@@ -3,7 +3,7 @@ import { RichTextEditor } from "../RichTextEditor.js";
 
 const ICONS = ["💡", "⚠️", "📌", "✅", "🔥", "❗"];
 
-export function CalloutBlock({ content, onSave, onEnter }: { content: CalloutContent; onSave: (c: CalloutContent) => void; onEnter: () => void }) {
+export function CalloutBlock({ content, onSave, onEnter }: { content: CalloutContent; onSave: (c: CalloutContent) => Promise<void>; onEnter: () => void }) {
   return (
     <div className="flex items-start gap-2 rounded-lg bg-accent/5 p-3">
       <select

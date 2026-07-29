@@ -28,6 +28,10 @@ import {
   Rows3,
   GanttChartSquare,
   Image as ImageIcon,
+  Pin,
+  PinOff,
+  Menu,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +65,10 @@ const ICONS: Record<string, LucideIcon> = {
   rows: Rows3,
   timeline: GanttChartSquare,
   image: ImageIcon,
+  pin: Pin,
+  "pin-off": PinOff,
+  menu: Menu,
+  clock: Clock,
 };
 
 export function Icon({ name, className }: { name: string; className?: string }) {

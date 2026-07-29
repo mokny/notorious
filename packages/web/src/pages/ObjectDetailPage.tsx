@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { objectApi, schemaApi } from "../lib/api/resources.js";
@@ -6,6 +7,8 @@ import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
+import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
+import { useRecentObjects } from "../hooks/useRecentObjects.js";
 
 export function ObjectDetailPage() {
   const { workspaceId, objectId } = useParams<{ workspaceId: string; objectId: string }>();
@@ -36,19 +39,37 @@ export function ObjectDetailPage() {
     },
   });
 
+  const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
+  const { addRecent } = useRecentObjects(workspaceId);
+
+  useEffect(() => {
+    if (objectId) addRecent(objectId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objectId]);
+
   if (!object || !properties || !workspaceId) return <div className="p-8 text-sm text-ink-muted">Loading…</div>;
 
   const hasRecurrence = properties.some((p) => p.key === "recurrence");
+  const pinned = isPinned(object.id);
 
   return (
-    <div className="mx-auto flex max-w-5xl gap-8 px-8 py-10">
+    <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
       <div className="min-w-0 flex-1">
-        <input
-          value={object.title}
-          onChange={(e) => updateTitleMutation.mutate(e.target.value)}
-          placeholder="Untitled"
-          className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            value={object.title}
+            onChange={(e) => updateTitleMutation.mutate(e.target.value)}
+            placeholder="Untitled"
+            className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
+          />
+          <button
+            onClick={() => togglePin(object.id)}
+            title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+            className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${pinned ? "text-accent" : "text-ink-muted"}`}
+          >
+            <Icon name={pinned ? "pin-off" : "pin"} className="h-4 w-4" />
+          </button>
+        </div>
 
         {hasRecurrence && (
           <Button variant="secondary" className="mt-3" onClick={() => completeRecurringMutation.mutate()}>
@@ -63,7 +84,7 @@ export function ObjectDetailPage() {
         <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
       </div>
 
-      <aside className="w-72 shrink-0 space-y-3 border-l border-border pl-6">
+      <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
         <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
         {properties.map((property) => (
           <div key={property.id}>

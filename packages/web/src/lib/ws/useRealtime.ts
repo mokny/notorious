@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeEvent } from "@notorious/shared";
+import { useAuth } from "../../context/AuthContext.js";
 
 /**
  * Opens one WebSocket connection per open workspace and invalidates the
@@ -10,6 +11,8 @@ import type { RealtimeEvent } from "@notorious/shared";
 export function useRealtime(workspaceId: string | undefined): void {
   const queryClient = useQueryClient();
   const socketRef = useRef<WebSocket | null>(null);
+  const { user } = useAuth();
+  const currentUserId = user?.id;
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -27,7 +30,13 @@ export function useRealtime(workspaceId: string | undefined): void {
         queryClient.invalidateQueries({ queryKey: ["viewResults"] });
         queryClient.invalidateQueries({ queryKey: ["backlinks", payload.entityId] });
       } else if (payload.entity === "block") {
-        queryClient.invalidateQueries({ queryKey: ["blocks", payload.objectId ?? ""] });
+        // Block-save events fire on every debounced keystroke. Skip the
+        // refetch for changes we made ourselves - our own editor already has
+        // the authoritative text, and racing a refetch against active typing
+        // is what caused characters to occasionally get reverted/dropped.
+        if (payload.actorId !== currentUserId) {
+          queryClient.invalidateQueries({ queryKey: ["blocks", payload.objectId ?? ""] });
+        }
       } else if (payload.entity === "member") {
         queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
         queryClient.invalidateQueries({ queryKey: ["workspaces"] });
@@ -38,5 +47,5 @@ export function useRealtime(workspaceId: string | undefined): void {
     };
 
     return () => socket.close();
-  }, [workspaceId, queryClient]);
+  }, [workspaceId, queryClient, currentUserId]);
 }

@@ -37,12 +37,14 @@ export interface BlockRendererProps {
   block: BlockNode;
   workspaceId: string;
   objectId: string;
-  onSave: (content: Record<string, unknown>) => void;
+  onSave: (content: Record<string, unknown>) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
   onSlashSelect: (type: BlockType) => void;
   renderColumn?: (columnIndex: number) => ReactNode;
   toggleChildren?: ReactNode;
+  autoFocus?: boolean;
+  onAutoFocused?: () => void;
 }
 
 export function BlockRenderer({
@@ -55,6 +57,8 @@ export function BlockRenderer({
   onSlashSelect,
   renderColumn,
   toggleChildren,
+  autoFocus,
+  onAutoFocused,
 }: BlockRendererProps) {
   /**
    * `block.content` is untyped JSON on the wire (it varies per block type),
@@ -65,8 +69,8 @@ export function BlockRenderer({
   function content<T>(): T {
     return block.content as unknown as T;
   }
-  function save(value: unknown): void {
-    onSave(value as Record<string, unknown>);
+  function save(value: unknown): Promise<void> {
+    return onSave(value as Record<string, unknown>);
   }
 
   switch (block.type) {
@@ -78,6 +82,8 @@ export function BlockRenderer({
           onEnter={onEnter}
           onBackspaceEmpty={onBackspaceEmpty}
           onSlashSelect={onSlashSelect}
+          autoFocus={autoFocus}
+          onAutoFocused={onAutoFocused}
         />
       );
     case "heading":

@@ -1,3 +1,4 @@
+import { useMemo, useRef } from "react";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -15,15 +16,42 @@ interface UseMarkdownEditorOptions {
   onSlashSelect?: (type: BlockType) => void;
 }
 
+function isEmptyEditor(target: HTMLElement): boolean {
+  return target.textContent?.trim().length === 0;
+}
+
 /**
  * One TipTap instance per rich-text block. Each block holds a single
  * paragraph of inline content (bold/italic/code/link) - block-level
  * structure (headings, lists, tables, ...) is modeled as separate block rows
- * instead of nested ProseMirror nodes, so Enter always means "new block".
+ * instead of nested ProseMirror nodes, so Enter always means "new block"
+ * (Shift+Enter still inserts a soft line break within the block, via the
+ * stock hardBreak extension).
+ *
+ * The extensions/editorProps objects are memoized so they don't change
+ * identity on every parent re-render: TipTap's `useEditor` re-applies
+ * `editor.setOptions()`/`view.setProps()` whenever any option's reference
+ * changes, and doing that on every keystroke-triggered re-render was the
+ * root cause of occasional dropped characters (a ProseMirror view prop
+ * update landing mid-keystroke). Callbacks are read through refs instead of
+ * being part of the dependency surface, so they're always current without
+ * forcing a re-create.
  */
 export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
-  return useEditor({
-    extensions: [
+  const onChangeRef = useRef(options.onChange);
+  const onEnterRef = useRef(options.onEnter);
+  const onBackspaceEmptyRef = useRef(options.onBackspaceEmpty);
+  const onSlashSelectRef = useRef(options.onSlashSelect);
+
+  onChangeRef.current = options.onChange;
+  onEnterRef.current = options.onEnter;
+  onBackspaceEmptyRef.current = options.onBackspaceEmpty;
+  onSlashSelectRef.current = options.onSlashSelect;
+
+  const hasSlashCommand = Boolean(options.onSlashSelect);
+
+  const extensions = useMemo(
+    () => [
       StarterKit.configure({
         heading: false,
         bulletList: false,
@@ -32,35 +60,38 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
         blockquote: false,
         codeBlock: false,
         horizontalRule: false,
-        hardBreak: false,
       }),
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: options.placeholder ?? "Type '/' for commands…" }),
       Markdown.configure({ html: false, transformPastedText: true }),
-      ...(options.onSlashSelect
-        ? [SlashCommand.configure({ onSelect: options.onSlashSelect })]
-        : []),
+      ...(hasSlashCommand ? [SlashCommand.configure({ onSelect: (type) => onSlashSelectRef.current?.(type) })] : []),
     ],
-    content: options.markdown,
-    editorProps: {
-      handleKeyDown: (_view, event) => {
+    [options.placeholder, hasSlashCommand],
+  );
+
+  const editorProps = useMemo(
+    () => ({
+      handleKeyDown: (_view: unknown, event: KeyboardEvent) => {
         if (event.key === "Enter" && !event.shiftKey) {
-          options.onEnter?.();
+          onEnterRef.current?.();
           return true;
         }
         if (event.key === "Backspace" && isEmptyEditor(event.target as HTMLElement)) {
-          options.onBackspaceEmpty?.();
+          onBackspaceEmptyRef.current?.();
         }
         return false;
       },
-    },
-    onUpdate: ({ editor }) => {
-      const storage = editor.storage as { markdown: { getMarkdown: () => string } };
-      options.onChange(storage.markdown.getMarkdown().trim());
+    }),
+    [],
+  );
+
+  return useEditor({
+    extensions,
+    content: options.markdown,
+    editorProps,
+    onUpdate: ({ editor: updatedEditor }) => {
+      const storage = updatedEditor.storage as { markdown: { getMarkdown: () => string } };
+      onChangeRef.current?.(storage.markdown.getMarkdown().trim());
     },
   });
-}
-
-function isEmptyEditor(target: HTMLElement): boolean {
-  return target.textContent?.trim().length === 0;
 }

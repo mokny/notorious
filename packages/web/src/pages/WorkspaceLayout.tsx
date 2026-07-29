@@ -1,18 +1,27 @@
-import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { schemaApi, workspaceApi, authApi } from "../lib/api/resources.js";
+import { workspaceApi, authApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
+import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
 import { Icon } from "../components/ui/Icon.js";
+import { navLinkClass } from "../components/nav/navLinkClass.js";
+import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
+import { RecentNavSection } from "../components/nav/RecentNavSection.js";
+import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 
 export function WorkspaceLayout() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useRealtime(workspaceId);
+  const { pinnedIds } = useWorkspacePins(workspaceId);
 
   const { data: workspace } = useQuery({
     queryKey: ["workspace", workspaceId],
@@ -20,11 +29,9 @@ export function WorkspaceLayout() {
     enabled: Boolean(workspaceId),
   });
 
-  const { data: objectTypes } = useQuery({
-    queryKey: ["objectTypes", workspaceId],
-    queryFn: () => schemaApi.objectTypes(workspaceId!),
-    enabled: Boolean(workspaceId),
-  });
+  // Close the mobile drawer whenever the route changes (desktop ignores this,
+  // since the sidebar there is always visible regardless of this state).
+  useEffect(() => setSidebarOpen(false), [location.pathname]);
 
   async function handleLogout() {
     await authApi.logout();
@@ -33,7 +40,15 @@ export function WorkspaceLayout() {
 
   return (
     <div className="flex h-screen">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-surface-raised">
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface-raised transition-transform duration-200 ease-in-out md:relative md:z-0 md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <button
           onClick={() => navigate("/")}
           className="flex items-center gap-2 border-b border-border px-4 py-4 text-left hover:bg-surface"
@@ -43,25 +58,29 @@ export function WorkspaceLayout() {
         </button>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-          <NavLink
-            to={`/w/${workspaceId}/search`}
-            className={({ isActive }) => navClass(isActive)}
-          >
-            <Icon name="search" /> Search
+          <NavLink to={`/w/${workspaceId}/search`} className={({ isActive }) => navLinkClass(isActive)}>
+            <Icon name="search" className="h-4 w-4" /> Search
           </NavLink>
 
-          <p className="px-3 pb-1 pt-4 text-xs font-medium uppercase tracking-wide text-ink-muted">Objects</p>
-          {objectTypes
-            ?.slice()
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((type) => (
-              <NavLink key={type.id} to={`/w/${workspaceId}/types/${type.key}`} className={({ isActive }) => navClass(isActive)}>
-                <Icon name={type.icon} /> {type.name}
-              </NavLink>
-            ))}
+          {pinnedIds.length > 0 && (
+            <div className="mt-3">
+              <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Pinned</p>
+              <div className="space-y-0.5">
+                {pinnedIds.map((objectId) => (
+                  <PinnedNavItem key={objectId} workspaceId={workspaceId!} objectId={objectId} />
+                ))}
+              </div>
+            </div>
+          )}
 
-          <NavLink to={`/w/${workspaceId}/settings`} className={({ isActive }) => navClass(isActive)}>
-            <Icon name="settings" /> Settings
+          <RecentNavSection workspaceId={workspaceId!} />
+
+          <div className="mt-3 border-t border-border pt-2">
+            <ObjectTypeMenu workspaceId={workspaceId!} />
+          </div>
+
+          <NavLink to={`/w/${workspaceId}/settings`} className={({ isActive }) => navLinkClass(isActive)}>
+            <Icon name="settings" className="h-4 w-4" /> Settings
           </NavLink>
         </nav>
 
@@ -86,15 +105,21 @@ export function WorkspaceLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center gap-2 border-b border-border p-2 md:hidden">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
+            title="Open menu"
+          >
+            <Icon name="menu" className="h-5 w-5" />
+          </button>
+          <span className="truncate text-sm font-medium">{workspace?.name}</span>
+        </div>
+        <main className="min-w-0 flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
-}
-
-function navClass(isActive: boolean): string {
-  return `flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-    isActive ? "bg-accent/10 text-accent font-medium" : "text-ink-muted hover:bg-surface hover:text-ink"
-  }`;
 }

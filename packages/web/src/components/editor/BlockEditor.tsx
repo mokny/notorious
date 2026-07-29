@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import type { BlockType } from "@notorious/shared";
@@ -13,6 +13,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
   const queryClient = useQueryClient();
   const importInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
 
   const { data: blocks } = useQuery({ queryKey: ["blocks", objectId], queryFn: () => blockApi.list(objectId) });
   const tree = buildBlockTree(blocks ?? []);
@@ -24,7 +25,10 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
   const createMutation = useMutation({
     mutationFn: (input: { parentBlockId: string | null; afterBlockId: string | null; type: BlockType; content: Record<string, unknown> }) =>
       blockApi.create({ objectId, parentBlockId: input.parentBlockId, afterBlockId: input.afterBlockId, type: input.type, content: input.content }),
-    onSuccess: invalidate,
+    onSuccess: (createdBlock) => {
+      invalidate();
+      setPendingFocusBlockId(createdBlock.id);
+    },
   });
 
   const updateMutation = useMutation({
@@ -85,12 +89,14 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         objectId,
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
-        updateBlockContent: (blockId, content) => updateMutation.mutate({ blockId, content }),
+        updateBlockContent: (blockId, content) => updateMutation.mutateAsync({ blockId, content }).then(() => undefined),
         deleteBlock: (blockId) => deleteMutation.mutate(blockId),
         moveBlock: (blockId, parentBlockId, afterBlockId) => moveMutation.mutate({ blockId, parentBlockId, afterBlockId }),
+        pendingFocusBlockId,
+        clearPendingFocus: () => setPendingFocusBlockId(null),
       }}
     >
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button variant="ghost" onClick={() => window.open(blockApi.exportMarkdownUrl(objectId), "_blank")}>
           <Icon name="download" className="h-3.5 w-3.5" /> Export Markdown
         </Button>

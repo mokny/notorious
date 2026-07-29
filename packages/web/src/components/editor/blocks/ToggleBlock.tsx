@@ -5,7 +5,7 @@ import { Icon } from "../../ui/Icon.js";
 
 interface ToggleBlockProps {
   content: ToggleContent;
-  onSave: (content: ToggleContent) => void;
+  onSave: (content: ToggleContent) => Promise<void>;
   children: ReactNode;
 }
 

@@ -9,7 +9,7 @@ const SIZE_CLASS: Record<1 | 2 | 3, string> = {
 
 interface HeadingBlockProps {
   content: HeadingContent;
-  onSave: (content: HeadingContent) => void;
+  onSave: (content: HeadingContent) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
 }
