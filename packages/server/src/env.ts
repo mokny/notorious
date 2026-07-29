@@ -23,6 +23,12 @@ export const env = {
   databasePath: resolveFromServerRoot(process.env.DATABASE_PATH ?? "../../data/notorious.db"),
   filesDir: resolveFromServerRoot(process.env.FILES_DIR ?? "../../data/files"),
   sessionSecret: process.env.SESSION_SECRET ?? "dev-only-insecure-secret-change-me",
+  // Deliberately NOT tied to isProduction: the "Secure" cookie attribute makes
+  // browsers silently refuse to store/send the cookie over a plain HTTP
+  // connection, which would break login on any server accessed via a real
+  // hostname/IP before HTTPS is set up (see docs/DEPLOYMENT.md). Only enable
+  // this once a reverse proxy actually terminates TLS in front of the app.
+  cookieSecure: process.env.COOKIE_SECURE === "true",
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   vapidSubject: process.env.VAPID_SUBJECT ?? "mailto:admin@example.com",

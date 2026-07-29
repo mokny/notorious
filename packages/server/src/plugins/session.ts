@@ -6,6 +6,7 @@ import { sessions, users } from "../db/schema.js";
 import { newId, nowIso } from "../lib/ids.js";
 import { unauthorized } from "../lib/httpError.js";
 import { authenticateApiKey } from "../modules/apiKeys/service.js";
+import { env } from "../env.js";
 
 const SESSION_COOKIE = "notorious_sid";
 const SESSION_TTL_DAYS = 30;
@@ -74,7 +75,7 @@ export async function createSession(reply: FastifyReply, userId: string): Promis
     path: "/",
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: env.cookieSecure,
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
 }

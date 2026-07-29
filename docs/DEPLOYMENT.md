@@ -125,6 +125,10 @@ server {
 Web Push requires the app to be served over HTTPS (except on `localhost`), so a reverse proxy with a
 real TLS certificate is required before push notifications will work from outside your LAN.
 
+Once HTTPS is actually in place, set `COOKIE_SECURE=true` in `.env` and restart. Leave it `false`
+(the default) until then - browsers silently drop a `Secure` cookie sent over plain HTTP, which
+breaks login, not just push notifications.
+
 ## Option B: Docker Compose
 
 ```bash
