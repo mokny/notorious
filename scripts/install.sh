@@ -53,7 +53,11 @@ fi
 if [ "$NODE_OK" = false ]; then
   if [ "$PKG_MANAGER" = "apt" ]; then
     if ask_yes_no "Install Node.js 22.x now via NodeSource (adds an apt repository, runs as root)?" y; then
-      curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+      if [ -n "$SUDO" ]; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO -E bash -
+      else
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      fi
       $SUDO apt-get install -y nodejs
     else
       echo "Please install Node.js 20+ yourself and re-run this script." >&2
