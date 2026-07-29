@@ -17,11 +17,11 @@ interface HeadingBlockProps {
 export function HeadingBlock({ content, onSave, onEnter, onBackspaceEmpty }: HeadingBlockProps) {
   return (
     <div className={SIZE_CLASS[content.level]}>
-      <div className="flex items-center gap-2">
+      <div className="group/heading flex items-center gap-2">
         <select
           value={content.level}
           onChange={(e) => onSave({ ...content, level: Number(e.target.value) as 1 | 2 | 3 })}
-          className="rounded border border-border bg-transparent text-xs font-normal text-ink-muted"
+          className="invisible rounded border border-border bg-transparent text-xs font-normal text-ink-muted group-focus-within/heading:visible"
         >
           <option value={1}>H1</option>
           <option value={2}>H2</option>

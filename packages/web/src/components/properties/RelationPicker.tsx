@@ -77,10 +77,10 @@ function RelationPill({
   workspaceId: string;
   onRemove: () => void;
 }) {
-  const { title, icon } = useObjectTitle(objectId);
+  const { title, icon } = useObjectTitle(workspaceId, objectId);
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs">
-      <Icon name={icon ?? "file-text"} className="h-3 w-3 text-ink-muted" />
+      <Icon name={icon} className="h-3 w-3 text-ink-muted" />
       <Link to={`/w/${workspaceId}/objects/${objectId}`} className="hover:underline">
         {title}
       </Link>

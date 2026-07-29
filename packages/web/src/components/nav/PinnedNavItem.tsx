@@ -13,20 +13,22 @@ interface PinnedNavItemProps {
 }
 
 /**
- * One pinned object in the sidebar. If it has "sub-objects" (anything that
- * links back to it - the same relation data the Backlinks panel uses) they
- * are reachable via the expand chevron, without leaving the sidebar.
+ * One pinned object in the sidebar. If it has sub-objects (the universal
+ * "sub_objects" relation every object type has - see
+ * modules/schema/subObjects.ts server-side) they are reachable via the
+ * expand chevron, without leaving the sidebar.
  */
 export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
   const [expanded, setExpanded] = useState(false);
-  const { title, icon } = useObjectTitle(objectId);
+  const { title, icon } = useObjectTitle(workspaceId, objectId);
   const { toggle: togglePin } = useWorkspacePins(workspaceId);
 
-  const { data: subObjects } = useQuery({
-    queryKey: ["backlinks", objectId],
-    queryFn: () => objectApi.backlinks(objectId),
+  const { data: object } = useQuery({
+    queryKey: ["object", objectId],
+    queryFn: () => objectApi.get(objectId),
   });
-  const hasSubObjects = Boolean(subObjects && subObjects.length > 0);
+  const subObjectIds = Array.isArray(object?.values.sub_objects) ? object.values.sub_objects : [];
+  const hasSubObjects = subObjectIds.length > 0;
 
   return (
     <div>
@@ -39,7 +41,7 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
           <Icon name={expanded ? "chevron-down" : "chevron-right"} className="h-3 w-3" />
         </button>
         <NavLink to={`/w/${workspaceId}/objects/${objectId}`} className={({ isActive }) => navLinkClass(isActive) + " flex-1"}>
-          <Icon name={icon ?? "file-text"} className="h-3.5 w-3.5 shrink-0" />
+          <Icon name={icon} className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{title}</span>
         </NavLink>
         <button
@@ -53,18 +55,21 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
 
       {expanded && hasSubObjects && (
         <div className="ml-4 space-y-0.5 border-l border-border pl-2">
-          {subObjects!.map((sub) => (
-            <NavLink
-              key={sub.id}
-              to={`/w/${workspaceId}/objects/${sub.id}`}
-              className={({ isActive }) => navLinkClass(isActive, "text-xs")}
-            >
-              <Icon name={sub.icon ?? "file-text"} className="h-3 w-3 shrink-0" />
-              <span className="truncate">{sub.title}</span>
-            </NavLink>
+          {subObjectIds.map((subObjectId) => (
+            <SubObjectRow key={subObjectId} workspaceId={workspaceId} objectId={subObjectId} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function SubObjectRow({ workspaceId, objectId }: { workspaceId: string; objectId: string }) {
+  const { title, icon } = useObjectTitle(workspaceId, objectId);
+  return (
+    <NavLink to={`/w/${workspaceId}/objects/${objectId}`} className={({ isActive }) => navLinkClass(isActive, "text-xs")}>
+      <Icon name={icon} className="h-3 w-3 shrink-0" />
+      <span className="truncate">{title}</span>
+    </NavLink>
   );
 }

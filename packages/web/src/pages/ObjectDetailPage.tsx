@@ -5,10 +5,12 @@ import { objectApi, schemaApi } from "../lib/api/resources.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
+import { SubObjectsPanel } from "../components/SubObjectsPanel.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
 import { useRecentObjects } from "../hooks/useRecentObjects.js";
+import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 
 export function ObjectDetailPage() {
   const { workspaceId, objectId } = useParams<{ workspaceId: string; objectId: string }>();
@@ -30,6 +32,9 @@ export function ObjectDetailPage() {
     mutationFn: (title: string) => objectApi.update(objectId!, { title }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
   });
+  const [title, setTitle] = useDebouncedSave(object?.title ?? "", (value) =>
+    updateTitleMutation.mutateAsync(value).then(() => undefined),
+  );
 
   const completeRecurringMutation = useMutation({
     mutationFn: () => objectApi.completeRecurring(objectId!),
@@ -57,8 +62,8 @@ export function ObjectDetailPage() {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <input
-            value={object.title}
-            onChange={(e) => updateTitleMutation.mutate(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="Untitled"
             className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
           />
@@ -81,17 +86,25 @@ export function ObjectDetailPage() {
           <BlockEditor workspaceId={workspaceId} objectId={object.id} />
         </div>
 
+        <SubObjectsPanel
+          workspaceId={workspaceId}
+          objectId={object.id}
+          objectTypeId={object.objectTypeId}
+          subObjectIds={Array.isArray(object.values.sub_objects) ? object.values.sub_objects : []}
+        />
         <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
       </div>
 
       <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
         <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
-        {properties.map((property) => (
-          <div key={property.id}>
-            <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
-            <PropertyCell workspaceId={workspaceId} object={object} property={property} />
-          </div>
-        ))}
+        {properties
+          .filter((property) => property.key !== "sub_objects")
+          .map((property) => (
+            <div key={property.id}>
+              <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
+              <PropertyCell workspaceId={workspaceId} object={object} property={property} />
+            </div>
+          ))}
       </aside>
     </div>
   );

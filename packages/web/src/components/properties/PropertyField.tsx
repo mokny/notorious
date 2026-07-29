@@ -3,13 +3,14 @@ import { TagPicker } from "./TagPicker.js";
 import { RelationPicker } from "./RelationPicker.js";
 import { RatingInput } from "./RatingInput.js";
 import { FilePropertyField } from "./FilePropertyField.js";
+import { DebouncedTextInput } from "./DebouncedTextInput.js";
 
 interface PropertyFieldProps {
   property: Property;
   value: PropertyValue;
   workspaceId: string;
   objectId: string | null;
-  onChange: (value: PropertyValue) => void;
+  onChange: (value: PropertyValue) => Promise<void>;
   /** Relation values are backed by dedicated create/delete-relation endpoints, not a value PATCH. */
   onRelationAdd?: (targetObjectId: string) => void;
   onRelationRemove?: (targetObjectId: string) => void;
@@ -32,7 +33,7 @@ export function PropertyField({
 
   switch (config.type) {
     case "text":
-      return <input className={inputClass} value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} />;
+      return <DebouncedTextInput className={inputClass} value={(value as string) ?? ""} onSave={onChange} />;
 
     case "url":
       return value ? (
@@ -40,37 +41,22 @@ export function PropertyField({
           {value as string}
         </a>
       ) : (
-        <input
-          className={inputClass}
-          type="url"
-          placeholder="https://…"
-          value={(value as string) ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <DebouncedTextInput className={inputClass} type="url" placeholder="https://…" value={(value as string) ?? ""} onSave={onChange} />
       );
 
     case "email":
-      return (
-        <input
-          className={inputClass}
-          type="email"
-          value={(value as string) ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      );
+      return <DebouncedTextInput className={inputClass} type="email" value={(value as string) ?? ""} onSave={onChange} />;
 
     case "phone":
-      return (
-        <input className={inputClass} type="tel" value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} />
-      );
+      return <DebouncedTextInput className={inputClass} type="tel" value={(value as string) ?? ""} onSave={onChange} />;
 
     case "number":
       return (
-        <input
+        <DebouncedTextInput
           className={inputClass}
           type="number"
-          value={value === null || value === undefined ? "" : Number(value)}
-          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+          value={value === null || value === undefined ? "" : String(value)}
+          onSave={(v) => onChange(v === "" ? null : Number(v))}
         />
       );
 

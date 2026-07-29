@@ -5,11 +5,11 @@ const ICONS = ["💡", "⚠️", "📌", "✅", "🔥", "❗"];
 
 export function CalloutBlock({ content, onSave, onEnter }: { content: CalloutContent; onSave: (c: CalloutContent) => Promise<void>; onEnter: () => void }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg bg-accent/5 p-3">
+    <div className="group/callout flex items-start gap-2 rounded-lg bg-accent/5 p-3">
       <select
         value={content.icon}
         onChange={(e) => onSave({ ...content, icon: e.target.value })}
-        className="rounded border-none bg-transparent text-lg"
+        className="cursor-pointer rounded border-none bg-transparent text-lg opacity-50 group-focus-within/callout:opacity-100"
       >
         {ICONS.map((icon) => (
           <option key={icon} value={icon}>

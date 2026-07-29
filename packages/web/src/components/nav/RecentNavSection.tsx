@@ -34,10 +34,10 @@ export function RecentNavSection({ workspaceId }: { workspaceId: string }) {
 }
 
 function RecentNavItem({ workspaceId, objectId }: { workspaceId: string; objectId: string }) {
-  const { title, icon } = useObjectTitle(objectId);
+  const { title, icon } = useObjectTitle(workspaceId, objectId);
   return (
     <NavLink to={`/w/${workspaceId}/objects/${objectId}`} className={({ isActive }) => navLinkClass(isActive)}>
-      <Icon name={icon ?? "file-text"} className="h-3.5 w-3.5 shrink-0" />
+      <Icon name={icon} className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">{title}</span>
     </NavLink>
   );

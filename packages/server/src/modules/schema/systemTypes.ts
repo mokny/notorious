@@ -2,6 +2,7 @@ import { SYSTEM_OBJECT_TYPES, type PropertyType, type PropertyConfig } from "@no
 import { db } from "../../db/client.js";
 import { objectTypes, properties } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
+import { createSubObjectsProperty } from "./subObjects.js";
 
 function option(label: string, color: string): { id: string; label: string; color: string } {
   return { id: newId(), label, color };
@@ -200,5 +201,9 @@ export async function seedSystemObjectTypes(workspaceId: string): Promise<void> 
 
   if (propertyRows.length > 0) {
     await db.insert(properties).values(propertyRows);
+  }
+
+  for (const type of SYSTEM_OBJECT_TYPES) {
+    await createSubObjectsProperty(workspaceId, typeIdByKey[type.key]!);
   }
 }

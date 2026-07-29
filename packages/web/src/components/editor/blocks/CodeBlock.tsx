@@ -4,12 +4,12 @@ const LANGUAGES = ["text", "bash", "javascript", "typescript", "python", "json",
 
 export function CodeBlock({ content, onSave }: { content: CodeContent; onSave: (c: CodeContent) => void }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-[#0d1117]">
+    <div className="group/code overflow-hidden rounded-lg border border-border bg-[#0d1117]">
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5">
         <select
           value={content.language ?? "text"}
           onChange={(e) => onSave({ ...content, language: e.target.value })}
-          className="rounded bg-transparent text-xs text-slate-300"
+          className="invisible rounded bg-transparent text-xs text-slate-300 group-focus-within/code:visible"
         >
           {LANGUAGES.map((lang) => (
             <option key={lang} value={lang} className="bg-[#0d1117]">

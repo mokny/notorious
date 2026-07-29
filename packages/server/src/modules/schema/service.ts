@@ -12,6 +12,7 @@ import { db } from "../../db/client.js";
 import { objectTypes, properties } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
+import { createSubObjectsProperty } from "./subObjects.js";
 
 /**
  * The `type` field is stored redundantly inside the JSON `config` blob (as the
@@ -72,6 +73,7 @@ export async function createObjectType(
     isSystem: false,
     createdAt: nowIso(),
   });
+  await createSubObjectsProperty(workspaceId, id);
 
   return { id, workspaceId, key: input.key, name: input.name, icon: input.icon, isSystem: false };
 }

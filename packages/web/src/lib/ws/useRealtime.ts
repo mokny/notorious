@@ -25,10 +25,16 @@ export function useRealtime(workspaceId: string | undefined): void {
       const payload = JSON.parse(event.data) as RealtimeEvent;
 
       if (payload.entity === "object") {
-        queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
-        queryClient.invalidateQueries({ queryKey: ["object", payload.entityId] });
-        queryClient.invalidateQueries({ queryKey: ["viewResults"] });
-        queryClient.invalidateQueries({ queryKey: ["backlinks", payload.entityId] });
+        // Same reasoning as the "block" case below: title/property edits are
+        // debounced-saved per keystroke too (see useDebouncedSave), so
+        // refetching our own echoed change can race an active edit and
+        // revert it. Other users' changes still come through normally.
+        if (payload.actorId !== currentUserId) {
+          queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
+          queryClient.invalidateQueries({ queryKey: ["object", payload.entityId] });
+          queryClient.invalidateQueries({ queryKey: ["viewResults"] });
+          queryClient.invalidateQueries({ queryKey: ["backlinks", payload.entityId] });
+        }
       } else if (payload.entity === "block") {
         // Block-save events fire on every debounced keystroke. Skip the
         // refetch for changes we made ourselves - our own editor already has

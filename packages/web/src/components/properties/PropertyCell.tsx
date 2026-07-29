@@ -18,7 +18,7 @@ export function PropertyCell({ workspaceId, object, property }: PropertyCellProp
       value={object.values[property.key] ?? null}
       workspaceId={workspaceId}
       objectId={object.id}
-      onChange={(value) => void mutations.updateValue(object.id, property.key, value)}
+      onChange={(value) => mutations.updateValue(object.id, property.key, value)}
       onRelationAdd={(targetId) => void mutations.addRelation(object.id, property, targetId)}
       onRelationRemove={(targetId) => void mutations.removeRelation(object.id, property, targetId)}
     />
