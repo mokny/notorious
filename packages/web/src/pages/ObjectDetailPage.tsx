@@ -31,7 +31,10 @@ export function ObjectDetailPage() {
 
   const updateTitleMutation = useMutation({
     mutationFn: (title: string) => objectApi.update(objectId!, { title }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["object", objectId] });
+      void queryClient.invalidateQueries({ queryKey: ["recentEdits", workspaceId] });
+    },
   });
   const [title, setTitle] = useDebouncedSave(object?.title ?? "", (value) =>
     updateTitleMutation.mutateAsync(value).then(() => undefined),

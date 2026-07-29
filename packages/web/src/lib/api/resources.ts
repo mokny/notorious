@@ -57,6 +57,7 @@ export const workspaceApi = {
   invites: (id: string) => apiRequest<WorkspaceInvite[]>(`/api/v1/workspaces/${id}/invites`),
   revokeInvite: (id: string, inviteId: string) =>
     apiRequest<void>(`/api/v1/workspaces/${id}/invites/${inviteId}`, { method: "DELETE" }),
+  recentEdits: (id: string) => apiRequest<string[]>(`/api/v1/workspaces/${id}/recent-edits`),
 };
 
 export const schemaApi = {

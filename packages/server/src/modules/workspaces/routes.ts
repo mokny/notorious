@@ -33,6 +33,13 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     return workspaceService.getWorkspace(id);
   });
 
+  app.get("/api/v1/workspaces/:id/recent-edits", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    return workspaceService.listRecentlyEditedObjectIds(id, user.id, 8);
+  });
+
   app.patch("/api/v1/workspaces/:id", async (request) => {
     const user = requireUser(request);
     const { id } = request.params as { id: string };

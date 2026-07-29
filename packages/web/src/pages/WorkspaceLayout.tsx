@@ -12,6 +12,7 @@ import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
 import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
 import { RecentNavSection } from "../components/nav/RecentNavSection.js";
+import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 
 export function WorkspaceLayout() {
@@ -71,6 +72,7 @@ export function WorkspaceLayout() {
               <Icon name="layout-dashboard" className="h-4 w-4" /> Dashboard
             </NavLink>
           )}
+          <ObjectTypeMenu workspaceId={workspaceId!} />
           <NavLink to={`/w/${workspaceId}/search`} className={({ isActive }) => navLinkClass(isActive)}>
             <Icon name="search" className="h-4 w-4" /> Search
           </NavLink>
@@ -91,14 +93,13 @@ export function WorkspaceLayout() {
           )}
 
           <RecentNavSection workspaceId={workspaceId!} />
+          <RecentlyEditedNavSection workspaceId={workspaceId!} />
 
           <div className="mt-3 border-t border-border pt-2">
-            <ObjectTypeMenu workspaceId={workspaceId!} />
+            <NavLink to={`/w/${workspaceId}/settings`} className={({ isActive }) => navLinkClass(isActive)}>
+              <Icon name="settings" className="h-4 w-4" /> Settings
+            </NavLink>
           </div>
-
-          <NavLink to={`/w/${workspaceId}/settings`} className={({ isActive }) => navLinkClass(isActive)}>
-            <Icon name="settings" className="h-4 w-4" /> Settings
-          </NavLink>
         </nav>
 
         <div className="flex items-center justify-between border-t border-border p-3">

@@ -159,12 +159,17 @@ function defaultPropertiesFor(
       ];
     case "file":
       return [{ key: "attachment", name: "Attachment", type: "file", config: { type: "file" } }];
+    case "bookmark":
+      return [
+        { key: "url", name: "URL", type: "url", config: { type: "url" } },
+        { key: "description", name: "Description", type: "text", config: { type: "text" } },
+      ];
     default:
       return [];
   }
 }
 
-/** Creates the 10 built-in object types (and their default properties) for a new workspace. */
+/** Creates the 11 built-in object types (and their default properties) for a new workspace. */
 export async function seedSystemObjectTypes(workspaceId: string): Promise<void> {
   const createdAt = nowIso();
   const typeIdByKey: Record<string, string> = {};

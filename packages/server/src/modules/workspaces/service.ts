@@ -1,4 +1,4 @@
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, isNotNull, desc, max } from "drizzle-orm";
 import type {
   CreateWorkspaceInput,
   UpdateWorkspaceInput,
@@ -8,7 +8,7 @@ import type {
   WorkspaceInvite,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { workspaces, workspaceMembers, workspaceInvites, users } from "../../db/schema.js";
+import { workspaces, workspaceMembers, workspaceInvites, users, activityLog, objects } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { seedSystemObjectTypes } from "../schema/systemTypes.js";
@@ -161,4 +161,29 @@ export async function revokeInvite(workspaceId: string, inviteId: string): Promi
     .update(workspaceInvites)
     .set({ status: "revoked" })
     .where(and(eq(workspaceInvites.id, inviteId), eq(workspaceInvites.workspaceId, workspaceId), ne(workspaceInvites.status, "accepted")));
+}
+
+/**
+ * Object ids this user has actually edited in this workspace (object
+ * updates, block changes, relation changes - anything recorded via
+ * `recordAndBroadcast`), most-recently-edited first. Distinct from "recently
+ * viewed" (a purely client-side, per-device list of what was opened) - this
+ * is server-side truth about what was *changed*, sourced from the activity
+ * log and shared across whichever device the user is on.
+ */
+export async function listRecentlyEditedObjectIds(
+  workspaceId: string,
+  actorId: string,
+  limit: number,
+): Promise<string[]> {
+  const rows = await db
+    .select({ objectId: activityLog.objectId, lastEditedAt: max(activityLog.createdAt) })
+    .from(activityLog)
+    .innerJoin(objects, eq(objects.id, activityLog.objectId))
+    .where(and(eq(activityLog.workspaceId, workspaceId), eq(activityLog.actorId, actorId), isNotNull(activityLog.objectId)))
+    .groupBy(activityLog.objectId)
+    .orderBy(desc(max(activityLog.createdAt)))
+    .limit(limit);
+
+  return rows.map((row) => row.objectId!);
 }

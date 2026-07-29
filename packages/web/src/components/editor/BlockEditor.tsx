@@ -32,6 +32,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ["blocks", objectId] });
+    void queryClient.invalidateQueries({ queryKey: ["recentEdits", workspaceId] });
   }
 
   const createMutation = useMutation({

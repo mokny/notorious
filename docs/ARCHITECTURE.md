@@ -21,8 +21,8 @@ both the API and the UI are forced (by the type checker) to stay in sync with.
 
 Everything an object type + properties combo can describe, deliberately stays uniform:
 
-- **`object_types`** - the 10 built-in types (Note, Project, Task, Person, Book, Meeting, Company,
-  File, Database, Collection) are seeded per-workspace when a workspace is created (see
+- **`object_types`** - the built-in types (Note, Project, Task, Person, Book, Meeting, Company,
+  File, Database, Collection, Bookmark) are seeded per-workspace when a workspace is created (see
   `modules/schema/systemTypes.ts`), and users can add their own on top. Seeding per-workspace (rather
   than sharing one global row) means one workspace's custom properties on "Task" never leak into
   another workspace's Task objects.

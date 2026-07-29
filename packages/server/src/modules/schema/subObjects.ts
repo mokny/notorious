@@ -8,7 +8,7 @@ export const SUB_OBJECTS_PROPERTY_KEY = "sub_objects";
  * Every object type gets this relation property so any object can have child
  * "sub-objects" of any type, regardless of what other properties that type
  * defines (unlike Task's parent_task, which only links other Tasks). Called
- * both when seeding the 10 system types for a new workspace and when a user
+ * both when seeding the system types for a new workspace and when a user
  * creates a custom object type - see migrations/0004_universal_sub_objects.sql
  * for backfilling object types that already existed before this shipped.
  */

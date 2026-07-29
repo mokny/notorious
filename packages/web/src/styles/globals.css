@@ -45,7 +45,7 @@ body {
 }
 
 .slash-menu {
-  @apply w-64 overflow-hidden rounded-lg border border-border bg-surface-raised p-1 shadow-xl;
+  @apply w-64 max-h-80 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-xl;
 }
 .slash-item {
   @apply flex w-full flex-col items-start gap-0 rounded-md px-2 py-1.5 text-left text-sm;

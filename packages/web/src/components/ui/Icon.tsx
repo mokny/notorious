@@ -33,6 +33,8 @@ import {
   Menu,
   Clock,
   LayoutDashboard,
+  Pencil,
+  Bookmark,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +73,8 @@ const ICONS: Record<string, LucideIcon> = {
   menu: Menu,
   clock: Clock,
   "layout-dashboard": LayoutDashboard,
+  pencil: Pencil,
+  bookmark: Bookmark,
 };
 
 export function Icon({ name, className }: { name: string; className?: string }) {

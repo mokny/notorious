@@ -17,6 +17,7 @@ export function useObjectMutations(workspaceId: string): ObjectMutations {
       queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
       queryClient.invalidateQueries({ queryKey: ["viewResults"] }),
       queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] }),
+      queryClient.invalidateQueries({ queryKey: ["recentEdits", workspaceId] }),
     ]);
   }
 
