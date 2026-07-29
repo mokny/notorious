@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Bumps the project's patch version on every commit (see README.md#versioning)
+# and stages the result so it's part of the commit being made.
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+node "$REPO_ROOT/scripts/bump-version.mjs"
+git add "$REPO_ROOT/package.json"

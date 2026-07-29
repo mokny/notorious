@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: 255 255 255;
+  --surface-raised: 248 250 252;
+  --ink: 15 23 42;
+  --ink-muted: 100 116 139;
+  --accent: 99 102 241;
+  --border: 226 232 240;
+}
+
+.dark {
+  --surface: 15 17 26;
+  --surface-raised: 24 27 39;
+  --ink: 241 245 249;
+  --ink-muted: 148 163 184;
+  --accent: 129 140 248;
+  --border: 39 43 60;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+body {
+  @apply bg-surface text-ink antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+.glass {
+  background: rgb(var(--surface-raised) / 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink-muted) / 0.3);
+  border-radius: 999px;
+}
+
+.slash-menu {
+  @apply w-64 overflow-hidden rounded-lg border border-border bg-surface-raised p-1 shadow-xl;
+}
+.slash-item {
+  @apply flex w-full flex-col items-start gap-0 rounded-md px-2 py-1.5 text-left text-sm;
+}
+.slash-item strong {
+  @apply font-medium text-ink;
+}
+.slash-item span {
+  @apply text-xs text-ink-muted;
+}
+.slash-item-active,
+.slash-item:hover {
+  @apply bg-accent/10;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: rgb(var(--ink-muted));
+  pointer-events: none;
+  height: 0;
+}

@@ -1,0 +1,43 @@
+{
+  "name": "notorious",
+  "private": true,
+  "version": "0.0.2",
+  "type": "module",
+  "description": "Self-hosted, multi-user notes and knowledge base application",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
+    "dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev --workspace=packages/server",
+    "dev:web": "npm run dev --workspace=packages/web",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/web",
+    "start": "npm run start --workspace=packages/server",
+    "start:prod": "npm run migrate:prod --workspace=packages/server && npm run start --workspace=packages/server",
+    "migrate": "npm run migrate --workspace=packages/server",
+    "create-user": "npm run create-user:prod --workspace=packages/server --",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.7.2"
+  },
+  "allowScripts": {
+    "argon2@0.41.1": true,
+    "better-sqlite3@13.0.2": true,
+    "fsevents@2.3.3": true,
+    "esbuild": true
+  }
+}

@@ -1,0 +1,17 @@
+services:
+  notorious:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: "${SESSION_SECRET:?set a random 64-char hex secret in .env, e.g. output of 'openssl rand -hex 32'}"
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+    volumes:
+      - notorious-data:/app/data
+
+volumes:
+  notorious-data:

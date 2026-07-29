@@ -1,0 +1,267 @@
+import { eq, and, isNull, isNotNull, desc } from "drizzle-orm";
+import type {
+  CreateObjectInput,
+  UpdateObjectInput,
+  CreateRelationInput,
+  ObjectRecord,
+  Relation,
+  ViewFilter,
+  ViewSort,
+} from "@notorious/shared";
+import { db } from "../../db/client.js";
+import { objects, relations, objectValues } from "../../db/schema.js";
+import { newId, nowIso } from "../../lib/ids.js";
+import { notFound } from "../../lib/httpError.js";
+import { listProperties } from "../schema/service.js";
+import { resolveValuesForObjects } from "./valueResolver.js";
+import { applyFilters, compareForSort, MAX_SCAN } from "./query.js";
+import { reindexObjectBody, removeFromIndex } from "../search/indexer.js";
+
+function toRecord(row: typeof objects.$inferSelect, values: Record<string, unknown>): ObjectRecord {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    objectTypeId: row.objectTypeId,
+    title: row.title,
+    icon: row.icon,
+    cover: row.cover,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    archivedAt: row.archivedAt,
+    values: values as ObjectRecord["values"],
+  };
+}
+
+export async function createObject(
+  workspaceId: string,
+  userId: string,
+  input: CreateObjectInput,
+): Promise<ObjectRecord> {
+  const id = newId();
+  const now = nowIso();
+
+  await db.insert(objects).values({
+    id,
+    workspaceId,
+    objectTypeId: input.objectTypeId,
+    title: input.title,
+    icon: input.icon ?? null,
+    cover: input.cover ?? null,
+    createdBy: userId,
+    createdAt: now,
+    updatedAt: now,
+    archivedAt: null,
+  });
+
+  if (Object.keys(input.values).length > 0) {
+    await writeStoredValues(id, input.objectTypeId, input.values);
+  }
+
+  await reindexObjectBody(id, input.title);
+  return getObject(id);
+}
+
+export async function getObjectWorkspaceId(objectId: string): Promise<string> {
+  const rows = await db
+    .select({ workspaceId: objects.workspaceId })
+    .from(objects)
+    .where(eq(objects.id, objectId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Object not found");
+  return row.workspaceId;
+}
+
+export async function getObject(objectId: string): Promise<ObjectRecord> {
+  const rows = await db.select().from(objects).where(eq(objects.id, objectId)).limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Object not found");
+
+  const props = await listProperties(row.objectTypeId);
+  const values = await resolveValuesForObjects([objectId], props);
+  return toRecord(row, values.get(objectId) ?? {});
+}
+
+export async function updateObject(
+  objectId: string,
+  input: UpdateObjectInput,
+): Promise<ObjectRecord> {
+  const existing = await db.select().from(objects).where(eq(objects.id, objectId)).limit(1);
+  const row = existing[0];
+  if (!row) throw notFound("Object not found");
+
+  const patch: Partial<typeof objects.$inferInsert> = { updatedAt: nowIso() };
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.icon !== undefined) patch.icon = input.icon;
+  if (input.cover !== undefined) patch.cover = input.cover;
+
+  await db.update(objects).set(patch).where(eq(objects.id, objectId));
+
+  if (input.values && Object.keys(input.values).length > 0) {
+    await writeStoredValues(objectId, row.objectTypeId, input.values);
+  }
+
+  await reindexObjectBody(objectId, input.title ?? row.title);
+  return getObject(objectId);
+}
+
+async function writeStoredValues(
+  objectId: string,
+  objectTypeId: string,
+  values: Record<string, unknown>,
+): Promise<void> {
+  const props = await listProperties(objectTypeId);
+  const propertyByKey = new Map(props.map((p) => [p.key, p]));
+
+  for (const [key, value] of Object.entries(values)) {
+    const property = propertyByKey.get(key);
+    if (!property || ["relation", "formula", "rollup"].includes(property.type)) continue;
+
+    await db
+      .insert(objectValues)
+      .values({ objectId, propertyId: property.id, value: JSON.stringify(value) })
+      .onConflictDoUpdate({
+        target: [objectValues.objectId, objectValues.propertyId],
+        set: { value: JSON.stringify(value) },
+      });
+  }
+}
+
+export async function archiveObject(objectId: string): Promise<void> {
+  await db.update(objects).set({ archivedAt: nowIso() }).where(eq(objects.id, objectId));
+}
+
+export async function restoreObject(objectId: string): Promise<void> {
+  await db.update(objects).set({ archivedAt: null }).where(eq(objects.id, objectId));
+}
+
+export async function deleteObject(objectId: string): Promise<void> {
+  await db.delete(objects).where(eq(objects.id, objectId));
+  removeFromIndex(objectId);
+}
+
+export interface QueryObjectsOptions {
+  objectTypeId?: string;
+  archived: boolean;
+  filters?: ViewFilter[];
+  sorts?: ViewSort[];
+  cursor?: string;
+  limit: number;
+}
+
+export interface QueryObjectsResult {
+  items: ObjectRecord[];
+  nextCursor: string | null;
+}
+
+/** Shared query engine used by both the plain object list endpoint and saved views. */
+export async function queryObjects(
+  workspaceId: string,
+  options: QueryObjectsOptions,
+): Promise<QueryObjectsResult> {
+  const conditions = [
+    eq(objects.workspaceId, workspaceId),
+    options.archived ? isNotNull(objects.archivedAt) : isNull(objects.archivedAt),
+  ];
+  if (options.objectTypeId) conditions.push(eq(objects.objectTypeId, options.objectTypeId));
+
+  const rows = await db
+    .select()
+    .from(objects)
+    .where(and(...conditions))
+    .orderBy(desc(objects.updatedAt))
+    .limit(MAX_SCAN);
+
+  if (rows.length === 0) return { items: [], nextCursor: null };
+
+  const propsByType = new Map<string, Awaited<ReturnType<typeof listProperties>>>();
+  for (const row of rows) {
+    if (!propsByType.has(row.objectTypeId)) {
+      propsByType.set(row.objectTypeId, await listProperties(row.objectTypeId));
+    }
+  }
+
+  const objectIds = rows.map((r) => r.id);
+  const allProps = [...propsByType.values()].flat();
+  const valuesByObject = await resolveValuesForObjects(objectIds, allProps);
+
+  let records = rows.map((row) => toRecord(row, valuesByObject.get(row.id) ?? {}));
+
+  if (options.filters && options.filters.length > 0) {
+    const props = propsByType.get(rows[0]!.objectTypeId) ?? allProps;
+    const keyByPropertyId = new Map(props.map((p) => [p.id, p.key]));
+    records = records.filter((r) => applyFilters(r.values, options.filters!, keyByPropertyId));
+  }
+
+  if (options.sorts && options.sorts.length > 0) {
+    const props = propsByType.get(rows[0]!.objectTypeId) ?? allProps;
+    const keyByPropertyId = new Map(props.map((p) => [p.id, p.key]));
+    records = [...records].sort((a, b) => compareForSort(a.values, b.values, options.sorts!, keyByPropertyId));
+  }
+
+  const offset = options.cursor ? Number(options.cursor) || 0 : 0;
+  const page = records.slice(offset, offset + options.limit);
+  const nextCursor = offset + options.limit < records.length ? String(offset + options.limit) : null;
+
+  return { items: page, nextCursor };
+}
+
+export async function createRelation(
+  workspaceId: string,
+  input: CreateRelationInput,
+): Promise<Relation> {
+  const id = newId();
+  const createdAt = nowIso();
+  await db
+    .insert(relations)
+    .values({
+      id,
+      workspaceId,
+      propertyId: input.propertyId,
+      sourceObjectId: input.sourceObjectId,
+      targetObjectId: input.targetObjectId,
+      createdAt,
+    })
+    .onConflictDoNothing();
+
+  return { id, workspaceId, propertyId: input.propertyId, sourceObjectId: input.sourceObjectId, targetObjectId: input.targetObjectId, createdAt };
+}
+
+export async function deleteRelation(relationId: string): Promise<void> {
+  await db.delete(relations).where(eq(relations.id, relationId));
+}
+
+/**
+ * Deletes a relation by its (property, source, target) triple. The API only
+ * ever hands clients the *target object ids* for a relation property (see
+ * `resolveValuesForObjects`), never the relation row's own id, so unlinking
+ * from the property editor goes through this instead of `deleteRelation`.
+ */
+export async function deleteRelationByTriple(
+  propertyId: string,
+  sourceObjectId: string,
+  targetObjectId: string,
+): Promise<void> {
+  await db
+    .delete(relations)
+    .where(
+      and(
+        eq(relations.propertyId, propertyId),
+        eq(relations.sourceObjectId, sourceObjectId),
+        eq(relations.targetObjectId, targetObjectId),
+      ),
+    );
+}
+
+/** Objects that link *to* this object (regardless of which relation property was used). */
+export async function listBacklinks(objectId: string): Promise<ObjectRecord[]> {
+  const rows = await db.select().from(relations).where(eq(relations.targetObjectId, objectId));
+  const sourceIds = [...new Set(rows.map((r) => r.sourceObjectId))];
+
+  const results: ObjectRecord[] = [];
+  for (const id of sourceIds) {
+    results.push(await getObject(id));
+  }
+  return results;
+}

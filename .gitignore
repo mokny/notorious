@@ -1,0 +1,18 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+
+# runtime data (owner backups them up separately, see docs/DEPLOYMENT.md)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/files/*
+!data/files/.gitkeep
+
+.DS_Store
+*.tsbuildinfo
+coverage/

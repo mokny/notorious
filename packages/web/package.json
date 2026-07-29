@@ -1,0 +1,53 @@
+{
+  "name": "@notorious/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@notorious/shared": "*",
+    "@radix-ui/react-dialog": "^1.1.4",
+    "@radix-ui/react-dropdown-menu": "^2.1.4",
+    "@radix-ui/react-select": "^2.1.4",
+    "@radix-ui/react-tabs": "^1.1.2",
+    "@radix-ui/react-toast": "^1.2.4",
+    "@radix-ui/react-tooltip": "^1.1.6",
+    "@tanstack/react-query": "^5.62.7",
+    "@tanstack/react-virtual": "^3.10.9",
+    "@tiptap/core": "^2.10.4",
+    "@tiptap/extension-link": "^2.10.4",
+    "@tiptap/extension-placeholder": "^2.10.4",
+    "@tiptap/react": "^2.10.4",
+    "@tiptap/starter-kit": "^2.10.4",
+    "@tiptap/suggestion": "^2.10.4",
+    "katex": "^0.16.11",
+    "lucide-react": "^0.462.0",
+    "mermaid": "^11.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "tippy.js": "^6.3.7",
+    "tiptap-markdown": "^0.8.10",
+    "workbox-precaching": "^7.3.0"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.7",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.1",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}
