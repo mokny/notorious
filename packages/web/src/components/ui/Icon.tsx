@@ -77,7 +77,39 @@ const ICONS: Record<string, LucideIcon> = {
   bookmark: Bookmark,
 };
 
+function isImageUrl(value: string): boolean {
+  return (
+    value.startsWith("/api/v1/files/") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:image/")
+  );
+}
+
+/**
+ * `name` is usually one of the slugs registered above (an object *type*'s
+ * default icon, or a chrome icon like "trash"), but an individual object can
+ * override it with a custom emoji or an uploaded image (see IconPicker) - a
+ * string that was never meant to match this registry. Anything not
+ * recognized as a slug is rendered as-is instead of silently falling back to
+ * a generic file icon: a URL becomes an `<img>`, anything else (an emoji,
+ * typically) is rendered as literal text.
+ */
 export function Icon({ name, className }: { name: string; className?: string }) {
-  const Component = ICONS[name] ?? FileText;
+  if (!name) return <FileText className={className ?? "h-4 w-4"} />;
+
+  if (isImageUrl(name)) {
+    return <img src={name} alt="" className={`${className ?? "h-4 w-4"} shrink-0 rounded object-cover`} />;
+  }
+
+  const Component = ICONS[name];
+  if (!Component) {
+    return (
+      <span className={`${className ?? "h-4 w-4"} inline-flex shrink-0 items-center justify-center text-base leading-none`}>
+        {name}
+      </span>
+    );
+  }
+
   return <Component className={className ?? "h-4 w-4"} />;
 }

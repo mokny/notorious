@@ -11,7 +11,9 @@ const propertyValueSchema = z.union([
 export const createObjectSchema = z.object({
   objectTypeId: z.string(),
   title: z.string().max(2000).default("Untitled"),
-  icon: z.string().max(16).nullable().optional(),
+  // Long enough for an uploaded icon's file URL (e.g. "/api/v1/files/<uuid>"),
+  // not just a short emoji or Lucide icon-name slug.
+  icon: z.string().max(500).nullable().optional(),
   cover: z.string().max(2000).nullable().optional(),
   values: z.record(z.string(), propertyValueSchema).default({}),
 });
@@ -19,7 +21,9 @@ export type CreateObjectInput = z.infer<typeof createObjectSchema>;
 
 export const updateObjectSchema = z.object({
   title: z.string().max(2000).optional(),
-  icon: z.string().max(16).nullable().optional(),
+  // Long enough for an uploaded icon's file URL (e.g. "/api/v1/files/<uuid>"),
+  // not just a short emoji or Lucide icon-name slug.
+  icon: z.string().max(500).nullable().optional(),
   cover: z.string().max(2000).nullable().optional(),
   values: z.record(z.string(), propertyValueSchema).optional(),
 });

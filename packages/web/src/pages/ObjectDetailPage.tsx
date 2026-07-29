@@ -6,6 +6,8 @@ import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
 import { SubObjectsPanel } from "../components/SubObjectsPanel.js";
+import { IconPicker } from "../components/IconPicker.js";
+import { CoverImage } from "../components/CoverImage.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
@@ -27,6 +29,12 @@ export function ObjectDetailPage() {
     queryKey: ["properties", object?.objectTypeId],
     queryFn: () => schemaApi.properties(object!.objectTypeId),
     enabled: Boolean(object),
+  });
+
+  const { data: objectTypes } = useQuery({
+    queryKey: ["objectTypes", workspaceId],
+    queryFn: () => schemaApi.objectTypes(workspaceId!),
+    enabled: Boolean(workspaceId),
   });
 
   const updateTitleMutation = useMutation({
@@ -98,72 +106,83 @@ export function ObjectDetailPage() {
   const hasRecurrence = properties.some((p) => p.key === "recurrence");
   const pinned = isPinned(object.id);
   const isDashboard = workspace?.dashboardObjectId === object.id;
+  const objectType = objectTypes?.find((type) => type.id === object.objectTypeId);
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Untitled"
-            className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
+    <div>
+      <CoverImage workspaceId={workspaceId} objectId={object.id} cover={object.cover} />
+
+      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <IconPicker
+              workspaceId={workspaceId}
+              objectId={object.id}
+              icon={object.icon}
+              fallbackIcon={objectType?.icon ?? "file-text"}
+            />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Untitled"
+              className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
+            />
+            <button
+              onClick={() => togglePin(object.id)}
+              title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+              className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${pinned ? "text-accent" : "text-ink-muted"}`}
+            >
+              <Icon name={pinned ? "pin-off" : "pin"} className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => dashboardMutation.mutate(isDashboard ? null : object.id)}
+              disabled={dashboardMutation.isPending}
+              title={isDashboard ? "Remove as workspace dashboard" : "Set as workspace dashboard"}
+              className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isDashboard ? "text-accent" : "text-ink-muted"}`}
+            >
+              <Icon name="layout-dashboard" className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              title="Delete object"
+              className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
+            >
+              <Icon name="trash" className="h-4 w-4" />
+            </button>
+          </div>
+
+          {hasRecurrence && (
+            <Button variant="secondary" className="mt-3" onClick={() => completeRecurringMutation.mutate()}>
+              <Icon name="check-square" className="h-3.5 w-3.5" /> Mark done
+            </Button>
+          )}
+
+          <div className="mt-6">
+            <BlockEditor workspaceId={workspaceId} objectId={object.id} />
+          </div>
+
+          <SubObjectsPanel
+            workspaceId={workspaceId}
+            objectId={object.id}
+            objectTypeId={object.objectTypeId}
+            subObjectIds={Array.isArray(object.values.sub_objects) ? object.values.sub_objects : []}
           />
-          <button
-            onClick={() => togglePin(object.id)}
-            title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
-            className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${pinned ? "text-accent" : "text-ink-muted"}`}
-          >
-            <Icon name={pinned ? "pin-off" : "pin"} className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => dashboardMutation.mutate(isDashboard ? null : object.id)}
-            disabled={dashboardMutation.isPending}
-            title={isDashboard ? "Remove as workspace dashboard" : "Set as workspace dashboard"}
-            className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isDashboard ? "text-accent" : "text-ink-muted"}`}
-          >
-            <Icon name="layout-dashboard" className="h-4 w-4" />
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            title="Delete object"
-            className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
-          >
-            <Icon name="trash" className="h-4 w-4" />
-          </button>
+          <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
         </div>
 
-        {hasRecurrence && (
-          <Button variant="secondary" className="mt-3" onClick={() => completeRecurringMutation.mutate()}>
-            <Icon name="check-square" className="h-3.5 w-3.5" /> Mark done
-          </Button>
-        )}
-
-        <div className="mt-6">
-          <BlockEditor workspaceId={workspaceId} objectId={object.id} />
-        </div>
-
-        <SubObjectsPanel
-          workspaceId={workspaceId}
-          objectId={object.id}
-          objectTypeId={object.objectTypeId}
-          subObjectIds={Array.isArray(object.values.sub_objects) ? object.values.sub_objects : []}
-        />
-        <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
+        <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
+          {properties
+            .filter((property) => property.key !== "sub_objects")
+            .map((property) => (
+              <div key={property.id}>
+                <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
+                <PropertyCell workspaceId={workspaceId} object={object} property={property} />
+              </div>
+            ))}
+        </aside>
       </div>
-
-      <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
-        {properties
-          .filter((property) => property.key !== "sub_objects")
-          .map((property) => (
-            <div key={property.id}>
-              <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
-              <PropertyCell workspaceId={workspaceId} object={object} property={property} />
-            </div>
-          ))}
-      </aside>
     </div>
   );
 }
