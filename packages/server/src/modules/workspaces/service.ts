@@ -24,7 +24,7 @@ export async function createWorkspace(
   await db.insert(workspaceMembers).values({ workspaceId: id, userId: ownerId, role: "owner", joinedAt: createdAt });
   await seedSystemObjectTypes(id);
 
-  return { id, name: input.name, icon: input.icon, ownerId, createdAt };
+  return { id, name: input.name, icon: input.icon, ownerId, dashboardObjectId: null, createdAt };
 }
 
 export async function listWorkspacesForUser(userId: string): Promise<Workspace[]> {
@@ -34,6 +34,7 @@ export async function listWorkspacesForUser(userId: string): Promise<Workspace[]
       name: workspaces.name,
       icon: workspaces.icon,
       ownerId: workspaces.ownerId,
+      dashboardObjectId: workspaces.dashboardObjectId,
       createdAt: workspaces.createdAt,
     })
     .from(workspaceMembers)

@@ -16,6 +16,7 @@ import type {
   ToggleContent,
   ColumnsContent,
   DatabaseViewContent,
+  SubObjectContent,
 } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { ParagraphBlock } from "./blocks/ParagraphBlock.js";
@@ -32,6 +33,7 @@ import { ToggleBlock } from "./blocks/ToggleBlock.js";
 import { DividerBlock } from "./blocks/DividerBlock.js";
 import { ColumnsBlock } from "./blocks/ColumnsBlock.js";
 import { DatabaseViewBlock } from "./blocks/DatabaseViewBlock.js";
+import { SubObjectBlock } from "./blocks/SubObjectBlock.js";
 
 export interface BlockRendererProps {
   block: BlockNode;
@@ -120,6 +122,8 @@ export function BlockRenderer({
       return <ColumnsBlock content={content<ColumnsContent>()} onSave={save} renderColumn={renderColumn ?? (() => null)} />;
     case "database_view":
       return <DatabaseViewBlock content={content<DatabaseViewContent>()} workspaceId={workspaceId} onSave={save} />;
+    case "sub_object":
+      return <SubObjectBlock content={content<SubObjectContent>()} workspaceId={workspaceId} hostObjectId={objectId} onSave={save} />;
     default:
       return null;
   }

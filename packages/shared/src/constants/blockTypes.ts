@@ -16,6 +16,7 @@ export const BLOCK_TYPES = [
   "divider",
   "columns",
   "database_view",
+  "sub_object",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -39,4 +40,5 @@ export const LEAF_BLOCK_TYPES: readonly BlockType[] = [
   "mermaid",
   "divider",
   "database_view",
+  "sub_object",
 ];

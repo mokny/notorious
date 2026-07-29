@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { workspaceApi, authApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useTheme } from "../context/ThemeContext.js";
@@ -21,7 +23,13 @@ export function WorkspaceLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useRealtime(workspaceId);
-  const { pinnedIds } = useWorkspacePins(workspaceId);
+  const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
+  const pinSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  function handlePinDragEnd(event: DragEndEvent) {
+    if (!event.over || event.active.id === event.over.id) return;
+    reorder(String(event.active.id), String(event.over.id));
+  }
 
   const { data: workspace } = useQuery({
     queryKey: ["workspace", workspaceId],
@@ -58,6 +66,11 @@ export function WorkspaceLayout() {
         </button>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
+          {workspace?.dashboardObjectId && (
+            <NavLink to={`/w/${workspaceId}/objects/${workspace.dashboardObjectId}`} className={({ isActive }) => navLinkClass(isActive)}>
+              <Icon name="layout-dashboard" className="h-4 w-4" /> Dashboard
+            </NavLink>
+          )}
           <NavLink to={`/w/${workspaceId}/search`} className={({ isActive }) => navLinkClass(isActive)}>
             <Icon name="search" className="h-4 w-4" /> Search
           </NavLink>
@@ -65,11 +78,15 @@ export function WorkspaceLayout() {
           {pinnedIds.length > 0 && (
             <div className="mt-3">
               <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Pinned</p>
-              <div className="space-y-0.5">
-                {pinnedIds.map((objectId) => (
-                  <PinnedNavItem key={objectId} workspaceId={workspaceId!} objectId={objectId} />
-                ))}
-              </div>
+              <DndContext sensors={pinSensors} onDragEnd={handlePinDragEnd}>
+                <SortableContext items={pinnedIds} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-0.5">
+                    {pinnedIds.map((objectId) => (
+                      <PinnedNavItem key={objectId} workspaceId={workspaceId!} objectId={objectId} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </div>
           )}
 

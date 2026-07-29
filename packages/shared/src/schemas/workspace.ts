@@ -10,6 +10,7 @@ export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export const updateWorkspaceSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   icon: z.string().min(1).max(16).optional(),
+  dashboardObjectId: z.string().nullable().optional(),
 });
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 

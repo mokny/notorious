@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 import type { BlockType } from "@notorious/shared";
 import { blockApi, fileApi } from "../../lib/api/resources.js";
 import { buildBlockTree } from "./blockTree.js";
@@ -79,6 +80,8 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         return { columnCount: 2 };
       case "toggle":
         return { summaryMarkdown: "" };
+      case "sub_object":
+        return { objectId: null };
       default:
         return {};
     }
@@ -88,9 +91,38 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     if (!event.over || event.active.id === event.over.id) return;
     const blockId = String(event.active.id);
     const overId = String(event.over.id);
-    const overBlock = (blocks ?? []).find((b) => b.id === overId);
-    if (!overBlock) return;
-    moveMutation.mutate({ blockId, parentBlockId: overBlock.parentBlockId, afterBlockId: overBlock.id });
+    const all = blocks ?? [];
+    const draggedBlock = all.find((b) => b.id === blockId);
+    const overBlock = all.find((b) => b.id === overId);
+    if (!draggedBlock || !overBlock) return;
+
+    if (draggedBlock.parentBlockId !== overBlock.parentBlockId) {
+      // Moving into a different nesting level entirely (e.g. into another
+      // toggle/column) - there's no "old position" within that list to
+      // compare against, so just drop it right after whatever it landed on.
+      moveMutation.mutate({ blockId, parentBlockId: overBlock.parentBlockId, afterBlockId: overBlock.id });
+      return;
+    }
+
+    // Same level: `over.id` is just "which slot the pointer is over now", not
+    // "insert after this" - always inserting after it silently reversed any
+    // drag that moved a block *upward* past its target, since the block would
+    // still end up below the thing it was dropped on. Reordering the sibling
+    // list the same way dnd-kit's own list does (`arrayMove`) and reading off
+    // the block's new predecessor gives the correct side regardless of
+    // drag direction.
+    // Plain ordinal comparison, not `localeCompare` - see blockTree.ts for why
+    // locale-aware collation scrambles these fractional-indexing position keys.
+    const siblings = all
+      .filter((b) => b.parentBlockId === draggedBlock.parentBlockId)
+      .sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
+    const oldIndex = siblings.findIndex((b) => b.id === blockId);
+    const newIndex = siblings.findIndex((b) => b.id === overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(siblings, oldIndex, newIndex);
+    const draggedIndex = reordered.findIndex((b) => b.id === blockId);
+    const afterBlockId = draggedIndex > 0 ? reordered[draggedIndex - 1]!.id : null;
+    moveMutation.mutate({ blockId, parentBlockId: overBlock.parentBlockId, afterBlockId });
   }
 
   /** Uploads each dropped file and appends a block for it (image/video get a

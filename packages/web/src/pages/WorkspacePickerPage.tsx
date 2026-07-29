@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { workspaceApi, schemaApi } from "../lib/api/resources.js";
+import { workspaceApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
@@ -19,14 +19,15 @@ export function WorkspacePickerPage() {
     mutationFn: () => workspaceApi.create({ name: name || "Untitled Workspace", icon: "sparkles" }),
     onSuccess: async (workspace) => {
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      await openWorkspace(workspace.id);
+      openWorkspace(workspace.id);
     },
   });
 
-  async function openWorkspace(workspaceId: string) {
-    const types = await schemaApi.objectTypes(workspaceId);
-    const defaultType = types.find((t) => t.key === "task") ?? types[0];
-    navigate(defaultType ? `/w/${workspaceId}/types/${defaultType.key}` : `/w/${workspaceId}/search`);
+  // WorkspaceHome (the index route for "/w/:id") decides where that actually
+  // lands - the workspace's dashboard object if one is set, otherwise the
+  // same "first object type" fallback this used to compute here directly.
+  function openWorkspace(workspaceId: string) {
+    navigate(`/w/${workspaceId}`);
   }
 
   function handleCreate(event: FormEvent) {

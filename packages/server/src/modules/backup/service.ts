@@ -211,7 +211,14 @@ export async function importWorkspace(ownerId: string, zipBuffer: Buffer): Promi
     if (newObjectId) await reindexObjectBody(newObjectId, object.title);
   }
 
-  return { id: workspaceId, name: `${manifest.workspace.name} (Restored)`, icon: manifest.workspace.icon, ownerId, createdAt };
+  return {
+    id: workspaceId,
+    name: `${manifest.workspace.name} (Restored)`,
+    icon: manifest.workspace.icon,
+    ownerId,
+    dashboardObjectId: null,
+    createdAt,
+  };
 }
 
 function remapPropertyConfig(

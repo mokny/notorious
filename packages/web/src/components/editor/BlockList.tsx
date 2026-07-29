@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { BlockType } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { BlockItem } from "./BlockItem.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { SLASH_COMMAND_ITEMS } from "./SlashCommand.js";
+import { useClickOutside } from "../../hooks/useClickOutside.js";
 import { Icon } from "../ui/Icon.js";
 
 interface BlockListProps {
@@ -17,6 +18,8 @@ interface BlockListProps {
 export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: BlockListProps) {
   const { createBlockAfter } = useBlockEditor();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  useClickOutside(pickerRef, () => setPickerOpen(false), pickerOpen);
 
   return (
     <div className="space-y-0.5">
@@ -26,7 +29,7 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
         ))}
       </SortableContext>
 
-      <div className="relative">
+      <div className="relative" ref={pickerRef}>
         <button
           onClick={() => setPickerOpen((v) => !v)}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted opacity-0 hover:bg-surface-raised hover:opacity-100 group-hover:opacity-100"

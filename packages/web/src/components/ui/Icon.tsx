@@ -32,6 +32,7 @@ import {
   PinOff,
   Menu,
   Clock,
+  LayoutDashboard,
   type LucideIcon,
 } from "lucide-react";
 
@@ -69,6 +70,7 @@ const ICONS: Record<string, LucideIcon> = {
   "pin-off": PinOff,
   menu: Menu,
   clock: Clock,
+  "layout-dashboard": LayoutDashboard,
 };
 
 export function Icon({ name, className }: { name: string; className?: string }) {

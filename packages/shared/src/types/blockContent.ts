@@ -64,3 +64,7 @@ export interface DatabaseViewContent {
 export interface ToggleContent {
   summaryMarkdown: string;
 }
+/** Embeds a link to another object inline in the document, expandable to that object's own sub-objects (recursively). `objectId` is null until a target has been picked. */
+export interface SubObjectContent {
+  objectId: string | null;
+}

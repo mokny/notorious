@@ -26,6 +26,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "divider", label: "Divider", description: "Horizontal rule" },
   { type: "columns", label: "Columns", description: "Side-by-side layout" },
   { type: "database_view", label: "Linked view", description: "Embed a saved view of objects" },
+  { type: "sub_object", label: "Sub-object", description: "Embed a linked object, expandable to its own sub-objects" },
 ];
 
 /** Extension options: the host component supplies what happens when a block type is chosen. */

@@ -1,3 +1,4 @@
+import { arrayMove } from "@dnd-kit/sortable";
 import { useLocalStorageState } from "./useLocalStorageState.js";
 
 /** Objects pinned to the sidebar, per workspace. A personal, per-device preference. */
@@ -12,5 +13,14 @@ export function useWorkspacePins(workspaceId: string | undefined) {
     setPinnedIds((prev) => (prev.includes(objectId) ? prev.filter((id) => id !== objectId) : [...prev, objectId]));
   }
 
-  return { pinnedIds, isPinned, toggle };
+  function reorder(activeId: string, overId: string): void {
+    setPinnedIds((prev) => {
+      const oldIndex = prev.indexOf(activeId);
+      const newIndex = prev.indexOf(overId);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }
+
+  return { pinnedIds, isPinned, toggle, reorder };
 }

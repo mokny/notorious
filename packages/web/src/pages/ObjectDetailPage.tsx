@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { objectApi, schemaApi } from "../lib/api/resources.js";
+import { objectApi, schemaApi, workspaceApi } from "../lib/api/resources.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
@@ -15,6 +15,7 @@ import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 export function ObjectDetailPage() {
   const { workspaceId, objectId } = useParams<{ workspaceId: string; objectId: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: object } = useQuery({
     queryKey: ["object", objectId],
@@ -47,6 +48,43 @@ export function ObjectDetailPage() {
   const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
   const { addRecent } = useRecentObjects(workspaceId);
 
+  const { data: workspace } = useQuery({
+    queryKey: ["workspace", workspaceId],
+    queryFn: () => workspaceApi.get(workspaceId!),
+    enabled: Boolean(workspaceId),
+  });
+
+  const dashboardMutation = useMutation({
+    mutationFn: (dashboardObjectId: string | null) => workspaceApi.update(workspaceId!, { dashboardObjectId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => objectApi.remove(objectId!),
+    onSuccess: async () => {
+      void queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["viewResults"] });
+      queryClient.removeQueries({ queryKey: ["object", objectId] });
+      // If this was the workspace's dashboard object, the FK that pointed to
+      // it has already been cleared server-side (ON DELETE SET NULL) - but
+      // `invalidateQueries` only *schedules* a refetch; navigating before it
+      // resolves would land WorkspaceHome on the still-cached (stale)
+      // dashboardObjectId, bouncing it straight back to this now-deleted
+      // object's URL. Awaiting it first guarantees the redirect target is
+      // computed from the post-delete workspace state.
+      await queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
+      navigate(`/w/${workspaceId}`);
+    },
+  });
+
+  function handleDelete() {
+    if (!object) return;
+    const confirmed = window.confirm(
+      `"${object.title || "Untitled"}" endgültig löschen? Dateien, die nur diesem Objekt gehören, werden mitgelöscht, und Verlinkungen von anderen Objekten hierher werden entfernt. Das kann nicht rückgängig gemacht werden.`,
+    );
+    if (confirmed) deleteMutation.mutate();
+  }
+
   useEffect(() => {
     if (objectId) addRecent(objectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,6 +94,7 @@ export function ObjectDetailPage() {
 
   const hasRecurrence = properties.some((p) => p.key === "recurrence");
   const pinned = isPinned(object.id);
+  const isDashboard = workspace?.dashboardObjectId === object.id;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
@@ -73,6 +112,22 @@ export function ObjectDetailPage() {
             className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${pinned ? "text-accent" : "text-ink-muted"}`}
           >
             <Icon name={pinned ? "pin-off" : "pin"} className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => dashboardMutation.mutate(isDashboard ? null : object.id)}
+            disabled={dashboardMutation.isPending}
+            title={isDashboard ? "Remove as workspace dashboard" : "Set as workspace dashboard"}
+            className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isDashboard ? "text-accent" : "text-ink-muted"}`}
+          >
+            <Icon name="layout-dashboard" className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            title="Delete object"
+            className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
+          >
+            <Icon name="trash" className="h-4 w-4" />
           </button>
         </div>
 

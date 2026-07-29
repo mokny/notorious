@@ -8,6 +8,8 @@ import {
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole } from "./access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
+import { getObjectWorkspaceId } from "../objects/service.js";
+import { badRequest } from "../../lib/httpError.js";
 import * as workspaceService from "./service.js";
 
 export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<void> {
@@ -36,6 +38,12 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     const { id } = request.params as { id: string };
     await requireWorkspaceRole(id, user.id, "editor");
     const input = updateWorkspaceSchema.parse(request.body);
+
+    if (input.dashboardObjectId) {
+      const objectWorkspaceId = await getObjectWorkspaceId(input.dashboardObjectId);
+      if (objectWorkspaceId !== id) throw badRequest("Dashboard object must belong to this workspace");
+    }
+
     const workspace = await workspaceService.updateWorkspace(id, input);
 
     await recordAndBroadcast({

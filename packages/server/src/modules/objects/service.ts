@@ -16,6 +16,7 @@ import { listProperties } from "../schema/service.js";
 import { resolveValuesForObjects } from "./valueResolver.js";
 import { applyFilters, compareForSort, MAX_SCAN } from "./query.js";
 import { reindexObjectBody, removeFromIndex } from "../search/indexer.js";
+import { listFilesForObject, deleteFile } from "../files/service.js";
 
 function toRecord(row: typeof objects.$inferSelect, values: Record<string, unknown>): ObjectRecord {
   return {
@@ -137,8 +138,21 @@ export async function restoreObject(objectId: string): Promise<void> {
 }
 
 export async function deleteObject(objectId: string): Promise<void> {
+  // Uploaded files aren't foreign-keyed to their object (their `objectId`
+  // column is a plain string, not a reference) so deleting the object row
+  // wouldn't touch them - list them first, while we still can, so the ones
+  // that belonged only to this object (and their bytes on disk) get cleaned
+  // up too instead of turning into permanent orphans.
+  const orphanedFiles = await listFilesForObject(objectId);
+
+  // Blocks, object_values and relations (both as source and as target) are
+  // all foreign-keyed to `objects.id` with `onDelete: cascade`, so this one
+  // delete already removes the object's own content and unlinks it from
+  // every other object that referenced it - no separate cleanup needed there.
   await db.delete(objects).where(eq(objects.id, objectId));
   removeFromIndex(objectId);
+
+  await Promise.all(orphanedFiles.map((file) => deleteFile(file.id)));
 }
 
 export interface QueryObjectsOptions {

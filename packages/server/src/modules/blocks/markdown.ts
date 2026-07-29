@@ -87,7 +87,10 @@ export function blocksToMarkdown(flatBlocks: Block[]): string {
     list.push(block);
     byParent.set(block.parentBlockId, list);
   }
-  for (const list of byParent.values()) list.sort((a, b) => a.position.localeCompare(b.position));
+  // Plain ordinal comparison, not `localeCompare` - see blockTree.ts on the
+  // frontend for why locale-aware collation silently scrambles these
+  // fractional-indexing position keys.
+  for (const list of byParent.values()) list.sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
 
   const renderLevel = (parentId: string | null): string => {
     const children = byParent.get(parentId) ?? [];

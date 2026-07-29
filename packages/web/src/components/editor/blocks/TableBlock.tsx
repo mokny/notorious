@@ -50,6 +50,7 @@ export function TableBlock({
                 <input
                   value={column}
                   onChange={(e) => setColumn(index, e.target.value)}
+                  autoComplete="off"
                   className="w-full border-none bg-transparent font-medium outline-none"
                 />
               </th>
@@ -69,6 +70,7 @@ export function TableBlock({
                   <input
                     value={row[colIndex] ?? ""}
                     onChange={(e) => setCell(rowIndex, colIndex, e.target.value)}
+                    autoComplete="off"
                     className="w-full border-none bg-transparent outline-none"
                   />
                 </td>

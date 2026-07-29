@@ -37,6 +37,8 @@ export interface Workspace {
   name: string;
   icon: string;
   ownerId: string;
+  /** The single object shown when opening this workspace, and linked as "Dashboard" in the nav - null until an owner/editor sets one. */
+  dashboardObjectId: string | null;
   createdAt: ISODateString;
 }
 

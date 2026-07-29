@@ -4,6 +4,7 @@ import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { WorkspacePickerPage } from "./pages/WorkspacePickerPage.js";
 import { WorkspaceLayout } from "./pages/WorkspaceLayout.js";
+import { WorkspaceHome } from "./pages/WorkspaceHome.js";
 import { ObjectTypePage } from "./pages/ObjectTypePage.js";
 import { ObjectDetailPage } from "./pages/ObjectDetailPage.js";
 import { SearchPage } from "./pages/SearchPage.js";
@@ -45,6 +46,7 @@ export function App() {
           </RequireAuth>
         }
       >
+        <Route index element={<WorkspaceHome />} />
         <Route path="types/:objectTypeKey" element={<ObjectTypePage />} />
         <Route path="objects/:objectId" element={<ObjectDetailPage />} />
         <Route path="search" element={<SearchPage />} />

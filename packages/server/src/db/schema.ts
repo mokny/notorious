@@ -37,6 +37,11 @@ export const workspaces = sqliteTable("workspaces", {
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),
+  // Not a Drizzle-level `.references()` - `objects` itself references
+  // `workspaces`, and a mutual cycle between the two breaks TypeScript's
+  // inference for both table types. The actual foreign key (with
+  // ON DELETE SET NULL) is still enforced at the SQL level, in the migration.
+  dashboardObjectId: text("dashboard_object_id"),
   createdAt: text("created_at").notNull(),
 });
 
