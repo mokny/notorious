@@ -22,14 +22,18 @@ export default defineConfig({
           { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
-      workbox: {
-        // App-shell caching only: object/API data always goes to the network so
-        // collaborators never see stale content from the cache.
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        navigateFallbackDenylist: [/^\/api\//],
-      },
       injectManifest: {
         swSrc: "src/push-sw.ts",
+        // App-shell caching only: object/API data always goes to the network so
+        // collaborators never see stale content from the cache. Mermaid's
+        // diagram-renderer bundle (and its cytoscape/d3/dagre/katex
+        // dependencies, consolidated below into "vendor-diagrams") is
+        // deliberately excluded - it's several MB, only needed the first time
+        // someone opens a Mermaid/Math block, and reading+hashing it during
+        // this precache-manifest build step is what ran a memory-constrained
+        // server out of heap. It still loads fine on demand from the network.
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        globIgnores: ["**/vendor-diagrams-*.js"],
       },
       strategies: "injectManifest",
       srcDir: "src",
@@ -46,5 +50,20 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Mermaid pulls in cytoscape/d3/dagre/cose-bilkent for its various
+          // diagram layouts, and KaTeX is its own sizeable renderer - grouping
+          // them into one predictably-named chunk makes it possible to
+          // exclude exactly that chunk from the PWA precache manifest (see
+          // injectManifest.globIgnores above) instead of guessing at dozens
+          // of auto-hashed per-diagram-type chunk names.
+          if (/node_modules\/(mermaid|cytoscape|cose-bilkent|dagre|d3-?[\w-]*|katex)\//.test(id)) {
+            return "vendor-diagrams";
+          }
+        },
+      },
+    },
   },
 });

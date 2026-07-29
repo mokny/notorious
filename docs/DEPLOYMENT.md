@@ -175,3 +175,13 @@ existing one, so restoring is always non-destructive.
 
 See `.env.example` for the full list with defaults. The only one without a safe default is
 `SESSION_SECRET`, which must be set to a random value in any real deployment.
+
+## Build memory requirements
+
+`npm run build` (specifically the frontend's `vite build`) needs roughly 1-1.5GB of free RAM on a
+small VPS. If it's killed with "JavaScript heap out of memory", either build on a machine with more
+RAM and copy over `packages/web/dist`, or add a swap file temporarily:
+
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+```
