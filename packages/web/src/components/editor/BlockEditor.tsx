@@ -70,7 +70,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
       case "checklist":
         return { items: [] };
       case "table":
-        return { columns: ["Column 1", "Column 2"], rows: [[]] };
+        return { columns: ["Column 1", "Column 2"], rows: [["", ""]] };
       case "code":
         return { code: "", language: "text" };
       case "callout":

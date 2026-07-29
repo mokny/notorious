@@ -1,25 +1,43 @@
 import type { TableContent } from "@notorious/shared";
+import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { Icon } from "../../ui/Icon.js";
 
-export function TableBlock({ content, onSave }: { content: TableContent; onSave: (c: TableContent) => void }) {
+export function TableBlock({
+  content: externalContent,
+  onSave,
+}: {
+  content: TableContent;
+  onSave: (c: TableContent) => Promise<void>;
+}) {
+  const [content, save] = useDebouncedSave(externalContent, onSave);
   const columns = content.columns?.length ? content.columns : ["Column 1", "Column 2"];
   const rows = content.rows ?? [];
 
   function setColumn(index: number, value: string) {
-    onSave({ columns: columns.map((c, i) => (i === index ? value : c)), rows });
+    save({ columns: columns.map((c, i) => (i === index ? value : c)), rows });
   }
 
   function setCell(rowIndex: number, colIndex: number, value: string) {
-    const nextRows = rows.map((row, r) => (r === rowIndex ? row.map((cell, c) => (c === colIndex ? value : cell)) : row));
-    onSave({ columns, rows: nextRows });
+    // `.map()` over a row can only ever touch indices the row already has -
+    // rows shorter than the column count (e.g. a freshly created table's
+    // default `[]` row) would silently drop edits to any cell past their
+    // current length. Pad to the full column count first so every cell index
+    // always exists to write into.
+    const nextRows = rows.map((row, r) => {
+      if (r !== rowIndex) return row;
+      const paddedRow = columns.map((_, c) => row[c] ?? "");
+      paddedRow[colIndex] = value;
+      return paddedRow;
+    });
+    save({ columns, rows: nextRows });
   }
 
   function addColumn() {
-    onSave({ columns: [...columns, `Column ${columns.length + 1}`], rows: rows.map((row) => [...row, ""]) });
+    save({ columns: [...columns, `Column ${columns.length + 1}`], rows: rows.map((row) => [...row, ""]) });
   }
 
   function addRow() {
-    onSave({ columns, rows: [...rows, columns.map(() => "")] });
+    save({ columns, rows: [...rows, columns.map(() => "")] });
   }
 
   return (

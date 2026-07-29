@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createBlockSchema, updateBlockSchema, moveBlockSchema, importMarkdownSchema } from "@notorious/shared";
-import { requireUser } from "../../plugins/session.js";
+import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole } from "../workspaces/access.js";
 import { getObjectWorkspaceId, getObject } from "../objects/service.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
@@ -27,6 +27,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId: input.objectId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} added a block`,
       entity: "block",
@@ -51,6 +52,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} edited a block`,
       entity: "block",
@@ -74,6 +76,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} reordered a block`,
       entity: "block",
@@ -96,6 +99,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} removed a block`,
       entity: "block",
@@ -119,6 +123,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId: input.objectId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} imported Markdown content`,
       entity: "block",

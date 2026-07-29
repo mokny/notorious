@@ -66,6 +66,16 @@ export function requireUser(request: FastifyRequest): AuthenticatedUser {
   return request.user;
 }
 
+/**
+ * The requesting browser tab's self-generated id (see `lib/ws/clientId.ts`
+ * on the frontend), used to let that same tab's own realtime broadcast skip
+ * itself without also skipping the user's other open tabs.
+ */
+export function getClientId(request: FastifyRequest): string | undefined {
+  const header = request.headers["x-client-id"];
+  return typeof header === "string" ? header : undefined;
+}
+
 export async function createSession(reply: FastifyReply, userId: string): Promise<void> {
   const id = newId();
   const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();

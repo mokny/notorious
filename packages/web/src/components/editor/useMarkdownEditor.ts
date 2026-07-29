@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -85,7 +85,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
     [],
   );
 
-  return useEditor({
+  const editor = useEditor({
     extensions,
     content: options.markdown,
     editorProps,
@@ -94,4 +94,20 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       onChangeRef.current?.(storage.markdown.getMarkdown().trim());
     },
   });
+
+  // `content` above only seeds the editor once, on creation - by itself it
+  // never notices later prop changes, so a block another collaborator (or
+  // this same account's other tab) edits stays frozen at whatever it showed
+  // when this component first mounted, even though the query cache behind it
+  // has already moved on. Push those external changes in explicitly, but
+  // only while this editor is idle: if the user has it focused, they're the
+  // one actively typing, and overwriting mid-edit would fight their cursor.
+  useEffect(() => {
+    if (!editor || editor.isFocused) return;
+    const storage = editor.storage as { markdown: { getMarkdown: () => string } };
+    if (storage.markdown.getMarkdown().trim() === options.markdown.trim()) return;
+    editor.commands.setContent(options.markdown, false);
+  }, [options.markdown, editor]);
+
+  return editor;
 }

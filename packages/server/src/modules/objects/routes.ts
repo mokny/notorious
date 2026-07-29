@@ -5,7 +5,7 @@ import {
   listObjectsQuerySchema,
   createRelationSchema,
 } from "@notorious/shared";
-import { requireUser } from "../../plugins/session.js";
+import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole } from "../workspaces/access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import * as objectService from "./service.js";
@@ -23,6 +23,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       workspaceId,
       objectId: object.id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "created",
       summary: `${user.name} created "${object.title}"`,
       entity: "object",
@@ -67,6 +68,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       workspaceId,
       objectId: id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} updated "${object.title}"`,
       entity: "object",
@@ -88,6 +90,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       workspaceId,
       objectId: id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "archived",
       summary: `${user.name} archived an object`,
       entity: "object",
@@ -117,6 +120,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     await recordAndBroadcast({
       workspaceId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "deleted",
       summary: `${user.name} permanently deleted an object`,
       entity: "object",
@@ -138,6 +142,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       workspaceId,
       objectId: id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: result.next
         ? `${user.name} completed a task and scheduled the next occurrence`
@@ -168,6 +173,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     await recordAndBroadcast({
       workspaceId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} linked two objects`,
       entity: "relation",
@@ -194,6 +200,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       workspaceId,
       objectId: sourceObjectId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} removed a link between two objects`,
       entity: "relation",
@@ -213,6 +220,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     await recordAndBroadcast({
       workspaceId,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} removed a link between two objects`,
       entity: "relation",

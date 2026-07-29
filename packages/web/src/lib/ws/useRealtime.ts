@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeEvent } from "@notorious/shared";
-import { useAuth } from "../../context/AuthContext.js";
+import { clientId as myClientId } from "./clientId.js";
 
 /**
  * Opens one WebSocket connection per open workspace and invalidates the
@@ -11,8 +11,6 @@ import { useAuth } from "../../context/AuthContext.js";
 export function useRealtime(workspaceId: string | undefined): void {
   const queryClient = useQueryClient();
   const socketRef = useRef<WebSocket | null>(null);
-  const { user } = useAuth();
-  const currentUserId = user?.id;
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -28,8 +26,10 @@ export function useRealtime(workspaceId: string | undefined): void {
         // Same reasoning as the "block" case below: title/property edits are
         // debounced-saved per keystroke too (see useDebouncedSave), so
         // refetching our own echoed change can race an active edit and
-        // revert it. Other users' changes still come through normally.
-        if (payload.actorId !== currentUserId) {
+        // revert it. Compared by clientId (this browser tab), not actorId
+        // (the user) - the same account open in two tabs must still see each
+        // other's edits live, only a tab's own echo of itself gets skipped.
+        if (payload.clientId !== myClientId) {
           queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["object", payload.entityId] });
           queryClient.invalidateQueries({ queryKey: ["viewResults"] });
@@ -37,10 +37,10 @@ export function useRealtime(workspaceId: string | undefined): void {
         }
       } else if (payload.entity === "block") {
         // Block-save events fire on every debounced keystroke. Skip the
-        // refetch for changes we made ourselves - our own editor already has
-        // the authoritative text, and racing a refetch against active typing
-        // is what caused characters to occasionally get reverted/dropped.
-        if (payload.actorId !== currentUserId) {
+        // refetch for changes this tab made itself - its own editor already
+        // has the authoritative text, and racing a refetch against active
+        // typing is what caused characters to occasionally get dropped.
+        if (payload.clientId !== myClientId) {
           queryClient.invalidateQueries({ queryKey: ["blocks", payload.objectId ?? ""] });
         }
       } else if (payload.entity === "member") {
@@ -53,5 +53,5 @@ export function useRealtime(workspaceId: string | undefined): void {
     };
 
     return () => socket.close();
-  }, [workspaceId, queryClient, currentUserId]);
+  }, [workspaceId, queryClient]);
 }

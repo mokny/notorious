@@ -1,3 +1,5 @@
+import { clientId } from "../ws/clientId.js";
+
 export class ApiError extends Error {
   constructor(
     public statusCode: number,
@@ -29,7 +31,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const response = await fetch(buildUrl(path, options.query), {
     method: options.method ?? "GET",
     credentials: "include",
-    headers: options.body ? { "Content-Type": "application/json" } : undefined,
+    headers: options.body
+      ? { "Content-Type": "application/json", "X-Client-Id": clientId }
+      : { "X-Client-Id": clientId },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
@@ -47,7 +51,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 }
 
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(path, { method: "POST", credentials: "include", body: formData });
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    headers: { "X-Client-Id": clientId },
+    body: formData,
+  });
   const data = await response.json();
   if (!response.ok) throw new ApiError(response.status, data.message ?? "Upload failed");
   return data as T;

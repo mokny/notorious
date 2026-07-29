@@ -1,13 +1,14 @@
 import { useRef } from "react";
 import type { ImageContent, VideoContent, EmbedContent } from "@notorious/shared";
 import { fileApi } from "../../../lib/api/resources.js";
+import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { Icon } from "../../ui/Icon.js";
 
 interface MediaProps<T> {
   content: T;
   workspaceId: string;
   objectId: string;
-  onSave: (content: T) => void;
+  onSave: (content: T) => Promise<void>;
 }
 
 function UrlPrompt({ onSave, label }: { onSave: (url: string) => void; label: string }) {
@@ -25,8 +26,9 @@ function UrlPrompt({ onSave, label }: { onSave: (url: string) => void; label: st
   );
 }
 
-export function ImageBlock({ content, workspaceId, objectId, onSave }: MediaProps<ImageContent>) {
+export function ImageBlock({ content: externalContent, workspaceId, objectId, onSave }: MediaProps<ImageContent>) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [content, save] = useDebouncedSave(externalContent, onSave);
 
   if (content.url) {
     return (
@@ -34,7 +36,7 @@ export function ImageBlock({ content, workspaceId, objectId, onSave }: MediaProp
         <img src={content.url} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
         <input
           value={content.caption ?? ""}
-          onChange={(e) => onSave({ ...content, caption: e.target.value })}
+          onChange={(e) => save({ ...content, caption: e.target.value })}
           placeholder="Caption"
           className="mt-1 w-full border-none bg-transparent text-center text-xs text-ink-muted outline-none"
         />
@@ -44,7 +46,7 @@ export function ImageBlock({ content, workspaceId, objectId, onSave }: MediaProp
 
   return (
     <div className="space-y-2">
-      <UrlPrompt label="image" onSave={(url) => onSave({ ...content, url })} />
+      <UrlPrompt label="image" onSave={(url) => save({ ...content, url })} />
       <button onClick={() => inputRef.current?.click()} className="text-xs text-accent hover:underline">
         Or upload a file…
       </button>
@@ -57,7 +59,7 @@ export function ImageBlock({ content, workspaceId, objectId, onSave }: MediaProp
           const file = e.target.files?.[0];
           if (!file) return;
           const asset = await fileApi.upload(workspaceId, file, objectId);
-          onSave({ ...content, url: fileApi.downloadUrl(asset.id), fileId: asset.id });
+          save({ ...content, url: fileApi.downloadUrl(asset.id), fileId: asset.id });
         }}
       />
     </div>

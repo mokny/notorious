@@ -13,6 +13,8 @@ interface RecordChangeInput {
   entity: RealtimeEvent["entity"];
   entityId: string;
   realtimeAction: RealtimeEvent["action"];
+  /** The originating browser tab, so it can skip its own echoed broadcast. */
+  clientId?: string;
 }
 
 /** Writes an audit-log row and broadcasts the change to connected clients in one call. */
@@ -35,6 +37,7 @@ export async function recordAndBroadcast(input: RecordChangeInput): Promise<void
     entityId: input.entityId,
     objectId: input.objectId ?? null,
     actorId: input.actorId,
+    clientId: input.clientId,
     at,
   });
 }

@@ -164,5 +164,14 @@ export interface RealtimeEvent {
   /** The parent object id, when `entity` is "block" (omitted otherwise). */
   objectId?: string | null;
   actorId: string;
+  /**
+   * Identifies the browser tab/window that made the change (see
+   * `lib/ws/clientId.ts` on the frontend). Distinct from `actorId`: two tabs
+   * open under the same account have the same actorId but different
+   * clientIds, so clients must skip their own echo by clientId, not by user -
+   * otherwise editing the same document in two tabs as one user would look
+   * like the other tab never receives any live updates at all.
+   */
+  clientId?: string;
   at: ISODateString;
 }

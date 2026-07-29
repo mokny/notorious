@@ -5,7 +5,7 @@ import {
   inviteMemberSchema,
   updateMemberRoleSchema,
 } from "@notorious/shared";
-import { requireUser } from "../../plugins/session.js";
+import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole } from "./access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import * as workspaceService from "./service.js";
@@ -41,6 +41,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     await recordAndBroadcast({
       workspaceId: id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} updated the workspace settings`,
       entity: "member",
@@ -68,6 +69,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     await recordAndBroadcast({
       workspaceId: id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "shared",
       summary: `${user.name} invited ${input.email} to the workspace`,
       entity: "member",
@@ -89,6 +91,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     await recordAndBroadcast({
       workspaceId: id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} changed a member's role`,
       entity: "member",
@@ -108,6 +111,7 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     await recordAndBroadcast({
       workspaceId: id,
       actorId: user.id,
+      clientId: getClientId(request),
       action: "updated",
       summary: `${user.name} removed a member from the workspace`,
       entity: "member",

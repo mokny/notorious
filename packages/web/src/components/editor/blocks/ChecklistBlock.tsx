@@ -1,19 +1,27 @@
 import type { ChecklistContent } from "@notorious/shared";
+import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { Icon } from "../../ui/Icon.js";
 
-export function ChecklistBlock({ content, onSave }: { content: ChecklistContent; onSave: (c: ChecklistContent) => void }) {
+export function ChecklistBlock({
+  content: externalContent,
+  onSave,
+}: {
+  content: ChecklistContent;
+  onSave: (c: ChecklistContent) => Promise<void>;
+}) {
+  const [content, save] = useDebouncedSave(externalContent, onSave);
   const items = content.items ?? [];
 
   function updateItem(index: number, patch: Partial<(typeof items)[number]>) {
-    onSave({ items: items.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
+    save({ items: items.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
   }
 
   function addItem() {
-    onSave({ items: [...items, { markdown: "", checked: false }] });
+    save({ items: [...items, { markdown: "", checked: false }] });
   }
 
   function removeItem(index: number) {
-    onSave({ items: items.filter((_, i) => i !== index) });
+    save({ items: items.filter((_, i) => i !== index) });
   }
 
   return (

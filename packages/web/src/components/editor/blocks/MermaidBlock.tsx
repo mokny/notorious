@@ -1,7 +1,15 @@
 import { useEffect, useId, useState } from "react";
 import type { MermaidContent } from "@notorious/shared";
+import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 
-export function MermaidBlock({ content, onSave }: { content: MermaidContent; onSave: (c: MermaidContent) => void }) {
+export function MermaidBlock({
+  content: externalContent,
+  onSave,
+}: {
+  content: MermaidContent;
+  onSave: (c: MermaidContent) => Promise<void>;
+}) {
+  const [content, save] = useDebouncedSave(externalContent, onSave);
   const id = useId().replace(/:/g, "");
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +44,7 @@ export function MermaidBlock({ content, onSave }: { content: MermaidContent; onS
     <div className="space-y-2 rounded-lg border border-border p-3">
       <textarea
         value={content.code ?? ""}
-        onChange={(e) => onSave({ code: e.target.value })}
+        onChange={(e) => save({ code: e.target.value })}
         placeholder={"graph TD\n  A --> B"}
         rows={4}
         className="w-full resize-y border-none bg-transparent font-mono text-sm outline-none"
