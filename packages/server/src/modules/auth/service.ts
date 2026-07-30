@@ -1,11 +1,12 @@
 import argon2 from "argon2";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { RegisterInput, LoginInput, User } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { users, workspaceInvites, workspaceMembers } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, unauthorized } from "../../lib/httpError.js";
 import { createWorkspace } from "../workspaces/service.js";
+import { getRegistrationEnabled } from "../instanceSettings/service.js";
 
 const AVATAR_COLORS = ["#6366f1", "#22c55e", "#f97316", "#ec4899", "#0ea5e9", "#eab308"];
 
@@ -23,6 +24,11 @@ function toUser(row: typeof users.$inferSelect): User {
  * Registers a new user, creates their first personal workspace, and redeems
  * any pending invites addressed to their email so shared workspaces show up
  * immediately after sign-up.
+ *
+ * Deliberately NOT gated on the self-registration setting here (see
+ * modules/instanceSettings) - that only governs the public HTTP endpoint
+ * (see auth/routes.ts), not this function itself, which is also how
+ * `scripts/createUser.ts` provisions accounts and must always be able to.
  */
 export async function registerUser(input: RegisterInput): Promise<User> {
   const existing = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
@@ -38,6 +44,23 @@ export async function registerUser(input: RegisterInput): Promise<User> {
   await redeemPendingInvites(id, input.email);
 
   return { id, email: input.email, name: input.name, avatarColor, createdAt };
+}
+
+/**
+ * Whether `email` is allowed to self-register right now, for the public
+ * `POST /api/v1/auth/register` endpoint to check before calling
+ * `registerUser` - true if self-registration is enabled instance-wide, or
+ * regardless of that setting, if this exact email has a pending workspace
+ * invite waiting to be redeemed.
+ */
+export async function canRegisterEmail(email: string): Promise<boolean> {
+  if (await getRegistrationEnabled()) return true;
+  const invite = await db
+    .select({ id: workspaceInvites.id })
+    .from(workspaceInvites)
+    .where(and(eq(workspaceInvites.email, email), eq(workspaceInvites.status, "pending")))
+    .limit(1);
+  return Boolean(invite[0]);
 }
 
 async function redeemPendingInvites(userId: string, email: string): Promise<void> {

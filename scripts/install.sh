@@ -157,6 +157,7 @@ npm run migrate
 if ask_yes_no "Create your first user account now?" y; then
   npm run create-user
 fi
+log "Self-registration through /register is disabled by default - run 'npm run enable-registration' any time to let people sign themselves up, or keep using 'npm run create-user' to provision accounts yourself."
 
 if command -v systemctl >/dev/null 2>&1; then
   if ask_yes_no "Start Notorious automatically on system boot (systemd service, runs as user '$APP_USER')?" y; then

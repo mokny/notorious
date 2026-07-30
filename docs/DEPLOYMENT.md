@@ -50,10 +50,15 @@ npm run migrate        # creates the SQLite schema
 npm run start:prod     # runs pending migrations, then starts the server on $PORT (serves the web app too)
 ```
 
-Visit `http://your-server:4000` (or put a reverse proxy in front of it, see below), and either register
-your own account via the `/register` page, or create one from the shell: `npm run create-user` (see
-the README for details - it prompts for email/name/password, or accepts them as
-`--email=`/`--name=`/`--password=` flags for scripted use).
+Self-registration through `/register` is disabled by default - create your first account from the
+shell: `npm run create-user` (see the README for details - it prompts for email/name/password, or
+accepts them as `--email=`/`--name=`/`--password=` flags for scripted use). Visit
+`http://your-server:4000` (or put a reverse proxy in front of it, see below) to log in.
+
+If you'd rather let people sign themselves up through `/register`, run `npm run enable-registration` -
+takes effect immediately (it's a database setting, not an env var), no restart needed. Reverse it
+with `npm run disable-registration`. Either way, inviting a specific email from **Settings -> Members**
+always lets that person register to redeem the invite, regardless of this setting.
 
 ### Running it as a systemd service
 
@@ -136,12 +141,19 @@ This builds a single image (multi-stage: compiles all three packages, then a sli
 runs it with a named volume (`notorious-data`) mounted at `/app/data` - that volume is exactly the
 SQLite file + uploaded files, so backing up the volume backs up everything.
 
-Register your first account through the `/register` page, or create one from the shell without going
-through the browser:
+Self-registration through `/register` is disabled by default - create your first account from the
+shell instead:
 
 ```bash
 docker compose exec notorious node packages/server/dist/scripts/createUser.js \
   --email=you@example.com --name="Your Name" --password=a-strong-password
+```
+
+To let people sign themselves up through `/register` instead, enable it (takes effect immediately,
+no restart needed):
+
+```bash
+docker compose exec notorious node packages/server/dist/scripts/setRegistration.js --enable
 ```
 
 ### Updating

@@ -267,6 +267,15 @@ export const shareLinks = sqliteTable("share_links", {
   createdAt: text("created_at").notNull(),
 });
 
+// Singleton row (id is always 1, enforced at the SQL level in the migration)
+// for instance-wide settings - just registration for now, but a real table
+// rather than an env var so it can be toggled live via a script (see
+// scripts/setRegistration.ts) without editing .env/restarting the server.
+export const instanceSettings = sqliteTable("instance_settings", {
+  id: integer("id").primaryKey(),
+  registrationEnabled: integer("registration_enabled", { mode: "boolean" }).notNull().default(false),
+});
+
 export const pushSubscriptions = sqliteTable("push_subscriptions", {
   id: text("id").primaryKey(),
   userId: text("user_id")

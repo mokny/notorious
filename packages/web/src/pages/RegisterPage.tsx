@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { authApi } from "../lib/api/resources.js";
+import { useQuery } from "@tanstack/react-query";
+import { authApi, systemApi } from "../lib/api/resources.js";
 import { ApiError } from "../lib/api/client.js";
 import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
@@ -14,6 +15,16 @@ export function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
+
+  // Self-registration is disabled by default (see docs/DEPLOYMENT.md) - the
+  // form below still works regardless of this, since a workspace owner can
+  // invite a specific email even while it's off. This is just an upfront
+  // heads-up for anyone who landed here without an invite.
+  const { data: registrationStatus } = useQuery({
+    queryKey: ["registrationStatus"],
+    queryFn: systemApi.registrationStatus,
+    staleTime: 60_000,
+  });
 
   if (user) return <Navigate to="/" replace />;
 
@@ -39,6 +50,12 @@ export function RegisterPage() {
           <h1 className="text-2xl font-semibold">Create your account</h1>
           <p className="mt-1 text-sm text-ink-muted">A personal workspace is created automatically</p>
         </div>
+        {registrationStatus?.enabled === false && (
+          <p className="rounded-lg border border-border bg-surface-raised p-3 text-sm text-ink-muted">
+            Open registration is currently disabled on this instance. If a workspace owner invited you, you can still
+            create your account below - just use the email address the invite was sent to.
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-surface-raised p-6">
           <TextField placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required />
           <TextField type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />

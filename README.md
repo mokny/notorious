@@ -5,8 +5,10 @@ object-based editing (Note, Project, Task, Person, Book, Meeting, Company, File,
 a block editor, six view types over the same data, full-text/fuzzy search, live sync across devices,
 per-workspace ZIP backups, and Web Push notifications - all backed by a single SQLite file.
 
-There are no pre-created accounts - register your own via the `/register` page, or create one from
-the shell with `npm run create-user` (see [Creating user accounts](#creating-user-accounts)).
+There are no pre-created accounts, and self-registration through the `/register` page is **disabled
+by default** - create the first one from the shell with `npm run create-user` (see
+[Creating user accounts](#creating-user-accounts)), or run `npm run enable-registration` if you'd
+rather let people sign themselves up.
 
 Want to run it yourself? Follow [Quick start](#quick-start-local-development) below for local
 development, or [Installing on your own Linux server](#installing-on-your-own-linux-server) to deploy it.
@@ -41,8 +43,15 @@ npm run migrate
 npm run dev           # runs the API server (port 4000) and the Vite dev server (port 5173) together
 ```
 
-Open http://localhost:5173 and register an account, or create one from the shell first with
-`npm run create-user` (see [Creating user accounts](#creating-user-accounts)).
+Create your first account from the shell (self-registration is off by default):
+
+```bash
+npm run create-user --workspace=packages/server
+```
+
+Then open http://localhost:5173 and log in. (Prefer clicking through a sign-up form while developing?
+`npm run set-registration --workspace=packages/server -- --enable` turns on `/register` instead - see
+[Creating user accounts](#creating-user-accounts).)
 
 Web Push notifications need a VAPID key pair. Generate one and put it in `.env`:
 
@@ -86,9 +95,8 @@ manual steps, reverse proxy/HTTPS setup, and backup instructions.
 
 ### Creating user accounts
 
-Anyone can create their own account through the `/register` page, but if you'd rather provision
-accounts yourself (e.g. self-registration disabled by policy, or you're onboarding a teammate over
-the phone), create one from the shell instead:
+Self-registration through the `/register` page is **disabled by default** - `install.sh` walks you
+through creating your first account from the shell instead:
 
 ```bash
 npm run create-user
@@ -103,7 +111,16 @@ npm run create-user -- --email=jane@example.com --name="Jane Doe" --password=a-s
 
 This behaves exactly like registering through the UI: it creates the user, their own personal
 workspace, and redeems any pending invites for that email address. To share an existing workspace
-with them afterwards, use **Settings -> Members** (or have them log in and share it themselves).
+with them afterwards, use **Settings -> Members** (or have them log in and share it themselves) -
+inviting a specific email always works, regardless of the setting below.
+
+If you'd rather let people create their own accounts through `/register` (e.g. a small team you trust
+with open sign-up), turn it on instance-wide - takes effect immediately, no restart needed:
+
+```bash
+npm run enable-registration
+npm run disable-registration   # turn it back off later
+```
 
 ## Other useful commands
 
@@ -111,6 +128,8 @@ with them afterwards, use **Settings -> Members** (or have them log in and share
 npm run build           # builds shared -> server -> web (production output)
 npm run start:prod      # runs pending migrations, then starts the built server (serves the built web app too)
 npm run create-user     # creates a new user account from the shell (see above)
+npm run enable-registration   # lets anyone create their own account via /register
+npm run disable-registration  # back to invite/shell-only (the default)
 npm run lint            # ESLint across the whole monorepo
 npm run typecheck       # TypeScript project-wide, no emit
 ```

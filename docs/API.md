@@ -40,9 +40,10 @@ curl -b cookies.txt http://localhost:4000/api/v1/workspaces
 
 | Endpoint | Notes |
 | --- | --- |
-| `POST /api/v1/auth/register` | Creates a user + their first personal workspace; redeems any pending invites for that email |
+| `POST /api/v1/auth/register` | Creates a user + their first personal workspace; redeems any pending invites for that email. 403s unless self-registration is enabled instance-wide (`npm run enable-registration`, off by default) *or* the email has a pending workspace invite |
 | `POST /api/v1/auth/login` / `POST /api/v1/auth/logout` | Sets/clears the session cookie |
 | `GET /api/v1/auth/me` | Current user, or 401 |
+| `GET /api/v1/system/registration-status` | Unauthenticated - `{ enabled: boolean }`, so the login/register pages can show whether open sign-up is currently on |
 
 ## Workspaces & sharing
 

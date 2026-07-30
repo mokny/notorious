@@ -191,6 +191,7 @@ export const linkPreviewApi = {
 
 export const systemApi = {
   version: () => apiRequest<{ version: string }>("/api/v1/version"),
+  registrationStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/registration-status"),
 };
 
 export const shareLinkApi = {
