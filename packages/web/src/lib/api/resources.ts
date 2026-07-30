@@ -25,6 +25,7 @@ import type {
   CreateBlockInput,
   UpdateBlockInput,
   MoveBlockInput,
+  RestoreBlockInput,
   CreateViewInput,
   UpdateViewInput,
   CreateSavedSearchInput,
@@ -50,6 +51,7 @@ export const workspaceApi = {
   get: (id: string) => apiRequest<Workspace>(`/api/v1/workspaces/${id}`),
   update: (id: string, input: UpdateWorkspaceInput) =>
     apiRequest<Workspace>(`/api/v1/workspaces/${id}`, { method: "PATCH", body: input }),
+  remove: (id: string) => apiRequest<void>(`/api/v1/workspaces/${id}`, { method: "DELETE" }),
   members: (id: string) => apiRequest<WorkspaceMember[]>(`/api/v1/workspaces/${id}/members`),
   invite: (id: string, input: InviteMemberInput) =>
     apiRequest<{ status: string }>(`/api/v1/workspaces/${id}/members`, { method: "POST", body: input }),
@@ -124,6 +126,8 @@ export const blockApi = {
   update: (id: string, input: UpdateBlockInput) => apiRequest<Block>(`/api/v1/blocks/${id}`, { method: "PATCH", body: input }),
   move: (id: string, input: MoveBlockInput) => apiRequest<Block>(`/api/v1/blocks/${id}/move`, { method: "POST", body: input }),
   remove: (id: string) => apiRequest<void>(`/api/v1/blocks/${id}`, { method: "DELETE" }),
+  /** Undo/redo only - see useEditorHistory.ts. */
+  restore: (input: RestoreBlockInput) => apiRequest<Block>("/api/v1/blocks/restore", { method: "POST", body: input }),
   importMarkdown: (objectId: string, markdown: string) =>
     apiRequest<Block[]>("/api/v1/blocks/import-markdown", { method: "POST", body: { objectId, markdown } }),
   exportMarkdownUrl: (objectId: string) => `/api/v1/objects/${objectId}/export-markdown`,

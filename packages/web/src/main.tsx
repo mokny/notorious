@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.js";
 import { ThemeProvider } from "./context/ThemeContext.js";
+import { ConfirmProvider } from "./context/ConfirmContext.js";
 import { App } from "./App.js";
 import "./styles/globals.css";
 
@@ -46,11 +47,13 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </BrowserRouter>
+        <ConfirmProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </BrowserRouter>
+        </ConfirmProvider>
       </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,

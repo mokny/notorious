@@ -171,6 +171,17 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     return workspace;
   });
 
+  // Owner-only, unlike the rename/icon PATCH above (editor+): deleting the
+  // whole workspace is irreversible and takes everyone's access with it, not
+  // just a setting the owner happens to also let editors change.
+  app.delete("/api/v1/workspaces/:id", async (request, reply) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    await requireWorkspaceRole(id, user.id, "owner");
+    await workspaceService.deleteWorkspace(id);
+    reply.code(204);
+  });
+
   app.get("/api/v1/workspaces/:id/members", async (request) => {
     const user = requireUser(request);
     const { id } = request.params as { id: string };

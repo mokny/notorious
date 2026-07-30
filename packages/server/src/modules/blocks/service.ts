@@ -1,5 +1,5 @@
 import { eq, and, isNull } from "drizzle-orm";
-import type { CreateBlockInput, UpdateBlockInput, MoveBlockInput, Block } from "@notorious/shared";
+import type { CreateBlockInput, UpdateBlockInput, MoveBlockInput, RestoreBlockInput, Block } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { blocks, objects } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -142,6 +142,39 @@ export async function deleteBlock(blockId: string): Promise<void> {
 
   await db.delete(blocks).where(eq(blocks.id, blockId));
   await touchObject(row.objectId);
+}
+
+/**
+ * Re-inserts a block with its original id and position (see
+ * `restoreBlockSchema`'s doc comment for why this exists instead of just
+ * calling `createBlock` again) - the editor's undo/redo is the only caller,
+ * either bringing back a just-deleted block or redoing a create that was
+ * just undone.
+ */
+export async function restoreBlock(input: RestoreBlockInput): Promise<Block> {
+  const now = nowIso();
+  await db.insert(blocks).values({
+    id: input.id,
+    objectId: input.objectId,
+    parentBlockId: input.parentBlockId,
+    type: input.type,
+    content: JSON.stringify(input.content),
+    position: input.position,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await touchObject(input.objectId);
+
+  return {
+    id: input.id,
+    objectId: input.objectId,
+    parentBlockId: input.parentBlockId,
+    type: input.type,
+    content: input.content,
+    position: input.position,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export interface BlockTreeNode {

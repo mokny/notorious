@@ -1,8 +1,10 @@
 import { useRef, useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { workspaceApi, backupApi, systemApi, fileApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
+import { useConfirm } from "../context/ConfirmContext.js";
+import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
 import { IconPicker } from "../components/IconPicker.js";
@@ -16,6 +18,8 @@ const ROLES = ["viewer", "commenter", "editor"] as const;
 export function SettingsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const importInputRef = useRef<HTMLInputElement>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -61,27 +65,61 @@ export function SettingsPage() {
     },
   });
 
+  const renameMutation = useMutation({
+    mutationFn: (name: string) => workspaceApi.update(workspaceId!, { name }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+  const [name, setName] = useDebouncedSave(workspace?.name ?? "", (value) =>
+    renameMutation.mutateAsync(value).then(() => undefined),
+  );
+
+  const deleteWorkspaceMutation = useMutation({
+    mutationFn: () => workspaceApi.remove(workspaceId!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      navigate("/", { replace: true });
+    },
+  });
+
   function handleInvite(event: FormEvent) {
     event.preventDefault();
     inviteMutation.mutate();
+  }
+
+  async function handleDeleteWorkspace() {
+    if (!workspace) return;
+    const confirmed = await confirm({
+      title: `Delete "${workspace.name}"?`,
+      description:
+        "This deletes the entire workspace for everyone: every object, block, file, view and member's access. This cannot be undone.",
+      confirmLabel: "Delete workspace",
+      danger: true,
+    });
+    if (confirmed) deleteWorkspaceMutation.mutate();
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-10 px-6 py-10">
       <section>
         <h2 className="text-lg font-semibold">Workspace</h2>
-        <p className="mt-1 text-sm text-ink-muted">Pick an icon for "{workspace?.name}", or upload your own image.</p>
-        <div className="mt-4">
+        <p className="mt-1 text-sm text-ink-muted">Rename "{workspace?.name}", pick an icon, or upload your own image.</p>
+        <div className="mt-4 space-y-4">
           {workspace && (
-            <IconPicker
-              icon={workspace.icon}
-              fallbackIcon={workspace.icon}
-              onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon ?? "sparkles").then(() => undefined)}
-              onUploadIcon={async (file) => {
-                const asset = await fileApi.upload(workspaceId!, file);
-                return fileApi.downloadUrl(asset.id);
-              }}
-            />
+            <>
+              <TextField value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" aria-label="Workspace name" />
+              <IconPicker
+                icon={workspace.icon}
+                fallbackIcon={workspace.icon}
+                onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon ?? "sparkles").then(() => undefined)}
+                onUploadIcon={async (file) => {
+                  const asset = await fileApi.upload(workspaceId!, file);
+                  return fileApi.downloadUrl(asset.id);
+                }}
+              />
+            </>
           )}
         </div>
       </section>
@@ -204,6 +242,21 @@ export function SettingsPage() {
             />
           </div>
           {importMutation.isSuccess && <p className="mt-2 text-sm text-green-600">Restored as a new workspace - check the workspace picker.</p>}
+        </section>
+      )}
+
+      {isOwner && (
+        <section>
+          <h2 className="text-lg font-semibold text-red-500">Danger zone</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Permanently deletes this workspace for everyone - every object, block, file, view and member's access. Not
+            reversible; download a backup first if you might want any of this later.
+          </p>
+          <div className="mt-4">
+            <Button variant="danger" onClick={handleDeleteWorkspace} disabled={deleteWorkspaceMutation.isPending}>
+              Delete this workspace
+            </Button>
+          </div>
         </section>
       )}
 

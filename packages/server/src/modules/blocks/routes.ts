@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { createBlockSchema, updateBlockSchema, moveBlockSchema, importMarkdownSchema } from "@notorious/shared";
+import { createBlockSchema, updateBlockSchema, moveBlockSchema, importMarkdownSchema, restoreBlockSchema } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, resolveActor } from "../workspaces/access.js";
 import { getObjectWorkspaceId, getObject } from "../objects/service.js";
@@ -29,6 +29,33 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       clientId: getClientId(request),
       action: "updated",
       summary: `${created.actorName} added a block`,
+      entity: "block",
+      entityId: block.id,
+      realtimeAction: "created",
+    });
+
+    reply.code(201);
+    return block;
+  });
+
+  // Editor undo/redo only (see useEditorHistory.ts) - re-inserts a block with
+  // its original id/position instead of computing a fresh one, so a restored
+  // block reappears exactly where it was, not wherever `afterBlockId` would
+  // place a brand-new block relative to today's neighbors.
+  app.post("/api/v1/blocks/restore", async (request, reply) => {
+    const input = restoreBlockSchema.parse(request.body);
+    const workspaceId = await getObjectWorkspaceId(input.objectId);
+    const access = await requireAccess(request, workspaceId, "editor", { objectId: input.objectId });
+    const block = await blockService.restoreBlock(input);
+
+    const restored = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: input.objectId,
+      actorId: restored.actorId,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${restored.actorName} restored a block`,
       entity: "block",
       entityId: block.id,
       realtimeAction: "created",

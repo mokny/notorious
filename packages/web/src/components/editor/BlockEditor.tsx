@@ -1,15 +1,34 @@
-import { useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import type { BlockType } from "@notorious/shared";
+import type { Block, BlockType } from "@notorious/shared";
 import { blockApi, fileApi } from "../../lib/api/resources.js";
 import { withShareToken } from "../../lib/api/shareMode.js";
 import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
 import { BlockList } from "./BlockList.js";
+import { useEditorHistory, type BlockSnapshot } from "./useEditorHistory.js";
 import { Button } from "../ui/Button.js";
 import { Icon } from "../ui/Icon.js";
+
+function isEditableElementFocused(): boolean {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) return false;
+  if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") return true;
+  return el.isContentEditable;
+}
+
+/** Finds where `blockId` currently sits among its siblings, as a `{parentBlockId, afterBlockId}` pair - the shape `moveBlock`/`performMove` need to move it back there later. */
+function currentEndpointsFor(all: Block[], blockId: string): { parentBlockId: string | null; afterBlockId: string | null } | null {
+  const block = all.find((b) => b.id === blockId);
+  if (!block) return null;
+  const siblings = all
+    .filter((b) => b.parentBlockId === block.parentBlockId)
+    .sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
+  const index = siblings.findIndex((b) => b.id === blockId);
+  return { parentBlockId: block.parentBlockId, afterBlockId: index > 0 ? siblings[index - 1]!.id : null };
+}
 
 /** Picks a sensible block type/content for a dropped file, based on its MIME type. */
 function blockForDroppedFile(file: File, url: string, fileId: string): { type: BlockType; content: Record<string, unknown> } {
@@ -43,6 +62,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     onSuccess: (createdBlock) => {
       invalidate();
       setPendingFocusBlockId(createdBlock.id);
+      history.recordCreate(createdBlock);
     },
   });
 
@@ -62,10 +82,73 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     onSuccess: invalidate,
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: (block: BlockSnapshot) => blockApi.restore({ objectId, ...block }),
+    onSuccess: invalidate,
+  });
+
   const importMutation = useMutation({
     mutationFn: (markdown: string) => blockApi.importMarkdown(objectId, markdown),
     onSuccess: invalidate,
   });
+
+  const history = useEditorHistory({
+    onDelete: async (blockId) => {
+      const snapshot = (blocks ?? []).find((b) => b.id === blockId) ?? null;
+      await deleteMutation.mutateAsync(blockId);
+      return snapshot;
+    },
+    onRestore: (block) => restoreMutation.mutateAsync(block),
+    onMove: (blockId, parentBlockId, afterBlockId) => moveMutation.mutateAsync({ blockId, parentBlockId, afterBlockId }),
+  });
+
+  /** Looks up the block's current content before deleting it, so the delete is undoable. */
+  function performDelete(blockId: string): void {
+    const snapshot = (blocks ?? []).find((b) => b.id === blockId);
+    deleteMutation.mutate(blockId, {
+      onSuccess: () => {
+        if (snapshot) history.recordDelete(snapshot);
+      },
+    });
+  }
+
+  /** Captures where the block currently sits before moving it, so the move is undoable. */
+  function performMove(blockId: string, parentBlockId: string | null, afterBlockId: string | null): void {
+    const from = currentEndpointsFor(blocks ?? [], blockId);
+    moveMutation.mutate(
+      { blockId, parentBlockId, afterBlockId },
+      {
+        onSuccess: () => {
+          if (from) history.recordMove(blockId, from, { parentBlockId, afterBlockId });
+        },
+      },
+    );
+  }
+
+  // Ctrl+Z/Cmd+Z (undo) and Ctrl+Shift+Z/Cmd+Shift+Z or Ctrl+Y (redo) for
+  // block structure changes - see useEditorHistory.ts for why content edits
+  // aren't handled here. Skipped entirely while focus is inside a text
+  // input/textarea/contenteditable, so it never competes with whatever
+  // undo that surface already has of its own.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
+      const modifier = event.metaKey || event.ctrlKey;
+      if (!modifier || isEditableElementFocused()) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        history.redo();
+      } else if (key === "z") {
+        event.preventDefault();
+        history.undo();
+      } else if (key === "y" && event.ctrlKey) {
+        event.preventDefault();
+        history.redo();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [history]);
 
   function defaultContentFor(type: BlockType): Record<string, unknown> {
     switch (type) {
@@ -112,7 +195,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
       // Moving into a different nesting level entirely (e.g. into another
       // toggle/column) - there's no "old position" within that list to
       // compare against, so just drop it right after whatever it landed on.
-      moveMutation.mutate({ blockId, parentBlockId: overBlock.parentBlockId, afterBlockId: overBlock.id });
+      performMove(blockId, overBlock.parentBlockId, overBlock.id);
       return;
     }
 
@@ -134,7 +217,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     const reordered = arrayMove(siblings, oldIndex, newIndex);
     const draggedIndex = reordered.findIndex((b) => b.id === blockId);
     const afterBlockId = draggedIndex > 0 ? reordered[draggedIndex - 1]!.id : null;
-    moveMutation.mutate({ blockId, parentBlockId: overBlock.parentBlockId, afterBlockId });
+    performMove(blockId, overBlock.parentBlockId, afterBlockId);
   }
 
   /** Uploads each dropped file and appends a block for it (image/video get a
@@ -184,8 +267,8 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => updateMutation.mutateAsync({ blockId, content }).then(() => undefined),
-        deleteBlock: (blockId) => deleteMutation.mutate(blockId),
-        moveBlock: (blockId, parentBlockId, afterBlockId) => moveMutation.mutate({ blockId, parentBlockId, afterBlockId }),
+        deleteBlock: (blockId) => performDelete(blockId),
+        moveBlock: (blockId, parentBlockId, afterBlockId) => performMove(blockId, parentBlockId, afterBlockId),
         pendingFocusBlockId,
         clearPendingFocus: () => setPendingFocusBlockId(null),
         isDraggingAny,

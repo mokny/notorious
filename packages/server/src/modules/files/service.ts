@@ -92,3 +92,21 @@ export async function deleteFile(id: string): Promise<void> {
   const fullPath = absoluteStoragePath(row.storagePath);
   if (fs.existsSync(fullPath)) await fsp.unlink(fullPath);
 }
+
+/**
+ * Used only by workspace deletion, and only unlinks bytes on disk - unlike
+ * `deleteFile`, it doesn't touch the DB rows itself, since `files.workspaceId`
+ * already has `onDelete: cascade` and the workspace delete removes them along
+ * with everything else. Has to run *before* that delete though: once the
+ * workspace (and its files rows) are gone, the storage paths needed to find
+ * the bytes on disk are gone too.
+ */
+export async function deleteWorkspaceFilesFromDisk(workspaceId: string): Promise<void> {
+  const rows = await db.select({ storagePath: files.storagePath }).from(files).where(eq(files.workspaceId, workspaceId));
+  await Promise.all(
+    rows.map(async (row) => {
+      const fullPath = absoluteStoragePath(row.storagePath);
+      if (fs.existsSync(fullPath)) await fsp.unlink(fullPath);
+    }),
+  );
+}

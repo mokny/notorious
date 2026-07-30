@@ -11,6 +11,7 @@ import { SubObjectsPanel } from "../components/SubObjectsPanel.js";
 import { IconPicker } from "../components/IconPicker.js";
 import { CoverImage } from "../components/CoverImage.js";
 import { ShareDialog } from "../components/ShareDialog.js";
+import { useConfirm } from "../context/ConfirmContext.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
@@ -47,6 +48,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const objectId = objectIdProp ?? params.objectId;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   // A whole-workspace share is redirected onto this exact route with no
   // special props (see SharePage.tsx) - it's a real page in the normal
   // `/w/:workspaceId` tree, so this falls back to the active share session's
@@ -137,11 +139,15 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     },
   });
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!object) return;
-    const confirmed = window.confirm(
-      `"${object.title || "Untitled"}" endgültig löschen? Dateien, die nur diesem Objekt gehören, werden mitgelöscht, und Verlinkungen von anderen Objekten hierher werden entfernt. Das kann nicht rückgängig gemacht werden.`,
-    );
+    const confirmed = await confirm({
+      title: `"${object.title || "Untitled"}" endgültig löschen?`,
+      description:
+        "Dateien, die nur diesem Objekt gehören, werden mitgelöscht, und Verlinkungen von anderen Objekten hierher werden entfernt. Das kann nicht rückgängig gemacht werden.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
     if (confirmed) deleteMutation.mutate();
   }
 

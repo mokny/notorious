@@ -42,6 +42,20 @@ export function removeFromIndex(objectId: string): void {
   sqlite.prepare("DELETE FROM objects_fts WHERE object_id = ?").run(objectId);
 }
 
+/**
+ * Used only by workspace deletion. `objects_fts` is an FTS5 virtual table,
+ * which can't carry a real foreign key, so cascading a workspace delete
+ * leaves its objects' index entries behind as permanent orphans unless
+ * they're removed explicitly - and that has to happen *before* the
+ * workspace (and its `objects` rows) are gone, since this relies on the
+ * subquery still being able to resolve which object ids belonged to it.
+ */
+export function removeWorkspaceFromIndex(workspaceId: string): void {
+  sqlite
+    .prepare("DELETE FROM objects_fts WHERE object_id IN (SELECT id FROM objects WHERE workspace_id = ?)")
+    .run(workspaceId);
+}
+
 /** Recomputes and re-indexes an object's body from its current blocks. Call after any block edit. */
 export async function reindexObjectBody(objectId: string, title: string): Promise<void> {
   const body = await flattenObjectBody(objectId);

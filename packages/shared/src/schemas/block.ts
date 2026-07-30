@@ -27,3 +27,22 @@ export const importMarkdownSchema = z.object({
   markdown: z.string().max(2_000_000),
 });
 export type ImportMarkdownInput = z.infer<typeof importMarkdownSchema>;
+
+/**
+ * Re-inserts a block exactly as it was, id and position included - used by
+ * the editor's undo/redo (see useEditorHistory.ts) to bring back a deleted
+ * block, or to redo a create that was just undone. Unlike `createBlockSchema`
+ * (which always generates a fresh id and computes a fresh position from
+ * `afterBlockId`), undo/redo needs the block to reappear in the exact same
+ * spot it was in - not "at the end" or "wherever its neighbors happen to be
+ * now".
+ */
+export const restoreBlockSchema = z.object({
+  objectId: z.string(),
+  id: z.string(),
+  parentBlockId: z.string().nullable(),
+  type: z.enum(BLOCK_TYPES),
+  content: z.record(z.string(), z.unknown()),
+  position: z.string(),
+});
+export type RestoreBlockInput = z.infer<typeof restoreBlockSchema>;

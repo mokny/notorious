@@ -22,6 +22,8 @@ import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { seedSystemObjectTypes } from "../schema/systemTypes.js";
 import { positionBetween } from "../../lib/position.js";
+import { deleteWorkspaceFilesFromDisk } from "../files/service.js";
+import { removeWorkspaceFromIndex } from "../search/indexer.js";
 
 export async function createWorkspace(
   ownerId: string,
@@ -67,6 +69,23 @@ export async function updateWorkspace(
 ): Promise<Workspace> {
   await db.update(workspaces).set(input).where(eq(workspaces.id, workspaceId));
   return getWorkspace(workspaceId);
+}
+
+/**
+ * Every table that references a workspace (members, invites, object types,
+ * properties, objects, blocks, relations, views, files, activity log,
+ * pins, saved searches, share links, ...) has `onDelete: cascade` on that
+ * foreign key (see db/schema.ts), so a single delete here removes all of it
+ * at the SQL level. The two things that *aren't* reachable via a foreign key
+ * - files' bytes on disk, and objects' entries in the `objects_fts` search
+ * index (an FTS5 virtual table, which can't carry a real FK) - need to be
+ * cleaned up explicitly, and before this delete runs: both rely on rows
+ * (storage paths, object ids) that the cascade is about to remove.
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  await deleteWorkspaceFilesFromDisk(workspaceId);
+  removeWorkspaceFromIndex(workspaceId);
+  await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
 }
 
 export async function listMembers(workspaceId: string): Promise<WorkspaceMember[]> {
