@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ResolvedShareLink } from "@notorious/shared";
 import { shareLinkApi } from "../lib/api/resources.js";
 import { setShareMode } from "../lib/api/shareMode.js";
+import { useRealtime } from "../lib/ws/useRealtime.js";
 import { ObjectDetailPage } from "./ObjectDetailPage.js";
 import { SharedWorkspaceBrowse } from "./SharedWorkspaceBrowse.js";
 import { Icon } from "../components/ui/Icon.js";
@@ -44,6 +45,11 @@ export function SharePage() {
     enabled: Boolean(token),
     retry: false,
   });
+
+  // Live updates for anonymous visitors too - see useRealtime's shareToken
+  // param. Called unconditionally (before the loading/error returns below)
+  // since hooks can't be conditional; it no-ops until workspaceId is known.
+  useRealtime(resolved?.workspaceId, token);
 
   if (isLoading) {
     return (

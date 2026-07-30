@@ -6,7 +6,7 @@ import {
   createRelationSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
-import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess } from "../workspaces/access.js";
+import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess, resolveActor } from "../workspaces/access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import * as objectService from "./service.js";
 import { completeRecurringTask } from "./recurrence.js";
@@ -57,23 +57,22 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
   app.patch("/api/v1/objects/:id", async (request) => {
     const { id } = request.params as { id: string };
     const workspaceId = await objectService.getObjectWorkspaceId(id);
-    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId: id });
+    const access = await requireAccess(request, workspaceId, "editor", { objectId: id });
     const input = updateObjectSchema.parse(request.body);
     const object = await objectService.updateObject(id, input);
 
-    if (actorId) {
-      await recordAndBroadcast({
-        workspaceId,
-        objectId: id,
-        actorId,
-        clientId: getClientId(request),
-        action: "updated",
-        summary: `${actorName} updated "${object.title}"`,
-        entity: "object",
-        entityId: id,
-        realtimeAction: "updated",
-      });
-    }
+    const { actorId, actorName } = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: id,
+      actorId,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${actorName} updated "${object.title}"`,
+      entity: "object",
+      entityId: id,
+      realtimeAction: "updated",
+    });
 
     return object;
   });

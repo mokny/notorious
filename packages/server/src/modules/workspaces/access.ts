@@ -82,3 +82,17 @@ export function requireWorkspaceScopedAccess(
 ): Promise<AccessResult> {
   return requireAccess(request, workspaceId, minRole, { requireWorkspaceScope: true });
 }
+
+/**
+ * Who to attribute an audit-log entry/realtime broadcast to. A real member
+ * attributes to themselves; an anonymous share-link visitor has no account,
+ * so their edits are attributed to whoever created that link - same
+ * reasoning as file uploads (see modules/files/routes.ts). Without this,
+ * changes an anonymous editor makes would need to skip the broadcast
+ * entirely, and every *other* viewer of that link (including the owner)
+ * would stop seeing live updates from that visitor.
+ */
+export function resolveActor(request: FastifyRequest, access: AccessResult): { actorId: string; actorName: string } {
+  if (access.actorId) return { actorId: access.actorId, actorName: access.actorName! };
+  return { actorId: request.shareAccess!.createdBy, actorName: "Someone via a shared link" };
+}

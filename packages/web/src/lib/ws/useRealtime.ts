@@ -7,8 +7,14 @@ import { clientId as myClientId } from "./clientId.js";
  * Opens one WebSocket connection per open workspace and invalidates the
  * relevant React Query caches whenever another client changes something -
  * this is what makes edits show up live across devices/collaborators.
+ *
+ * `shareToken` is set when this is an anonymous visitor following a public
+ * share link (see SharePage.tsx) rather than a logged-in member - the socket
+ * handshake can't carry the `X-Share-Token` header the REST API uses
+ * (browsers don't let you set custom headers on a WebSocket), so it goes as
+ * a query param instead; the server resolves it the same way either way.
  */
-export function useRealtime(workspaceId: string | undefined): void {
+export function useRealtime(workspaceId: string | undefined, shareToken?: string): void {
   const queryClient = useQueryClient();
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -16,7 +22,9 @@ export function useRealtime(workspaceId: string | undefined): void {
     if (!workspaceId) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws?workspaceId=${workspaceId}`);
+    const query = new URLSearchParams({ workspaceId });
+    if (shareToken) query.set("shareToken", shareToken);
+    const socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query.toString()}`);
     socketRef.current = socket;
 
     socket.onmessage = (event) => {
@@ -53,5 +61,5 @@ export function useRealtime(workspaceId: string | undefined): void {
     };
 
     return () => socket.close();
-  }, [workspaceId, queryClient]);
+  }, [workspaceId, shareToken, queryClient]);
 }

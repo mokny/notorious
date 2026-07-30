@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createBlockSchema, updateBlockSchema, moveBlockSchema, importMarkdownSchema } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
-import { requireWorkspaceRole, requireAccess } from "../workspaces/access.js";
+import { requireWorkspaceRole, requireAccess, resolveActor } from "../workspaces/access.js";
 import { getObjectWorkspaceId, getObject } from "../objects/service.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import * as blockService from "./service.js";
@@ -18,22 +18,21 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/blocks", async (request, reply) => {
     const input = createBlockSchema.parse(request.body);
     const workspaceId = await getObjectWorkspaceId(input.objectId);
-    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId: input.objectId });
+    const access = await requireAccess(request, workspaceId, "editor", { objectId: input.objectId });
     const block = await blockService.createBlock(input);
 
-    if (actorId) {
-      await recordAndBroadcast({
-        workspaceId,
-        objectId: input.objectId,
-        actorId,
-        clientId: getClientId(request),
-        action: "updated",
-        summary: `${actorName} added a block`,
-        entity: "block",
-        entityId: block.id,
-        realtimeAction: "created",
-      });
-    }
+    const created = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: input.objectId,
+      actorId: created.actorId,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${created.actorName} added a block`,
+      entity: "block",
+      entityId: block.id,
+      realtimeAction: "created",
+    });
 
     reply.code(201);
     return block;
@@ -43,23 +42,22 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const objectId = await blockService.getBlockObjectId(id);
     const workspaceId = await getObjectWorkspaceId(objectId);
-    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId });
+    const access = await requireAccess(request, workspaceId, "editor", { objectId });
     const input = updateBlockSchema.parse(request.body);
     const block = await blockService.updateBlock(id, input);
 
-    if (actorId) {
-      await recordAndBroadcast({
-        workspaceId,
-        objectId,
-        actorId,
-        clientId: getClientId(request),
-        action: "updated",
-        summary: `${actorName} edited a block`,
-        entity: "block",
-        entityId: id,
-        realtimeAction: "updated",
-      });
-    }
+    const updated = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: updated.actorId,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${updated.actorName} edited a block`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
 
     return block;
   });
@@ -68,23 +66,22 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const objectId = await blockService.getBlockObjectId(id);
     const workspaceId = await getObjectWorkspaceId(objectId);
-    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId });
+    const access = await requireAccess(request, workspaceId, "editor", { objectId });
     const input = moveBlockSchema.parse(request.body);
     const block = await blockService.moveBlock(id, input);
 
-    if (actorId) {
-      await recordAndBroadcast({
-        workspaceId,
-        objectId,
-        actorId,
-        clientId: getClientId(request),
-        action: "updated",
-        summary: `${actorName} reordered a block`,
-        entity: "block",
-        entityId: id,
-        realtimeAction: "updated",
-      });
-    }
+    const moved = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: moved.actorId,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${moved.actorName} reordered a block`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
 
     return block;
   });
@@ -93,22 +90,21 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const objectId = await blockService.getBlockObjectId(id);
     const workspaceId = await getObjectWorkspaceId(objectId);
-    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId });
+    const access = await requireAccess(request, workspaceId, "editor", { objectId });
     await blockService.deleteBlock(id);
 
-    if (actorId) {
-      await recordAndBroadcast({
-        workspaceId,
-        objectId,
-        actorId,
-        clientId: getClientId(request),
-        action: "updated",
-        summary: `${actorName} removed a block`,
-        entity: "block",
-        entityId: id,
-        realtimeAction: "deleted",
-      });
-    }
+    const deleted = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: deleted.actorId,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${deleted.actorName} removed a block`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "deleted",
+    });
 
     reply.code(204);
   });
