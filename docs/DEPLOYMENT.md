@@ -111,23 +111,11 @@ so re-running them is always safe - already-applied migrations are skipped.
 If you deployed from a git clone and would rather keep using `git pull` yourself, that still works
 fine too - the scripts just no longer require it.
 
-### Reverse proxy (nginx example, for HTTPS + a real domain)
+### Reverse proxy (nginx, for HTTPS + a real domain)
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name notes.example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;   # required for the /ws WebSocket endpoint
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+See **[docs/NGINX.md](NGINX.md)** for the full walkthrough, both via a UI (Nginx Proxy Manager) and
+via plain config files - including the WebSocket upgrade headers the `/ws` realtime endpoint needs,
+and the upload size limit nginx's 1MB default would otherwise silently enforce ahead of the app.
 
 Web Push requires the app to be served over HTTPS (except on `localhost`), so a reverse proxy with a
 real TLS certificate is required before push notifications will work from outside your LAN.
