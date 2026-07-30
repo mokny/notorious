@@ -65,6 +65,21 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     const objectWorkspaceId = await getObjectWorkspaceId(input.objectId);
     if (objectWorkspaceId !== id) throw badRequest("Object must belong to this workspace");
     await workspaceService.pinObject(id, input.objectId);
+
+    // Not tied to `objectId` here (omitted) - a pin change isn't an edit *of*
+    // that object, and logging it against one would wrongly surface it in
+    // that object's "recently edited" list (see listRecentlyEditedObjectIds).
+    await recordAndBroadcast({
+      workspaceId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${user.name} pinned an object`,
+      entity: "pin",
+      entityId: input.objectId,
+      realtimeAction: "created",
+    });
+
     reply.code(204);
   });
 
@@ -73,6 +88,18 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     const { id, objectId } = request.params as { id: string; objectId: string };
     await requireWorkspaceRole(id, user.id, "editor");
     await workspaceService.unpinObject(id, objectId);
+
+    await recordAndBroadcast({
+      workspaceId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${user.name} unpinned an object`,
+      entity: "pin",
+      entityId: objectId,
+      realtimeAction: "deleted",
+    });
+
     reply.code(204);
   });
 
@@ -82,6 +109,18 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     await requireWorkspaceRole(id, user.id, "editor");
     const input = movePinSchema.parse(request.body);
     await workspaceService.movePin(id, objectId, input.afterObjectId);
+
+    await recordAndBroadcast({
+      workspaceId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${user.name} reordered the pinned objects`,
+      entity: "pin",
+      entityId: objectId,
+      realtimeAction: "updated",
+    });
+
     reply.code(204);
   });
 

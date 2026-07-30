@@ -57,6 +57,11 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
       } else if (payload.entity === "relation") {
         queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
         queryClient.invalidateQueries({ queryKey: ["viewResults"] });
+      } else if (payload.entity === "pin") {
+        // Pin/unpin/reorder is a discrete, deliberate action (not a per-
+        // keystroke stream like block saves) - refetching even for the tab
+        // that made the change itself is harmless, so no clientId check.
+        queryClient.invalidateQueries({ queryKey: ["pins", workspaceId] });
       }
     };
 

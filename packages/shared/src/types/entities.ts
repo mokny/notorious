@@ -160,7 +160,7 @@ export interface ActivityEntry {
 /** Payload broadcast over the WebSocket connection for a given workspace room. */
 export interface RealtimeEvent {
   workspaceId: string;
-  entity: "object" | "block" | "relation" | "view" | "member";
+  entity: "object" | "block" | "relation" | "view" | "member" | "pin";
   action: "created" | "updated" | "deleted";
   entityId: string;
   /** The parent object id, when `entity` is "block" (omitted otherwise). */
