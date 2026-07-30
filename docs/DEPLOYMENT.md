@@ -186,7 +186,8 @@ See `.env.example` for the full list with defaults. The only one without a safe 
 ## Build memory requirements
 
 `npm run build` (specifically the frontend's `vite build`, which bundles Mermaid and its
-diagram-layout dependencies) needs roughly 1-2GB of free RAM/swap on a small VPS. `install.sh` and
+diagram-layout dependencies, plus Excalidraw for the whiteboard object/block) needs roughly 2-3GB
+of free RAM/swap on a small VPS. `install.sh` and
 `update.sh` already run the build with `NODE_OPTIONS=--max-old-space-size=2048`, since V8 sometimes
 auto-detects a conservative default heap ceiling (well under 1GB) on small VMs that in practice have
 more RAM or swap available than that - if you run `npm run build` by hand, do the same:
