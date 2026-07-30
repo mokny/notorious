@@ -11,6 +11,8 @@ interface SubObjectsPanelProps {
   objectId: string;
   objectTypeId: string;
   subObjectIds: string[];
+  /** Hides "New sub-object" - an anonymous share session can't create objects (not share-aware server-side), so the button would just fail. Defaults to true for normal, logged-in usage. */
+  canCreate?: boolean;
 }
 
 /**
@@ -19,7 +21,7 @@ interface SubObjectsPanelProps {
  * so any object - a Note, a Book, whatever - can have child objects of any
  * type, not just the type-specific relations like Task's parent_task.
  */
-export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObjectIds }: SubObjectsPanelProps) {
+export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObjectIds, canCreate = true }: SubObjectsPanelProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const mutations = useObjectMutations(workspaceId);
@@ -59,39 +61,41 @@ export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObject
     <div className="mt-10 border-t border-border pt-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Sub-objects</h3>
-        <div
-          ref={containerRef}
-          className="relative"
-          onBlur={(event) => {
-            if (!containerRef.current?.contains(event.relatedTarget as Node)) setMenuOpen(false);
-          }}
-        >
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
+        {canCreate && (
+          <div
+            ref={containerRef}
+            className="relative"
+            onBlur={(event) => {
+              if (!containerRef.current?.contains(event.relatedTarget as Node)) setMenuOpen(false);
+            }}
           >
-            <Icon name="plus" className="h-3 w-3" /> New sub-object
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 z-20 mt-1 max-h-64 w-48 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
-              {objectTypes
-                ?.slice()
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      createMutation.mutate(type.id);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-muted hover:bg-surface hover:text-ink"
-                  >
-                    <Icon name={type.icon} className="h-3.5 w-3.5" /> {type.name}
-                  </button>
-                ))}
-            </div>
-          )}
-        </div>
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
+            >
+              <Icon name="plus" className="h-3 w-3" /> New sub-object
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 z-20 mt-1 max-h-64 w-48 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
+                {objectTypes
+                  ?.slice()
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        createMutation.mutate(type.id);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-muted hover:bg-surface hover:text-ink"
+                    >
+                      <Icon name={type.icon} className="h-3.5 w-3.5" /> {type.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <RelationPicker

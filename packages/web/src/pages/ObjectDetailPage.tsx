@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi } from "../lib/api/resources.js";
+import { getShareRole } from "../lib/api/shareMode.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
@@ -37,12 +38,20 @@ interface ObjectDetailPageProps {
   share?: SharedObjectContext;
 }
 
-export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objectIdProp, share }: ObjectDetailPageProps = {}) {
+export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objectIdProp, share: shareProp }: ObjectDetailPageProps = {}) {
   const params = useParams<{ workspaceId: string; objectId: string }>();
   const workspaceId = workspaceIdProp ?? params.workspaceId;
   const objectId = objectIdProp ?? params.objectId;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  // A whole-workspace share is redirected onto this exact route with no
+  // special props (see SharePage.tsx) - it's a real page in the normal
+  // `/w/:workspaceId` tree, so this falls back to the active share session's
+  // role instead of assuming a real logged-in member. `singleObject: false`
+  // since a workspace share can browse anywhere, unlike the `share` prop
+  // passed explicitly for a single-object share.
+  const globalShareRole = getShareRole();
+  const share: SharedObjectContext | undefined = shareProp ?? (globalShareRole ? { role: globalShareRole, singleObject: false } : undefined);
   const canEdit = !share || roleAtLeast(share.role, "editor");
 
   const {
@@ -227,13 +236,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             <BlockEditor workspaceId={workspaceId} objectId={object.id} />
           </div>
 
-          {!share && (
+          {/* Hidden only for a single-object share (it can't grant access to
+              browse anywhere else) - a whole-workspace share can, so these
+              stay visible there, same as for a logged-in member. */}
+          {!share?.singleObject && (
             <>
               <SubObjectsPanel
                 workspaceId={workspaceId}
                 objectId={object.id}
                 objectTypeId={object.objectTypeId}
                 subObjectIds={Array.isArray(object.values.sub_objects) ? object.values.sub_objects : []}
+                canCreate={!share}
               />
               <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
             </>

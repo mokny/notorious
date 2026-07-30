@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { authApi } from "../lib/api/resources.js";
 import { ApiError } from "../lib/api/client.js";
+import { setShareMode } from "../lib/api/shareMode.js";
 import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
@@ -22,6 +23,10 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await authApi.login({ email, password });
+      // A real login always supersedes a leftover anonymous share session in
+      // this tab (see lib/api/shareMode.ts) - otherwise a stale share token
+      // header would keep tagging along on this account's own requests.
+      setShareMode(null);
       await refetch();
       navigate("/");
     } catch (err) {

@@ -6,6 +6,7 @@ import { ViewRenderer } from "../components/views/ViewRenderer.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useNavigate } from "react-router-dom";
+import { isSharedSession } from "../lib/api/shareMode.js";
 
 const VIEW_TYPES = [
   { type: "table", label: "Table", icon: "rows" },
@@ -70,9 +71,11 @@ export function ObjectTypePage() {
           <Icon name={objectType.icon} className="h-5 w-5 text-accent" />
           <h1 className="text-lg font-semibold">{objectType.name}</h1>
         </div>
-        <Button variant="primary" onClick={() => createObjectMutation.mutate()}>
-          <Icon name="plus" className="h-3.5 w-3.5" /> New {objectType.name}
-        </Button>
+        {!isSharedSession() && (
+          <Button variant="primary" onClick={() => createObjectMutation.mutate()}>
+            <Icon name="plus" className="h-3.5 w-3.5" /> New {objectType.name}
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-1 border-b border-border px-4 py-1.5">
@@ -87,22 +90,24 @@ export function ObjectTypePage() {
             {view.name}
           </button>
         ))}
-        <div className="group relative">
-          <button className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised">
-            <Icon name="plus" className="h-3.5 w-3.5" />
-          </button>
-          <div className="absolute left-0 z-20 hidden w-40 rounded-lg border border-border bg-surface-raised p-1 shadow-lg group-focus-within:block group-hover:block">
-            {VIEW_TYPES.map((viewType) => (
-              <button
-                key={viewType.type}
-                onClick={() => createViewMutation.mutate(viewType.type)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
-              >
-                <Icon name={viewType.icon} className="h-3.5 w-3.5" /> {viewType.label}
-              </button>
-            ))}
+        {!isSharedSession() && (
+          <div className="group relative">
+            <button className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised">
+              <Icon name="plus" className="h-3.5 w-3.5" />
+            </button>
+            <div className="absolute left-0 z-20 hidden w-40 rounded-lg border border-border bg-surface-raised p-1 shadow-lg group-focus-within:block group-hover:block">
+              {VIEW_TYPES.map((viewType) => (
+                <button
+                  key={viewType.type}
+                  onClick={() => createViewMutation.mutate(viewType.type)}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
+                >
+                  <Icon name={viewType.icon} className="h-3.5 w-3.5" /> {viewType.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

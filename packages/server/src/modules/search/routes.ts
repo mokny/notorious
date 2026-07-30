@@ -1,14 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { searchQuerySchema, createSavedSearchSchema } from "@notorious/shared";
 import { requireUser } from "../../plugins/session.js";
-import { requireWorkspaceRole } from "../workspaces/access.js";
+import { requireWorkspaceRole, requireWorkspaceScopedAccess } from "../workspaces/access.js";
 import * as searchService from "./service.js";
 
 export async function registerSearchRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/workspaces/:workspaceId/search", async (request) => {
-    const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
-    await requireWorkspaceRole(workspaceId, user.id, "viewer");
+    await requireWorkspaceScopedAccess(request, workspaceId, "viewer");
     const query = searchQuerySchema.parse(request.query);
     return searchService.searchObjects(workspaceId, query);
   });

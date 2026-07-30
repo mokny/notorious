@@ -7,6 +7,7 @@ import { workspaceApi, authApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
+import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
 import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
@@ -22,8 +23,9 @@ export function WorkspaceLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const shareToken = getShareToken();
 
-  useRealtime(workspaceId);
+  useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
   const pinSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -58,13 +60,21 @@ export function WorkspaceLayout() {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 border-b border-border px-4 py-4 text-left hover:bg-surface"
-        >
-          <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
-          <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
-        </button>
+        {shareToken ? (
+          <div className="flex items-center gap-2 border-b border-border px-4 py-4">
+            <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
+            <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
+            <span className="ml-auto shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs text-ink-muted">Shared</span>
+          </div>
+        ) : (
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-2 border-b border-border px-4 py-4 text-left hover:bg-surface"
+          >
+            <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
+            <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
+          </button>
+        )}
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
           {workspace?.dashboardObjectId && (
@@ -93,32 +103,42 @@ export function WorkspaceLayout() {
           )}
 
           <RecentNavSection workspaceId={workspaceId!} />
-          <RecentlyEditedNavSection workspaceId={workspaceId!} />
+          {/* "Recently edited BY ME" doesn't apply to an anonymous visitor,
+              and its endpoint isn't share-aware server-side. */}
+          {!shareToken && <RecentlyEditedNavSection workspaceId={workspaceId!} />}
 
-          <div className="mt-3 border-t border-border pt-2">
-            <NavLink to={`/w/${workspaceId}/settings`} className={({ isActive }) => navLinkClass(isActive)}>
-              <Icon name="settings" className="h-4 w-4" /> Settings
-            </NavLink>
-          </div>
+          {!shareToken && (
+            <div className="mt-3 border-t border-border pt-2">
+              <NavLink to={`/w/${workspaceId}/settings`} className={({ isActive }) => navLinkClass(isActive)}>
+                <Icon name="settings" className="h-4 w-4" /> Settings
+              </NavLink>
+            </div>
+          )}
         </nav>
 
         <div className="flex items-center justify-between border-t border-border p-3">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <span
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-              style={{ backgroundColor: user?.avatarColor }}
-            >
-              {user?.name?.[0]}
-            </span>
-            <span className="truncate text-sm">{user?.name}</span>
-          </div>
+          {shareToken ? (
+            <span className="truncate text-sm text-ink-muted">Viewing via a shared link</span>
+          ) : (
+            <div className="flex items-center gap-2 overflow-hidden">
+              <span
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+                style={{ backgroundColor: user?.avatarColor }}
+              >
+                {user?.name?.[0]}
+              </span>
+              <span className="truncate text-sm">{user?.name}</span>
+            </div>
+          )}
           <div className="flex items-center gap-1">
             <button onClick={toggle} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Toggle theme">
               <Icon name={theme === "dark" ? "sun" : "moon"} />
             </button>
-            <button onClick={handleLogout} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Log out">
-              <Icon name="close" />
-            </button>
+            {!shareToken && (
+              <button onClick={handleLogout} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Log out">
+                <Icon name="close" />
+              </button>
+            )}
           </div>
         </div>
       </aside>

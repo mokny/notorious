@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { searchApi } from "../lib/api/resources.js";
 import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
+import { isSharedSession } from "../lib/api/shareMode.js";
 import { Icon } from "../components/ui/Icon.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
@@ -24,7 +25,9 @@ export function SearchPage() {
   const { data: savedSearches } = useQuery({
     queryKey: ["savedSearches", workspaceId],
     queryFn: () => searchApi.savedSearches(workspaceId!),
-    enabled: Boolean(workspaceId),
+    // Saved searches are per-user and their endpoint isn't share-aware -
+    // meaningless (and a guaranteed 401) for an anonymous share session.
+    enabled: Boolean(workspaceId) && !isSharedSession(),
   });
 
   const saveMutation = useMutation({
@@ -44,7 +47,7 @@ export function SearchPage() {
         <Button variant={fuzzy ? "primary" : "secondary"} onClick={() => setFuzzy((v) => !v)} title="Toggle fuzzy/typo-tolerant search">
           Fuzzy
         </Button>
-        {query && (
+        {query && !isSharedSession() && (
           <Button variant="secondary" onClick={() => saveMutation.mutate()}>
             Save
           </Button>

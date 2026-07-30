@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.js";
+import { isSharedSession } from "./lib/api/shareMode.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { WorkspacePickerPage } from "./pages/WorkspacePickerPage.js";
@@ -11,10 +12,16 @@ import { SearchPage } from "./pages/SearchPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+/**
+ * `allowShareSession` lets an anonymous whole-workspace share visitor
+ * through instead of bouncing to /login - only used for the `/w/:workspaceId`
+ * tree (see SharePage.tsx's redirect there), never for e.g. the workspace
+ * picker, which has no meaning without a real account.
+ */
+function RequireAuth({ children, allowShareSession = false }: { children: React.ReactNode; allowShareSession?: boolean }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return <FullScreenSpinner />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user && !(allowShareSession && isSharedSession())) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
@@ -46,7 +53,7 @@ export function App() {
       <Route
         path="/w/:workspaceId"
         element={
-          <RequireAuth>
+          <RequireAuth allowShareSession>
             <WorkspaceLayout />
           </RequireAuth>
         }

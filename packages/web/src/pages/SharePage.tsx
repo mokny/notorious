@@ -1,12 +1,11 @@
-import { createContext, useContext, useEffect } from "react";
-import { Outlet, useParams } from "react-router-dom";
+import { createContext, useContext } from "react";
+import { Navigate, Outlet, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { ResolvedShareLink } from "@notorious/shared";
 import { shareLinkApi } from "../lib/api/resources.js";
 import { setShareMode } from "../lib/api/shareMode.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { ObjectDetailPage } from "./ObjectDetailPage.js";
-import { SharedWorkspaceBrowse } from "./SharedWorkspaceBrowse.js";
 import { Icon } from "../components/ui/Icon.js";
 
 const ShareResolutionContext = createContext<ResolvedShareLink | null>(null);
@@ -21,19 +20,18 @@ function useShareResolution(): ResolvedShareLink {
  * Entry point for `/share/:token` - a public route (outside `RequireAuth`,
  * see App.tsx) that anonymous visitors land on. Activates share mode so
  * every subsequent API call in this tab carries the token (see
- * lib/api/shareMode.ts), resolves what it grants access to, then renders
- * either a single shared object or a small browse UI for a whole shared
- * workspace via the nested routes below.
+ * lib/api/shareMode.ts), resolves what it grants access to, then either:
+ *
+ * - a whole-workspace share redirects straight onto the normal `/w/:workspaceId`
+ *   route tree - the exact same dashboard, sidebar/dropdown navigation and
+ *   views a logged-in member gets (see App.tsx's `RequireAuth` and
+ *   WorkspaceLayout.tsx, both of which special-case an active share session).
+ * - a single-object share renders a small, focused view of just that one
+ *   object instead (via the nested routes below), since it can't grant
+ *   access to browse anywhere else.
  */
 export function SharePage() {
   const { token } = useParams<{ token: string }>();
-
-  // Set synchronously during render, not in an effect - by the time any
-  // child's useQuery fetcher actually runs (after this render commits), the
-  // token must already be in place. Plain module state, not React state, so
-  // this is safe to do outside an effect.
-  if (token) setShareMode(token);
-  useEffect(() => () => setShareMode(null), []);
 
   const {
     data: resolved,
@@ -46,10 +44,20 @@ export function SharePage() {
     retry: false,
   });
 
-  // Live updates for anonymous visitors too - see useRealtime's shareToken
-  // param. Called unconditionally (before the loading/error returns below)
-  // since hooks can't be conditional; it no-ops until workspaceId is known.
-  useRealtime(resolved?.workspaceId, token);
+  // Set synchronously during render, not in an effect - by the time any
+  // child's useQuery fetcher actually runs (after this render commits), the
+  // token/role/scope must already be in place. Plain module state, not React
+  // state, so this is safe to do outside an effect.
+  // Deliberately not cleared on unmount: a whole-workspace share redirects
+  // onto the normal `/w/:workspaceId` tree below (WorkspaceLayout,
+  // ObjectDetailPage, ...), which needs this to still be set by the time it
+  // mounts - and an anonymous visitor has no other logged-in session in this
+  // tab to protect by clearing it. A fresh page load resets it naturally.
+  if (token && resolved) {
+    setShareMode({ token, role: resolved.role, scope: resolved.objectId ? "object" : "workspace" });
+  }
+
+  useRealtime(resolved?.objectId ? resolved.workspaceId : undefined, token);
 
   if (isLoading) {
     return (
@@ -69,6 +77,12 @@ export function SharePage() {
     );
   }
 
+  if (!resolved.objectId) {
+    // Whole-workspace share: reuse the exact same experience a logged-in
+    // member gets, instead of a separate cut-down browsing UI.
+    return <Navigate to={`/w/${resolved.workspaceId}`} replace />;
+  }
+
   return (
     <div className="min-h-screen bg-surface">
       <header className="flex items-center gap-2 border-b border-border px-6 py-3">
@@ -85,24 +99,19 @@ export function SharePage() {
   );
 }
 
-/** `/share/:token` index - either the one shared object, or a browse UI for a shared workspace. */
+/** `/share/:token` index - the one object a single-object share grants access to. */
 export function SharedIndexRoute() {
   const resolved = useShareResolution();
-
-  if (resolved.objectId) {
-    return (
-      <ObjectDetailPage
-        workspaceId={resolved.workspaceId}
-        objectId={resolved.objectId}
-        share={{ role: resolved.role, singleObject: true }}
-      />
-    );
-  }
-
-  return <SharedWorkspaceBrowse workspaceId={resolved.workspaceId} />;
+  return (
+    <ObjectDetailPage
+      workspaceId={resolved.workspaceId}
+      objectId={resolved.objectId!}
+      share={{ role: resolved.role, singleObject: true }}
+    />
+  );
 }
 
-/** `/share/:token/objects/:objectId` - only reachable when browsing a whole shared workspace. */
+/** `/share/:token/objects/:objectId` - reachable from a sub-object/relation link embedded within the shared object's content (see `objectHref` in shareMode.ts). Still scoped to the same single object server-side; anything else 403s with a friendly message (see ObjectDetailPage's error state). */
 export function SharedObjectRoute() {
   const resolved = useShareResolution();
   const { objectId } = useParams<{ objectId: string }>();
@@ -111,7 +120,7 @@ export function SharedObjectRoute() {
     <ObjectDetailPage
       workspaceId={resolved.workspaceId}
       objectId={objectId}
-      share={{ role: resolved.role, singleObject: false }}
+      share={{ role: resolved.role, singleObject: true }}
     />
   );
 }
