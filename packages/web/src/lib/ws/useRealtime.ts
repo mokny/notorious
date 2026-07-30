@@ -1,7 +1,46 @@
-import { useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import type { RealtimeEvent } from "@notorious/shared";
 import { clientId as myClientId } from "./clientId.js";
+
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 15_000;
+
+function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient: QueryClient): void {
+  if (payload.entity === "object") {
+    // Same reasoning as the "block" case below: title/property edits are
+    // debounced-saved per keystroke too (see useDebouncedSave), so
+    // refetching our own echoed change can race an active edit and
+    // revert it. Compared by clientId (this browser tab), not actorId
+    // (the user) - the same account open in two tabs must still see each
+    // other's edits live, only a tab's own echo of itself gets skipped.
+    if (payload.clientId !== myClientId) {
+      queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ["object", payload.entityId] });
+      queryClient.invalidateQueries({ queryKey: ["viewResults"] });
+      queryClient.invalidateQueries({ queryKey: ["backlinks", payload.entityId] });
+    }
+  } else if (payload.entity === "block") {
+    // Block-save events fire on every debounced keystroke. Skip the
+    // refetch for changes this tab made itself - its own editor already
+    // has the authoritative text, and racing a refetch against active
+    // typing is what caused characters to occasionally get dropped.
+    if (payload.clientId !== myClientId) {
+      queryClient.invalidateQueries({ queryKey: ["blocks", payload.objectId ?? ""] });
+    }
+  } else if (payload.entity === "member") {
+    queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
+    queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+  } else if (payload.entity === "relation") {
+    queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
+    queryClient.invalidateQueries({ queryKey: ["viewResults"] });
+  } else if (payload.entity === "pin") {
+    // Pin/unpin/reorder is a discrete, deliberate action (not a per-
+    // keystroke stream like block saves) - refetching even for the tab
+    // that made the change itself is harmless, so no clientId check.
+    queryClient.invalidateQueries({ queryKey: ["pins", workspaceId] });
+  }
+}
 
 /**
  * Opens one WebSocket connection per open workspace and invalidates the
@@ -13,58 +52,70 @@ import { clientId as myClientId } from "./clientId.js";
  * handshake can't carry the `X-Share-Token` header the REST API uses
  * (browsers don't let you set custom headers on a WebSocket), so it goes as
  * a query param instead; the server resolves it the same way either way.
+ *
+ * Reconnects with backoff on any drop: a backgrounded/throttled mobile tab
+ * (or a laptop coming back from sleep) is exactly the kind of thing that
+ * silently kills a WebSocket, and without this the tab would go
+ * realtime-blind until the whole page reloads. On the first reconnect after
+ * a drop, everything this hook knows how to invalidate gets invalidated
+ * once, as a catch-up for whatever was missed while disconnected - the
+ * per-entity, per-clientId filtering above only applies to messages that
+ * actually arrive, which doesn't help for a gap with no messages at all.
+ * `main.tsx`'s `refetchOnWindowFocus: true` covers the same "tab was away,
+ * refresh what's missing" need from the other direction (a plain REST
+ * refetch, independent of whether the socket itself reconnected yet).
  */
 export function useRealtime(workspaceId: string | undefined, shareToken?: string): void {
   const queryClient = useQueryClient();
-  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     if (!workspaceId) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const query = new URLSearchParams({ workspaceId });
-    if (shareToken) query.set("shareToken", shareToken);
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query.toString()}`);
-    socketRef.current = socket;
+    let cancelled = false;
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | undefined;
+    let reconnectDelay = RECONNECT_BASE_DELAY_MS;
+    let hasConnectedBefore = false;
 
-    socket.onmessage = (event) => {
-      const payload = JSON.parse(event.data) as RealtimeEvent;
+    function connect(): void {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const query = new URLSearchParams({ workspaceId: workspaceId! });
+      if (shareToken) query.set("shareToken", shareToken);
+      socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query.toString()}`);
 
-      if (payload.entity === "object") {
-        // Same reasoning as the "block" case below: title/property edits are
-        // debounced-saved per keystroke too (see useDebouncedSave), so
-        // refetching our own echoed change can race an active edit and
-        // revert it. Compared by clientId (this browser tab), not actorId
-        // (the user) - the same account open in two tabs must still see each
-        // other's edits live, only a tab's own echo of itself gets skipped.
-        if (payload.clientId !== myClientId) {
+      socket.onopen = () => {
+        reconnectDelay = RECONNECT_BASE_DELAY_MS;
+        if (hasConnectedBefore) {
           queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
-          queryClient.invalidateQueries({ queryKey: ["object", payload.entityId] });
+          queryClient.invalidateQueries({ queryKey: ["object"] });
+          queryClient.invalidateQueries({ queryKey: ["blocks"] });
           queryClient.invalidateQueries({ queryKey: ["viewResults"] });
-          queryClient.invalidateQueries({ queryKey: ["backlinks", payload.entityId] });
+          queryClient.invalidateQueries({ queryKey: ["backlinks"] });
+          queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
+          queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+          queryClient.invalidateQueries({ queryKey: ["pins", workspaceId] });
         }
-      } else if (payload.entity === "block") {
-        // Block-save events fire on every debounced keystroke. Skip the
-        // refetch for changes this tab made itself - its own editor already
-        // has the authoritative text, and racing a refetch against active
-        // typing is what caused characters to occasionally get dropped.
-        if (payload.clientId !== myClientId) {
-          queryClient.invalidateQueries({ queryKey: ["blocks", payload.objectId ?? ""] });
-        }
-      } else if (payload.entity === "member") {
-        queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
-        queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      } else if (payload.entity === "relation") {
-        queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
-        queryClient.invalidateQueries({ queryKey: ["viewResults"] });
-      } else if (payload.entity === "pin") {
-        // Pin/unpin/reorder is a discrete, deliberate action (not a per-
-        // keystroke stream like block saves) - refetching even for the tab
-        // that made the change itself is harmless, so no clientId check.
-        queryClient.invalidateQueries({ queryKey: ["pins", workspaceId] });
-      }
-    };
+        hasConnectedBefore = true;
+      };
 
-    return () => socket.close();
+      socket.onmessage = (event) => {
+        const payload = JSON.parse(event.data) as RealtimeEvent;
+        handleMessage(payload, workspaceId!, queryClient);
+      };
+
+      socket.onclose = () => {
+        if (cancelled) return;
+        reconnectTimeout = setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_DELAY_MS);
+      };
+    }
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(reconnectTimeout);
+      socket?.close();
+    };
   }, [workspaceId, shareToken, queryClient]);
 }

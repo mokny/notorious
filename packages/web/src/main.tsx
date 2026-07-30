@@ -9,7 +9,14 @@ import "./styles/globals.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
+    // Refetch whatever's on screen when a tab regains focus/visibility - this
+    // is the catch-up path for anything missed while backgrounded (mobile
+    // background tabs get their timers/network throttled, and the workspace
+    // WebSocket in useRealtime.ts can drop during that window), and it also
+    // covers a PWA resumed from suspension without a full reload. React
+    // Query's focus manager listens on `visibilitychange`, so this fires on
+    // tab-switching too, not just whole-window blur/focus.
+    queries: { retry: 1, refetchOnWindowFocus: true },
   },
 });
 
