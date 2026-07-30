@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { BookmarkContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
+import { linkPreviewApi } from "../../../lib/api/resources.js";
 import { Icon } from "../../ui/Icon.js";
 
 function hostnameOf(url: string): string {
@@ -18,6 +20,23 @@ export function BookmarkBlock({
   onSave: (c: BookmarkContent) => Promise<void>;
 }) {
   const [content, save] = useDebouncedSave(externalContent, onSave);
+  const [isFetchingTitle, setIsFetchingTitle] = useState(false);
+
+  async function setUrl(value: string) {
+    await save({ ...content, url: value });
+    // Best-effort: the page might not respond, block the request, or simply
+    // have no <title> - the title field stays freely editable either way,
+    // this just saves typing it out by hand for the common case.
+    setIsFetchingTitle(true);
+    try {
+      const { title } = await linkPreviewApi.fetchTitle(value);
+      if (title) save({ ...content, url: value, title });
+    } catch {
+      // Ignored - no title fetched is not an error the user needs to see.
+    } finally {
+      setIsFetchingTitle(false);
+    }
+  }
 
   if (!content.url) {
     return (
@@ -30,7 +49,7 @@ export function BookmarkBlock({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               const value = (e.target as HTMLInputElement).value.trim();
-              if (value) save({ ...content, url: value });
+              if (value) void setUrl(value);
             }
           }}
         />
@@ -47,7 +66,7 @@ export function BookmarkBlock({
         <input
           value={content.title ?? ""}
           onChange={(e) => save({ ...content, title: e.target.value })}
-          placeholder={hostnameOf(content.url)}
+          placeholder={isFetchingTitle ? "Fetching title…" : hostnameOf(content.url)}
           autoComplete="off"
           className="w-full border-none bg-transparent text-sm font-medium outline-none"
         />

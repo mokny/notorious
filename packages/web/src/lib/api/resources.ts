@@ -174,3 +174,11 @@ export const apiKeyApi = {
   create: (input: CreateApiKeyInput) => apiRequest<CreatedApiKey>("/api/v1/api-keys", { method: "POST", body: input }),
   revoke: (id: string) => apiRequest<void>(`/api/v1/api-keys/${id}`, { method: "DELETE" }),
 };
+
+export const linkPreviewApi = {
+  fetchTitle: (url: string) => apiRequest<{ title: string | null }>("/api/v1/link-preview", { query: { url } }),
+};
+
+export const systemApi = {
+  version: () => apiRequest<{ version: string }>("/api/v1/version"),
+};

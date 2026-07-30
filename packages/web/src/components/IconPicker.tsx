@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { objectApi, fileApi } from "../lib/api/resources.js";
+import { fileApi } from "../lib/api/resources.js";
 import { useClickOutside } from "../hooks/useClickOutside.js";
 import { Icon } from "./ui/Icon.js";
 
@@ -16,29 +15,27 @@ function fileIdFromUrl(url: string): string | null {
 }
 
 interface IconPickerProps {
-  workspaceId: string;
-  objectId: string;
   icon: string | null;
   fallbackIcon: string;
+  /** Persists the new icon (null clears it back to `fallbackIcon`, e.g. an object type's default - not valid for a workspace, see `resettable`). */
+  onChangeIcon: (icon: string | null) => Promise<void>;
+  /** Uploads the file and resolves to the icon value (a `fileApi.downloadUrl()`-shaped URL) to persist. */
+  onUploadIcon: (file: File) => Promise<string>;
+  /** Shows a "Reset" button that clears back to `fallbackIcon` via `onChangeIcon(null)` - omit where null isn't a valid icon value (e.g. workspaces, which always need some icon set). */
+  resettable?: boolean;
 }
 
-/** Lets you set an object's icon from a preset emoji grid, any typed-in emoji, or an uploaded image - shown next to the object's title. */
-export function IconPicker({ workspaceId, objectId, icon, fallbackIcon }: IconPickerProps) {
-  const queryClient = useQueryClient();
+/** Lets you set something's icon from a preset emoji grid, any typed-in emoji, or an uploaded image - used for both objects (next to the title) and workspaces (Settings). */
+export function IconPicker({ icon, fallbackIcon, onChangeIcon, onUploadIcon, resettable }: IconPickerProps) {
   const [open, setOpen] = useState(false);
   const [customEmoji, setCustomEmoji] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useClickOutside(containerRef, () => setOpen(false), open);
 
-  const setIconMutation = useMutation({
-    mutationFn: (newIcon: string | null) => objectApi.update(objectId, { icon: newIcon }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
-  });
-
   async function applyIcon(value: string | null) {
     const previousIcon = icon;
-    await setIconMutation.mutateAsync(value);
+    await onChangeIcon(value);
     // Without this, every re-upload leaves the old file behind as an
     // orphan - nothing else ever references an icon's own file.
     const oldFileId = previousIcon ? fileIdFromUrl(previousIcon) : null;
@@ -47,8 +44,8 @@ export function IconPicker({ workspaceId, objectId, icon, fallbackIcon }: IconPi
   }
 
   async function handleUpload(file: File) {
-    const asset = await fileApi.upload(workspaceId, file, objectId);
-    await applyIcon(fileApi.downloadUrl(asset.id));
+    const newIcon = await onUploadIcon(file);
+    await applyIcon(newIcon);
   }
 
   return (
@@ -97,7 +94,7 @@ export function IconPicker({ workspaceId, objectId, icon, fallbackIcon }: IconPi
             >
               <Icon name="upload" className="h-3.5 w-3.5" /> Upload image
             </button>
-            {icon && (
+            {resettable && icon && (
               <button
                 onClick={() => applyIcon(null)}
                 className="rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-surface hover:text-red-500"

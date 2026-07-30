@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { objectApi, schemaApi, workspaceApi } from "../lib/api/resources.js";
+import { objectApi, schemaApi, workspaceApi, fileApi } from "../lib/api/resources.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
@@ -47,6 +47,11 @@ export function ObjectDetailPage() {
   const [title, setTitle] = useDebouncedSave(object?.title ?? "", (value) =>
     updateTitleMutation.mutateAsync(value).then(() => undefined),
   );
+
+  const setIconMutation = useMutation({
+    mutationFn: (icon: string | null) => objectApi.update(objectId!, { icon }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
+  });
 
   const completeRecurringMutation = useMutation({
     mutationFn: () => objectApi.completeRecurring(objectId!),
@@ -116,10 +121,14 @@ export function ObjectDetailPage() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <IconPicker
-              workspaceId={workspaceId}
-              objectId={object.id}
               icon={object.icon}
               fallbackIcon={objectType?.icon ?? "file-text"}
+              onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon).then(() => undefined)}
+              onUploadIcon={async (file) => {
+                const asset = await fileApi.upload(workspaceId, file, object.id);
+                return fileApi.downloadUrl(asset.id);
+              }}
+              resettable
             />
             <input
               value={title}

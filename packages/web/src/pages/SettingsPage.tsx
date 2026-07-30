@@ -1,10 +1,11 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { workspaceApi, backupApi } from "../lib/api/resources.js";
+import { workspaceApi, backupApi, systemApi, fileApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
+import { IconPicker } from "../components/IconPicker.js";
 import { ApiError } from "../lib/api/client.js";
 import { NotificationSettings } from "../components/NotificationSettings.js";
 import { ApiKeysSettings } from "../components/ApiKeysSettings.js";
@@ -22,6 +23,7 @@ export function SettingsPage() {
 
   const { data: workspace } = useQuery({ queryKey: ["workspace", workspaceId], queryFn: () => workspaceApi.get(workspaceId!) });
   const { data: members } = useQuery({ queryKey: ["workspaceMembers", workspaceId], queryFn: () => workspaceApi.members(workspaceId!) });
+  const { data: version } = useQuery({ queryKey: ["version"], queryFn: systemApi.version, staleTime: Infinity });
 
   const isOwner = workspace?.ownerId === user?.id;
 
@@ -50,6 +52,14 @@ export function SettingsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspaces"] }),
   });
 
+  const setIconMutation = useMutation({
+    mutationFn: (icon: string) => workspaceApi.update(workspaceId!, { icon }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+
   function handleInvite(event: FormEvent) {
     event.preventDefault();
     inviteMutation.mutate();
@@ -57,6 +67,24 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-10 px-6 py-10">
+      <section>
+        <h2 className="text-lg font-semibold">Workspace</h2>
+        <p className="mt-1 text-sm text-ink-muted">Pick an icon for "{workspace?.name}", or upload your own image.</p>
+        <div className="mt-4">
+          {workspace && (
+            <IconPicker
+              icon={workspace.icon}
+              fallbackIcon={workspace.icon}
+              onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon ?? "sparkles").then(() => undefined)}
+              onUploadIcon={async (file) => {
+                const asset = await fileApi.upload(workspaceId!, file);
+                return fileApi.downloadUrl(asset.id);
+              }}
+            />
+          )}
+        </div>
+      </section>
+
       <section>
         <h2 className="text-lg font-semibold">Notifications</h2>
         <p className="mt-1 text-sm text-ink-muted">Get a push notification for task reminders, invitations and assignments.</p>
@@ -164,6 +192,8 @@ export function SettingsPage() {
           {importMutation.isSuccess && <p className="mt-2 text-sm text-green-600">Restored as a new workspace - check the workspace picker.</p>}
         </section>
       )}
+
+      {version && <p className="text-center text-xs text-ink-muted">Notorious v{version.version}</p>}
     </div>
   );
 }
