@@ -29,11 +29,46 @@ function shareUrl(token: string): string {
   return `${window.location.origin}/share/${token}`;
 }
 
+/**
+ * `navigator.clipboard` only exists in secure contexts (HTTPS, or localhost) -
+ * on a bare-metal deployment reached over plain HTTP/a LAN IP it's simply
+ * undefined, so calling it directly throws before anything is copied. Falls
+ * back to the old `execCommand("copy")` trick (works anywhere, deprecated but
+ * still supported everywhere) whenever the modern API isn't available.
+ */
+async function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // fall through to the legacy fallback below
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let succeeded = false;
+  try {
+    succeeded = document.execCommand("copy");
+  } catch {
+    succeeded = false;
+  }
+  document.body.removeChild(textarea);
+  return succeeded;
+}
+
 /** Popover for creating/listing/revoking public share links - reused for both whole-workspace shares (Settings) and single-object shares (ObjectDetailPage). */
 export function ShareDialog({ workspaceId, objectId, label }: ShareDialogProps) {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<ShareRole>("viewer");
   const [expiryMs, setExpiryMs] = useState<number | null>(null);
+  const [copyState, setCopyState] = useState<{ linkId: string; ok: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   useClickOutside(containerRef, () => setOpen(false), open);
@@ -60,6 +95,12 @@ export function ShareDialog({ workspaceId, objectId, label }: ShareDialogProps) 
     onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
+  async function handleCopy(linkId: string, token: string) {
+    const ok = await copyText(shareUrl(token));
+    setCopyState({ linkId, ok });
+    setTimeout(() => setCopyState((current) => (current?.linkId === linkId ? null : current)), 2000);
+  }
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -85,13 +126,19 @@ export function ShareDialog({ workspaceId, objectId, label }: ShareDialogProps) 
               <div key={link.id} className="rounded-md border border-border p-2">
                 <div className="flex items-center justify-between gap-1">
                   <code className="min-w-0 flex-1 truncate text-xs">{shareUrl(link.token)}</code>
-                  <button
-                    onClick={() => void navigator.clipboard.writeText(shareUrl(link.token))}
-                    title="Copy link"
-                    className="shrink-0 rounded p-1 text-ink-muted hover:bg-surface hover:text-ink"
-                  >
-                    <Icon name="copy" className="h-3.5 w-3.5" />
-                  </button>
+                  {copyState?.linkId === link.id ? (
+                    <span className={`shrink-0 px-1 text-[11px] ${copyState.ok ? "text-green-600" : "text-red-500"}`}>
+                      {copyState.ok ? "Copied!" : "Copy failed"}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => void handleCopy(link.id, link.token)}
+                      title="Copy link"
+                      className="shrink-0 rounded p-1 text-ink-muted hover:bg-surface hover:text-ink"
+                    >
+                      <Icon name="copy" className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   <button
                     onClick={() => revokeMutation.mutate(link.id)}
                     title="Revoke this link"
