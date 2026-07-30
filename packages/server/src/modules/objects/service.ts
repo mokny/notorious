@@ -9,7 +9,7 @@ import type {
   ViewSort,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { objects, relations, objectValues } from "../../db/schema.js";
+import { objects, relations, objectValues, objectTypes, blocks } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { notFound } from "../../lib/httpError.js";
 import { listProperties } from "../schema/service.js";
@@ -17,6 +17,7 @@ import { resolveValuesForObjects } from "./valueResolver.js";
 import { applyFilters, compareForSort, MAX_SCAN } from "./query.js";
 import { reindexObjectBody, removeFromIndex } from "../search/indexer.js";
 import { listFilesForObject, deleteFile } from "../files/service.js";
+import { positionBetween } from "../../lib/position.js";
 
 function toRecord(row: typeof objects.$inferSelect, values: Record<string, unknown>): ObjectRecord {
   return {
@@ -59,8 +60,27 @@ export async function createObject(
     await writeStoredValues(id, input.objectTypeId, input.values);
   }
 
+  await seedWhiteboardBlockIfNeeded(id, input.objectTypeId, now);
+
   await reindexObjectBody(id, input.title);
   return getObject(id);
+}
+
+/** A brand-new Whiteboard object starts with one ready-to-draw-on canvas block, rather than the normal empty block list requiring a slash command first - the block itself is otherwise a completely ordinary block (see modules/blocks/service.ts), just created directly here instead of through that module to avoid a service-to-service import for this one bootstrap step. */
+async function seedWhiteboardBlockIfNeeded(objectId: string, objectTypeId: string, createdAt: string): Promise<void> {
+  const typeRows = await db.select({ key: objectTypes.key }).from(objectTypes).where(eq(objectTypes.id, objectTypeId)).limit(1);
+  if (typeRows[0]?.key !== "whiteboard") return;
+
+  await db.insert(blocks).values({
+    id: newId(),
+    objectId,
+    parentBlockId: null,
+    type: "whiteboard",
+    content: "{}",
+    position: positionBetween(null, null),
+    createdAt,
+    updatedAt: createdAt,
+  });
 }
 
 export async function getObjectWorkspaceId(objectId: string): Promise<string> {

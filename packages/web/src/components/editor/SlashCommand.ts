@@ -28,6 +28,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "database_view", label: "Linked view", description: "Embed a saved view of objects" },
   { type: "sub_object", label: "Sub-object", description: "Embed a linked object, expandable to its own sub-objects" },
   { type: "bookmark", label: "Bookmark", description: "Save a link with a title and description" },
+  { type: "whiteboard", label: "Whiteboard", description: "Sketch with shapes, arrows and freehand drawing" },
 ];
 
 /** Extension options: the host component supplies what happens when a block type is chosen. */

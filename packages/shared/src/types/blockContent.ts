@@ -75,3 +75,16 @@ export interface BookmarkContent {
   description?: string;
   icon?: string | null;
 }
+/**
+ * A drawing/sketching canvas (shapes, text, freehand, arrows - see
+ * WhiteboardBlock.tsx, backed by Excalidraw) - either embedded as a block in
+ * any object, or the sole content of a dedicated Whiteboard object (one gets
+ * created automatically when a Whiteboard object is created, see
+ * modules/objects/service.ts). `sceneJson` is Excalidraw's own `.excalidraw`
+ * file-format JSON (from its `serializeAsJSON` helper) kept as an opaque
+ * string - only the whiteboard block itself, never the server, needs to
+ * interpret it.
+ */
+export interface WhiteboardContent {
+  sceneJson?: string;
+}

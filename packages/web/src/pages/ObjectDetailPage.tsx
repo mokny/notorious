@@ -21,9 +21,12 @@ import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 // without blocking `<a>`/`Link` navigation the way a blanket `pointer-events-
 // none` on the whole container would - sub-object/relation links inside
 // otherwise-read-only content still need to be clickable (see
-// SubObjectBlock.tsx, RelationPicker.tsx).
+// SubObjectBlock.tsx, RelationPicker.tsx). `canvas` covers the whiteboard
+// block (Excalidraw draws/handles pointer events directly on a <canvas>
+// element, not an input/button) - without it a "viewer" could still draw on
+// someone else's shared whiteboard.
 const READ_ONLY_LOCK =
-  "[&_input]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button]:pointer-events-none [&_[contenteditable]]:pointer-events-none";
+  "[&_input]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button]:pointer-events-none [&_[contenteditable]]:pointer-events-none [&_canvas]:pointer-events-none";
 
 export interface SharedObjectContext {
   role: WorkspaceRole;

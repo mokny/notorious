@@ -87,6 +87,8 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         return { objectId: null };
       case "bookmark":
         return { url: "" };
+      case "whiteboard":
+        return {};
       default:
         return {};
     }

@@ -39,6 +39,7 @@ import {
   Bookmark,
   Share2,
   Copy,
+  PenTool,
   type LucideIcon,
 } from "lucide-react";
 
@@ -81,6 +82,7 @@ const ICONS: Record<string, LucideIcon> = {
   bookmark: Bookmark,
   share: Share2,
   copy: Copy,
+  whiteboard: PenTool,
 };
 
 function isImageUrl(value: string): boolean {

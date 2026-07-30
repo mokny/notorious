@@ -33,7 +33,7 @@ export default defineConfig({
         // this precache-manifest build step is what ran a memory-constrained
         // server out of heap. It still loads fine on demand from the network.
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        globIgnores: ["**/vendor-diagrams-*.js"],
+        globIgnores: ["**/vendor-diagrams-*.js", "**/vendor-whiteboard-*.js"],
       },
       strategies: "injectManifest",
       srcDir: "src",
@@ -68,6 +68,14 @@ export default defineConfig({
           // of auto-hashed per-diagram-type chunk names.
           if (/node_modules\/(mermaid|cytoscape|cose-bilkent|dagre|d3-?[\w-]*|katex)\//.test(id)) {
             return "vendor-diagrams";
+          }
+          // Excalidraw (the whiteboard block/object's drawing canvas) is its
+          // own multi-MB bundle with a long dependency chain - same reasoning
+          // as vendor-diagrams above: its own chunk, excluded from the PWA
+          // precache manifest, loaded on demand only when a whiteboard block
+          // actually renders (see WhiteboardBlock.tsx's dynamic import).
+          if (/node_modules\/(@excalidraw|roughjs|perfect-freehand|points-on-curve|pica|image-blob-reduce)\//.test(id)) {
+            return "vendor-whiteboard";
           }
         },
       },

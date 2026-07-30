@@ -18,6 +18,7 @@ export const BLOCK_TYPES = [
   "database_view",
   "sub_object",
   "bookmark",
+  "whiteboard",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -43,4 +44,5 @@ export const LEAF_BLOCK_TYPES: readonly BlockType[] = [
   "database_view",
   "sub_object",
   "bookmark",
+  "whiteboard",
 ];
