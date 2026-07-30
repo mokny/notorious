@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { objectApi, fileApi } from "../lib/api/resources.js";
+import { withShareToken } from "../lib/api/shareMode.js";
 import { Icon } from "./ui/Icon.js";
 
 interface CoverImageProps {
@@ -66,7 +67,7 @@ export function CoverImage({ workspaceId, objectId, cover }: CoverImageProps) {
 
   return (
     <div className="relative w-full" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <img src={cover} alt="" className="max-h-[300px] w-full object-cover" />
+      <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" />
       {hover && (
         <div className="absolute right-3 top-3 flex gap-1.5">
           <button

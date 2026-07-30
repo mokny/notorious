@@ -31,10 +31,14 @@ declare module "fastify" {
  * Resolves the current user from the session cookie on every request, and
  * provides `request.requireUser()` for routes that must be authenticated.
  * Sessions are stored server-side (not JWTs) so they can be revoked on logout.
- * Also resolves an `X-Share-Token` header (if present and no session/API key
- * won) into `request.shareAccess`, for the small set of routes that accept
- * anonymous share-link access alongside normal membership - see
- * `modules/workspaces/access.ts`'s `requireAccess`.
+ * Also resolves a share token (if present and no session/API key won) into
+ * `request.shareAccess`, for the small set of routes that accept anonymous
+ * share-link access alongside normal membership - see
+ * `modules/workspaces/access.ts`'s `requireAccess`. Normally carried as an
+ * `X-Share-Token` header (see lib/api/client.ts on the frontend), but also
+ * accepted as a `?shareToken=` query param for the handful of requests that
+ * can't attach custom headers - plain `<img src>` loads (object/workspace
+ * icons, covers, image blocks) and the WebSocket handshake.
  */
 export const sessionPlugin = fp(async (app: FastifyInstance) => {
   app.decorateRequest("user", null);
@@ -68,7 +72,9 @@ export const sessionPlugin = fp(async (app: FastifyInstance) => {
       }
     }
 
-    const shareToken = request.headers["x-share-token"];
+    const headerToken = request.headers["x-share-token"];
+    const queryToken = (request.query as { shareToken?: string } | undefined)?.shareToken;
+    const shareToken = typeof headerToken === "string" ? headerToken : queryToken;
     if (typeof shareToken === "string") {
       request.shareAccess = await resolveShareToken(shareToken);
     }

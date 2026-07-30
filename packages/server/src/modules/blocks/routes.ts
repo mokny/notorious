@@ -134,10 +134,13 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/api/v1/objects/:objectId/export-markdown", async (request, reply) => {
-    const user = requireUser(request);
     const { objectId } = request.params as { objectId: string };
     const workspaceId = await getObjectWorkspaceId(objectId);
-    await requireWorkspaceRole(workspaceId, user.id, "viewer");
+    // Reached via `window.open(...)` (see BlockEditor.tsx) - a plain
+    // navigation, same "no custom header" constraint as an <img src>, so the
+    // share token (if any) arrives as a query param here too (see
+    // plugins/session.ts).
+    await requireAccess(request, workspaceId, "viewer", { objectId });
 
     const [object, blocks] = await Promise.all([getObject(objectId), blockService.listBlocks(objectId)]);
     const markdown = `# ${object.title}\n\n${blocksToMarkdown(blocks)}`;

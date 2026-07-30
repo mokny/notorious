@@ -72,3 +72,21 @@ export function objectHref(workspaceId: string, objectId: string): string {
   }
   return `/w/${workspaceId}/objects/${objectId}`;
 }
+
+/**
+ * A plain `<img src>`/`<video src>` or a `window.open(...)` navigation can't
+ * attach the `X-Share-Token` header `apiRequest`/`apiUpload` use - append it
+ * as a query param instead, so object/workspace icons, covers, image/video
+ * blocks and the Markdown export link still work for an anonymous share
+ * visitor. Object/cover/block-content values are stored as plain
+ * `/api/v1/files/<id>` strings with no token baked in (correctly - a token
+ * shouldn't end up in permanent data), so this has to run at render/click
+ * time, not just right after an upload. A no-op outside of share mode, and
+ * for anything that isn't one of our own API URLs (external image URLs,
+ * embeds, bookmarked links).
+ */
+export function withShareToken(url: string): string {
+  if (!session || !url.startsWith("/api/v1/")) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}shareToken=${encodeURIComponent(session.token)}`;
+}

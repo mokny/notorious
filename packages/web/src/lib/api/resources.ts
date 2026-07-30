@@ -152,6 +152,13 @@ export const fileApi = {
     if (blockId) formData.append("blockId", blockId);
     return apiUpload<FileAsset>(`/api/v1/workspaces/${workspaceId}/files`, formData);
   },
+  // Deliberately plain (no share token appended here) - this value gets
+  // stored as-is (an object/workspace's icon/cover field, a block's image
+  // url, ...) and re-rendered later from that stored string, long after
+  // this call returns. Wherever a file URL is actually put into an <img>/
+  // <video> src, it goes through `withShareToken()` at render time instead
+  // (see Icon.tsx, CoverImage.tsx, MediaBlocks.tsx) - appending it here too
+  // would double up the query param on first render.
   downloadUrl: (id: string) => `/api/v1/files/${id}`,
   remove: (id: string) => apiRequest<void>(`/api/v1/files/${id}`, { method: "DELETE" }),
 };

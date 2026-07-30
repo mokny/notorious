@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { ImageContent, VideoContent, EmbedContent } from "@notorious/shared";
 import { fileApi } from "../../../lib/api/resources.js";
+import { withShareToken } from "../../../lib/api/shareMode.js";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { Icon } from "../../ui/Icon.js";
 
@@ -33,7 +34,7 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
   if (content.url) {
     return (
       <figure>
-        <img src={content.url} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
+        <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
         <input
           value={content.caption ?? ""}
           onChange={(e) => save({ ...content, caption: e.target.value })}
@@ -70,7 +71,7 @@ export function VideoBlock({ content, workspaceId, objectId, onSave }: MediaProp
   const inputRef = useRef<HTMLInputElement>(null);
 
   if (content.url) {
-    return <video src={content.url} controls className="max-h-96 w-full rounded-lg bg-black" />;
+    return <video src={withShareToken(content.url)} controls className="max-h-96 w-full rounded-lg bg-black" />;
   }
 
   return (

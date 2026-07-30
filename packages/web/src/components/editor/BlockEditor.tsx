@@ -4,6 +4,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, ty
 import { arrayMove } from "@dnd-kit/sortable";
 import type { BlockType } from "@notorious/shared";
 import { blockApi, fileApi } from "../../lib/api/resources.js";
+import { withShareToken } from "../../lib/api/shareMode.js";
 import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
 import { BlockList } from "./BlockList.js";
@@ -206,7 +207,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         )}
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Button variant="ghost" onClick={() => window.open(blockApi.exportMarkdownUrl(objectId), "_blank")}>
+          <Button variant="ghost" onClick={() => window.open(withShareToken(blockApi.exportMarkdownUrl(objectId)), "_blank")}>
             <Icon name="download" className="h-3.5 w-3.5" /> Export Markdown
           </Button>
           <Button variant="ghost" onClick={() => importInputRef.current?.click()}>

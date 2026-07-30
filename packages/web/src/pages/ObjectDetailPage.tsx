@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi } from "../lib/api/resources.js";
-import { getShareRole } from "../lib/api/shareMode.js";
+import { getShareRole, withShareToken } from "../lib/api/shareMode.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
@@ -167,7 +167,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
       {canEdit ? (
         <CoverImage workspaceId={workspaceId} objectId={object.id} cover={object.cover} />
       ) : (
-        object.cover && <img src={object.cover} alt="" className="max-h-[300px] w-full object-cover" />
+        object.cover && <img src={withShareToken(object.cover)} alt="" className="max-h-[300px] w-full object-cover" />
       )}
 
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">

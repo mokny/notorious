@@ -1,3 +1,4 @@
+import { withShareToken } from "../../lib/api/shareMode.js";
 import {
   FileText,
   FolderKanban,
@@ -103,7 +104,7 @@ export function Icon({ name, className }: { name: string; className?: string }) 
   if (!name) return <FileText className={className ?? "h-4 w-4"} />;
 
   if (isImageUrl(name)) {
-    return <img src={name} alt="" className={`${className ?? "h-4 w-4"} shrink-0 rounded object-cover`} />;
+    return <img src={withShareToken(name)} alt="" className={`${className ?? "h-4 w-4"} shrink-0 rounded object-cover`} />;
   }
 
   const Component = ICONS[name];

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { fileApi } from "../../lib/api/resources.js";
+import { withShareToken } from "../../lib/api/shareMode.js";
 import { Icon } from "../ui/Icon.js";
 
 interface FilePropertyFieldProps {
@@ -23,9 +24,14 @@ export function FilePropertyField({ workspaceId, objectId, value, isImage, onCha
     return (
       <div className="flex items-center gap-2">
         {isImage ? (
-          <img src={fileApi.downloadUrl(value)} alt="" className="h-10 w-10 rounded-md object-cover" />
+          <img src={withShareToken(fileApi.downloadUrl(value))} alt="" className="h-10 w-10 rounded-md object-cover" />
         ) : (
-          <a href={fileApi.downloadUrl(value)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm text-accent">
+          <a
+            href={withShareToken(fileApi.downloadUrl(value))}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 text-sm text-accent"
+          >
             <Icon name="paperclip" className="h-3.5 w-3.5" /> Open file
           </a>
         )}
