@@ -16,6 +16,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
     deleteBlock,
     pendingFocusBlockId,
     clearPendingFocus,
+    isDraggingAny,
   } = useBlockEditor();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
 
@@ -27,16 +28,29 @@ export function BlockItem({ block }: { block: BlockNode }) {
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="group flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60">
-      <div className="mt-1 flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+    // Named group ("item", not the bare default) - a block editor nests many
+    // of these inside one outer "editor"-named group (see BlockEditor.tsx),
+    // and CSS :hover propagates to every ancestor of whatever's under the
+    // pointer. With everyone sharing the same unnamed "group", hovering *any*
+    // block satisfied the outer group's hover state too, which made every
+    // block's controls appear at once instead of just the hovered one's.
+    <div ref={setNodeRef} style={style} className="group/item flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60">
+      <div className="mt-1 flex shrink-0 items-center gap-0.5">
         <button
           onClick={() => createBlockAfter(block.parentBlockId, block.id, "paragraph")}
-          className="rounded p-0.5 text-ink-muted hover:bg-surface hover:text-ink"
+          className="rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/item:opacity-100"
           title="Add block below"
         >
           <Icon name="plus" className="h-3.5 w-3.5" />
         </button>
-        <button {...attributes} {...listeners} className="cursor-grab rounded p-0.5 text-ink-muted hover:bg-surface hover:text-ink" title="Drag to reorder">
+        <button
+          {...attributes}
+          {...listeners}
+          className={`cursor-grab rounded p-0.5 text-ink-muted hover:bg-surface hover:text-ink ${
+            isDraggingAny ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"
+          }`}
+          title="Drag to reorder"
+        >
           <Icon name="grip-vertical" className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -59,7 +73,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
 
       <button
         onClick={() => deleteBlock(block.id)}
-        className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover:opacity-100"
+        className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover/item:opacity-100"
         title="Delete block"
       >
         <Icon name="trash" className="h-3.5 w-3.5" />

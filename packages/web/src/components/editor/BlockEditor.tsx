@@ -1,6 +1,6 @@
 import { useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { BlockType } from "@notorious/shared";
 import { blockApi, fileApi } from "../../lib/api/resources.js";
@@ -23,6 +23,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
   const importInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
+  const [isDraggingAny, setIsDraggingAny] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const dragDepth = useRef(0);
@@ -83,12 +84,19 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         return { summaryMarkdown: "" };
       case "sub_object":
         return { objectId: null };
+      case "bookmark":
+        return { url: "" };
       default:
         return {};
     }
   }
 
+  function handleDragStart(_event: DragStartEvent) {
+    setIsDraggingAny(true);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setIsDraggingAny(false);
     if (!event.over || event.active.id === event.over.id) return;
     const blockId = String(event.active.id);
     const overId = String(event.over.id);
@@ -177,6 +185,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         moveBlock: (blockId, parentBlockId, afterBlockId) => moveMutation.mutate({ blockId, parentBlockId, afterBlockId }),
         pendingFocusBlockId,
         clearPendingFocus: () => setPendingFocusBlockId(null),
+        isDraggingAny,
       }}
     >
       <div
@@ -216,8 +225,8 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
           />
         </div>
 
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <div className="group">
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setIsDraggingAny(false)}>
+          <div className="group/editor">
             <BlockList blocks={tree} parentBlockId={null} />
           </div>
         </DndContext>

@@ -68,3 +68,9 @@ export interface ToggleContent {
 export interface SubObjectContent {
   objectId: string | null;
 }
+/** A bookmarked URL rendered as a card. `url` is empty until one has been entered; `title`/`description` are freely editable, not fetched from the page. */
+export interface BookmarkContent {
+  url: string;
+  title?: string;
+  description?: string;
+}

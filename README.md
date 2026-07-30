@@ -8,15 +8,8 @@ per-workspace ZIP backups, and Web Push notifications - all backed by a single S
 There are no pre-created accounts - register your own via the `/register` page, or create one from
 the shell with `npm run create-user` (see [Creating user accounts](#creating-user-accounts)).
 
-## Getting the code
-
-```bash
-git clone https://github.com/mokny/notorious.git
-cd notorious
-```
-
-From here, either follow [Quick start](#quick-start-local-development) below to run it locally, or
-[Installing on your own Linux server](#installing-on-your-own-linux-server) to deploy it.
+Want to run it yourself? Follow [Quick start](#quick-start-local-development) below for local
+development, or [Installing on your own Linux server](#installing-on-your-own-linux-server) to deploy it.
 
 ## Documentation
 
@@ -39,6 +32,8 @@ Prerequisites: Node.js 20+ and npm. `better-sqlite3` and `argon2` contain native
 need `python3`, `make` and `g++` installed if no prebuilt binary matches your platform.
 
 ```bash
+git clone https://github.com/mokny/notorious.git
+cd notorious
 npm install
 cp .env.example .env
 npm run migrate
@@ -56,10 +51,10 @@ npm run generate-vapid-keys --workspace=packages/server
 
 ## Installing on your own Linux server
 
+One line, no git required - downloads the code (via curl/wget) into `./notorious` and installs it:
+
 ```bash
-git clone https://github.com/mokny/notorious.git
-cd notorious
-./scripts/install.sh
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
 ```
 
 This installs missing system dependencies (Node.js and, on Debian/Ubuntu, the build tools better-
@@ -72,16 +67,18 @@ end it asks:
 
 Answer yes to install and enable a systemd unit (`/etc/systemd/system/notorious.service`) so the app
 starts on boot and restarts if it crashes; answer no to start it yourself later with
-`npm run start:prod`. The script is safe to re-run.
+`npm run start:prod`. The script is safe to re-run. (Already have a git clone and prefer that? `cd`
+into it and run `./scripts/install.sh` directly - same script, same result.)
 
-Whenever you want to update to the latest version:
+Whenever you want to update to the latest version, from inside that directory:
 
 ```bash
-./scripts/update.sh
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash
 ```
 
-This pulls the latest code, reinstalls dependencies, rebuilds, runs any pending migrations, and
-restarts the systemd service if `install.sh` set one up (otherwise it tells you to restart manually).
+This re-downloads the latest code as a tarball (`.env` and `data/` are untouched - neither is part of
+the download), reinstalls dependencies, rebuilds, runs any pending migrations, and restarts the
+systemd service if `install.sh` set one up (otherwise it tells you to restart manually).
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for what these scripts do under the hood, plus the fully
 manual steps, reverse proxy/HTTPS setup, and backup instructions.

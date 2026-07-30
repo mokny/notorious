@@ -17,6 +17,7 @@ import type {
   ColumnsContent,
   DatabaseViewContent,
   SubObjectContent,
+  BookmarkContent,
 } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { ParagraphBlock } from "./blocks/ParagraphBlock.js";
@@ -34,6 +35,7 @@ import { DividerBlock } from "./blocks/DividerBlock.js";
 import { ColumnsBlock } from "./blocks/ColumnsBlock.js";
 import { DatabaseViewBlock } from "./blocks/DatabaseViewBlock.js";
 import { SubObjectBlock } from "./blocks/SubObjectBlock.js";
+import { BookmarkBlock } from "./blocks/BookmarkBlock.js";
 
 export interface BlockRendererProps {
   block: BlockNode;
@@ -124,6 +126,8 @@ export function BlockRenderer({
       return <DatabaseViewBlock content={content<DatabaseViewContent>()} workspaceId={workspaceId} onSave={save} />;
     case "sub_object":
       return <SubObjectBlock content={content<SubObjectContent>()} workspaceId={workspaceId} hostObjectId={objectId} onSave={save} />;
+    case "bookmark":
+      return <BookmarkBlock content={content<BookmarkContent>()} onSave={save} />;
     default:
       return null;
   }

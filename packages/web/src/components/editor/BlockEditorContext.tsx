@@ -11,6 +11,8 @@ export interface BlockEditorActions {
   /** The block that should receive focus once it appears (set right after Enter creates one). */
   pendingFocusBlockId: string | null;
   clearPendingFocus: () => void;
+  /** True for the whole editor while any block is being dragged - not just the one under the pointer, so every block's move handle stays visible as a drop-target cue. */
+  isDraggingAny: boolean;
 }
 
 const BlockEditorContext = createContext<BlockEditorActions | null>(null);

@@ -14,7 +14,6 @@ export const SYSTEM_OBJECT_TYPE_KEYS = [
   "file",
   "database",
   "collection",
-  "bookmark",
 ] as const;
 
 export type SystemObjectTypeKey = (typeof SYSTEM_OBJECT_TYPE_KEYS)[number];
@@ -36,5 +35,4 @@ export const SYSTEM_OBJECT_TYPES: readonly SystemObjectTypeDefinition[] = [
   { key: "file", name: "File", icon: "paperclip" },
   { key: "database", name: "Database", icon: "table" },
   { key: "collection", name: "Collection", icon: "layers" },
-  { key: "bookmark", name: "Bookmark", icon: "bookmark" },
 ];

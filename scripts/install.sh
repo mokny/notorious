@@ -3,8 +3,42 @@
 # dependencies, .env setup, build, database migration, and (optionally) a
 # systemd service so it starts on boot. Safe to re-run.
 #
-# Usage: ./scripts/install.sh
+# Usage: ./scripts/install.sh (after a manual git clone), or as the one-line
+# installer from the README:
+#   curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
 set -euo pipefail
+
+REPO_URL="https://github.com/mokny/notorious"
+BRANCH="main"
+
+# `curl ... | bash` has no real script file on disk - BASH_SOURCE[0] is just
+# the literal string "bash" in that case, which doesn't resolve to a path.
+# That's the signal this is the one-line installer, not `./scripts/install.sh`
+# run after a manual clone: download the code as a tarball (no git needed)
+# and hand off to the real, now-on-disk copy of this same script.
+if [ ! -f "${BASH_SOURCE[0]:-/nonexistent}" ]; then
+  TARGET_DIR="${NOTORIOUS_DIR:-notorious}"
+  if [ -e "$TARGET_DIR" ] && [ -n "$(ls -A "$TARGET_DIR" 2>/dev/null)" ]; then
+    echo "Directory '$TARGET_DIR' already exists and isn't empty." >&2
+    echo "Remove it, set NOTORIOUS_DIR=<path> to install elsewhere, or if it's an existing" >&2
+    echo "Notorious install, cd into it and run ./scripts/update.sh instead." >&2
+    exit 1
+  fi
+
+  echo "==> Downloading Notorious ($BRANCH)"
+  mkdir -p "$TARGET_DIR"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$REPO_URL/archive/refs/heads/$BRANCH.tar.gz" | tar xz -C "$TARGET_DIR" --strip-components=1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- "$REPO_URL/archive/refs/heads/$BRANCH.tar.gz" | tar xz -C "$TARGET_DIR" --strip-components=1
+  else
+    echo "Need curl or wget to download Notorious - install either and try again." >&2
+    exit 1
+  fi
+
+  cd "$TARGET_DIR"
+  exec ./scripts/install.sh
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"

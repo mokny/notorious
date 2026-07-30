@@ -4,25 +4,28 @@ Notorious keeps all of its state in exactly two places: **one SQLite file** and 
 uploaded files**. Both paths are configured via `DATABASE_PATH` and `FILES_DIR` in `.env`
 (see `.env.example`). That is the entire "database" - there is no separate service to provision.
 
-You can run it two ways: directly on the server with Node.js (what you `git pull` and update), or
-via Docker Compose. Both read the same `.env` file and the same `data/` directory layout.
+You can run it two ways: directly on the server with Node.js, or via Docker Compose. Both read the
+same `.env` file and the same `data/` directory layout.
 
-## Option A: Bare-metal Linux (git pull + systemd)
+## Option A: Bare-metal Linux (systemd)
 
 ### First-time setup (scripted)
 
 ```bash
-git clone https://github.com/mokny/notorious.git
-cd notorious
-./scripts/install.sh
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
 ```
 
-`scripts/install.sh` does everything below in one pass: checks/installs Node.js 20+ and (on
-Debian/Ubuntu) the build tools needed if `better-sqlite3`/`argon2` have to compile from source,
-`npm install`, sets up `.env` (generates `SESSION_SECRET`, optionally a VAPID key pair), builds,
-migrates, offers to create your first user account, and asks whether to install a systemd service so
-the app starts on boot. It's safe to re-run. The rest of this section explains what it does and how
-to do it by hand if you'd rather not run a script with `sudo`.
+No git required - this one-liner downloads the code as a tarball (via curl, falling back to wget) into
+`./notorious` and runs the installer. `scripts/install.sh` does everything below in one pass:
+checks/installs Node.js 20+ and (on Debian/Ubuntu) the build tools needed if `better-sqlite3`/`argon2`
+have to compile from source, `npm install`, sets up `.env` (generates `SESSION_SECRET`, optionally a
+VAPID key pair), builds, migrates, offers to create your first user account, and asks whether to
+install a systemd service so the app starts on boot. It's safe to re-run. The rest of this section
+explains what it does and how to do it by hand if you'd rather not run a script with `sudo`.
+
+(If you'd rather work from a git clone - e.g. you want `git log`/`git pull` available on the server -
+that still works: `git clone https://github.com/mokny/notorious.git && cd notorious &&
+./scripts/install.sh` runs the exact same script.)
 
 ### First-time setup (manual)
 
@@ -81,20 +84,21 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now notorious
 ```
 
-### Updating (git pull workflow)
+### Updating
 
 ```bash
 cd /opt/notorious
-./scripts/update.sh
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash
 ```
 
-`scripts/update.sh` pulls the latest code, runs `npm install`, rebuilds, runs any pending migrations,
-and restarts the systemd service if `install.sh` set one up (it warns and asks for confirmation first
-if it finds uncommitted local changes). Equivalent by hand:
+No git required, either - `scripts/update.sh` downloads the latest code as a tarball and syncs it in
+(`.env` and `data/` are untouched - neither is part of the download), runs `npm install`, rebuilds, runs
+any pending migrations, and restarts the systemd service if `install.sh` set one up. Equivalent by
+hand:
 
 ```bash
 cd /opt/notorious
-git pull
+curl -fsSL https://github.com/mokny/notorious/archive/refs/heads/main.tar.gz | tar xz --strip-components=1
 npm install            # picks up any new/updated dependencies
 npm run build
 npm run migrate
@@ -103,6 +107,9 @@ sudo systemctl restart notorious
 
 Migrations are additive and tracked in a `_migrations` table (see `packages/server/src/db/migrate.ts`),
 so re-running them is always safe - already-applied migrations are skipped.
+
+If you deployed from a git clone and would rather keep using `git pull` yourself, that still works
+fine too - the scripts just no longer require it.
 
 ### Reverse proxy (nginx example, for HTTPS + a real domain)
 
