@@ -198,22 +198,22 @@ export async function listRecentlyEditedObjectIds(
   return rows.map((row) => row.objectId!);
 }
 
-/** This user's pinned objects in this workspace, in their chosen order - server-backed so the sidebar looks the same on every device (see workspace_pins in db/schema.ts). */
-export async function listPins(workspaceId: string, userId: string): Promise<string[]> {
+/** This workspace's pinned objects, in the curated order - a shared "quick navigation" list every member and anonymous share visitor sees the same version of (see workspace_pins in db/schema.ts), not a personal per-account list. */
+export async function listPins(workspaceId: string): Promise<string[]> {
   const rows = await db
     .select({ objectId: workspacePins.objectId, position: workspacePins.position })
     .from(workspacePins)
-    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId)))
+    .where(eq(workspacePins.workspaceId, workspaceId))
     .orderBy(workspacePins.position);
   return rows.map((row) => row.objectId);
 }
 
-/** Pins an object at the end of this user's list - a no-op if already pinned. */
-export async function pinObject(workspaceId: string, userId: string, objectId: string): Promise<void> {
+/** Pins an object at the end of the workspace's list - a no-op if already pinned. */
+export async function pinObject(workspaceId: string, objectId: string): Promise<void> {
   const existing = await db
     .select({ position: workspacePins.position })
     .from(workspacePins)
-    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId)))
+    .where(eq(workspacePins.workspaceId, workspaceId))
     .orderBy(desc(workspacePins.position))
     .limit(1);
 
@@ -221,7 +221,6 @@ export async function pinObject(workspaceId: string, userId: string, objectId: s
     .insert(workspacePins)
     .values({
       workspaceId,
-      userId,
       objectId,
       position: positionBetween(existing[0]?.position ?? null, null),
       createdAt: nowIso(),
@@ -229,23 +228,16 @@ export async function pinObject(workspaceId: string, userId: string, objectId: s
     .onConflictDoNothing();
 }
 
-export async function unpinObject(workspaceId: string, userId: string, objectId: string): Promise<void> {
-  await db
-    .delete(workspacePins)
-    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId), eq(workspacePins.objectId, objectId)));
+export async function unpinObject(workspaceId: string, objectId: string): Promise<void> {
+  await db.delete(workspacePins).where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.objectId, objectId)));
 }
 
 /** Repositions a pinned object to just after `afterObjectId` (or first, if null) - see BlockEditor.tsx's handleDragEnd for why the caller resolves this from a client-side `arrayMove` rather than passing a raw drop target. */
-export async function movePin(
-  workspaceId: string,
-  userId: string,
-  objectId: string,
-  afterObjectId: string | null,
-): Promise<void> {
+export async function movePin(workspaceId: string, objectId: string, afterObjectId: string | null): Promise<void> {
   const rows = await db
     .select({ objectId: workspacePins.objectId, position: workspacePins.position })
     .from(workspacePins)
-    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId)))
+    .where(eq(workspacePins.workspaceId, workspaceId))
     .orderBy(workspacePins.position);
 
   let newPosition: string;
@@ -261,7 +253,7 @@ export async function movePin(
   await db
     .update(workspacePins)
     .set({ position: newPosition })
-    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId), eq(workspacePins.objectId, objectId)));
+    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.objectId, objectId)));
 }
 
 /** This user's most recently viewed objects in this workspace, most recent first - server-backed for the same cross-device reason as pins. */

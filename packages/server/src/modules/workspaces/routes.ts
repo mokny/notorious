@@ -9,7 +9,7 @@ import {
   touchRecentlyViewedSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
-import { requireWorkspaceRole, requireAccess } from "./access.js";
+import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess } from "./access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import { getObjectWorkspaceId } from "../objects/service.js";
 import { badRequest } from "../../lib/httpError.js";
@@ -46,44 +46,48 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     return workspaceService.listRecentlyEditedObjectIds(id, user.id, RECENT_LIMIT);
   });
 
-  // Pinned objects and "recently viewed" are per-user, device-synced
-  // preferences (see workspace_pins/recently_viewed in db/schema.ts) - real
-  // membership only, not exposed to anonymous share-link visitors (there's
-  // no account to sync them against).
+  // Pinned objects are a workspace-wide "quick navigation" list, like the
+  // dashboard object - viewable by anyone with access to the workspace,
+  // including an anonymous whole-workspace share visitor (see
+  // requireWorkspaceScopedAccess), but only editable by real members with at
+  // least editor rights, since changing it changes what *everyone* sees.
   app.get("/api/v1/workspaces/:id/pins", async (request) => {
-    const user = requireUser(request);
     const { id } = request.params as { id: string };
-    await requireWorkspaceRole(id, user.id, "viewer");
-    return workspaceService.listPins(id, user.id);
+    await requireWorkspaceScopedAccess(request, id, "viewer");
+    return workspaceService.listPins(id);
   });
 
   app.post("/api/v1/workspaces/:id/pins", async (request, reply) => {
     const user = requireUser(request);
     const { id } = request.params as { id: string };
-    await requireWorkspaceRole(id, user.id, "viewer");
+    await requireWorkspaceRole(id, user.id, "editor");
     const input = pinObjectSchema.parse(request.body);
     const objectWorkspaceId = await getObjectWorkspaceId(input.objectId);
     if (objectWorkspaceId !== id) throw badRequest("Object must belong to this workspace");
-    await workspaceService.pinObject(id, user.id, input.objectId);
+    await workspaceService.pinObject(id, input.objectId);
     reply.code(204);
   });
 
   app.delete("/api/v1/workspaces/:id/pins/:objectId", async (request, reply) => {
     const user = requireUser(request);
     const { id, objectId } = request.params as { id: string; objectId: string };
-    await requireWorkspaceRole(id, user.id, "viewer");
-    await workspaceService.unpinObject(id, user.id, objectId);
+    await requireWorkspaceRole(id, user.id, "editor");
+    await workspaceService.unpinObject(id, objectId);
     reply.code(204);
   });
 
   app.post("/api/v1/workspaces/:id/pins/:objectId/move", async (request, reply) => {
     const user = requireUser(request);
     const { id, objectId } = request.params as { id: string; objectId: string };
-    await requireWorkspaceRole(id, user.id, "viewer");
+    await requireWorkspaceRole(id, user.id, "editor");
     const input = movePinSchema.parse(request.body);
-    await workspaceService.movePin(id, user.id, objectId, input.afterObjectId);
+    await workspaceService.movePin(id, objectId, input.afterObjectId);
     reply.code(204);
   });
+
+  // "Recently viewed" stays a per-user, device-synced preference (see
+  // recently_viewed in db/schema.ts) - real membership only, not exposed to
+  // anonymous share-link visitors (there's no account to sync it against).
 
   app.get("/api/v1/workspaces/:id/recently-viewed", async (request) => {
     const user = requireUser(request);

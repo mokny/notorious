@@ -1,19 +1,19 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { workspaceApi } from "../lib/api/resources.js";
-import { useAuth } from "../context/AuthContext.js";
 
 /**
- * Objects pinned to the sidebar, per workspace - server-backed (not
- * localStorage) so the same pins show up on every device a member logs
- * into. Only meaningful for a real logged-in member (there's no account to
- * sync against for an anonymous share-link visitor), so this quietly no-ops
- * when `user` is null instead of requiring every call site to check.
+ * Objects pinned to the sidebar - a workspace-wide "quick navigation" list
+ * (server-backed, like the dashboard object) that every member *and* an
+ * anonymous whole-workspace share visitor sees the same version of, not a
+ * personal per-account preference. `toggle`/`reorder` only ever actually get
+ * called from UI that's already hidden for anyone without edit rights (see
+ * ObjectDetailPage.tsx's pin button) - the server enforces the real "editor+"
+ * boundary regardless.
  */
 export function useWorkspacePins(workspaceId: string | undefined) {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
-  const enabled = Boolean(workspaceId) && Boolean(user);
+  const enabled = Boolean(workspaceId);
   const queryKey = ["pins", workspaceId];
 
   const { data: pinnedIds = [] } = useQuery({

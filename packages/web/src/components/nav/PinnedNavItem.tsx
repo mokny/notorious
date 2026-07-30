@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { objectApi } from "../../lib/api/resources.js";
 import { useObjectTitle } from "../../hooks/useObjectTitle.js";
 import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
+import { isSharedSession } from "../../lib/api/shareMode.js";
 import { Icon } from "../ui/Icon.js";
 import { navLinkClass } from "./navLinkClass.js";
 
@@ -36,17 +37,24 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
+  // Curating the shared pin list needs real editor+ membership server-side
+  // (see workspaces/routes.ts) - hidden here rather than left to fail on
+  // click, same policy as the pin button on ObjectDetailPage.
+  const canCurate = !isSharedSession();
+
   return (
     <div ref={setNodeRef} style={style}>
       <div className="group flex items-center gap-0.5 rounded-lg pr-1 hover:bg-surface">
-        <button
-          {...attributes}
-          {...listeners}
-          className="shrink-0 cursor-grab rounded p-1 text-ink-muted opacity-0 hover:text-ink group-hover:opacity-100"
-          title="Drag to reorder"
-        >
-          <Icon name="grip-vertical" className="h-3 w-3" />
-        </button>
+        {canCurate && (
+          <button
+            {...attributes}
+            {...listeners}
+            className="shrink-0 cursor-grab rounded p-1 text-ink-muted opacity-0 hover:text-ink group-hover:opacity-100"
+            title="Drag to reorder"
+          >
+            <Icon name="grip-vertical" className="h-3 w-3" />
+          </button>
+        )}
         <button
           onClick={() => setExpanded((v) => !v)}
           className={`shrink-0 rounded p-1 text-ink-muted hover:text-ink ${hasSubObjects ? "" : "invisible"}`}
@@ -58,13 +66,15 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
           <Icon name={icon} className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{title}</span>
         </NavLink>
-        <button
-          onClick={() => togglePin(objectId)}
-          className="shrink-0 rounded p-1 text-ink-muted opacity-0 hover:text-red-500 group-hover:opacity-100"
-          title="Unpin"
-        >
-          <Icon name="pin-off" className="h-3.5 w-3.5" />
-        </button>
+        {canCurate && (
+          <button
+            onClick={() => togglePin(objectId)}
+            className="shrink-0 rounded p-1 text-ink-muted opacity-0 hover:text-red-500 group-hover:opacity-100"
+            title="Unpin"
+          >
+            <Icon name="pin-off" className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {expanded && hasSubObjects && (

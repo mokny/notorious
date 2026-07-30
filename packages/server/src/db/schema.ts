@@ -237,26 +237,26 @@ export const activityLog = sqliteTable("activity_log", {
   createdAt: text("created_at").notNull(),
 });
 
-// Per-user, per-workspace sidebar pins - server-backed (not localStorage) so
-// they're the same on every device a member logs into. `position` is a
-// fractional-indexing key, same scheme as `blocks.position` (see
-// lib/position.ts) - reordering never requires rewriting sibling rows.
+// Workspace-wide sidebar pins - a shared "quick navigation" list every
+// member (and an anonymous workspace-share visitor - see workspaces/access.ts)
+// sees the same version of, like the dashboard object rather than a personal
+// per-user preference (an anonymous visitor has no account for a personal
+// list to belong to). `position` is a fractional-indexing key, same scheme
+// as `blocks.position` (see lib/position.ts) - reordering never requires
+// rewriting sibling rows.
 export const workspacePins = sqliteTable(
   "workspace_pins",
   {
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
     objectId: text("object_id")
       .notNull()
       .references(() => objects.id, { onDelete: "cascade" }),
     position: text("position").notNull(),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [primaryKey({ columns: [table.workspaceId, table.userId, table.objectId] })],
+  (table) => [primaryKey({ columns: [table.workspaceId, table.objectId] })],
 );
 
 // Per-user, per-workspace "recently viewed" list - server-backed for the
