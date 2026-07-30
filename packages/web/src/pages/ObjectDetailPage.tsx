@@ -16,6 +16,14 @@ import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
 import { useRecentObjects } from "../hooks/useRecentObjects.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 
+// Disables interactive edit controls for a read-only (viewer/commenter) share
+// without blocking `<a>`/`Link` navigation the way a blanket `pointer-events-
+// none` on the whole container would - sub-object/relation links inside
+// otherwise-read-only content still need to be clickable (see
+// SubObjectBlock.tsx, RelationPicker.tsx).
+const READ_ONLY_LOCK =
+  "[&_input]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button]:pointer-events-none [&_[contenteditable]]:pointer-events-none";
+
 export interface SharedObjectContext {
   role: WorkspaceRole;
   /** True when the share is scoped to exactly this one object - hides navigation into sub-objects/backlinks, since such a share can't grant access to those (separate objects). */
@@ -37,10 +45,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const navigate = useNavigate();
   const canEdit = !share || roleAtLeast(share.role, "editor");
 
-  const { data: object } = useQuery({
+  const {
+    data: object,
+    isError: objectLoadFailed,
+  } = useQuery({
     queryKey: ["object", objectId],
     queryFn: () => objectApi.get(objectId!),
     enabled: Boolean(objectId),
+    retry: !share, // a share-scope rejection (401/404) won't resolve by retrying, unlike a real transient network error
   });
 
   const { data: properties } = useQuery({
@@ -126,6 +138,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectId]);
 
+  if (objectLoadFailed) {
+    return (
+      <div className="p-8 text-sm text-ink-muted">
+        This object isn't part of what was shared with you, or the link has been revoked.
+      </div>
+    );
+  }
+
   if (!object || !properties || !workspaceId) return <div className="p-8 text-sm text-ink-muted">Loading…</div>;
 
   const hasRecurrence = properties.some((p) => p.key === "recurrence");
@@ -203,7 +223,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             </Button>
           )}
 
-          <div className={`mt-6 ${canEdit ? "" : "pointer-events-none"}`}>
+          <div className={`mt-6 ${canEdit ? "" : READ_ONLY_LOCK}`}>
             <BlockEditor workspaceId={workspaceId} objectId={object.id} />
           </div>
 
@@ -222,7 +242,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
         <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
-          <div className={canEdit ? "space-y-3" : "space-y-3 pointer-events-none"}>
+          <div className={`space-y-3 ${canEdit ? "" : READ_ONLY_LOCK}`}>
             {properties
               .filter((property) => property.key !== "sub_objects")
               .map((property) => (

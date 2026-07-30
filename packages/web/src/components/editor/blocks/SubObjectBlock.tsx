@@ -6,6 +6,7 @@ import { objectApi, schemaApi, searchApi } from "../../../lib/api/resources.js";
 import { useObjectTitle } from "../../../hooks/useObjectTitle.js";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
+import { objectHref } from "../../../lib/api/shareMode.js";
 import { Icon } from "../../ui/Icon.js";
 
 interface SubObjectBlockProps {
@@ -34,7 +35,7 @@ function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; o
         >
           <Icon name={expanded ? "chevron-down" : "chevron-right"} className="h-3.5 w-3.5" />
         </button>
-        <Link to={`/w/${workspaceId}/objects/${objectId}`} className="flex min-w-0 flex-1 items-center gap-1.5 hover:underline">
+        <Link to={objectHref(workspaceId, objectId)} className="flex min-w-0 flex-1 items-center gap-1.5 hover:underline">
           <Icon name={icon} className="h-4 w-4 shrink-0 text-ink-muted" />
           <span className="truncate text-sm">{title}</span>
         </Link>

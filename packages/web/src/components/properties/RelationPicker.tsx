@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { searchApi } from "../../lib/api/resources.js";
+import { objectHref } from "../../lib/api/shareMode.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useObjectTitle } from "../../hooks/useObjectTitle.js";
 import { Icon } from "../ui/Icon.js";
@@ -81,7 +82,7 @@ function RelationPill({
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs">
       <Icon name={icon} className="h-3 w-3 text-ink-muted" />
-      <Link to={`/w/${workspaceId}/objects/${objectId}`} className="hover:underline">
+      <Link to={objectHref(workspaceId, objectId)} className="hover:underline">
         {title}
       </Link>
       <button type="button" onClick={onRemove} className="text-ink-muted hover:text-red-500">
