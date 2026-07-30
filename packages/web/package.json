@@ -29,6 +29,7 @@
     "@tiptap/react": "^2.10.4",
     "@tiptap/starter-kit": "^2.10.4",
     "@tiptap/suggestion": "^2.10.4",
+    "fractional-indexing": "^3.4.0",
     "katex": "^0.16.11",
     "lucide-react": "^0.462.0",
     "mermaid": "^11.4.1",

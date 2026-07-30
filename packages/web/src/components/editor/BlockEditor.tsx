@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
+import { generateKeyBetween } from "fractional-indexing";
 import type { Block, BlockType } from "@notorious/shared";
 import { blockApi, fileApi } from "../../lib/api/resources.js";
 import { withShareToken } from "../../lib/api/shareMode.js";
@@ -28,6 +29,31 @@ function currentEndpointsFor(all: Block[], blockId: string): { parentBlockId: st
     .sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
   const index = siblings.findIndex((b) => b.id === blockId);
   return { parentBlockId: block.parentBlockId, afterBlockId: index > 0 ? siblings[index - 1]!.id : null };
+}
+
+/**
+ * Computes what the block list *should* look like immediately after a move,
+ * for an optimistic cache update (see `moveMutation`'s `onMutate` below).
+ * Without this, the block visibly snaps back to its old position for as
+ * long as the move's round trip takes (a GET across the whole document,
+ * which gets slower as the document grows) before jumping to its new spot
+ * once the response lands - dnd-kit's own drag preview only exists *during*
+ * the drag gesture, so the instant it ends, rendering falls back to
+ * whatever `["blocks", objectId]` currently holds, which is still the old
+ * order until this runs. Deriving the moved block's own position with the
+ * exact same `generateKeyBetween` the server uses (not just re-rendering in
+ * the right order some other way) means the eventual server-confirmed
+ * refetch settles in without a second, correcting jump.
+ */
+function computeOptimisticMove(all: Block[], blockId: string, parentBlockId: string | null, afterBlockId: string | null): Block[] {
+  const siblings = all
+    .filter((b) => b.parentBlockId === parentBlockId && b.id !== blockId)
+    .sort((a, b) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0));
+  const afterIndex = afterBlockId ? siblings.findIndex((b) => b.id === afterBlockId) : -1;
+  const afterBlock = afterIndex >= 0 ? siblings[afterIndex] : null;
+  const beforeBlock = siblings[afterIndex + 1] ?? null;
+  const position = generateKeyBetween(afterBlock?.position ?? null, beforeBlock?.position ?? null);
+  return all.map((b) => (b.id === blockId ? { ...b, parentBlockId, position } : b));
 }
 
 /** Picks a sensible block type/content for a dropped file, based on its MIME type. */
@@ -79,6 +105,20 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
   const moveMutation = useMutation({
     mutationFn: (input: { blockId: string; parentBlockId: string | null; afterBlockId: string | null }) =>
       blockApi.move(input.blockId, { parentBlockId: input.parentBlockId, afterBlockId: input.afterBlockId }),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ["blocks", objectId] });
+      const previous = queryClient.getQueryData<Block[]>(["blocks", objectId]);
+      if (previous) {
+        queryClient.setQueryData<Block[]>(
+          ["blocks", objectId],
+          computeOptimisticMove(previous, input.blockId, input.parentBlockId, input.afterBlockId),
+        );
+      }
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) queryClient.setQueryData(["blocks", objectId], context.previous);
+    },
     onSuccess: invalidate,
   });
 

@@ -21,6 +21,15 @@ export interface CalloutContent {
   icon: string;
 }
 export interface ChecklistItem {
+  /**
+   * Optional only for backward compatibility with checklists saved before
+   * drag-reordering was added - `ChecklistBlock.tsx` backfills a real one
+   * for any item that's missing it, the moment it loads. New items always
+   * get one at creation. Needed as a stable drag identity: the array index
+   * a `useSortable` hook would otherwise use changes on every reorder,
+   * which is exactly the one thing that must *not* change mid-drag.
+   */
+  id?: string;
   markdown: string;
   checked: boolean;
 }
