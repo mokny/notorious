@@ -33,7 +33,7 @@ export default defineConfig({
         // this precache-manifest build step is what ran a memory-constrained
         // server out of heap. It still loads fine on demand from the network.
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        globIgnores: ["**/vendor-diagrams-*.js", "**/vendor-whiteboard-*.js"],
+        globIgnores: ["**/vendor-diagrams-*.js", "**/vendor-whiteboard-*.js", "**/vendor-canvas-shared-*.js"],
       },
       strategies: "injectManifest",
       srcDir: "src",
@@ -60,6 +60,21 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // `roughjs` (and its own small dependency chain) renders the
+          // "hand-drawn" look for BOTH Mermaid diagrams and Excalidraw
+          // shapes, so it has to live in its own chunk rather than inside
+          // either "vendor-diagrams" or "vendor-whiteboard": putting it in
+          // either one makes that chunk statically depend on it while the
+          // *other* chunk also imports it, which - combined with Excalidraw
+          // depending on the real `mermaid` package for its optional
+          // "convert Mermaid to a drawing" action - closes a loop ("vendor-x
+          // imports vendor-y which imports vendor-x back") that Rollup
+          // rejects outright as a circular chunk. A separate shared leaf
+          // chunk that both of the others may depend on, but which depends
+          // on neither, can't participate in that cycle.
+          if (/node_modules\/(roughjs|hachure-fill|path-data-parser|points-on-path|points-on-curve)\//.test(id)) {
+            return "vendor-canvas-shared";
+          }
           // Mermaid pulls in cytoscape/d3/dagre/cose-bilkent for its various
           // diagram layouts, and KaTeX is its own sizeable renderer - grouping
           // them into one predictably-named chunk makes it possible to
@@ -74,7 +89,19 @@ export default defineConfig({
           // as vendor-diagrams above: its own chunk, excluded from the PWA
           // precache manifest, loaded on demand only when a whiteboard block
           // actually renders (see WhiteboardBlock.tsx's dynamic import).
-          if (/node_modules\/(@excalidraw|roughjs|perfect-freehand|points-on-curve|pica|image-blob-reduce)\//.test(id)) {
+          //
+          // `@excalidraw/mermaid-to-excalidraw` (Excalidraw's own optional
+          // "convert Mermaid to a drawing" toolbar action) is deliberately
+          // excluded from this bucket even though its path starts with
+          // "@excalidraw/": Excalidraw's own built code only ever reaches it
+          // through a dynamic `import()`, so it's better left as its own
+          // small on-demand chunk (which then depends on "vendor-diagrams"
+          // for the real `mermaid` package) instead of being dragged into
+          // this eager chunk.
+          if (
+            /node_modules\/(perfect-freehand|pica|image-blob-reduce)\//.test(id) ||
+            (/node_modules\/@excalidraw\//.test(id) && !/node_modules\/@excalidraw\/mermaid-to-excalidraw\//.test(id))
+          ) {
             return "vendor-whiteboard";
           }
         },
