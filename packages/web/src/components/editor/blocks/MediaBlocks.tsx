@@ -98,11 +98,20 @@ export function VideoBlock({ content, workspaceId, objectId, onSave }: MediaProp
 
 export function EmbedBlock({ content, onSave }: { content: EmbedContent; onSave: (c: EmbedContent) => void }) {
   if (content.url) {
+    // Dropping a PDF/audio file into the editor also lands here (see
+    // blockForDroppedFile in BlockEditor.tsx) - that content is our own,
+    // same-origin, server-controlled upload, not an arbitrary third-party
+    // page, so it doesn't need (and shouldn't get) the sandbox restriction
+    // below: Chrome's built-in PDF viewer can flat-out refuse to render
+    // inside a sandboxed iframe, replacing it with "This page has been
+    // blocked by Chrome" instead of the document. Pasted external embed
+    // URLs (the other use of this block) stay sandboxed.
+    const isOwnUpload = content.url.startsWith("/api/v1/files/");
     return (
       <iframe
-        src={content.url}
+        src={withShareToken(content.url)}
         className="h-96 w-full rounded-lg border border-border"
-        sandbox="allow-scripts allow-same-origin allow-popups"
+        {...(isOwnUpload ? {} : { sandbox: "allow-scripts allow-same-origin allow-popups" })}
       />
     );
   }

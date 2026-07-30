@@ -127,7 +127,7 @@ export function BlockRenderer({
     case "sub_object":
       return <SubObjectBlock content={content<SubObjectContent>()} workspaceId={workspaceId} hostObjectId={objectId} onSave={save} />;
     case "bookmark":
-      return <BookmarkBlock content={content<BookmarkContent>()} onSave={save} />;
+      return <BookmarkBlock content={content<BookmarkContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
     default:
       return null;
   }

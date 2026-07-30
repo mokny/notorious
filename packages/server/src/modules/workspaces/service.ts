@@ -8,10 +8,20 @@ import type {
   WorkspaceInvite,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { workspaces, workspaceMembers, workspaceInvites, users, activityLog, objects } from "../../db/schema.js";
+import {
+  workspaces,
+  workspaceMembers,
+  workspaceInvites,
+  users,
+  activityLog,
+  objects,
+  workspacePins,
+  recentlyViewed,
+} from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { seedSystemObjectTypes } from "../schema/systemTypes.js";
+import { positionBetween } from "../../lib/position.js";
 
 export async function createWorkspace(
   ownerId: string,
@@ -186,4 +196,92 @@ export async function listRecentlyEditedObjectIds(
     .limit(limit);
 
   return rows.map((row) => row.objectId!);
+}
+
+/** This user's pinned objects in this workspace, in their chosen order - server-backed so the sidebar looks the same on every device (see workspace_pins in db/schema.ts). */
+export async function listPins(workspaceId: string, userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ objectId: workspacePins.objectId, position: workspacePins.position })
+    .from(workspacePins)
+    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId)))
+    .orderBy(workspacePins.position);
+  return rows.map((row) => row.objectId);
+}
+
+/** Pins an object at the end of this user's list - a no-op if already pinned. */
+export async function pinObject(workspaceId: string, userId: string, objectId: string): Promise<void> {
+  const existing = await db
+    .select({ position: workspacePins.position })
+    .from(workspacePins)
+    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId)))
+    .orderBy(desc(workspacePins.position))
+    .limit(1);
+
+  await db
+    .insert(workspacePins)
+    .values({
+      workspaceId,
+      userId,
+      objectId,
+      position: positionBetween(existing[0]?.position ?? null, null),
+      createdAt: nowIso(),
+    })
+    .onConflictDoNothing();
+}
+
+export async function unpinObject(workspaceId: string, userId: string, objectId: string): Promise<void> {
+  await db
+    .delete(workspacePins)
+    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId), eq(workspacePins.objectId, objectId)));
+}
+
+/** Repositions a pinned object to just after `afterObjectId` (or first, if null) - see BlockEditor.tsx's handleDragEnd for why the caller resolves this from a client-side `arrayMove` rather than passing a raw drop target. */
+export async function movePin(
+  workspaceId: string,
+  userId: string,
+  objectId: string,
+  afterObjectId: string | null,
+): Promise<void> {
+  const rows = await db
+    .select({ objectId: workspacePins.objectId, position: workspacePins.position })
+    .from(workspacePins)
+    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId)))
+    .orderBy(workspacePins.position);
+
+  let newPosition: string;
+  if (!afterObjectId) {
+    newPosition = positionBetween(null, rows[0]?.position ?? null);
+  } else {
+    const index = rows.findIndex((row) => row.objectId === afterObjectId);
+    const after = rows[index];
+    const before = rows[index + 1];
+    newPosition = positionBetween(after?.position ?? null, before?.position ?? null);
+  }
+
+  await db
+    .update(workspacePins)
+    .set({ position: newPosition })
+    .where(and(eq(workspacePins.workspaceId, workspaceId), eq(workspacePins.userId, userId), eq(workspacePins.objectId, objectId)));
+}
+
+/** This user's most recently viewed objects in this workspace, most recent first - server-backed for the same cross-device reason as pins. */
+export async function listRecentlyViewed(workspaceId: string, userId: string, limit: number): Promise<string[]> {
+  const rows = await db
+    .select({ objectId: recentlyViewed.objectId })
+    .from(recentlyViewed)
+    .where(and(eq(recentlyViewed.workspaceId, workspaceId), eq(recentlyViewed.userId, userId)))
+    .orderBy(desc(recentlyViewed.viewedAt))
+    .limit(limit);
+  return rows.map((row) => row.objectId);
+}
+
+/** Records/bumps that this user just viewed this object - upserted so there's only ever one row per object, its timestamp refreshed on every open. */
+export async function touchRecentlyViewed(workspaceId: string, userId: string, objectId: string): Promise<void> {
+  await db
+    .insert(recentlyViewed)
+    .values({ workspaceId, userId, objectId, viewedAt: nowIso() })
+    .onConflictDoUpdate({
+      target: [recentlyViewed.workspaceId, recentlyViewed.userId, recentlyViewed.objectId],
+      set: { viewedAt: nowIso() },
+    });
 }

@@ -4,6 +4,9 @@ import {
   updateWorkspaceSchema,
   inviteMemberSchema,
   updateMemberRoleSchema,
+  pinObjectSchema,
+  movePinSchema,
+  touchRecentlyViewedSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess } from "./access.js";
@@ -11,6 +14,10 @@ import { recordAndBroadcast } from "../realtime/activity.js";
 import { getObjectWorkspaceId } from "../objects/service.js";
 import { badRequest } from "../../lib/httpError.js";
 import * as workspaceService from "./service.js";
+
+// Applies to both "recently edited" and "recently viewed" - kept in sync per
+// the same product decision, not a technical constraint of either query.
+const RECENT_LIMIT = 5;
 
 export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/workspaces", async (request) => {
@@ -36,7 +43,62 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     const user = requireUser(request);
     const { id } = request.params as { id: string };
     await requireWorkspaceRole(id, user.id, "viewer");
-    return workspaceService.listRecentlyEditedObjectIds(id, user.id, 8);
+    return workspaceService.listRecentlyEditedObjectIds(id, user.id, RECENT_LIMIT);
+  });
+
+  // Pinned objects and "recently viewed" are per-user, device-synced
+  // preferences (see workspace_pins/recently_viewed in db/schema.ts) - real
+  // membership only, not exposed to anonymous share-link visitors (there's
+  // no account to sync them against).
+  app.get("/api/v1/workspaces/:id/pins", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    return workspaceService.listPins(id, user.id);
+  });
+
+  app.post("/api/v1/workspaces/:id/pins", async (request, reply) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    const input = pinObjectSchema.parse(request.body);
+    const objectWorkspaceId = await getObjectWorkspaceId(input.objectId);
+    if (objectWorkspaceId !== id) throw badRequest("Object must belong to this workspace");
+    await workspaceService.pinObject(id, user.id, input.objectId);
+    reply.code(204);
+  });
+
+  app.delete("/api/v1/workspaces/:id/pins/:objectId", async (request, reply) => {
+    const user = requireUser(request);
+    const { id, objectId } = request.params as { id: string; objectId: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    await workspaceService.unpinObject(id, user.id, objectId);
+    reply.code(204);
+  });
+
+  app.post("/api/v1/workspaces/:id/pins/:objectId/move", async (request, reply) => {
+    const user = requireUser(request);
+    const { id, objectId } = request.params as { id: string; objectId: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    const input = movePinSchema.parse(request.body);
+    await workspaceService.movePin(id, user.id, objectId, input.afterObjectId);
+    reply.code(204);
+  });
+
+  app.get("/api/v1/workspaces/:id/recently-viewed", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    return workspaceService.listRecentlyViewed(id, user.id, RECENT_LIMIT);
+  });
+
+  app.post("/api/v1/workspaces/:id/recently-viewed", async (request, reply) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    const input = touchRecentlyViewedSchema.parse(request.body);
+    await workspaceService.touchRecentlyViewed(id, user.id, input.objectId);
+    reply.code(204);
   });
 
   app.patch("/api/v1/workspaces/:id", async (request) => {

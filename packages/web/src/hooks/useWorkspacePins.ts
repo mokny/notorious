@@ -1,25 +1,65 @@
 import { arrayMove } from "@dnd-kit/sortable";
-import { useLocalStorageState } from "./useLocalStorageState.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { workspaceApi } from "../lib/api/resources.js";
+import { useAuth } from "../context/AuthContext.js";
 
-/** Objects pinned to the sidebar, per workspace. A personal, per-device preference. */
+/**
+ * Objects pinned to the sidebar, per workspace - server-backed (not
+ * localStorage) so the same pins show up on every device a member logs
+ * into. Only meaningful for a real logged-in member (there's no account to
+ * sync against for an anonymous share-link visitor), so this quietly no-ops
+ * when `user` is null instead of requiring every call site to check.
+ */
 export function useWorkspacePins(workspaceId: string | undefined) {
-  const [pinnedIds, setPinnedIds] = useLocalStorageState<string[]>(`notorious-pins-${workspaceId ?? ""}`, []);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const enabled = Boolean(workspaceId) && Boolean(user);
+  const queryKey = ["pins", workspaceId];
+
+  const { data: pinnedIds = [] } = useQuery({
+    queryKey,
+    queryFn: () => workspaceApi.pins(workspaceId!),
+    enabled,
+  });
+
+  function invalidate() {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+
+  const pinMutation = useMutation({
+    mutationFn: (objectId: string) => workspaceApi.pin(workspaceId!, objectId),
+    onSuccess: invalidate,
+  });
+  const unpinMutation = useMutation({
+    mutationFn: (objectId: string) => workspaceApi.unpin(workspaceId!, objectId),
+    onSuccess: invalidate,
+  });
+  const moveMutation = useMutation({
+    mutationFn: ({ objectId, afterObjectId }: { objectId: string; afterObjectId: string | null }) =>
+      workspaceApi.movePin(workspaceId!, objectId, afterObjectId),
+    onSuccess: invalidate,
+  });
 
   function isPinned(objectId: string): boolean {
     return pinnedIds.includes(objectId);
   }
 
   function toggle(objectId: string): void {
-    setPinnedIds((prev) => (prev.includes(objectId) ? prev.filter((id) => id !== objectId) : [...prev, objectId]));
+    if (!enabled) return;
+    if (isPinned(objectId)) unpinMutation.mutate(objectId);
+    else pinMutation.mutate(objectId);
   }
 
+  /** `overId` is just "which slot the pointer is over now" - reordering the current list the same way dnd-kit's own list does (`arrayMove`) and reading off the dragged item's new predecessor gives the correct side regardless of drag direction (same reasoning as BlockEditor.tsx's handleDragEnd). */
   function reorder(activeId: string, overId: string): void {
-    setPinnedIds((prev) => {
-      const oldIndex = prev.indexOf(activeId);
-      const newIndex = prev.indexOf(overId);
-      if (oldIndex === -1 || newIndex === -1) return prev;
-      return arrayMove(prev, oldIndex, newIndex);
-    });
+    if (!enabled) return;
+    const oldIndex = pinnedIds.indexOf(activeId);
+    const newIndex = pinnedIds.indexOf(overId);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(pinnedIds, oldIndex, newIndex);
+    const draggedIndex = reordered.indexOf(activeId);
+    const afterObjectId = draggedIndex > 0 ? reordered[draggedIndex - 1]! : null;
+    moveMutation.mutate({ objectId: activeId, afterObjectId });
   }
 
   return { pinnedIds, isPinned, toggle, reorder };

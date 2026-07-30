@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { BookmarkContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
-import { linkPreviewApi } from "../../../lib/api/resources.js";
+import { linkPreviewApi, fileApi } from "../../../lib/api/resources.js";
+import { IconPicker } from "../../IconPicker.js";
 import { Icon } from "../../ui/Icon.js";
 
 function hostnameOf(url: string): string {
@@ -14,9 +15,13 @@ function hostnameOf(url: string): string {
 
 export function BookmarkBlock({
   content: externalContent,
+  workspaceId,
+  objectId,
   onSave,
 }: {
   content: BookmarkContent;
+  workspaceId: string;
+  objectId: string;
   onSave: (c: BookmarkContent) => Promise<void>;
 }) {
   const [content, save] = useDebouncedSave(externalContent, onSave);
@@ -25,14 +30,14 @@ export function BookmarkBlock({
   async function setUrl(value: string) {
     await save({ ...content, url: value });
     // Best-effort: the page might not respond, block the request, or simply
-    // have no <title> - the title field stays freely editable either way,
-    // this just saves typing it out by hand for the common case.
+    // have no <title>/favicon - both fields stay freely editable either way,
+    // this just saves doing it out by hand for the common case.
     setIsFetchingTitle(true);
     try {
-      const { title } = await linkPreviewApi.fetchTitle(value);
-      if (title) save({ ...content, url: value, title });
+      const { title, icon } = await linkPreviewApi.fetch(value);
+      if (title || icon) save({ ...content, url: value, ...(title ? { title } : {}), ...(icon ? { icon } : {}) });
     } catch {
-      // Ignored - no title fetched is not an error the user needs to see.
+      // Ignored - nothing fetched is not an error the user needs to see.
     } finally {
       setIsFetchingTitle(false);
     }
@@ -63,9 +68,16 @@ export function BookmarkBlock({
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border p-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent">
-        <Icon name="bookmark" className="h-4 w-4" />
-      </div>
+      <IconPicker
+        icon={content.icon ?? null}
+        fallbackIcon="bookmark"
+        onChangeIcon={async (newIcon) => save({ ...content, icon: newIcon })}
+        onUploadIcon={async (file) => {
+          const asset = await fileApi.upload(workspaceId, file, objectId);
+          return fileApi.downloadUrl(asset.id);
+        }}
+        resettable
+      />
       <div className="min-w-0 flex-1 space-y-1">
         <input
           value={content.title ?? ""}

@@ -26,3 +26,18 @@ export const updateMemberRoleSchema = z.object({
   role: z.enum(WORKSPACE_ROLES).exclude(["owner"]),
 });
 export type UpdateMemberRoleInput = z.infer<typeof updateMemberRoleSchema>;
+
+export const pinObjectSchema = z.object({
+  objectId: z.string().min(1),
+});
+export type PinObjectInput = z.infer<typeof pinObjectSchema>;
+
+export const movePinSchema = z.object({
+  afterObjectId: z.string().min(1).nullable(),
+});
+export type MovePinInput = z.infer<typeof movePinSchema>;
+
+export const touchRecentlyViewedSchema = z.object({
+  objectId: z.string().min(1),
+});
+export type TouchRecentlyViewedInput = z.infer<typeof touchRecentlyViewedSchema>;

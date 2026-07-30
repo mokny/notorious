@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { withShareToken } from "../../lib/api/shareMode.js";
 import {
   FileText,
@@ -101,10 +102,25 @@ function isImageUrl(value: string): boolean {
  * typically) is rendered as literal text.
  */
 export function Icon({ name, className }: { name: string; className?: string }) {
+  // A URL (e.g. a bookmark's auto-detected favicon, or a since-deleted
+  // uploaded file) can 404/fail to load - falls back to the generic file
+  // icon instead of a broken-image glyph. Reset whenever `name` itself
+  // changes, so a later, different, working URL gets a fresh attempt.
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [name]);
+
   if (!name) return <FileText className={className ?? "h-4 w-4"} />;
 
   if (isImageUrl(name)) {
-    return <img src={withShareToken(name)} alt="" className={`${className ?? "h-4 w-4"} shrink-0 rounded object-cover`} />;
+    if (imageFailed) return <FileText className={className ?? "h-4 w-4"} />;
+    return (
+      <img
+        src={withShareToken(name)}
+        alt=""
+        className={`${className ?? "h-4 w-4"} shrink-0 rounded object-cover`}
+        onError={() => setImageFailed(true)}
+      />
+    );
   }
 
   const Component = ICONS[name];

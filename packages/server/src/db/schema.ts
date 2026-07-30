@@ -237,6 +237,50 @@ export const activityLog = sqliteTable("activity_log", {
   createdAt: text("created_at").notNull(),
 });
 
+// Per-user, per-workspace sidebar pins - server-backed (not localStorage) so
+// they're the same on every device a member logs into. `position` is a
+// fractional-indexing key, same scheme as `blocks.position` (see
+// lib/position.ts) - reordering never requires rewriting sibling rows.
+export const workspacePins = sqliteTable(
+  "workspace_pins",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    objectId: text("object_id")
+      .notNull()
+      .references(() => objects.id, { onDelete: "cascade" }),
+    position: text("position").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.userId, table.objectId] })],
+);
+
+// Per-user, per-workspace "recently viewed" list - server-backed for the
+// same cross-device reason as workspace_pins above. One row per object ever
+// viewed; `viewedAt` gets bumped (upsert) on every open, and the API only
+// ever returns the most recent few (see modules/workspaces/service.ts) -
+// same "keep full history, limit at query time" approach as activityLog.
+export const recentlyViewed = sqliteTable(
+  "recently_viewed",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    objectId: text("object_id")
+      .notNull()
+      .references(() => objects.id, { onDelete: "cascade" }),
+    viewedAt: text("viewed_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.userId, table.objectId] })],
+);
+
 export const sentReminders = sqliteTable(
   "sent_reminders",
   {

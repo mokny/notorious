@@ -61,6 +61,14 @@ export const workspaceApi = {
   revokeInvite: (id: string, inviteId: string) =>
     apiRequest<void>(`/api/v1/workspaces/${id}/invites/${inviteId}`, { method: "DELETE" }),
   recentEdits: (id: string) => apiRequest<string[]>(`/api/v1/workspaces/${id}/recent-edits`),
+  pins: (id: string) => apiRequest<string[]>(`/api/v1/workspaces/${id}/pins`),
+  pin: (id: string, objectId: string) => apiRequest<void>(`/api/v1/workspaces/${id}/pins`, { method: "POST", body: { objectId } }),
+  unpin: (id: string, objectId: string) => apiRequest<void>(`/api/v1/workspaces/${id}/pins/${objectId}`, { method: "DELETE" }),
+  movePin: (id: string, objectId: string, afterObjectId: string | null) =>
+    apiRequest<void>(`/api/v1/workspaces/${id}/pins/${objectId}/move`, { method: "POST", body: { afterObjectId } }),
+  recentlyViewed: (id: string) => apiRequest<string[]>(`/api/v1/workspaces/${id}/recently-viewed`),
+  touchRecentlyViewed: (id: string, objectId: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${id}/recently-viewed`, { method: "POST", body: { objectId } }),
 };
 
 export const schemaApi = {
@@ -186,7 +194,7 @@ export const apiKeyApi = {
 };
 
 export const linkPreviewApi = {
-  fetchTitle: (url: string) => apiRequest<{ title: string | null }>("/api/v1/link-preview", { query: { url } }),
+  fetch: (url: string) => apiRequest<{ title: string | null; icon: string | null }>("/api/v1/link-preview", { query: { url } }),
 };
 
 export const systemApi = {
