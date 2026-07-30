@@ -18,7 +18,7 @@ import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 
 export function WorkspaceLayout() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const { user } = useAuth();
+  const { user, refetch } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,7 +46,13 @@ export function WorkspaceLayout() {
 
   async function handleLogout() {
     await authApi.logout();
-    navigate("/login");
+    // Without this, `user` in AuthContext stays the stale cached value from
+    // before logout - LoginPage immediately bounces back to "/" if it still
+    // sees a (stale) logged-in user, and WorkspacePickerPage then renders
+    // near-empty since its own queries now 401. Awaiting the refetch first
+    // guarantees LoginPage sees `user: null` on its very first render.
+    await refetch();
+    navigate("/login", { replace: true });
   }
 
   return (
