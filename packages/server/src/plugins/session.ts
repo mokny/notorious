@@ -6,6 +6,7 @@ import { sessions, users } from "../db/schema.js";
 import { newId, nowIso } from "../lib/ids.js";
 import { unauthorized } from "../lib/httpError.js";
 import { authenticateApiKey } from "../modules/apiKeys/service.js";
+import { resolveShareToken, type ResolvedShare } from "../modules/shareLinks/service.js";
 import { env } from "../env.js";
 
 const SESSION_COOKIE = "notorious_sid";
@@ -21,6 +22,8 @@ export interface AuthenticatedUser {
 declare module "fastify" {
   interface FastifyRequest {
     user: AuthenticatedUser | null;
+    /** Set when the request carries a valid `X-Share-Token` header - an anonymous visitor following a share link, see `modules/shareLinks`. */
+    shareAccess: ResolvedShare | null;
   }
 }
 
@@ -28,9 +31,14 @@ declare module "fastify" {
  * Resolves the current user from the session cookie on every request, and
  * provides `request.requireUser()` for routes that must be authenticated.
  * Sessions are stored server-side (not JWTs) so they can be revoked on logout.
+ * Also resolves an `X-Share-Token` header (if present and no session/API key
+ * won) into `request.shareAccess`, for the small set of routes that accept
+ * anonymous share-link access alongside normal membership - see
+ * `modules/workspaces/access.ts`'s `requireAccess`.
  */
 export const sessionPlugin = fp(async (app: FastifyInstance) => {
   app.decorateRequest("user", null);
+  app.decorateRequest("shareAccess", null);
 
   app.addHook("onRequest", async (request) => {
     const authHeader = request.headers.authorization;
@@ -40,23 +48,29 @@ export const sessionPlugin = fp(async (app: FastifyInstance) => {
     }
 
     const sid = request.cookies[SESSION_COOKIE];
-    if (!sid) return;
+    if (sid) {
+      const rows = await db
+        .select({
+          userId: users.id,
+          email: users.email,
+          name: users.name,
+          avatarColor: users.avatarColor,
+        })
+        .from(sessions)
+        .innerJoin(users, eq(sessions.userId, users.id))
+        .where(and(eq(sessions.id, sid), gt(sessions.expiresAt, nowIso())))
+        .limit(1);
 
-    const rows = await db
-      .select({
-        userId: users.id,
-        email: users.email,
-        name: users.name,
-        avatarColor: users.avatarColor,
-      })
-      .from(sessions)
-      .innerJoin(users, eq(sessions.userId, users.id))
-      .where(and(eq(sessions.id, sid), gt(sessions.expiresAt, nowIso())))
-      .limit(1);
+      const row = rows[0];
+      if (row) {
+        request.user = { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor };
+        return;
+      }
+    }
 
-    const row = rows[0];
-    if (row) {
-      request.user = { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor };
+    const shareToken = request.headers["x-share-token"];
+    if (typeof shareToken === "string") {
+      request.shareAccess = await resolveShareToken(shareToken);
     }
   });
 });

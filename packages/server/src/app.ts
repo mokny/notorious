@@ -27,6 +27,7 @@ import { registerRealtimeRoutes } from "./modules/realtime/routes.js";
 import { registerApiKeyRoutes } from "./modules/apiKeys/routes.js";
 import { registerLinkPreviewRoutes } from "./modules/linkPreview/routes.js";
 import { registerSystemRoutes } from "./modules/system/routes.js";
+import { registerShareLinkRoutes } from "./modules/shareLinks/routes.js";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const WEB_DIST_DIR = path.join(PACKAGE_ROOT, "packages/web/dist");
@@ -89,6 +90,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerApiKeyRoutes(app);
   await registerLinkPreviewRoutes(app);
   await registerSystemRoutes(app);
+  await registerShareLinkRoutes(app);
 
   app.get("/api/v1/health", async () => ({ status: "ok", version: PACKAGE_VERSION }));
 

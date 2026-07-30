@@ -248,6 +248,25 @@ export const sentReminders = sqliteTable(
   (table) => [primaryKey({ columns: [table.objectId, table.propertyId, table.reminderValue] })],
 );
 
+export const shareLinks = sqliteTable("share_links", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  // null = the whole workspace is shared; otherwise scoped to exactly this
+  // one object. Not a Drizzle `.references()` - `objects` rows can outlive
+  // or be deleted independently and the FK (ON DELETE CASCADE) is enforced
+  // at the SQL level in the migration instead, same as `files.objectId`.
+  objectId: text("object_id"),
+  token: text("token").notNull().unique(),
+  role: text("role").notNull().$type<"viewer" | "commenter" | "editor">(),
+  expiresAt: text("expires_at"),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+});
+
 export const pushSubscriptions = sqliteTable("push_subscriptions", {
   id: text("id").primaryKey(),
   userId: text("user_id")

@@ -31,6 +31,9 @@ import type {
   ApiKey,
   CreatedApiKey,
   CreateApiKeyInput,
+  ShareLink,
+  CreateShareLinkInput,
+  ResolvedShareLink,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
 
@@ -181,4 +184,14 @@ export const linkPreviewApi = {
 
 export const systemApi = {
   version: () => apiRequest<{ version: string }>("/api/v1/version"),
+};
+
+export const shareLinkApi = {
+  list: (workspaceId: string, objectId: string | null) =>
+    apiRequest<ShareLink[]>(`/api/v1/workspaces/${workspaceId}/share-links`, { query: { objectId: objectId ?? undefined } }),
+  create: (workspaceId: string, input: CreateShareLinkInput) =>
+    apiRequest<ShareLink>(`/api/v1/workspaces/${workspaceId}/share-links`, { method: "POST", body: input }),
+  revoke: (workspaceId: string, id: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/share-links/${id}`, { method: "DELETE" }),
+  resolve: (token: string) => apiRequest<ResolvedShareLink>(`/api/v1/public/share/${token}`),
 };

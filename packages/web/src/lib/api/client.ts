@@ -1,4 +1,10 @@
 import { clientId } from "../ws/clientId.js";
+import { getShareToken } from "./shareMode.js";
+
+function shareHeaders(): Record<string, string> {
+  const token = getShareToken();
+  return token ? { "X-Share-Token": token } : {};
+}
 
 export class ApiError extends Error {
   constructor(
@@ -32,8 +38,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     method: options.method ?? "GET",
     credentials: "include",
     headers: options.body
-      ? { "Content-Type": "application/json", "X-Client-Id": clientId }
-      : { "X-Client-Id": clientId },
+      ? { "Content-Type": "application/json", "X-Client-Id": clientId, ...shareHeaders() }
+      : { "X-Client-Id": clientId, ...shareHeaders() },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
@@ -54,7 +60,7 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
   const response = await fetch(path, {
     method: "POST",
     credentials: "include",
-    headers: { "X-Client-Id": clientId },
+    headers: { "X-Client-Id": clientId, ...shareHeaders() },
     body: formData,
   });
   const data = await response.json();

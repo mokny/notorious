@@ -52,6 +52,10 @@ export function BookmarkBlock({
               if (value) void setUrl(value);
             }
           }}
+          onBlur={(e) => {
+            const value = e.target.value.trim();
+            if (value) void setUrl(value);
+          }}
         />
       </div>
     );

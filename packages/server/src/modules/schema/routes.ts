@@ -1,14 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { createObjectTypeSchema, createPropertySchema, updatePropertySchema } from "@notorious/shared";
 import { requireUser } from "../../plugins/session.js";
-import { requireWorkspaceRole } from "../workspaces/access.js";
+import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess } from "../workspaces/access.js";
 import * as schemaService from "./service.js";
 
 export async function registerSchemaRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/workspaces/:workspaceId/object-types", async (request) => {
-    const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
-    await requireWorkspaceRole(workspaceId, user.id, "viewer");
+    await requireWorkspaceScopedAccess(request, workspaceId, "viewer");
     return schemaService.listObjectTypes(workspaceId);
   });
 
@@ -30,10 +29,12 @@ export async function registerSchemaRoutes(app: FastifyInstance): Promise<void> 
   });
 
   app.get("/api/v1/object-types/:objectTypeId/properties", async (request) => {
-    const user = requireUser(request);
     const { objectTypeId } = request.params as { objectTypeId: string };
     const property = await schemaService.listProperties(objectTypeId);
-    if (property[0]) await requireWorkspaceRole(property[0].workspaceId, user.id, "viewer");
+    // Not object-scoped: property definitions are workspace schema, not a
+    // specific object's data, so a single-object share may read them too
+    // (needed to render/edit that object's own properties).
+    if (property[0]) await requireAccess(request, property[0].workspaceId, "viewer");
     return property;
   });
 

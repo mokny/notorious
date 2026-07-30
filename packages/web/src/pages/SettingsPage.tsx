@@ -9,6 +9,7 @@ import { IconPicker } from "../components/IconPicker.js";
 import { ApiError } from "../lib/api/client.js";
 import { NotificationSettings } from "../components/NotificationSettings.js";
 import { ApiKeysSettings } from "../components/ApiKeysSettings.js";
+import { ShareDialog } from "../components/ShareDialog.js";
 
 const ROLES = ["viewer", "commenter", "editor"] as const;
 
@@ -164,6 +165,19 @@ export function SettingsPage() {
         )}
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
       </section>
+
+      {isOwner && (
+        <section>
+          <h2 className="text-lg font-semibold">Public sharing</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Share the whole workspace via a link, without requiring an account. Set a role, and optionally an expiry -
+            you can revoke it at any time below.
+          </p>
+          <div className="mt-4">
+            <ShareDialog workspaceId={workspaceId!} objectId={null} label="Share workspace" />
+          </div>
+        </section>
+      )}
 
       {isOwner && (
         <section>

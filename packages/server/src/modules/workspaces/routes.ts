@@ -6,7 +6,7 @@ import {
   updateMemberRoleSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
-import { requireWorkspaceRole } from "./access.js";
+import { requireWorkspaceRole, requireAccess } from "./access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import { getObjectWorkspaceId } from "../objects/service.js";
 import { badRequest } from "../../lib/httpError.js";
@@ -27,9 +27,8 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.get("/api/v1/workspaces/:id", async (request) => {
-    const user = requireUser(request);
     const { id } = request.params as { id: string };
-    await requireWorkspaceRole(id, user.id, "viewer");
+    await requireAccess(request, id, "viewer");
     return workspaceService.getWorkspace(id);
   });
 

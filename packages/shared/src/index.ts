@@ -16,3 +16,4 @@ export * from "./schemas/view.js";
 export * from "./schemas/search.js";
 export * from "./schemas/push.js";
 export * from "./schemas/apiKey.js";
+export * from "./schemas/shareLink.js";

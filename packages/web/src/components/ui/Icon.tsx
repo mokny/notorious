@@ -35,6 +35,8 @@ import {
   LayoutDashboard,
   Pencil,
   Bookmark,
+  Share2,
+  Copy,
   type LucideIcon,
 } from "lucide-react";
 
@@ -75,6 +77,8 @@ const ICONS: Record<string, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
   pencil: Pencil,
   bookmark: Bookmark,
+  share: Share2,
+  copy: Copy,
 };
 
 function isImageUrl(value: string): boolean {

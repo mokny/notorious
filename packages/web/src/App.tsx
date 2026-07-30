@@ -9,6 +9,7 @@ import { ObjectTypePage } from "./pages/ObjectTypePage.js";
 import { ObjectDetailPage } from "./pages/ObjectDetailPage.js";
 import { SearchPage } from "./pages/SearchPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
+import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -30,6 +31,10 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/share/:token" element={<SharePage />}>
+        <Route index element={<SharedIndexRoute />} />
+        <Route path="objects/:objectId" element={<SharedObjectRoute />} />
+      </Route>
       <Route
         path="/"
         element={

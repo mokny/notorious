@@ -6,7 +6,7 @@ import {
   createRelationSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
-import { requireWorkspaceRole } from "../workspaces/access.js";
+import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess } from "../workspaces/access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import * as objectService from "./service.js";
 import { completeRecurringTask } from "./recurrence.js";
@@ -36,9 +36,8 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
   });
 
   app.get("/api/v1/workspaces/:workspaceId/objects", async (request) => {
-    const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
-    await requireWorkspaceRole(workspaceId, user.id, "viewer");
+    await requireWorkspaceScopedAccess(request, workspaceId, "viewer");
     const query = listObjectsQuerySchema.parse(request.query);
     return objectService.queryObjects(workspaceId, {
       objectTypeId: query.objectTypeId,
@@ -49,32 +48,32 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
   });
 
   app.get("/api/v1/objects/:id", async (request) => {
-    const user = requireUser(request);
     const { id } = request.params as { id: string };
     const workspaceId = await objectService.getObjectWorkspaceId(id);
-    await requireWorkspaceRole(workspaceId, user.id, "viewer");
+    await requireAccess(request, workspaceId, "viewer", { objectId: id });
     return objectService.getObject(id);
   });
 
   app.patch("/api/v1/objects/:id", async (request) => {
-    const user = requireUser(request);
     const { id } = request.params as { id: string };
     const workspaceId = await objectService.getObjectWorkspaceId(id);
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId: id });
     const input = updateObjectSchema.parse(request.body);
     const object = await objectService.updateObject(id, input);
 
-    await recordAndBroadcast({
-      workspaceId,
-      objectId: id,
-      actorId: user.id,
-      clientId: getClientId(request),
-      action: "updated",
-      summary: `${user.name} updated "${object.title}"`,
-      entity: "object",
-      entityId: id,
-      realtimeAction: "updated",
-    });
+    if (actorId) {
+      await recordAndBroadcast({
+        workspaceId,
+        objectId: id,
+        actorId,
+        clientId: getClientId(request),
+        action: "updated",
+        summary: `${actorName} updated "${object.title}"`,
+        entity: "object",
+        entityId: id,
+        realtimeAction: "updated",
+      });
+    }
 
     return object;
   });

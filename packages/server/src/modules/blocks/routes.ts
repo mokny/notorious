@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createBlockSchema, updateBlockSchema, moveBlockSchema, importMarkdownSchema } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
-import { requireWorkspaceRole } from "../workspaces/access.js";
+import { requireWorkspaceRole, requireAccess } from "../workspaces/access.js";
 import { getObjectWorkspaceId, getObject } from "../objects/service.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import * as blockService from "./service.js";
@@ -9,103 +9,106 @@ import { markdownToBlockTree, blocksToMarkdown } from "./markdown.js";
 
 export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/objects/:objectId/blocks", async (request) => {
-    const user = requireUser(request);
     const { objectId } = request.params as { objectId: string };
     const workspaceId = await getObjectWorkspaceId(objectId);
-    await requireWorkspaceRole(workspaceId, user.id, "viewer");
+    await requireAccess(request, workspaceId, "viewer", { objectId });
     return blockService.listBlocks(objectId);
   });
 
   app.post("/api/v1/blocks", async (request, reply) => {
-    const user = requireUser(request);
     const input = createBlockSchema.parse(request.body);
     const workspaceId = await getObjectWorkspaceId(input.objectId);
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId: input.objectId });
     const block = await blockService.createBlock(input);
 
-    await recordAndBroadcast({
-      workspaceId,
-      objectId: input.objectId,
-      actorId: user.id,
-      clientId: getClientId(request),
-      action: "updated",
-      summary: `${user.name} added a block`,
-      entity: "block",
-      entityId: block.id,
-      realtimeAction: "created",
-    });
+    if (actorId) {
+      await recordAndBroadcast({
+        workspaceId,
+        objectId: input.objectId,
+        actorId,
+        clientId: getClientId(request),
+        action: "updated",
+        summary: `${actorName} added a block`,
+        entity: "block",
+        entityId: block.id,
+        realtimeAction: "created",
+      });
+    }
 
     reply.code(201);
     return block;
   });
 
   app.patch("/api/v1/blocks/:id", async (request) => {
-    const user = requireUser(request);
     const { id } = request.params as { id: string };
     const objectId = await blockService.getBlockObjectId(id);
     const workspaceId = await getObjectWorkspaceId(objectId);
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId });
     const input = updateBlockSchema.parse(request.body);
     const block = await blockService.updateBlock(id, input);
 
-    await recordAndBroadcast({
-      workspaceId,
-      objectId,
-      actorId: user.id,
-      clientId: getClientId(request),
-      action: "updated",
-      summary: `${user.name} edited a block`,
-      entity: "block",
-      entityId: id,
-      realtimeAction: "updated",
-    });
+    if (actorId) {
+      await recordAndBroadcast({
+        workspaceId,
+        objectId,
+        actorId,
+        clientId: getClientId(request),
+        action: "updated",
+        summary: `${actorName} edited a block`,
+        entity: "block",
+        entityId: id,
+        realtimeAction: "updated",
+      });
+    }
 
     return block;
   });
 
   app.post("/api/v1/blocks/:id/move", async (request) => {
-    const user = requireUser(request);
     const { id } = request.params as { id: string };
     const objectId = await blockService.getBlockObjectId(id);
     const workspaceId = await getObjectWorkspaceId(objectId);
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId });
     const input = moveBlockSchema.parse(request.body);
     const block = await blockService.moveBlock(id, input);
 
-    await recordAndBroadcast({
-      workspaceId,
-      objectId,
-      actorId: user.id,
-      clientId: getClientId(request),
-      action: "updated",
-      summary: `${user.name} reordered a block`,
-      entity: "block",
-      entityId: id,
-      realtimeAction: "updated",
-    });
+    if (actorId) {
+      await recordAndBroadcast({
+        workspaceId,
+        objectId,
+        actorId,
+        clientId: getClientId(request),
+        action: "updated",
+        summary: `${actorName} reordered a block`,
+        entity: "block",
+        entityId: id,
+        realtimeAction: "updated",
+      });
+    }
 
     return block;
   });
 
   app.delete("/api/v1/blocks/:id", async (request, reply) => {
-    const user = requireUser(request);
     const { id } = request.params as { id: string };
     const objectId = await blockService.getBlockObjectId(id);
     const workspaceId = await getObjectWorkspaceId(objectId);
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    const { actorId, actorName } = await requireAccess(request, workspaceId, "editor", { objectId });
     await blockService.deleteBlock(id);
 
-    await recordAndBroadcast({
-      workspaceId,
-      objectId,
-      actorId: user.id,
-      clientId: getClientId(request),
-      action: "updated",
-      summary: `${user.name} removed a block`,
-      entity: "block",
-      entityId: id,
-      realtimeAction: "deleted",
-    });
+    if (actorId) {
+      await recordAndBroadcast({
+        workspaceId,
+        objectId,
+        actorId,
+        clientId: getClientId(request),
+        action: "updated",
+        summary: `${actorName} removed a block`,
+        entity: "block",
+        entityId: id,
+        realtimeAction: "deleted",
+      });
+    }
 
     reply.code(204);
   });
