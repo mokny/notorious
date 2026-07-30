@@ -13,6 +13,8 @@ import type {
   FileAsset,
   RegisterInput,
   LoginInput,
+  ChangePasswordInput,
+  ChangeEmailInput,
   CreateWorkspaceInput,
   UpdateWorkspaceInput,
   InviteMemberInput,
@@ -43,6 +45,8 @@ export const authApi = {
   register: (input: RegisterInput) => apiRequest<User>("/api/v1/auth/register", { method: "POST", body: input }),
   login: (input: LoginInput) => apiRequest<User>("/api/v1/auth/login", { method: "POST", body: input }),
   logout: () => apiRequest<void>("/api/v1/auth/logout", { method: "POST" }),
+  changePassword: (input: ChangePasswordInput) => apiRequest<void>("/api/v1/auth/password", { method: "PATCH", body: input }),
+  changeEmail: (input: ChangeEmailInput) => apiRequest<User>("/api/v1/auth/email", { method: "PATCH", body: input }),
 };
 
 export const workspaceApi = {

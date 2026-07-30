@@ -100,6 +100,9 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     },
     onRestore: (block) => restoreMutation.mutateAsync(block),
     onMove: (blockId, parentBlockId, afterBlockId) => moveMutation.mutateAsync({ blockId, parentBlockId, afterBlockId }),
+    // Not `performUpdate` below - undo/redo navigate the existing stack, they
+    // shouldn't push a fresh entry back onto it every time they run.
+    onUpdate: (blockId, content) => updateMutation.mutateAsync({ blockId, content }),
   });
 
   /** Looks up the block's current content before deleting it, so the delete is undoable. */
@@ -112,9 +115,43 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     });
   }
 
-  /** Captures where the block currently sits before moving it, so the move is undoable. */
-  function performMove(blockId: string, parentBlockId: string | null, afterBlockId: string | null): void {
-    const from = currentEndpointsFor(blocks ?? [], blockId);
+  /**
+   * Looks up the block's current (full, pre-merge) content before saving,
+   * so a content edit is undoable too - one step per committed save, same
+   * as create/delete/move, not one per keystroke (see useEditorHistory.ts).
+   * Uses the server's response for the "after" snapshot rather than the raw
+   * `content` argument, since a save is a partial, shallow-merged patch (see
+   * blocks/service.ts's `updateBlock`) and undo needs the *full* content on
+   * both sides to restore correctly.
+   */
+  function performUpdate(blockId: string, content: Record<string, unknown>): Promise<void> {
+    const before = (blocks ?? []).find((b) => b.id === blockId);
+    return updateMutation
+      .mutateAsync(
+        { blockId, content },
+        {
+          onSuccess: (updated) => {
+            if (before) history.recordUpdate(blockId, before.content, updated.content);
+          },
+        },
+      )
+      .then(() => undefined);
+  }
+
+  /**
+   * Captures where the block currently sits before moving it, so the move is
+   * undoable. `precomputedFrom` lets a caller that already sorted the
+   * sibling list for its own purposes (see `handleDragEnd`'s same-parent
+   * branch) pass that along instead of making this recompute the identical
+   * sort a second time.
+   */
+  function performMove(
+    blockId: string,
+    parentBlockId: string | null,
+    afterBlockId: string | null,
+    precomputedFrom?: { parentBlockId: string | null; afterBlockId: string | null } | null,
+  ): void {
+    const from = precomputedFrom !== undefined ? precomputedFrom : currentEndpointsFor(blocks ?? [], blockId);
     moveMutation.mutate(
       { blockId, parentBlockId, afterBlockId },
       {
@@ -214,10 +251,14 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     const oldIndex = siblings.findIndex((b) => b.id === blockId);
     const newIndex = siblings.findIndex((b) => b.id === overId);
     if (oldIndex === -1 || newIndex === -1) return;
+    // Already have the sorted sibling list right here - the "from" endpoint
+    // undo needs is just this block's predecessor in it, no need to make
+    // performMove re-sort the same array again to re-derive it.
+    const fromAfterBlockId = oldIndex > 0 ? siblings[oldIndex - 1]!.id : null;
     const reordered = arrayMove(siblings, oldIndex, newIndex);
     const draggedIndex = reordered.findIndex((b) => b.id === blockId);
     const afterBlockId = draggedIndex > 0 ? reordered[draggedIndex - 1]!.id : null;
-    performMove(blockId, overBlock.parentBlockId, afterBlockId);
+    performMove(blockId, overBlock.parentBlockId, afterBlockId, { parentBlockId: draggedBlock.parentBlockId, afterBlockId: fromAfterBlockId });
   }
 
   /** Uploads each dropped file and appends a block for it (image/video get a
@@ -266,7 +307,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         objectId,
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
-        updateBlockContent: (blockId, content) => updateMutation.mutateAsync({ blockId, content }).then(() => undefined),
+        updateBlockContent: (blockId, content) => performUpdate(blockId, content),
         deleteBlock: (blockId) => performDelete(blockId),
         moveBlock: (blockId, parentBlockId, afterBlockId) => performMove(blockId, parentBlockId, afterBlockId),
         pendingFocusBlockId,

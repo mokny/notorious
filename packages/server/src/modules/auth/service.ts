@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import { eq, and } from "drizzle-orm";
-import type { RegisterInput, LoginInput, User } from "@notorious/shared";
+import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, User } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { users, workspaceInvites, workspaceMembers } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -96,4 +96,32 @@ export async function verifyCredentials(input: LoginInput): Promise<User> {
 export async function getUserById(id: string): Promise<User | null> {
   const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return rows[0] ? toUser(rows[0]) : null;
+}
+
+/** Requires the current password, same as `changeEmail` - this changes how the account is authenticated, not a profile detail. */
+export async function changePassword(userId: string, input: ChangePasswordInput): Promise<void> {
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const row = rows[0];
+  if (!row) throw unauthorized();
+
+  const valid = await argon2.verify(row.passwordHash, input.currentPassword);
+  if (!valid) throw badRequest("Current password is incorrect");
+
+  const passwordHash = await argon2.hash(input.newPassword);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+}
+
+export async function changeEmail(userId: string, input: ChangeEmailInput): Promise<User> {
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const row = rows[0];
+  if (!row) throw unauthorized();
+
+  const valid = await argon2.verify(row.passwordHash, input.currentPassword);
+  if (!valid) throw badRequest("Current password is incorrect");
+
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, input.newEmail)).limit(1);
+  if (existing[0] && existing[0].id !== userId) throw badRequest("An account with this email already exists");
+
+  await db.update(users).set({ email: input.newEmail }).where(eq(users.id, userId));
+  return toUser({ ...row, email: input.newEmail });
 }

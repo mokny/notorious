@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { registerSchema, loginSchema } from "@notorious/shared";
-import { registerUser, verifyCredentials, getUserById, canRegisterEmail } from "./service.js";
-import { createSession, destroySession, requireUser } from "../../plugins/session.js";
+import { registerSchema, loginSchema, changePasswordSchema, changeEmailSchema } from "@notorious/shared";
+import { registerUser, verifyCredentials, getUserById, canRegisterEmail, changePassword, changeEmail } from "./service.js";
+import { createSession, destroySession, requireUser, invalidateOtherSessions } from "../../plugins/session.js";
 import { forbidden } from "../../lib/httpError.js";
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
@@ -46,5 +46,22 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return { message: "Session is no longer valid" };
     }
     return user;
+  });
+
+  app.patch("/api/v1/auth/password", async (request, reply) => {
+    const user = requireUser(request);
+    const input = changePasswordSchema.parse(request.body);
+    await changePassword(user.id, input);
+    // Anyone else's (or an attacker's) session on this account is signed out
+    // the moment the password changes - see invalidateOtherSessions's doc
+    // comment. This tab's own session is left alone.
+    await invalidateOtherSessions(request, user.id);
+    reply.code(204);
+  });
+
+  app.patch("/api/v1/auth/email", async (request) => {
+    const user = requireUser(request);
+    const input = changeEmailSchema.parse(request.body);
+    return changeEmail(user.id, input);
   });
 }

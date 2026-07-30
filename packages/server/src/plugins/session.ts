@@ -1,6 +1,6 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { eq, gt, and } from "drizzle-orm";
+import { eq, gt, and, ne } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { sessions, users } from "../db/schema.js";
 import { newId, nowIso } from "../lib/ids.js";
@@ -116,4 +116,20 @@ export async function destroySession(request: FastifyRequest, reply: FastifyRepl
     await db.delete(sessions).where(eq(sessions.id, sid));
   }
   reply.clearCookie(SESSION_COOKIE, { path: "/" });
+}
+
+/**
+ * Signs out every *other* session for this account - called after a password
+ * change (see auth/routes.ts), on the assumption that changing the password
+ * may be the user reacting to a compromised session elsewhere. The session
+ * making the request itself is left alone, so changing your own password
+ * doesn't also log out the tab you just did it from.
+ */
+export async function invalidateOtherSessions(request: FastifyRequest, userId: string): Promise<void> {
+  const currentSid = request.cookies[SESSION_COOKIE];
+  if (currentSid) {
+    await db.delete(sessions).where(and(eq(sessions.userId, userId), ne(sessions.id, currentSid)));
+  } else {
+    await db.delete(sessions).where(eq(sessions.userId, userId));
+  }
 }

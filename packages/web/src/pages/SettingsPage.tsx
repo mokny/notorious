@@ -11,6 +11,7 @@ import { IconPicker } from "../components/IconPicker.js";
 import { ApiError } from "../lib/api/client.js";
 import { NotificationSettings } from "../components/NotificationSettings.js";
 import { ApiKeysSettings } from "../components/ApiKeysSettings.js";
+import { AccountSettings } from "../components/AccountSettings.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 
 const ROLES = ["viewer", "commenter", "editor"] as const;
@@ -103,6 +104,12 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-10 px-6 py-10">
+      <section>
+        <h2 className="text-lg font-semibold">Account</h2>
+        <p className="mt-1 text-sm text-ink-muted">Update the email address or password for your own account.</p>
+        <AccountSettings />
+      </section>
+
       <section>
         <h2 className="text-lg font-semibold">Workspace</h2>
         <p className="mt-1 text-sm text-ink-muted">Rename "{workspace?.name}", pick an icon, or upload your own image.</p>
