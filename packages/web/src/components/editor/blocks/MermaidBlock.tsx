@@ -25,13 +25,23 @@ export function MermaidBlock({
       const mermaid = mod.default;
       mermaid.initialize({ startOnLoad: false, theme: "neutral" });
       try {
+        // `render()` alone doesn't throw on invalid syntax - it resolves
+        // with mermaid's own built-in "error diagram" SVG instead (a large,
+        // unstyled graphic with a bomb icon and the mermaid version number),
+        // which would otherwise render as-is below. `parse()` does throw on
+        // invalid syntax, so validating with it first is what lets the
+        // catch block below show our own small error message instead.
+        await mermaid.parse(content.code);
         const { svg: rendered } = await mermaid.render(`mermaid-${id}`, content.code);
         if (!cancelled) {
           setSvg(rendered);
           setError(null);
         }
       } catch {
-        if (!cancelled) setError("Could not render this diagram");
+        if (!cancelled) {
+          setError("Could not render this diagram - check the syntax");
+          setSvg("");
+        }
       }
     });
 
