@@ -45,6 +45,8 @@ function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; o
       >
         <button
           onClick={() => setExpanded((v) => !v)}
+          // View action, not an edit - see CollapsibleSection.tsx's identical marker for why.
+          data-view-toggle
           className={`shrink-0 rounded p-0.5 text-ink-muted hover:text-ink ${hasChildren ? "" : "invisible"}`}
           title="Show sub-objects"
         >

@@ -127,6 +127,8 @@ export const objects = sqliteTable("objects", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   archivedAt: text("archived_at"),
+  lockedAt: text("locked_at"),
+  lockedBy: text("locked_by").references(() => users.id, { onDelete: "set null" }),
 });
 
 export const objectValues = sqliteTable(
@@ -232,6 +234,24 @@ export const activityLog = sqliteTable("activity_log", {
   actorId: text("actor_id")
     .notNull()
     .references(() => users.id),
+  action: text("action").notNull(),
+  summary: text("summary").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+/** Per-block edit history shown below Properties when a block is selected (see BlockHistoryPanel.tsx) - see migrations/0014_block_history.sql for why this is separate from activityLog. */
+export const blockHistory = sqliteTable("block_history", {
+  id: text("id").primaryKey(),
+  blockId: text("block_id")
+    .notNull()
+    .references(() => blocks.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  actorId: text("actor_id")
+    .notNull()
+    .references(() => users.id),
+  actorName: text("actor_name").notNull(),
   action: text("action").notNull(),
   summary: text("summary").notNull(),
   createdAt: text("created_at").notNull(),

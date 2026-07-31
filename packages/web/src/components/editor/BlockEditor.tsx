@@ -64,7 +64,15 @@ function blockForDroppedFile(file: File, url: string, fileId: string): { type: B
   return { type: "paragraph", content: { markdown: `[${file.name}](${url})` } };
 }
 
-export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; objectId: string }) {
+interface BlockEditorProps {
+  workspaceId: string;
+  objectId: string;
+  /** Which block's edit history shows in the Properties sidebar - lifted to ObjectDetailPage.tsx, which renders that sidebar outside this component's own tree. */
+  selectedBlockId?: string | null;
+  onSelectBlock?: (blockId: string) => void;
+}
+
+export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onSelectBlock }: BlockEditorProps) {
   const queryClient = useQueryClient();
   const importInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -80,6 +88,12 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ["blocks", objectId] });
     void queryClient.invalidateQueries({ queryKey: ["recentEdits", workspaceId] });
+    // Prefix match, no specific block id: only one BlockHistoryPanel is ever
+    // mounted at a time (see ObjectDetailPage.tsx's selectedBlockId), so
+    // this just refreshes whichever one that happens to be - simpler than
+    // threading "which block did this specific mutation touch" through
+    // every call site here just to target it precisely.
+    void queryClient.invalidateQueries({ queryKey: ["blockHistory"] });
   }
 
   // A sub_object block's presence drives the "sub_objects" relation
@@ -368,6 +382,8 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         pendingFocusBlockId,
         clearPendingFocus: () => setPendingFocusBlockId(null),
         isDraggingAny,
+        selectedBlockId,
+        selectBlock: (blockId) => onSelectBlock?.(blockId),
       }}
     >
       <div

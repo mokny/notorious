@@ -23,11 +23,13 @@ import type {
   UpdatePropertyInput,
   CreateObjectInput,
   UpdateObjectInput,
+  SetObjectLockedInput,
   CreateRelationInput,
   CreateBlockInput,
   UpdateBlockInput,
   MoveBlockInput,
   RestoreBlockInput,
+  BlockHistoryEntry,
   CreateViewInput,
   UpdateViewInput,
   CreateSavedSearchInput,
@@ -105,6 +107,7 @@ export const objectApi = {
   get: (id: string) => apiRequest<ObjectRecord>(`/api/v1/objects/${id}`),
   update: (id: string, input: UpdateObjectInput) =>
     apiRequest<ObjectRecord>(`/api/v1/objects/${id}`, { method: "PATCH", body: input }),
+  setLocked: (id: string, input: SetObjectLockedInput) => apiRequest<ObjectRecord>(`/api/v1/objects/${id}/lock`, { method: "POST", body: input }),
   archive: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/archive`, { method: "POST" }),
   restore: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/restore`, { method: "POST" }),
   remove: (id: string) => apiRequest<void>(`/api/v1/objects/${id}`, { method: "DELETE" }),
@@ -135,6 +138,7 @@ export const blockApi = {
   importMarkdown: (objectId: string, markdown: string) =>
     apiRequest<Block[]>("/api/v1/blocks/import-markdown", { method: "POST", body: { objectId, markdown } }),
   exportMarkdownUrl: (objectId: string) => `/api/v1/objects/${objectId}/export-markdown`,
+  history: (id: string) => apiRequest<BlockHistoryEntry[]>(`/api/v1/blocks/${id}/history`),
 };
 
 export const viewApi = {

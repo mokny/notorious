@@ -4,6 +4,7 @@ import type { FastifyRequest } from "fastify";
 import { db } from "../../db/client.js";
 import { workspaceMembers } from "../../db/schema.js";
 import { forbidden, unauthorized } from "../../lib/httpError.js";
+import { assertObjectEditable } from "../objects/service.js";
 
 /** Returns the caller's role in the workspace, or null if they are not a member. */
 export async function getMemberRole(
@@ -57,21 +58,33 @@ export async function requireAccess(
   minRole: WorkspaceRole,
   options: RequireAccessOptions = {},
 ): Promise<AccessResult> {
+  let result: AccessResult;
+
   if (request.user) {
     await requireWorkspaceRole(workspaceId, request.user.id, minRole);
-    return { actorId: request.user.id, actorName: request.user.name };
+    result = { actorId: request.user.id, actorName: request.user.name };
+  } else {
+    const share = request.shareAccess;
+    const scopeOk =
+      share &&
+      share.workspaceId === workspaceId &&
+      roleAtLeast(share.role, minRole) &&
+      (!options.requireWorkspaceScope || share.objectId === null) &&
+      (options.objectId === undefined || share.objectId === null || share.objectId === options.objectId);
+
+    if (!scopeOk) throw unauthorized();
+    result = { actorId: null, actorName: null };
   }
 
-  const share = request.shareAccess;
-  const scopeOk =
-    share &&
-    share.workspaceId === workspaceId &&
-    roleAtLeast(share.role, minRole) &&
-    (!options.requireWorkspaceScope || share.objectId === null) &&
-    (options.objectId === undefined || share.objectId === null || share.objectId === options.objectId);
+  // Locking blocks edits from *everyone*, including the workspace owner
+  // (see objects/routes.ts's lock endpoint) - "editor" is the lowest role
+  // any mutating route asks for here, so this only ever runs for a request
+  // that's actually trying to change something, never a plain read.
+  if (options.objectId && roleAtLeast(minRole, "editor")) {
+    await assertObjectEditable(options.objectId);
+  }
 
-  if (!scopeOk) throw unauthorized();
-  return { actorId: null, actorName: null };
+  return result;
 }
 
 /** Shorthand for `requireAccess` on endpoints that browse/list across a whole workspace - never satisfiable by a single-object share. */

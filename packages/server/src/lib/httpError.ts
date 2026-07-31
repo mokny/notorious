@@ -14,3 +14,4 @@ export const forbidden = (message = "Not allowed"): HttpError => new HttpError(4
 export const notFound = (message = "Not found"): HttpError => new HttpError(404, message);
 export const badRequest = (message = "Bad request"): HttpError => new HttpError(400, message);
 export const conflict = (message = "Conflict"): HttpError => new HttpError(409, message);
+export const locked = (message = "This object is locked and cannot be edited"): HttpError => new HttpError(423, message);

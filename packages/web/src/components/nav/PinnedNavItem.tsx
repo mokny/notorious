@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { objectApi } from "../../lib/api/resources.js";
+import { blockApi, objectApi } from "../../lib/api/resources.js";
 import { useObjectTitle } from "../../hooks/useObjectTitle.js";
 import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
@@ -32,8 +32,33 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
     queryKey: ["object", objectId],
     queryFn: () => objectApi.get(objectId),
   });
-  const subObjectIds = Array.isArray(object?.values.sub_objects) ? object.values.sub_objects : [];
+  const subObjectIds = useMemo(
+    () => (Array.isArray(object?.values.sub_objects) ? object.values.sub_objects : []),
+    [object?.values.sub_objects],
+  );
   const hasSubObjects = subObjectIds.length > 0;
+
+  // `subObjectIds` (the "sub_objects" relation) has no inherent order of its
+  // own - only fetched once actually expanded, since it's extra work most
+  // pinned rows never need. Sub-objects embedded as a block in this object's
+  // own content sort by that block's position, matching the order you'd
+  // actually see scrolling through the object itself; any relation without a
+  // corresponding block (added by hand via SubObjectsPanel) keeps its
+  // original relative order, appended after the block-ordered ones.
+  const { data: blocks } = useQuery({
+    queryKey: ["blocks", objectId],
+    queryFn: () => blockApi.list(objectId),
+    enabled: expanded && hasSubObjects,
+  });
+  const orderedSubObjectIds = useMemo(() => {
+    if (!blocks) return subObjectIds;
+    const blockOrder = blocks
+      .filter((block) => block.type === "sub_object")
+      .map((block) => (block.content as { objectId?: string }).objectId)
+      .filter((id): id is string => Boolean(id) && subObjectIds.includes(id!));
+    const remaining = subObjectIds.filter((id) => !blockOrder.includes(id));
+    return [...blockOrder, ...remaining];
+  }, [blocks, subObjectIds]);
 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -79,7 +104,7 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
 
       {expanded && hasSubObjects && (
         <div className="ml-4 space-y-0.5 border-l border-border pl-2">
-          {subObjectIds.map((subObjectId) => (
+          {orderedSubObjectIds.map((subObjectId) => (
             <SubObjectRow key={subObjectId} workspaceId={workspaceId} objectId={subObjectId} />
           ))}
         </div>

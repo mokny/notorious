@@ -68,3 +68,16 @@ body {
   pointer-events: none;
   height: 0;
 }
+
+/* Hides hover-revealed edit controls (drag handles, add/delete buttons -
+   anything using the app's `opacity-0 ... group-hover(/name)?:opacity-100`
+   convention) inside read-only content (see ObjectDetailPage.tsx's
+   READ_ONLY_LOCK, used both for a locked object and a read-only share
+   visitor) - hovering shouldn't tease a control that would just fail (or
+   sit there invisible-but-clickable) anyway. Matched by substring since the
+   "group" name suffix varies per component (group-hover/item,
+   group-hover/checklistitem, ...), not by one exact class name. */
+.locked-content [class*="group-hover"][class*="opacity-100"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

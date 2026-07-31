@@ -13,6 +13,9 @@ export interface BlockEditorActions {
   clearPendingFocus: () => void;
   /** True for the whole editor while any block is being dragged - not just the one under the pointer, so every block's move handle stays visible as a drop-target cue. */
   isDraggingAny: boolean;
+  /** Which block's edit history shows in the Properties sidebar (see BlockHistoryPanel.tsx) - lifted above the editor since the sidebar isn't part of this component tree. */
+  selectedBlockId: string | null;
+  selectBlock: (blockId: string) => void;
 }
 
 const BlockEditorContext = createContext<BlockEditorActions | null>(null);

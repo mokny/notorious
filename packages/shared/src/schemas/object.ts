@@ -29,6 +29,11 @@ export const updateObjectSchema = z.object({
 });
 export type UpdateObjectInput = z.infer<typeof updateObjectSchema>;
 
+export const setObjectLockedSchema = z.object({
+  locked: z.boolean(),
+});
+export type SetObjectLockedInput = z.infer<typeof setObjectLockedSchema>;
+
 export const listObjectsQuerySchema = z.object({
   objectTypeId: z.string().optional(),
   archived: z.coerce.boolean().default(false),

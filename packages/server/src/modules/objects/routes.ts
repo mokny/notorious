@@ -4,6 +4,7 @@ import {
   updateObjectSchema,
   listObjectsQuerySchema,
   createRelationSchema,
+  setObjectLockedSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess, resolveActor } from "../workspaces/access.js";
@@ -77,6 +78,34 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     return object;
   });
 
+  // Owner-only, and deliberately NOT routed through `requireAccess` (which
+  // would reject the request the moment the object is already locked,
+  // making it impossible to ever unlock again) - locking/unlocking is the
+  // one action that must always be available to the owner regardless of
+  // the object's current lock state.
+  app.post("/api/v1/objects/:id/lock", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    const workspaceId = await objectService.getObjectWorkspaceId(id);
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const input = setObjectLockedSchema.parse(request.body);
+    const object = await objectService.setObjectLocked(id, input.locked ? user.id : null, input.locked);
+
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: input.locked ? `${user.name} locked "${object.title}"` : `${user.name} unlocked "${object.title}"`,
+      entity: "object",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return object;
+  });
+
   app.post("/api/v1/objects/:id/archive", async (request) => {
     const user = requireUser(request);
     const { id } = request.params as { id: string };
@@ -113,6 +142,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     const { id } = request.params as { id: string };
     const workspaceId = await objectService.getObjectWorkspaceId(id);
     await requireWorkspaceRole(workspaceId, user.id, "editor");
+    await objectService.assertObjectEditable(id);
     await objectService.deleteObject(id);
 
     await recordAndBroadcast({
@@ -166,6 +196,11 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     const { workspaceId } = request.params as { workspaceId: string };
     await requireWorkspaceRole(workspaceId, user.id, "editor");
     const input = createRelationSchema.parse(request.body);
+    // This route (unlike blocks/object-property routes) authorizes via
+    // `requireWorkspaceRole`, not `requireAccess`, so it doesn't get the lock
+    // check `requireAccess` runs automatically for an object-scoped editor+
+    // request - checked explicitly here instead.
+    await objectService.assertObjectEditable(input.sourceObjectId);
     const relation = await objectService.createRelation(workspaceId, input);
 
     await recordAndBroadcast({
@@ -192,6 +227,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       sourceObjectId: string;
       targetObjectId: string;
     };
+    await objectService.assertObjectEditable(sourceObjectId);
     await objectService.deleteRelationByTriple(propertyId, sourceObjectId, targetObjectId);
 
     await recordAndBroadcast({

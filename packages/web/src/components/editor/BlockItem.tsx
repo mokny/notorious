@@ -17,8 +17,11 @@ export function BlockItem({ block }: { block: BlockNode }) {
     pendingFocusBlockId,
     clearPendingFocus,
     isDraggingAny,
+    selectedBlockId,
+    selectBlock,
   } = useBlockEditor();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+  const isSelected = block.id === selectedBlockId;
 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -34,7 +37,14 @@ export function BlockItem({ block }: { block: BlockNode }) {
     // pointer. With everyone sharing the same unnamed "group", hovering *any*
     // block satisfied the outer group's hover state too, which made every
     // block's controls appear at once instead of just the hovered one's.
-    <div ref={setNodeRef} style={style} className="group/item flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60">
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={() => selectBlock(block.id)}
+      className={`group/item flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60 ${
+        isSelected ? "ring-1 ring-accent/40" : ""
+      }`}
+    >
       <div className="mt-1 flex shrink-0 items-center gap-0.5">
         <button
           onClick={() => createBlockAfter(block.parentBlockId, block.id, "paragraph")}

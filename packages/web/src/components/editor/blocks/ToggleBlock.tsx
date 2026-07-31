@@ -15,7 +15,7 @@ export function ToggleBlock({ content, onSave, children }: ToggleBlockProps) {
   return (
     <div>
       <div className="flex items-start gap-1">
-        <button onClick={() => setOpen((v) => !v)} className="mt-1 text-ink-muted hover:text-ink">
+        <button onClick={() => setOpen((v) => !v)} data-view-toggle className="mt-1 text-ink-muted hover:text-ink">
           <Icon name={open ? "chevron-down" : "chevron-right"} className="h-4 w-4" />
         </button>
         <div className="flex-1">

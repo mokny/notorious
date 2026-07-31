@@ -15,6 +15,14 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
     return blockService.listBlocks(objectId);
   });
 
+  app.get("/api/v1/blocks/:id/history", async (request) => {
+    const { id } = request.params as { id: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    await requireAccess(request, workspaceId, "viewer", { objectId });
+    return blockService.listBlockHistory(id);
+  });
+
   app.post("/api/v1/blocks", async (request, reply) => {
     const input = createBlockSchema.parse(request.body);
     const workspaceId = await getObjectWorkspaceId(input.objectId);
@@ -26,6 +34,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId: input.objectId,
       actorId: created.actorId,
+      actorName: created.actorName,
       clientId: getClientId(request),
       action: "updated",
       summary: `${created.actorName} added a block`,
@@ -53,6 +62,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId: input.objectId,
       actorId: restored.actorId,
+      actorName: restored.actorName,
       clientId: getClientId(request),
       action: "updated",
       summary: `${restored.actorName} restored a block`,
@@ -78,6 +88,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId,
       actorId: updated.actorId,
+      actorName: updated.actorName,
       clientId: getClientId(request),
       action: "updated",
       summary: `${updated.actorName} edited a block`,
@@ -102,6 +113,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       workspaceId,
       objectId,
       actorId: moved.actorId,
+      actorName: moved.actorName,
       clientId: getClientId(request),
       action: "updated",
       summary: `${moved.actorName} reordered a block`,
@@ -121,6 +133,12 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
     await blockService.deleteBlock(id);
 
     const deleted = resolveActor(request, access);
+    // Deliberately no `actorName` here (unlike every other block route) -
+    // block_history.block_id is a foreign key to blocks.id, and the block
+    // above is already gone by the time this runs, so there'd be nothing
+    // for that row to reference. Matches the migration's own reasoning:
+    // history for a block that no longer exists isn't reachable from the UI
+    // anyway (you can only view history by clicking an existing block).
     await recordAndBroadcast({
       workspaceId,
       objectId,

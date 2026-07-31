@@ -27,6 +27,10 @@ function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient:
     // typing is what caused characters to occasionally get dropped.
     if (payload.clientId !== myClientId) {
       queryClient.invalidateQueries({ queryKey: ["blocks", payload.objectId ?? ""] });
+      // Same self-echo skip as above - refreshes the history panel (see
+      // BlockHistoryPanel.tsx) if it's currently open on the block someone
+      // else just changed.
+      queryClient.invalidateQueries({ queryKey: ["blockHistory", payload.entityId] });
     }
   } else if (payload.entity === "member") {
     queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
@@ -89,6 +93,7 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["object"] });
           queryClient.invalidateQueries({ queryKey: ["blocks"] });
+          queryClient.invalidateQueries({ queryKey: ["blockHistory"] });
           queryClient.invalidateQueries({ queryKey: ["viewResults"] });
           queryClient.invalidateQueries({ queryKey: ["backlinks"] });
           queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });

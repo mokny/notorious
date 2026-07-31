@@ -93,6 +93,9 @@ export interface ObjectRecord {
   createdAt: ISODateString;
   updatedAt: ISODateString;
   archivedAt: ISODateString | null;
+  /** Set by the workspace owner (see objects/routes.ts's lock endpoint) - while set, nobody (including the owner) can edit this object until it's unlocked again. */
+  lockedAt: ISODateString | null;
+  lockedBy: string | null;
   values: Record<string, PropertyValue>;
 }
 
@@ -153,6 +156,16 @@ export interface ActivityEntry {
   objectId: string | null;
   actorId: string;
   action: "created" | "updated" | "archived" | "deleted" | "commented" | "shared";
+  summary: string;
+  createdAt: ISODateString;
+}
+
+/** One entry in a block's edit history (see BlockHistoryPanel.tsx) - capped at 10 per block, most recent first. */
+export interface BlockHistoryEntry {
+  id: string;
+  blockId: string;
+  actorName: string;
+  action: ActivityEntry["action"];
   summary: string;
   createdAt: ISODateString;
 }

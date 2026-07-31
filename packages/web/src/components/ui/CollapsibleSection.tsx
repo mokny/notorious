@@ -18,6 +18,11 @@ export function CollapsibleSection({ title, defaultExpanded = false, actions, ch
       <div className="mb-2 flex items-center justify-between">
         <button
           onClick={() => setExpanded((v) => !v)}
+          // Expanding/collapsing is a view action, not an edit - exempted
+          // from ObjectDetailPage.tsx's READ_ONLY_LOCK (which otherwise
+          // disables every `<button>` in a locked/read-only object) so it
+          // keeps working there.
+          data-view-toggle
           className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-ink-muted hover:text-ink"
         >
           <Icon name={expanded ? "chevron-down" : "chevron-right"} className="h-3.5 w-3.5" />

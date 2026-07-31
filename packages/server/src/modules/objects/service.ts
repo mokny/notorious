@@ -11,7 +11,7 @@ import type {
 import { db } from "../../db/client.js";
 import { objects, relations, objectValues, objectTypes, blocks } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
-import { notFound } from "../../lib/httpError.js";
+import { notFound, locked } from "../../lib/httpError.js";
 import { listProperties } from "../schema/service.js";
 import { resolveValuesForObjects } from "./valueResolver.js";
 import { applyFilters, compareForSort, MAX_SCAN } from "./query.js";
@@ -31,8 +31,31 @@ function toRecord(row: typeof objects.$inferSelect, values: Record<string, unkno
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     archivedAt: row.archivedAt,
+    lockedAt: row.lockedAt,
+    lockedBy: row.lockedBy,
     values: values as ObjectRecord["values"],
   };
+}
+
+/**
+ * Throws 423 if `objectId` is currently locked - the enforcement side of the
+ * owner-only lock toggle (see objects/routes.ts). Called from
+ * `workspaces/access.ts`'s `requireAccess` for every object-scoped editor+
+ * request, plus explicitly from the handful of mutating routes that check
+ * access via `requireWorkspaceRole` instead (relations, object delete) -
+ * see those call sites for why they can't go through `requireAccess` itself.
+ */
+export async function assertObjectEditable(objectId: string): Promise<void> {
+  const rows = await db.select({ lockedAt: objects.lockedAt }).from(objects).where(eq(objects.id, objectId)).limit(1);
+  if (rows[0]?.lockedAt) throw locked();
+}
+
+export async function setObjectLocked(objectId: string, userId: string | null, isLocked: boolean): Promise<ObjectRecord> {
+  await db
+    .update(objects)
+    .set({ lockedAt: isLocked ? nowIso() : null, lockedBy: isLocked ? userId : null })
+    .where(eq(objects.id, objectId));
+  return getObject(objectId);
 }
 
 export async function createObject(
@@ -263,6 +286,11 @@ export async function createRelation(
 }
 
 export async function deleteRelation(relationId: string): Promise<void> {
+  // Route only has the relation's own id, not the source object's - looked
+  // up here so the lock check (see assertObjectEditable) has something to
+  // check against.
+  const rows = await db.select({ sourceObjectId: relations.sourceObjectId }).from(relations).where(eq(relations.id, relationId)).limit(1);
+  if (rows[0]) await assertObjectEditable(rows[0].sourceObjectId);
   await db.delete(relations).where(eq(relations.id, relationId));
 }
 

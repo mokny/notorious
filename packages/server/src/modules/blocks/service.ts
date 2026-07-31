@@ -1,7 +1,7 @@
-import { eq, and, isNull } from "drizzle-orm";
-import type { CreateBlockInput, UpdateBlockInput, MoveBlockInput, RestoreBlockInput, Block } from "@notorious/shared";
+import { eq, and, isNull, desc } from "drizzle-orm";
+import type { CreateBlockInput, UpdateBlockInput, MoveBlockInput, RestoreBlockInput, Block, BlockHistoryEntry } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { blocks, objects } from "../../db/schema.js";
+import { blocks, objects, blockHistory } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { notFound } from "../../lib/httpError.js";
 import { positionBetween } from "../../lib/position.js";
@@ -21,6 +21,24 @@ function toBlock(row: typeof blocks.$inferSelect): Block {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/** Most-recent-first, capped at 10 - see recordAndBroadcast/recordBlockHistory, which already trims the table itself to the same limit at write time. */
+export async function listBlockHistory(blockId: string): Promise<BlockHistoryEntry[]> {
+  const rows = await db
+    .select()
+    .from(blockHistory)
+    .where(eq(blockHistory.blockId, blockId))
+    .orderBy(desc(blockHistory.createdAt))
+    .limit(10);
+  return rows.map((row) => ({
+    id: row.id,
+    blockId: row.blockId,
+    actorName: row.actorName,
+    action: row.action as BlockHistoryEntry["action"],
+    summary: row.summary,
+    createdAt: row.createdAt,
+  }));
 }
 
 export async function listBlocks(objectId: string): Promise<Block[]> {

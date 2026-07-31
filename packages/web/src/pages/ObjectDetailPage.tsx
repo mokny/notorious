@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
@@ -8,10 +8,12 @@ import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
 import { SubObjectsPanel } from "../components/SubObjectsPanel.js";
+import { BlockHistoryPanel } from "../components/BlockHistoryPanel.js";
 import { IconPicker } from "../components/IconPicker.js";
 import { CoverImage } from "../components/CoverImage.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 import { useConfirm } from "../context/ConfirmContext.js";
+import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
@@ -19,15 +21,22 @@ import { useRecentObjects } from "../hooks/useRecentObjects.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 
 // Disables interactive edit controls for a read-only (viewer/commenter) share
-// without blocking `<a>`/`Link` navigation the way a blanket `pointer-events-
-// none` on the whole container would - sub-object/relation links inside
-// otherwise-read-only content still need to be clickable (see
-// SubObjectBlock.tsx, RelationPicker.tsx). `canvas` covers the whiteboard
-// block (Excalidraw draws/handles pointer events directly on a <canvas>
-// element, not an input/button) - without it a "viewer" could still draw on
-// someone else's shared whiteboard.
+// - or an object the owner has locked, see `isLocked` below - without
+// blocking `<a>`/`Link` navigation the way a blanket `pointer-events-none`
+// on the whole container would - sub-object/relation links inside otherwise-
+// read-only content still need to be clickable (see SubObjectBlock.tsx,
+// RelationPicker.tsx). `canvas` covers the whiteboard block (Excalidraw
+// draws/handles pointer events directly on a <canvas> element, not an
+// input/button) - without it a "viewer" could still draw on someone else's
+// shared whiteboard. `locked-content` (see globals.css) additionally hides
+// hover-revealed edit affordances (drag handles, add/delete buttons)
+// entirely instead of leaving them visible-but-inert. Buttons marked
+// `data-view-toggle` (an expand/collapse chevron - see CollapsibleSection.tsx,
+// SubObjectBlock.tsx, ToggleBlock.tsx) are exempted: those only reveal
+// already-there content, not an edit, and disabling them would make
+// collapsed content permanently unreachable in read-only/locked view.
 const READ_ONLY_LOCK =
-  "[&_input]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button]:pointer-events-none [&_[contenteditable]]:pointer-events-none [&_canvas]:pointer-events-none";
+  "locked-content [&_input]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable]]:pointer-events-none [&_canvas]:pointer-events-none";
 
 export interface SharedObjectContext {
   role: WorkspaceRole;
@@ -93,6 +102,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const [title, setTitle] = useDebouncedSave(object?.title ?? "", (value) =>
     updateTitleMutation.mutateAsync(value).then(() => undefined),
   );
+  // Which block's edit history the Properties sidebar shows (see
+  // BlockHistoryPanel.tsx) - reset to null on navigating to a different
+  // object, so a stale selection from the last object never lingers.
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  useEffect(() => setSelectedBlockId(null), [objectId]);
 
   const setIconMutation = useMutation({
     mutationFn: (icon: string | null) => objectApi.update(objectId!, { icon }),
@@ -109,16 +123,23 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
   const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
   const { addRecent } = useRecentObjects(workspaceId);
+  const { user } = useAuth();
 
   const { data: workspace } = useQuery({
     queryKey: ["workspace", workspaceId],
     queryFn: () => workspaceApi.get(workspaceId!),
     enabled: Boolean(workspaceId),
   });
+  const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
 
   const dashboardMutation = useMutation({
     mutationFn: (dashboardObjectId: string | null) => workspaceApi.update(workspaceId!, { dashboardObjectId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: (locked: boolean) => objectApi.setLocked(objectId!, { locked }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
   });
 
   const deleteMutation = useMutation({
@@ -170,10 +191,18 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const pinned = isPinned(object.id);
   const isDashboard = workspace?.dashboardObjectId === object.id;
   const objectType = objectTypes?.find((type) => type.id === object.objectTypeId);
+  // Locking (owner-only, see the lock button below) blocks edits for
+  // *everyone*, including the owner who locked it - unlike `canEdit` above
+  // (share role), which only ever restricts an anonymous visitor. Combined
+  // here rather than folded into `canEdit` itself, since a few things below
+  // (the lock button itself, obviously) need to stay clickable regardless
+  // of the object's current lock state.
+  const isLocked = Boolean(object.lockedAt);
+  const effectiveCanEdit = canEdit && !isLocked;
 
   return (
     <div>
-      {canEdit ? (
+      {effectiveCanEdit ? (
         <CoverImage workspaceId={workspaceId} objectId={object.id} cover={object.cover} />
       ) : (
         object.cover && <img src={withShareToken(object.cover)} alt="" className="max-h-[300px] w-full object-cover" />
@@ -182,7 +211,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            {canEdit ? (
+            {effectiveCanEdit ? (
               <IconPicker
                 icon={object.icon}
                 fallbackIcon={objectType?.icon ?? "file-text"}
@@ -202,9 +231,28 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Untitled"
-              readOnly={!canEdit}
+              readOnly={!effectiveCanEdit}
               className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
             />
+            {/* Visible to anyone (so a non-owner understands why editing is
+                blocked), but only the owner can actually toggle it - everyone
+                else gets a plain, non-interactive indicator. */}
+            {isOwner ? (
+              <button
+                onClick={() => lockMutation.mutate(!isLocked)}
+                disabled={lockMutation.isPending}
+                title={isLocked ? "Unlock this object" : "Lock this object against edits"}
+                className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isLocked ? "text-accent" : "text-ink-muted"}`}
+              >
+                <Icon name={isLocked ? "lock" : "unlock"} className="h-4 w-4" />
+              </button>
+            ) : (
+              isLocked && (
+                <span className="shrink-0 p-1.5 text-accent" title="This object is locked against edits">
+                  <Icon name="lock" className="h-4 w-4" />
+                </span>
+              )
+            )}
             {!share && (
               <>
                 <button
@@ -225,8 +273,8 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 <ShareDialog workspaceId={workspaceId} objectId={object.id} label="Share" />
                 <button
                   onClick={handleDelete}
-                  disabled={deleteMutation.isPending}
-                  title="Delete object"
+                  disabled={deleteMutation.isPending || isLocked}
+                  title={isLocked ? "Unlock this object before deleting it" : "Delete object"}
                   className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
                 >
                   <Icon name="trash" className="h-4 w-4" />
@@ -241,30 +289,35 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             </Button>
           )}
 
-          <div className={`mt-6 ${canEdit ? "" : READ_ONLY_LOCK}`}>
-            <BlockEditor workspaceId={workspaceId} objectId={object.id} />
-          </div>
+          <div className={`mt-6 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
+            <BlockEditor
+              workspaceId={workspaceId}
+              objectId={object.id}
+              selectedBlockId={selectedBlockId}
+              onSelectBlock={setSelectedBlockId}
+            />
 
-          {/* Hidden only for a single-object share (it can't grant access to
-              browse anywhere else) - a whole-workspace share can, so these
-              stay visible there, same as for a logged-in member. */}
-          {!share?.singleObject && (
-            <>
-              <SubObjectsPanel
-                workspaceId={workspaceId}
-                objectId={object.id}
-                objectTypeId={object.objectTypeId}
-                subObjectIds={Array.isArray(object.values.sub_objects) ? object.values.sub_objects : []}
-                canCreate={!share}
-              />
-              <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
-            </>
-          )}
+            {/* Hidden only for a single-object share (it can't grant access
+                to browse anywhere else) - a whole-workspace share can, so
+                these stay visible there, same as for a logged-in member. */}
+            {!share?.singleObject && (
+              <>
+                <SubObjectsPanel
+                  workspaceId={workspaceId}
+                  objectId={object.id}
+                  objectTypeId={object.objectTypeId}
+                  subObjectIds={Array.isArray(object.values.sub_objects) ? object.values.sub_objects : []}
+                  canCreate={!share && !isLocked}
+                />
+                <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
+              </>
+            )}
+          </div>
         </div>
 
         <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
-          <div className={`space-y-3 ${canEdit ? "" : READ_ONLY_LOCK}`}>
+          <div className={`space-y-3 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
             {properties
               .filter((property) => property.key !== "sub_objects")
               .map((property) => (
@@ -274,6 +327,8 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </div>
               ))}
           </div>
+
+          {selectedBlockId && <BlockHistoryPanel blockId={selectedBlockId} />}
         </aside>
       </div>
     </div>

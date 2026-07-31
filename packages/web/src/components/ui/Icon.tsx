@@ -40,6 +40,9 @@ import {
   Share2,
   Copy,
   PenTool,
+  Lock,
+  Unlock,
+  History,
   type LucideIcon,
 } from "lucide-react";
 
@@ -83,6 +86,9 @@ const ICONS: Record<string, LucideIcon> = {
   share: Share2,
   copy: Copy,
   whiteboard: PenTool,
+  lock: Lock,
+  unlock: Unlock,
+  history: History,
 };
 
 function isImageUrl(value: string): boolean {
