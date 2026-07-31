@@ -18,11 +18,9 @@ export function BlockItem({ block }: { block: BlockNode }) {
     pendingFocusBlockId,
     clearPendingFocus,
     isDraggingAny,
-    selectedBlockId,
     selectBlock,
   } = useBlockEditor();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
-  const isSelected = block.id === selectedBlockId;
 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -42,9 +40,10 @@ export function BlockItem({ block }: { block: BlockNode }) {
       ref={setNodeRef}
       style={style}
       onClick={() => selectBlock(block.id)}
-      className={`group/item flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60 ${
-        isSelected ? "ring-1 ring-accent/40" : ""
-      }`}
+      // Selecting a block no longer highlights it here - see
+      // BlockHistoryPanel.tsx, which now identifies which block its entries
+      // belong to with a description line instead.
+      className="group/item flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60"
     >
       <div className="mt-1 flex shrink-0 items-center gap-0.5">
         <button

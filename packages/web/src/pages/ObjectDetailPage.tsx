@@ -340,7 +340,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               ))}
           </div>
 
-          {selectedBlockId && <BlockHistoryPanel blockId={selectedBlockId} />}
+          {selectedBlockId && <BlockHistoryPanel objectId={object.id} blockId={selectedBlockId} />}
         </aside>
       </div>
     </div>
