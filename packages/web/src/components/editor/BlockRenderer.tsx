@@ -127,7 +127,7 @@ export function BlockRenderer({
     case "database_view":
       return <DatabaseViewBlock content={content<DatabaseViewContent>()} workspaceId={workspaceId} onSave={save} />;
     case "sub_object":
-      return <SubObjectBlock content={content<SubObjectContent>()} workspaceId={workspaceId} hostObjectId={objectId} onSave={save} />;
+      return <SubObjectBlock content={content<SubObjectContent>()} workspaceId={workspaceId} onSave={save} />;
     case "bookmark":
       return <BookmarkBlock content={content<BookmarkContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
     case "whiteboard":

@@ -82,6 +82,18 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     void queryClient.invalidateQueries({ queryKey: ["recentEdits", workspaceId] });
   }
 
+  // A sub_object block's presence drives the "sub_objects" relation
+  // automatically now (see blocks/service.ts's `syncSubObjectRelation`) -
+  // this just refreshes this tab's own view of that relation (the
+  // SubObjectsPanel/BacklinksPanel below the editor, which both read from
+  // `["object", objectId]`, not from the blocks list `invalidate()` above
+  // already covers) right after it changes, instead of only on next
+  // navigation.
+  function invalidateHostObjectIfSubObject(blockType: BlockType | undefined): void {
+    if (blockType !== "sub_object") return;
+    void queryClient.invalidateQueries({ queryKey: ["object", objectId] });
+  }
+
   const createMutation = useMutation({
     mutationFn: (input: { parentBlockId: string | null; afterBlockId: string | null; type: BlockType; content: Record<string, unknown> }) =>
       blockApi.create({ objectId, parentBlockId: input.parentBlockId, afterBlockId: input.afterBlockId, type: input.type, content: input.content }),
@@ -89,6 +101,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
       invalidate();
       setPendingFocusBlockId(createdBlock.id);
       history.recordCreate(createdBlock);
+      invalidateHostObjectIfSubObject(createdBlock.type);
     },
   });
 
@@ -151,6 +164,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
     deleteMutation.mutate(blockId, {
       onSuccess: () => {
         if (snapshot) history.recordDelete(snapshot);
+        invalidateHostObjectIfSubObject(snapshot?.type);
       },
     });
   }
@@ -172,6 +186,7 @@ export function BlockEditor({ workspaceId, objectId }: { workspaceId: string; ob
         {
           onSuccess: (updated) => {
             if (before) history.recordUpdate(blockId, before.content, updated.content);
+            invalidateHostObjectIfSubObject(before?.type);
           },
         },
       )

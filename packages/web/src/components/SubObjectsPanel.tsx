@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { objectApi, schemaApi } from "../lib/api/resources.js";
 import { useObjectMutations } from "../hooks/useObjectMutations.js";
 import { RelationPicker } from "./properties/RelationPicker.js";
+import { CollapsibleSection } from "./ui/CollapsibleSection.js";
 import { Icon } from "./ui/Icon.js";
 
 interface SubObjectsPanelProps {
@@ -58,10 +59,10 @@ export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObject
   if (!subObjectsProperty) return null;
 
   return (
-    <div className="mt-10 border-t border-border pt-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Sub-objects</h3>
-        {canCreate && (
+    <CollapsibleSection
+      title="Sub-objects"
+      actions={
+        canCreate && (
           <div
             ref={containerRef}
             className="relative"
@@ -95,9 +96,9 @@ export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObject
               </div>
             )}
           </div>
-        )}
-      </div>
-
+        )
+      }
+    >
       <RelationPicker
         workspaceId={workspaceId}
         targetObjectTypeId={null}
@@ -105,6 +106,6 @@ export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObject
         onAdd={(targetId) => void mutations.addRelation(objectId, subObjectsProperty, targetId)}
         onRemove={(targetId) => void mutations.removeRelation(objectId, subObjectsProperty, targetId)}
       />
-    </div>
+    </CollapsibleSection>
   );
 }

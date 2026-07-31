@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { objectApi } from "../lib/api/resources.js";
+import { CollapsibleSection } from "./ui/CollapsibleSection.js";
 import { Icon } from "./ui/Icon.js";
 
 export function BacklinksPanel({ objectId, workspaceId }: { objectId: string; workspaceId: string }) {
@@ -9,8 +10,7 @@ export function BacklinksPanel({ objectId, workspaceId }: { objectId: string; wo
   if (!backlinks || backlinks.length === 0) return null;
 
   return (
-    <div className="mt-10 border-t border-border pt-4">
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">Linked from {backlinks.length} object(s)</h3>
+    <CollapsibleSection title={`Linked from ${backlinks.length} object(s)`}>
       <div className="space-y-1">
         {backlinks.map((object) => (
           <Link
@@ -23,6 +23,6 @@ export function BacklinksPanel({ objectId, workspaceId }: { objectId: string; wo
           </Link>
         ))}
       </div>
-    </div>
+    </CollapsibleSection>
   );
 }

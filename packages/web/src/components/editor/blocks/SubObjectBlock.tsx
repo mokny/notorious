@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { SubObjectContent } from "@notorious/shared";
 import { objectApi, schemaApi, searchApi } from "../../../lib/api/resources.js";
 import { useObjectTitle } from "../../../hooks/useObjectTitle.js";
@@ -12,8 +12,6 @@ import { Icon } from "../../ui/Icon.js";
 interface SubObjectBlockProps {
   content: SubObjectContent;
   workspaceId: string;
-  /** The object this block lives inside of - the "sub_objects" relation gets linked from here to whatever is picked/created. */
-  hostObjectId: string;
   onSave: (content: SubObjectContent) => Promise<void>;
 }
 
@@ -68,9 +66,19 @@ function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; o
   );
 }
 
-/** Lets you either search for an existing object or create a new one of a chosen type - the same two options SubObjectsPanel offers, just inline in the block editor at the point of insertion. */
-function SubObjectPicker({ workspaceId, hostObjectId, onPicked }: { workspaceId: string; hostObjectId: string; onPicked: (objectId: string) => void }) {
-  const queryClient = useQueryClient();
+/**
+ * Lets you either search for an existing object or create a new one of a
+ * chosen type - the same two options SubObjectsPanel offers, just inline in
+ * the block editor at the point of insertion.
+ *
+ * Doesn't create the "sub_objects" relation itself: picking a target here
+ * just sets this block's `content.objectId` (via `onPicked` -> the block's
+ * own `onSave`), and the server keeps the relation in sync with whichever
+ * objects are actually embedded by a sub_object block automatically (see
+ * blocks/service.ts's `syncSubObjectRelation`) - linking is a side effect of
+ * the block existing, not a separate step this component has to also do.
+ */
+function SubObjectPicker({ workspaceId, onPicked }: { workspaceId: string; onPicked: (objectId: string) => void }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
@@ -80,14 +88,6 @@ function SubObjectPicker({ workspaceId, hostObjectId, onPicked }: { workspaceId:
     setOpen(false);
     setTypeMenuOpen(false);
   });
-
-  const { data: hostObject } = useQuery({ queryKey: ["object", hostObjectId], queryFn: () => objectApi.get(hostObjectId) });
-  const { data: properties } = useQuery({
-    queryKey: ["properties", hostObject?.objectTypeId],
-    queryFn: () => schemaApi.properties(hostObject!.objectTypeId),
-    enabled: Boolean(hostObject),
-  });
-  const subObjectsProperty = properties?.find((p) => p.key === "sub_objects");
 
   const { data: results } = useQuery({
     queryKey: ["relationSearch", workspaceId, debouncedQuery],
@@ -101,21 +101,9 @@ function SubObjectPicker({ workspaceId, hostObjectId, onPicked }: { workspaceId:
     enabled: typeMenuOpen,
   });
 
-  async function link(targetObjectId: string): Promise<void> {
-    if (subObjectsProperty) {
-      await objectApi.createRelation(workspaceId, {
-        propertyId: subObjectsProperty.id,
-        sourceObjectId: hostObjectId,
-        targetObjectId,
-      });
-      void queryClient.invalidateQueries({ queryKey: ["object", hostObjectId] });
-    }
-    onPicked(targetObjectId);
-  }
-
   const createMutation = useMutation({
     mutationFn: async (objectTypeId: string) => objectApi.create(workspaceId, { objectTypeId, title: "Untitled", values: {} }),
-    onSuccess: (created) => link(created.id),
+    onSuccess: (created) => onPicked(created.id),
   });
 
   return (
@@ -144,7 +132,7 @@ function SubObjectPicker({ workspaceId, hostObjectId, onPicked }: { workspaceId:
             <button
               key={object.id}
               type="button"
-              onClick={() => link(object.id)}
+              onClick={() => onPicked(object.id)}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
             >
               <Icon name={object.icon ?? "file-text"} className="h-3.5 w-3.5 text-ink-muted" />
@@ -178,9 +166,9 @@ function SubObjectPicker({ workspaceId, hostObjectId, onPicked }: { workspaceId:
   );
 }
 
-export function SubObjectBlock({ content, workspaceId, hostObjectId, onSave }: SubObjectBlockProps) {
+export function SubObjectBlock({ content, workspaceId, onSave }: SubObjectBlockProps) {
   if (!content.objectId) {
-    return <SubObjectPicker workspaceId={workspaceId} hostObjectId={hostObjectId} onPicked={(objectId) => onSave({ ...content, objectId })} />;
+    return <SubObjectPicker workspaceId={workspaceId} onPicked={(objectId) => onSave({ ...content, objectId })} />;
   }
   return <SubObjectRow workspaceId={workspaceId} objectId={content.objectId} depth={0} />;
 }

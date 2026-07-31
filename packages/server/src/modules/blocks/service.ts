@@ -6,6 +6,9 @@ import { newId, nowIso } from "../../lib/ids.js";
 import { notFound } from "../../lib/httpError.js";
 import { positionBetween } from "../../lib/position.js";
 import { reindexObjectBody } from "../search/indexer.js";
+import { createRelation, deleteRelationByTriple, getObjectWorkspaceId } from "../objects/service.js";
+import { listProperties } from "../schema/service.js";
+import { SUB_OBJECTS_PROPERTY_KEY } from "../schema/subObjects.js";
 
 function toBlock(row: typeof blocks.$inferSelect): Block {
   return {
@@ -60,6 +63,58 @@ async function touchObject(objectId: string): Promise<void> {
   if (rows[0]) await reindexObjectBody(objectId, rows[0].title);
 }
 
+function subObjectTargetOf(content: string): string | null {
+  const parsed = JSON.parse(content) as { objectId?: string | null };
+  return parsed.objectId ?? null;
+}
+
+/** The "sub_objects" relation property id for whatever object type `hostObjectId` belongs to - every type has exactly one (see schema/subObjects.ts), so this is never ambiguous. */
+async function subObjectsPropertyIdFor(hostObjectId: string): Promise<string | null> {
+  const rows = await db.select({ objectTypeId: objects.objectTypeId }).from(objects).where(eq(objects.id, hostObjectId)).limit(1);
+  const objectTypeId = rows[0]?.objectTypeId;
+  if (!objectTypeId) return null;
+  const props = await listProperties(objectTypeId);
+  return props.find((p) => p.key === SUB_OBJECTS_PROPERTY_KEY)?.id ?? null;
+}
+
+/** True if some *other* sub_object block inside `hostObjectId` still embeds `targetObjectId` - i.e. whether unlinking it would be premature. */
+async function hasOtherSubObjectBlockReferencing(hostObjectId: string, targetObjectId: string, excludeBlockId: string | null): Promise<boolean> {
+  const rows = await db
+    .select({ id: blocks.id, content: blocks.content })
+    .from(blocks)
+    .where(and(eq(blocks.objectId, hostObjectId), eq(blocks.type, "sub_object")));
+  return rows.some((row) => row.id !== excludeBlockId && subObjectTargetOf(row.content) === targetObjectId);
+}
+
+/**
+ * Keeps the "sub_objects" relation in sync with which objects are actually
+ * embedded via a sub_object block, so linking/unlinking one is a side effect
+ * of adding/removing the block instead of a separate manual step (see
+ * `createBlock`/`updateBlock`/`deleteBlock`/`restoreBlock` below, the only
+ * callers). Unlinking only happens once *no* sub_object block in this
+ * object references the target anymore - the same object can legitimately
+ * be embedded by more than one block, and a relation added by hand through
+ * SubObjectsPanel's own picker (unrelated to any block) is never touched
+ * here, since nothing here ever runs unless a sub_object block itself
+ * changed.
+ */
+async function syncSubObjectRelation(hostObjectId: string, previousTarget: string | null, nextTarget: string | null, blockId: string | null): Promise<void> {
+  if (previousTarget === nextTarget) return;
+
+  if (previousTarget && !(await hasOtherSubObjectBlockReferencing(hostObjectId, previousTarget, blockId))) {
+    const propertyId = await subObjectsPropertyIdFor(hostObjectId);
+    if (propertyId) await deleteRelationByTriple(propertyId, hostObjectId, previousTarget);
+  }
+
+  if (nextTarget) {
+    const propertyId = await subObjectsPropertyIdFor(hostObjectId);
+    if (propertyId) {
+      const workspaceId = await getObjectWorkspaceId(hostObjectId);
+      await createRelation(workspaceId, { propertyId, sourceObjectId: hostObjectId, targetObjectId: nextTarget });
+    }
+  }
+}
+
 export async function createBlock(input: CreateBlockInput): Promise<Block> {
   const id = newId();
   const now = nowIso();
@@ -77,6 +132,11 @@ export async function createBlock(input: CreateBlockInput): Promise<Block> {
   });
 
   await touchObject(input.objectId);
+
+  if (input.type === "sub_object") {
+    const targetObjectId = (input.content as { objectId?: string | null }).objectId ?? null;
+    await syncSubObjectRelation(input.objectId, null, targetObjectId, id);
+  }
 
   return {
     id,
@@ -116,6 +176,10 @@ export async function updateBlock(blockId: string, input: UpdateBlockInput): Pro
   await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
   await touchObject(row.objectId);
 
+  if (row.type === "sub_object") {
+    await syncSubObjectRelation(row.objectId, subObjectTargetOf(row.content), subObjectTargetOf(content), blockId);
+  }
+
   return toBlock({ ...row, content, updatedAt });
 }
 
@@ -142,6 +206,10 @@ export async function deleteBlock(blockId: string): Promise<void> {
 
   await db.delete(blocks).where(eq(blocks.id, blockId));
   await touchObject(row.objectId);
+
+  if (row.type === "sub_object") {
+    await syncSubObjectRelation(row.objectId, subObjectTargetOf(row.content), null, blockId);
+  }
 }
 
 /**
@@ -164,6 +232,11 @@ export async function restoreBlock(input: RestoreBlockInput): Promise<Block> {
     updatedAt: now,
   });
   await touchObject(input.objectId);
+
+  if (input.type === "sub_object") {
+    const targetObjectId = (input.content as { objectId?: string | null }).objectId ?? null;
+    await syncSubObjectRelation(input.objectId, null, targetObjectId, input.id);
+  }
 
   return {
     id: input.id,
