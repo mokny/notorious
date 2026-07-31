@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi } from "../lib/api/resources.js";
-import { getShareRole, withShareToken } from "../lib/api/shareMode.js";
+import { getShareRole } from "../lib/api/shareMode.js";
 import { READ_ONLY_CONTENT_CLASS } from "../lib/readOnlyContent.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
@@ -22,6 +22,7 @@ import { Icon } from "../components/ui/Icon.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
 import { useRecentObjects } from "../hooks/useRecentObjects.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
+import { useDocumentTitle } from "../hooks/useDocumentTitle.js";
 
 // Disables interactive edit controls for a read-only (viewer/commenter) share
 // - or an object the owner has locked, see `isLocked` below. See
@@ -134,6 +135,8 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   });
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
 
+  useDocumentTitle(object && workspace ? `${title || "Untitled"} - ${workspace.name}` : undefined);
+
   const dashboardMutation = useMutation({
     mutationFn: (dashboardObjectId: string | null) => workspaceApi.update(workspaceId!, { dashboardObjectId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
@@ -204,11 +207,15 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
   return (
     <div>
-      {effectiveCanEdit ? (
-        <CoverImage workspaceId={workspaceId} objectId={object.id} cover={object.cover} />
-      ) : (
-        object.cover && <img src={withShareToken(object.cover)} alt="" className="max-h-[300px] w-full object-cover" />
-      )}
+      <CoverImage
+        workspaceId={workspaceId}
+        objectId={object.id}
+        cover={object.cover}
+        canEdit={effectiveCanEdit}
+        title={title}
+        onTitleChange={setTitle}
+        coverTextStyle={object.coverTextStyle}
+      />
 
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
         <div className="min-w-0 flex-1">
@@ -229,13 +236,18 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 <Icon name={object.icon ?? objectType?.icon ?? "file-text"} className="h-7 w-7" />
               </div>
             )}
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Untitled"
-              readOnly={!effectiveCanEdit}
-              className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
-            />
+            {/* Hidden once there's a cover - CoverImage renders the title as
+                an overlay on top of it instead, so showing it again here
+                too would just be a redundant, differently-sized copy. */}
+            {!object.cover && (
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Untitled"
+                readOnly={!effectiveCanEdit}
+                className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
+              />
+            )}
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
                 else gets a plain, non-interactive indicator. */}

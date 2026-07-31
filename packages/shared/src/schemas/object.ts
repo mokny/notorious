@@ -19,12 +19,27 @@ export const createObjectSchema = z.object({
 });
 export type CreateObjectInput = z.infer<typeof createObjectSchema>;
 
+/** Mirrors the `CoverTextStyle` type in types/entities.ts - kept as a separate hand-written zod schema rather than derived from it, matching this file's existing `propertyValueSchema`/`PropertyValue` split. */
+export const coverTextStyleSchema = z.object({
+  color: z.string().max(30),
+  opacity: z.number().min(0).max(1),
+  shadow: z.boolean(),
+  backgroundEnabled: z.boolean(),
+  backgroundColor: z.string().max(30),
+  backgroundOpacity: z.number().min(0).max(1),
+  fontFamily: z.enum(["default", "serif", "sans-serif", "monospace", "cursive"]),
+  bold: z.boolean(),
+  italic: z.boolean(),
+  uppercase: z.boolean(),
+});
+
 export const updateObjectSchema = z.object({
   title: z.string().max(2000).optional(),
   // Long enough for an uploaded icon's file URL (e.g. "/api/v1/files/<uuid>"),
   // not just a short emoji or Lucide icon-name slug.
   icon: z.string().max(500).nullable().optional(),
   cover: z.string().max(2000).nullable().optional(),
+  coverTextStyle: coverTextStyleSchema.nullable().optional(),
   values: z.record(z.string(), propertyValueSchema).optional(),
 });
 export type UpdateObjectInput = z.infer<typeof updateObjectSchema>;

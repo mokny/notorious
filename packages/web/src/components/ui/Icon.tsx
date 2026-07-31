@@ -47,6 +47,7 @@ import {
   FileStack,
   Play,
   Terminal,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 
@@ -97,6 +98,7 @@ const ICONS: Record<string, LucideIcon> = {
   embed: FileStack,
   play: Play,
   terminal: Terminal,
+  palette: Palette,
 };
 
 function isImageUrl(value: string): boolean {

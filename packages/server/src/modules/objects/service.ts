@@ -4,6 +4,7 @@ import type {
   UpdateObjectInput,
   CreateRelationInput,
   ObjectRecord,
+  CoverTextStyle,
   Relation,
   ViewFilter,
   ViewSort,
@@ -45,6 +46,7 @@ function toRecord(row: typeof objects.$inferSelect, values: Record<string, unkno
           error: row.scriptLastRunError,
         }
       : null,
+    coverTextStyle: row.coverTextStyle ? (JSON.parse(row.coverTextStyle) as CoverTextStyle) : null,
     values: values as ObjectRecord["values"],
   };
 }
@@ -163,6 +165,7 @@ export async function updateObject(
   if (input.title !== undefined) patch.title = input.title;
   if (input.icon !== undefined) patch.icon = input.icon;
   if (input.cover !== undefined) patch.cover = input.cover;
+  if (input.coverTextStyle !== undefined) patch.coverTextStyle = input.coverTextStyle ? JSON.stringify(input.coverTextStyle) : null;
 
   await db.update(objects).set(patch).where(eq(objects.id, objectId));
 

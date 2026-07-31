@@ -137,6 +137,7 @@ export const objects = sqliteTable("objects", {
   scriptLastRunDurationMs: integer("script_last_run_duration_ms"),
   scriptLastRunError: text("script_last_run_error"),
   scriptLastRunLog: text("script_last_run_log"),
+  coverTextStyle: text("cover_text_style"),
 });
 
 export const objectValues = sqliteTable(

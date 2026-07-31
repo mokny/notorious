@@ -96,7 +96,7 @@ export interface ObjectRecord {
   /** Set by the workspace owner (see objects/routes.ts's lock endpoint) - while set, nobody (including the owner) can edit this object until it's unlocked again. */
   lockedAt: ISODateString | null;
   lockedBy: string | null;
-  /** User-authored JavaScript, run server-side inside a QuickJS sandbox (see server's modules/scripting/) - null until the user has ever saved one. Withheld (always null) when fetched via an anonymous share link - see objects/routes.ts's `revealScript` handling. */
+  /** User-authored JavaScript, run server-side inside a QuickJS sandbox (see server's modules/scripting/) - null until the user has ever saved one. Withheld (always null) when fetched via an anonymous share link - see objects/routes.ts's `redactScriptForShare`. */
   scriptSource: string | null;
   /**
    * Kill-switch for *background automation* specifically (see
@@ -107,7 +107,28 @@ export interface ObjectRecord {
   scriptEnabled: boolean;
   /** Present once the script has ever been run (manually or automatically); null before the first run. */
   scriptLastRun: ScriptRunSummary | null;
+  /** User-configurable styling for the title overlaid on `cover` (see CoverImage.tsx) - null means "use the frontend's own default styling". */
+  coverTextStyle: CoverTextStyle | null;
   values: Record<string, PropertyValue>;
+}
+
+/** Styling for the object title text overlaid on its cover image - see CoverImage.tsx and CoverTextStyleEditor.tsx. */
+export interface CoverTextStyle {
+  /** Text color, e.g. "#ffffff". */
+  color: string;
+  /** Text opacity, 0-1 - independent of `backgroundOpacity` below. */
+  opacity: number;
+  /** Drop shadow behind the text, for legibility against a busy background image. */
+  shadow: boolean;
+  /** Whether a solid color band renders behind the text. */
+  backgroundEnabled: boolean;
+  backgroundColor: string;
+  /** 0-1, independent of the text's own `opacity`. */
+  backgroundOpacity: number;
+  fontFamily: "default" | "serif" | "sans-serif" | "monospace" | "cursive";
+  bold: boolean;
+  italic: boolean;
+  uppercase: boolean;
 }
 
 /** One script run's outcome, as returned by the run-script endpoint and shown in ScriptPanel.tsx. */
