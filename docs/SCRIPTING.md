@@ -54,6 +54,22 @@ const total = table.content.rows.reduce((sum, row) => sum + (Number(row[0]) || 0
 object.appendBlock("callout", { markdown: `**Total: ${total}**`, icon: "🧮" });
 ```
 
+**Same, but updates the total in place instead of appending a new callout every run** - the only
+way to find "the same" block again across runs is to recognize it by its content, so this looks
+for a callout whose text already starts with `**Total:` and edits that one if it's there.
+`// @automation` makes this actually useful: the total stays current on its own as the table
+changes, instead of growing a new callout underneath it on every run.
+
+```js
+// @automation
+const table = object.blocks.find((b) => b.type === "table");
+const total = table.content.rows.reduce((sum, row) => sum + (Number(row[0]) || 0), 0);
+const markdown = `**Total: ${total}**`;
+const existing = object.blocks.find((b) => b.type === "callout" && b.content.markdown?.startsWith("**Total:"));
+if (existing) object.setBlockContent(existing.id, { ...existing.content, markdown });
+else object.appendBlock("callout", { markdown, icon: "🧮" });
+```
+
 **Days until a deadline, written to a text property**
 
 ```js
