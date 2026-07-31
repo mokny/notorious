@@ -40,6 +40,9 @@ import type {
   ShareLink,
   CreateShareLinkInput,
   ResolvedShareLink,
+  UpdateObjectScriptInput,
+  SetScriptEnabledInput,
+  ScriptRunResult,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
 
@@ -126,6 +129,15 @@ export const objectApi = {
       method: "DELETE",
       body: { propertyId, sourceObjectId, targetObjectId },
     }),
+};
+
+/** Members-only, never available via share links - see workspaces/access.ts's `requireRealMemberAccess` on the server side. */
+export const scriptApi = {
+  updateSource: (id: string, input: UpdateObjectScriptInput) =>
+    apiRequest<ObjectRecord>(`/api/v1/objects/${id}/script`, { method: "PATCH", body: input }),
+  setEnabled: (id: string, input: SetScriptEnabledInput) =>
+    apiRequest<ObjectRecord>(`/api/v1/objects/${id}/script/enabled`, { method: "POST", body: input }),
+  run: (id: string) => apiRequest<ScriptRunResult>(`/api/v1/objects/${id}/run-script`, { method: "POST" }),
 };
 
 export const blockApi = {

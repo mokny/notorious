@@ -5,6 +5,7 @@ import { db } from "../../db/client.js";
 import { workspaceMembers } from "../../db/schema.js";
 import { forbidden, unauthorized } from "../../lib/httpError.js";
 import { assertObjectEditable } from "../objects/service.js";
+import { requireUser } from "../../plugins/session.js";
 
 /** Returns the caller's role in the workspace, or null if they are not a member. */
 export async function getMemberRole(
@@ -96,6 +97,30 @@ export function requireWorkspaceScopedAccess(
   minRole: WorkspaceRole,
 ): Promise<AccessResult> {
   return requireAccess(request, workspaceId, minRole, { requireWorkspaceScope: true });
+}
+
+/**
+ * Like `requireAccess` but for the small set of actions deliberately kept
+ * off anonymous share links entirely, even editor-role ones - server-side
+ * script authoring/execution (see modules/scripting/). Every other route
+ * that reaches `requireAccess` treats "real member" and "attached share
+ * link" as interchangeable by design (see that function's own doc comment);
+ * this is the one boundary in the app that isn't, so it goes through
+ * `requireUser`/`requireWorkspaceRole` directly instead of accepting
+ * `request.shareAccess` at all.
+ */
+export async function requireRealMemberAccess(
+  request: FastifyRequest,
+  workspaceId: string,
+  minRole: WorkspaceRole,
+  objectId?: string,
+): Promise<{ actorId: string; actorName: string }> {
+  const user = requireUser(request);
+  await requireWorkspaceRole(workspaceId, user.id, minRole);
+  if (objectId && roleAtLeast(minRole, "editor")) {
+    await assertObjectEditable(objectId);
+  }
+  return { actorId: user.id, actorName: user.name };
 }
 
 /**

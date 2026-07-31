@@ -9,6 +9,8 @@ import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
 import { SubObjectsPanel } from "../components/SubObjectsPanel.js";
+import { ScriptPanel } from "../components/ScriptPanel.js";
+import { CollapsibleSection } from "../components/ui/CollapsibleSection.js";
 import { BlockHistoryPanel } from "../components/BlockHistoryPanel.js";
 import { IconPicker } from "../components/IconPicker.js";
 import { CoverImage } from "../components/CoverImage.js";
@@ -311,6 +313,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 />
                 <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
               </>
+            )}
+
+            {/* Members-only, full stop - never shown for any kind of share,
+                not just single-object ones (see workspaces/access.ts's
+                `requireRealMemberAccess` on the server side for why running
+                arbitrary scripts is a stricter boundary than the rest of
+                this page's editing). */}
+            {!share && (
+              <CollapsibleSection title="Script">
+                <ScriptPanel workspaceId={workspaceId} object={object} />
+              </CollapsibleSection>
             )}
           </div>
         </div>

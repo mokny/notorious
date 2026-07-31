@@ -4,6 +4,7 @@ import { db } from "../../db/client.js";
 import { activityLog, blockHistory } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { broadcast } from "./hub.js";
+import { maybeScheduleAutomation } from "../scripting/automation.js";
 
 const MAX_BLOCK_HISTORY = 10;
 
@@ -24,6 +25,14 @@ interface RecordChangeInput {
    * because the other ~20 call sites for other entities don't need it.
    */
   actorName?: string;
+  /**
+   * Set by the scripting module's own apply-phase (see modules/scripting/service.ts)
+   * when committing a script's staged writes - without this, a script that
+   * edits its own object would re-trigger its own automation forever. Real
+   * user/API-driven edits never set this, so they always remain eligible to
+   * trigger an object's automation - see modules/scripting/automation.ts.
+   */
+  skipAutomationTrigger?: boolean;
 }
 
 /** Writes an audit-log row and broadcasts the change to connected clients in one call. */
@@ -53,6 +62,10 @@ export async function recordAndBroadcast(input: RecordChangeInput): Promise<void
     clientId: input.clientId,
     at,
   });
+
+  if (!input.skipAutomationTrigger && input.objectId) {
+    maybeScheduleAutomation(input.objectId);
+  }
 }
 
 /** Appends one block_history row and trims that block's history back down to the 10 most recent - see migrations/0014_block_history.sql for why this is trimmed at write time rather than only at read time. */

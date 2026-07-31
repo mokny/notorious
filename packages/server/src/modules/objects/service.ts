@@ -33,8 +33,32 @@ function toRecord(row: typeof objects.$inferSelect, values: Record<string, unkno
     archivedAt: row.archivedAt,
     lockedAt: row.lockedAt,
     lockedBy: row.lockedBy,
+    scriptSource: row.scriptSource,
+    scriptEnabled: row.scriptEnabled,
+    scriptLastRun: row.scriptLastRunAt
+      ? {
+          ranAt: row.scriptLastRunAt,
+          success: Boolean(row.scriptLastRunSuccess),
+          triggerType: (row.scriptLastRunTrigger ?? "manual") as "manual" | "automation",
+          durationMs: row.scriptLastRunDurationMs ?? 0,
+          log: row.scriptLastRunLog ?? "",
+          error: row.scriptLastRunError,
+        }
+      : null,
     values: values as ObjectRecord["values"],
   };
+}
+
+/**
+ * Strips script-related fields before a record reaches an anonymous
+ * share-link session - scripting is deliberately members-only (see
+ * workspaces/access.ts's `requireRealMemberAccess`), and that boundary
+ * should mean "a share visitor can't even see this object has a script",
+ * not just "can't run/edit it". Applied at the route layer (see
+ * objects/routes.ts), which is where `request.shareAccess` is known.
+ */
+export function redactScriptForShare(record: ObjectRecord): ObjectRecord {
+  return { ...record, scriptSource: null, scriptEnabled: false, scriptLastRun: null };
 }
 
 /**

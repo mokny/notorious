@@ -34,6 +34,34 @@ export const setObjectLockedSchema = z.object({
 });
 export type SetObjectLockedInput = z.infer<typeof setObjectLockedSchema>;
 
+/**
+ * Deliberately its own endpoint/schema, not folded into `updateObjectSchema` -
+ * script mutations go through a stricter "real workspace member only" auth
+ * check (see workspaces/access.ts's `requireRealMemberAccess`) that plain
+ * title/property edits via the generic PATCH must NOT be subject to (share-
+ * link editors still need to edit those). Splitting the endpoint is what
+ * makes that distinction enforceable.
+ */
+export const updateObjectScriptSchema = z.object({
+  scriptSource: z.string().max(20_000).nullable(),
+});
+export type UpdateObjectScriptInput = z.infer<typeof updateObjectScriptSchema>;
+
+export const setScriptEnabledSchema = z.object({
+  enabled: z.boolean(),
+});
+export type SetScriptEnabledInput = z.infer<typeof setScriptEnabledSchema>;
+
+export const scriptRunResultSchema = z.object({
+  ranAt: z.string(),
+  success: z.boolean(),
+  triggerType: z.enum(["manual", "automation"]),
+  durationMs: z.number(),
+  log: z.string(),
+  error: z.string().nullable(),
+});
+export type ScriptRunResult = z.infer<typeof scriptRunResultSchema>;
+
 export const listObjectsQuerySchema = z.object({
   objectTypeId: z.string().optional(),
   archived: z.coerce.boolean().default(false),

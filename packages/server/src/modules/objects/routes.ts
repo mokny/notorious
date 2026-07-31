@@ -40,19 +40,22 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     const { workspaceId } = request.params as { workspaceId: string };
     await requireWorkspaceScopedAccess(request, workspaceId, "viewer");
     const query = listObjectsQuerySchema.parse(request.query);
-    return objectService.queryObjects(workspaceId, {
+    const result = await objectService.queryObjects(workspaceId, {
       objectTypeId: query.objectTypeId,
       archived: query.archived,
       cursor: query.cursor,
       limit: query.limit,
     });
+    if (!request.shareAccess) return result;
+    return { ...result, items: result.items.map(objectService.redactScriptForShare) };
   });
 
   app.get("/api/v1/objects/:id", async (request) => {
     const { id } = request.params as { id: string };
     const workspaceId = await objectService.getObjectWorkspaceId(id);
     await requireAccess(request, workspaceId, "viewer", { objectId: id });
-    return objectService.getObject(id);
+    const object = await objectService.getObject(id);
+    return request.shareAccess ? objectService.redactScriptForShare(object) : object;
   });
 
   app.patch("/api/v1/objects/:id", async (request) => {
@@ -75,7 +78,7 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       realtimeAction: "updated",
     });
 
-    return object;
+    return request.shareAccess ? objectService.redactScriptForShare(object) : object;
   });
 
   // Owner-only, and deliberately NOT routed through `requireAccess` (which

@@ -129,6 +129,14 @@ export const objects = sqliteTable("objects", {
   archivedAt: text("archived_at"),
   lockedAt: text("locked_at"),
   lockedBy: text("locked_by").references(() => users.id, { onDelete: "set null" }),
+  scriptSource: text("script_source"),
+  scriptEnabled: integer("script_enabled", { mode: "boolean" }).notNull().default(false),
+  scriptLastRunAt: text("script_last_run_at"),
+  scriptLastRunSuccess: integer("script_last_run_success", { mode: "boolean" }),
+  scriptLastRunTrigger: text("script_last_run_trigger"),
+  scriptLastRunDurationMs: integer("script_last_run_duration_ms"),
+  scriptLastRunError: text("script_last_run_error"),
+  scriptLastRunLog: text("script_last_run_log"),
 });
 
 export const objectValues = sqliteTable(

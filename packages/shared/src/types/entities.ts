@@ -96,7 +96,30 @@ export interface ObjectRecord {
   /** Set by the workspace owner (see objects/routes.ts's lock endpoint) - while set, nobody (including the owner) can edit this object until it's unlocked again. */
   lockedAt: ISODateString | null;
   lockedBy: string | null;
+  /** User-authored JavaScript, run server-side inside a QuickJS sandbox (see server's modules/scripting/) - null until the user has ever saved one. Withheld (always null) when fetched via an anonymous share link - see objects/routes.ts's `revealScript` handling. */
+  scriptSource: string | null;
+  /**
+   * Kill-switch for *background automation* specifically (see
+   * modules/scripting/automation.ts's `// @automation` pragma) - a manual
+   * Run-button click always works regardless of this flag. Defaults to
+   * false so saving a script never silently starts auto-running it.
+   */
+  scriptEnabled: boolean;
+  /** Present once the script has ever been run (manually or automatically); null before the first run. */
+  scriptLastRun: ScriptRunSummary | null;
   values: Record<string, PropertyValue>;
+}
+
+/** One script run's outcome, as returned by the run-script endpoint and shown in ScriptPanel.tsx. */
+export interface ScriptRunSummary {
+  ranAt: ISODateString;
+  success: boolean;
+  triggerType: "manual" | "automation";
+  durationMs: number;
+  /** Captured `object.log(...)` output, truncated to the engine's log-size cap. */
+  log: string;
+  /** Present only when `success` is false. */
+  error: string | null;
 }
 
 export interface Relation {
