@@ -38,6 +38,18 @@ import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 const READ_ONLY_LOCK =
   "locked-content [&_input]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable]]:pointer-events-none [&_canvas]:pointer-events-none";
 
+// Same as READ_ONLY_LOCK, but inputs marked `data-lock-exempt` (a checklist
+// item's checkbox - see ChecklistBlock.tsx) stay interactive. Used only when
+// the object's own lock is the *sole* reason editing is disabled (`isLocked`
+// below, with `canEdit` otherwise true) - checking off a to-do isn't
+// "editing" the object's content the way the lock is meant to guard, so it's
+// deliberately let through even then (see toggleChecklistItemSchema and
+// access.ts's `allowWhenLocked`). A plain read-only share (`!canEdit`) still
+// gets the strict variant above - the underlying endpoint requires editor
+// access regardless, so a share viewer's checkbox click would just 403.
+const READ_ONLY_LOCK_ALLOW_CHECKLIST =
+  "locked-content [&_input:not([data-lock-exempt])]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable]]:pointer-events-none [&_canvas]:pointer-events-none";
+
 export interface SharedObjectContext {
   role: WorkspaceRole;
   /** True when the share is scoped to exactly this one object - hides navigation into sub-objects/backlinks, since such a share can't grant access to those (separate objects). */
@@ -289,7 +301,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             </Button>
           )}
 
-          <div className={`mt-6 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
+          <div className={`mt-6 ${effectiveCanEdit ? "" : canEdit ? READ_ONLY_LOCK_ALLOW_CHECKLIST : READ_ONLY_LOCK}`}>
             <BlockEditor
               workspaceId={workspaceId}
               objectId={object.id}

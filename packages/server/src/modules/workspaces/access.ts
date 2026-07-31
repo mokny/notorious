@@ -43,6 +43,8 @@ interface RequireAccessOptions {
   objectId?: string;
   /** When true, only a real member or a whole-workspace share (never a single-object share) may pass - for endpoints that browse/list across the workspace. */
   requireWorkspaceScope?: boolean;
+  /** When true, skip the object-lock check even though this call would normally trigger it - for the narrow set of actions the lock is deliberately scoped to exclude (e.g. checking off a checklist item; see objects/routes.ts's lock endpoint and toggleChecklistItemSchema). Still requires normal role/membership access. */
+  allowWhenLocked?: boolean;
 }
 
 /**
@@ -80,7 +82,7 @@ export async function requireAccess(
   // (see objects/routes.ts's lock endpoint) - "editor" is the lowest role
   // any mutating route asks for here, so this only ever runs for a request
   // that's actually trying to change something, never a plain read.
-  if (options.objectId && roleAtLeast(minRole, "editor")) {
+  if (options.objectId && roleAtLeast(minRole, "editor") && !options.allowWhenLocked) {
     await assertObjectEditable(options.objectId);
   }
 

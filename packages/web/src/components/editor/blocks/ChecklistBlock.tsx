@@ -23,6 +23,7 @@ function ChecklistItemRow({
   sortableId,
   item,
   onToggle,
+  onToggleItem,
   onChangeText,
   onEnter,
   onRemove,
@@ -31,6 +32,8 @@ function ChecklistItemRow({
   sortableId: string;
   item: ChecklistItem;
   onToggle: (checked: boolean) => void;
+  /** Exempt-from-lock path (see ChecklistBlock's own doc comment) - used instead of `onToggle` whenever the item has a stable id to address. */
+  onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
   onChangeText: (markdown: string) => void;
   onEnter: () => void;
   onRemove: () => void;
@@ -38,6 +41,7 @@ function ChecklistItemRow({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const canToggleWhileLocked = Boolean(item.id && onToggleItem);
 
   return (
     <div ref={setNodeRef} style={style} className="group/checklistitem flex items-start gap-1">
@@ -52,7 +56,17 @@ function ChecklistItemRow({
       <input
         type="checkbox"
         checked={item.checked}
-        onChange={(e) => onToggle(e.target.checked)}
+        onChange={(e) => (canToggleWhileLocked ? void onToggleItem!(item.id!, e.target.checked) : onToggle(e.target.checked))}
+        // Marks this checkbox as exempt from ObjectDetailPage.tsx's
+        // READ_ONLY_LOCK, which otherwise disables every `<input>` while the
+        // object is locked - checking off a to-do is deliberately still
+        // allowed then (see toggleChecklistItemSchema). Only set when the
+        // item can actually go through the lock-exempt endpoint above; a
+        // legacy item still waiting on its one-time id backfill (see
+        // `withIds`) falls back to the normal, lock-blocked save path, so it
+        // correctly stays disabled instead of looking clickable and
+        // silently failing.
+        {...(canToggleWhileLocked ? { "data-lock-exempt": "" } : {})}
         className="mt-1 h-4 w-4 shrink-0 accent-accent"
       />
       <textarea
@@ -96,9 +110,12 @@ function ChecklistItemRow({
 export function ChecklistBlock({
   content: externalContent,
   onSave,
+  onToggleItem,
 }: {
   content: ChecklistContent;
   onSave: (c: ChecklistContent) => Promise<void>;
+  /** Exempt-from-lock path for checking an item off - see toggleChecklistItemSchema. */
+  onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
 }) {
   const [content, save] = useDebouncedSave(externalContent, onSave);
   const items = content.items ?? [];
@@ -165,6 +182,7 @@ export function ChecklistBlock({
               sortableId={item.id ?? `unindexed-${index}`}
               item={item}
               onToggle={(checked) => updateItem(index, { checked })}
+              onToggleItem={onToggleItem}
               onChangeText={(markdown) => updateItem(index, { markdown })}
               onEnter={addItem}
               onRemove={() => removeItem(index)}

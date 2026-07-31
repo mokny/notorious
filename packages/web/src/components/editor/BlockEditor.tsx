@@ -124,6 +124,16 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
     onSuccess: invalidate,
   });
 
+  // Own mutation, not routed through `updateMutation` - checking off an item
+  // hits a dedicated endpoint that's exempt from the object lock (see
+  // toggleChecklistItemSchema), so it needs to stay a distinct call the
+  // generic content-edit path never makes.
+  const toggleChecklistItemMutation = useMutation({
+    mutationFn: (input: { blockId: string; itemId: string; checked: boolean }) =>
+      blockApi.toggleChecklistItem(input.blockId, { itemId: input.itemId, checked: input.checked }),
+    onSuccess: invalidate,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (blockId: string) => blockApi.remove(blockId),
     onSuccess: invalidate,
@@ -377,6 +387,8 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),
+        toggleChecklistItem: (blockId, itemId, checked) =>
+          toggleChecklistItemMutation.mutateAsync({ blockId, itemId, checked }).then(() => undefined),
         deleteBlock: (blockId) => performDelete(blockId),
         moveBlock: (blockId, parentBlockId, afterBlockId) => performMove(blockId, parentBlockId, afterBlockId),
         pendingFocusBlockId,

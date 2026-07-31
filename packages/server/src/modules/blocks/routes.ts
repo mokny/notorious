@@ -1,5 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { createBlockSchema, updateBlockSchema, moveBlockSchema, importMarkdownSchema, restoreBlockSchema } from "@notorious/shared";
+import {
+  createBlockSchema,
+  updateBlockSchema,
+  moveBlockSchema,
+  importMarkdownSchema,
+  restoreBlockSchema,
+  toggleChecklistItemSchema,
+} from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, resolveActor } from "../workspaces/access.js";
 import { getObjectWorkspaceId, getObject } from "../objects/service.js";
@@ -92,6 +99,36 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       clientId: getClientId(request),
       action: "updated",
       summary: `${updated.actorName} edited a block`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return block;
+  });
+
+  // Checking an item off a to-do list is exempt from the object-lock -
+  // see toggleChecklistItemSchema's doc comment and access.ts's
+  // `allowWhenLocked`. Kept as its own narrow endpoint rather than folding
+  // into the generic PATCH above, so that exemption can never accidentally
+  // cover any other kind of edit to the block.
+  app.patch("/api/v1/blocks/:id/checklist-item", async (request) => {
+    const { id } = request.params as { id: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    const access = await requireAccess(request, workspaceId, "editor", { objectId, allowWhenLocked: true });
+    const input = toggleChecklistItemSchema.parse(request.body);
+    const block = await blockService.toggleChecklistItem(id, input.itemId, input.checked);
+
+    const actor = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${actor.actorName} ${input.checked ? "checked off" : "unchecked"} a checklist item`,
       entity: "block",
       entityId: id,
       realtimeAction: "updated",

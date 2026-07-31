@@ -6,6 +6,8 @@ export interface BlockEditorActions {
   objectId: string;
   createBlockAfter: (parentBlockId: string | null, afterBlockId: string | null, type: BlockType, extraContent?: Record<string, unknown>) => void;
   updateBlockContent: (blockId: string, content: Record<string, unknown>) => Promise<void>;
+  /** Exempt from the object lock - see toggleChecklistItemSchema and ChecklistBlock.tsx. */
+  toggleChecklistItem: (blockId: string, itemId: string, checked: boolean) => Promise<void>;
   deleteBlock: (blockId: string) => void;
   moveBlock: (blockId: string, parentBlockId: string | null, afterBlockId: string | null) => void;
   /** The block that should receive focus once it appears (set right after Enter creates one). */

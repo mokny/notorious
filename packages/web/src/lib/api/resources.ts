@@ -27,6 +27,7 @@ import type {
   CreateRelationInput,
   CreateBlockInput,
   UpdateBlockInput,
+  ToggleChecklistItemInput,
   MoveBlockInput,
   RestoreBlockInput,
   BlockHistoryEntry,
@@ -131,6 +132,9 @@ export const blockApi = {
   list: (objectId: string) => apiRequest<Block[]>(`/api/v1/objects/${objectId}/blocks`),
   create: (input: CreateBlockInput) => apiRequest<Block>("/api/v1/blocks", { method: "POST", body: input }),
   update: (id: string, input: UpdateBlockInput) => apiRequest<Block>(`/api/v1/blocks/${id}`, { method: "PATCH", body: input }),
+  /** Exempt from the object lock - see toggleChecklistItemSchema. */
+  toggleChecklistItem: (id: string, input: ToggleChecklistItemInput) =>
+    apiRequest<Block>(`/api/v1/blocks/${id}/checklist-item`, { method: "PATCH", body: input }),
   move: (id: string, input: MoveBlockInput) => apiRequest<Block>(`/api/v1/blocks/${id}/move`, { method: "POST", body: input }),
   remove: (id: string) => apiRequest<void>(`/api/v1/blocks/${id}`, { method: "DELETE" }),
   /** Undo/redo only - see useEditorHistory.ts. */

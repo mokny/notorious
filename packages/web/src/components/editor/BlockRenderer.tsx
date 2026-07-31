@@ -44,6 +44,8 @@ export interface BlockRendererProps {
   workspaceId: string;
   objectId: string;
   onSave: (content: Record<string, unknown>) => Promise<void>;
+  /** Exempt from the object lock - see ChecklistBlock.tsx and toggleChecklistItemSchema. Only relevant for `checklist` blocks. */
+  onToggleChecklistItem: (itemId: string, checked: boolean) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
   onSlashSelect: (type: BlockType) => void;
@@ -58,6 +60,7 @@ export function BlockRenderer({
   workspaceId,
   objectId,
   onSave,
+  onToggleChecklistItem,
   onEnter,
   onBackspaceEmpty,
   onSlashSelect,
@@ -99,7 +102,7 @@ export function BlockRenderer({
     case "callout":
       return <CalloutBlock content={content<CalloutContent>()} onSave={save} onEnter={onEnter} />;
     case "checklist":
-      return <ChecklistBlock content={content<ChecklistContent>()} onSave={save} />;
+      return <ChecklistBlock content={content<ChecklistContent>()} onSave={save} onToggleItem={onToggleChecklistItem} />;
     case "table":
       return <TableBlock content={content<TableContent>()} onSave={save} />;
     case "code":

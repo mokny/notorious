@@ -3,7 +3,7 @@ import type { CreateBlockInput, UpdateBlockInput, MoveBlockInput, RestoreBlockIn
 import { db } from "../../db/client.js";
 import { blocks, objects, blockHistory } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
-import { notFound } from "../../lib/httpError.js";
+import { notFound, badRequest } from "../../lib/httpError.js";
 import { positionBetween } from "../../lib/position.js";
 import { reindexObjectBody } from "../search/indexer.js";
 import { createRelation, deleteRelationByTriple, getObjectWorkspaceId } from "../objects/service.js";
@@ -197,6 +197,35 @@ export async function updateBlock(blockId: string, input: UpdateBlockInput): Pro
   if (row.type === "sub_object") {
     await syncSubObjectRelation(row.objectId, subObjectTargetOf(row.content), subObjectTargetOf(content), blockId);
   }
+
+  return toBlock({ ...row, content, updatedAt });
+}
+
+/**
+ * Flips a single checklist item's `checked` field, leaving the rest of the
+ * block's content untouched. Deliberately separate from `updateBlock` -
+ * callers use it specifically because it's exempt from the object-lock
+ * check (see workspaces/access.ts's `allowWhenLocked`), and that exemption
+ * needs to stay narrowly scoped to "toggle one item's checkbox", not open up
+ * every other kind of checklist edit (text, add/remove, reorder) while locked.
+ */
+export async function toggleChecklistItem(blockId: string, itemId: string, checked: boolean): Promise<Block> {
+  const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Block not found");
+  if (row.type !== "checklist") throw badRequest("Not a checklist block");
+
+  const parsed = JSON.parse(row.content) as { items?: Array<{ id?: string; checked: boolean }> };
+  const items = parsed.items ?? [];
+  if (!items.some((item) => item.id === itemId)) throw notFound("Checklist item not found");
+
+  const updatedAt = nowIso();
+  const content = JSON.stringify({
+    ...parsed,
+    items: items.map((item) => (item.id === itemId ? { ...item, checked } : item)),
+  });
+  await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
+  await touchObject(row.objectId);
 
   return toBlock({ ...row, content, updatedAt });
 }

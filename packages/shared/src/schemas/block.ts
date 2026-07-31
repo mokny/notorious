@@ -22,6 +22,19 @@ export const moveBlockSchema = z.object({
 });
 export type MoveBlockInput = z.infer<typeof moveBlockSchema>;
 
+/**
+ * Checking an item off is deliberately exempt from the object-lock (see
+ * workspaces/access.ts's `allowWhenLocked` and objects/routes.ts's lock
+ * endpoint) - ticking a to-do isn't "editing" the object's content the same
+ * way changing its text/structure is, so it goes through its own narrow
+ * endpoint rather than the general `updateBlockSchema` one.
+ */
+export const toggleChecklistItemSchema = z.object({
+  itemId: z.string(),
+  checked: z.boolean(),
+});
+export type ToggleChecklistItemInput = z.infer<typeof toggleChecklistItemSchema>;
+
 export const importMarkdownSchema = z.object({
   objectId: z.string(),
   markdown: z.string().max(2_000_000),
