@@ -103,7 +103,7 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
     <div className="relative w-full" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6 pb-4">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
         <div ref={overlayRef} className="pointer-events-auto mx-auto max-w-full">
           {/* Unconstrained, invisible twin of the title text - its natural
               width at a fixed baseline size is what useFitText scales
