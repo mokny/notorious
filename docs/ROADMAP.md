@@ -13,9 +13,11 @@ everything at once.
   property-type registry (`PropertyField`) are already internal dispatch tables - the natural
   extension points for a future plugin system - but there is no external plugin loading, sandboxing,
   or manifest format yet.
-- **Full formula language.** `modules/schema/formula.ts` is a small, safe arithmetic expression
-  evaluator (numbers, `{property}` references, `+ - * /`, parentheses, `round/abs/min/max`) - not a
-  general scripting language like Notion's formula editor.
+- **Full formula language** for the Formula *property type* specifically. `modules/schema/formula.ts`
+  is still a small, safe arithmetic expression evaluator (numbers, `{property}` references,
+  `+ - * /`, parentheses, `round/abs/min/max`), not a general expression language like Notion's
+  formula editor. Real scripting exists separately now, per-object rather than per-property - see
+  [docs/SCRIPTING.md](SCRIPTING.md).
 - **Verified 100k+ object performance.** The design accounts for scale (indices on `workspace_id`,
   `TableView` uses `@tanstack/react-virtual` so only visible rows render, pagination via cursor), but
   `modules/objects/query.ts` currently resolves up to `MAX_SCAN` (5,000) candidate objects per query

@@ -17,6 +17,7 @@ development, or [Installing on your own Linux server](#installing-on-your-own-li
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - how the system is put together and why
 - [docs/API.md](docs/API.md) - REST/WebSocket API reference (also available live at `/api/docs`)
+- [docs/SCRIPTING.md](docs/SCRIPTING.md) - writing sandboxed per-object JavaScript, with examples
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - running this on your own Linux server, with or without Docker
 - [docs/NGINX.md](docs/NGINX.md) - reverse proxy setup for a real domain + HTTPS, via a UI (Nginx Proxy Manager) or plain config files
 - [docs/ROADMAP.md](docs/ROADMAP.md) - what's deliberately out of scope for this first pass, and why
