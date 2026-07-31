@@ -60,6 +60,14 @@ takes effect immediately (it's a database setting, not an env var), no restart n
 with `npm run disable-registration`. Either way, inviting a specific email from **Settings -> Members**
 always lets that person register to redeem the invite, regardless of this setting.
 
+Two-factor authentication (TOTP, via any standard authenticator app) is available to every user
+opt-in from **Settings -> Account**, off by default. To require it instance-wide - every user, new
+or existing, is forced to set up an authenticator before they can use anything else - run
+`npm run enable-2fa-requirement`. Same pattern as registration: takes effect immediately, no restart,
+reversed with `npm run disable-2fa-requirement`. Since there's no email-based account recovery in
+Notorious, each user gets 8 one-time backup codes when they set up 2FA - make sure that's communicated
+if you turn the requirement on for a team.
+
 ### Running it as a systemd service
 
 `scripts/install.sh` writes and enables this unit for you if you answer "yes" to the boot-start

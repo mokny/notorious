@@ -12,6 +12,8 @@ export interface User {
   name: string;
   avatarColor: string;
   createdAt: ISODateString;
+  /** Whether TOTP two-factor authentication is set up and confirmed for this account (see modules/twoFactor/) - never exposes the secret itself, just this flag. */
+  totpEnabled: boolean;
 }
 
 /**

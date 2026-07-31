@@ -41,9 +41,25 @@ curl -b cookies.txt http://localhost:4000/api/v1/workspaces
 | Endpoint | Notes |
 | --- | --- |
 | `POST /api/v1/auth/register` | Creates a user + their first personal workspace; redeems any pending invites for that email. 403s unless self-registration is enabled instance-wide (`npm run enable-registration`, off by default) *or* the email has a pending workspace invite |
-| `POST /api/v1/auth/login` / `POST /api/v1/auth/logout` | Sets/clears the session cookie |
+| `POST /api/v1/auth/login` | `{ email, password }` -> the `User`, or, if the account has 2FA enabled, `{ pending2fa: true }` plus a short-lived `notorious_pending_2fa` cookie (see below) instead of a real session |
+| `POST /api/v1/auth/logout` | Clears the session cookie |
 | `GET /api/v1/auth/me` | Current user, or 401 |
 | `GET /api/v1/system/registration-status` | Unauthenticated - `{ enabled: boolean }`, so the login/register pages can show whether open sign-up is currently on |
+
+### Two-factor authentication (TOTP)
+
+Per-user, opt-in by default (see `npm run enable-2fa-requirement` in [DEPLOYMENT.md](DEPLOYMENT.md) to make
+it mandatory instance-wide). Backed by any standard authenticator app (Google Authenticator, Authy,
+1Password, ...) - the server never sees your codes, only verifies TOTP tokens against an encrypted-at-rest
+secret.
+
+| Endpoint | Notes |
+| --- | --- |
+| `POST /api/v1/auth/2fa/setup` | Requires a session. Generates a fresh secret, returns `{ secret, qrCodeDataUrl }` - `totpEnabled` stays `false` until confirmed |
+| `POST /api/v1/auth/2fa/confirm` | `{ code }` (6 digits). Verifies the code, enables 2FA, and returns `{ backupCodes: string[] }` - **shown once, never again** |
+| `POST /api/v1/auth/2fa/disable` | `{ currentPassword }`. Removes the secret and backup codes |
+| `POST /api/v1/auth/2fa/verify` | No session required - reads the `notorious_pending_2fa` cookie set by `/auth/login`. `{ code }` *or* `{ backupCode }`, not both. On success, creates the real session and returns the `User`. Each backup code works once |
+| `GET /api/v1/system/2fa-required` | Unauthenticated - `{ required: boolean }`, the instance-wide 2FA mandate |
 
 ## Workspaces & sharing
 

@@ -7,9 +7,21 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   avatarColor: text("avatar_color").notNull().default("#6366f1"),
   createdAt: text("created_at").notNull(),
+  totpSecret: text("totp_secret"),
+  totpEnabled: integer("totp_enabled", { mode: "boolean" }).notNull().default(false),
+  totpBackupCodes: text("totp_backup_codes"),
 });
 
 export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const pendingTotpChallenges = sqliteTable("pending_totp_challenges", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -347,6 +359,7 @@ export const shareLinks = sqliteTable("share_links", {
 export const instanceSettings = sqliteTable("instance_settings", {
   id: integer("id").primaryKey(),
   registrationEnabled: integer("registration_enabled", { mode: "boolean" }).notNull().default(false),
+  require2faEnabled: integer("require_2fa_enabled", { mode: "boolean" }).notNull().default(false),
 });
 
 export const pushSubscriptions = sqliteTable("push_subscriptions", {

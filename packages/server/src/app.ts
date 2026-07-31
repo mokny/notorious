@@ -14,6 +14,7 @@ import { env } from "./env.js";
 import { HttpError } from "./lib/httpError.js";
 import { sessionPlugin } from "./plugins/session.js";
 import { registerAuthRoutes } from "./modules/auth/routes.js";
+import { registerTwoFactorRoutes } from "./modules/twoFactor/routes.js";
 import { registerWorkspaceRoutes } from "./modules/workspaces/routes.js";
 import { registerSchemaRoutes } from "./modules/schema/routes.js";
 import { registerObjectRoutes } from "./modules/objects/routes.js";
@@ -78,6 +79,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await registerAuthRoutes(app);
+  await registerTwoFactorRoutes(app);
   await registerWorkspaceRoutes(app);
   await registerSchemaRoutes(app);
   await registerObjectRoutes(app);

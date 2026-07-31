@@ -1,8 +1,11 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./context/AuthContext.js";
 import { isSharedSession } from "./lib/api/shareMode.js";
+import { systemApi } from "./lib/api/resources.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
+import { SetupTwoFactorPage } from "./pages/SetupTwoFactorPage.js";
 import { WorkspacePickerPage } from "./pages/WorkspacePickerPage.js";
 import { WorkspaceLayout } from "./pages/WorkspaceLayout.js";
 import { WorkspaceHome } from "./pages/WorkspaceHome.js";
@@ -20,8 +23,15 @@ import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePag
  */
 function RequireAuth({ children, allowShareSession = false }: { children: React.ReactNode; allowShareSession?: boolean }) {
   const { user, isLoading } = useAuth();
+  const { data: twoFactor } = useQuery({
+    queryKey: ["twoFactorRequired"],
+    queryFn: systemApi.twoFactorRequired,
+    staleTime: 60_000,
+    enabled: Boolean(user),
+  });
   if (isLoading) return <FullScreenSpinner />;
   if (!user && !(allowShareSession && isSharedSession())) return <Navigate to="/login" replace />;
+  if (user && twoFactor?.required && !user.totpEnabled) return <Navigate to="/setup-2fa" replace />;
   return <>{children}</>;
 }
 
@@ -38,6 +48,7 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/setup-2fa" element={<SetupTwoFactorPage />} />
       <Route path="/share/:token" element={<SharePage />}>
         <Route index element={<SharedIndexRoute />} />
         <Route path="objects/:objectId" element={<SharedObjectRoute />} />

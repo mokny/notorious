@@ -43,16 +43,32 @@ import type {
   UpdateObjectScriptInput,
   SetScriptEnabledInput,
   ScriptRunResult,
+  ConfirmTwoFactorInput,
+  DisableTwoFactorInput,
+  VerifyTwoFactorInput,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
+
+/** Returned by login when the account has 2FA enabled - a real session is only created once `twoFactorApi.verify` succeeds. */
+export interface Pending2fa {
+  pending2fa: true;
+}
 
 export const authApi = {
   me: () => apiRequest<User>("/api/v1/auth/me"),
   register: (input: RegisterInput) => apiRequest<User>("/api/v1/auth/register", { method: "POST", body: input }),
-  login: (input: LoginInput) => apiRequest<User>("/api/v1/auth/login", { method: "POST", body: input }),
+  login: (input: LoginInput) => apiRequest<User | Pending2fa>("/api/v1/auth/login", { method: "POST", body: input }),
   logout: () => apiRequest<void>("/api/v1/auth/logout", { method: "POST" }),
   changePassword: (input: ChangePasswordInput) => apiRequest<void>("/api/v1/auth/password", { method: "PATCH", body: input }),
   changeEmail: (input: ChangeEmailInput) => apiRequest<User>("/api/v1/auth/email", { method: "PATCH", body: input }),
+};
+
+export const twoFactorApi = {
+  setup: () => apiRequest<{ secret: string; qrCodeDataUrl: string }>("/api/v1/auth/2fa/setup", { method: "POST" }),
+  confirm: (input: ConfirmTwoFactorInput) =>
+    apiRequest<{ backupCodes: string[] }>("/api/v1/auth/2fa/confirm", { method: "POST", body: input }),
+  disable: (input: DisableTwoFactorInput) => apiRequest<void>("/api/v1/auth/2fa/disable", { method: "POST", body: input }),
+  verify: (input: VerifyTwoFactorInput) => apiRequest<User>("/api/v1/auth/2fa/verify", { method: "POST", body: input }),
 };
 
 export const workspaceApi = {
@@ -228,6 +244,7 @@ export const linkPreviewApi = {
 export const systemApi = {
   version: () => apiRequest<{ version: string }>("/api/v1/version"),
   registrationStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/registration-status"),
+  twoFactorRequired: () => apiRequest<{ required: boolean }>("/api/v1/system/2fa-required"),
 };
 
 export const shareLinkApi = {

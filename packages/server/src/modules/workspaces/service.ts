@@ -99,6 +99,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       name: users.name,
       avatarColor: users.avatarColor,
       createdAt: users.createdAt,
+      totpEnabled: users.totpEnabled,
     })
     .from(workspaceMembers)
     .innerJoin(users, eq(workspaceMembers.userId, users.id))
@@ -109,7 +110,14 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
     userId: row.userId,
     role: row.role,
     joinedAt: row.joinedAt,
-    user: { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor, createdAt: row.createdAt },
+    user: {
+      id: row.userId,
+      email: row.email,
+      name: row.name,
+      avatarColor: row.avatarColor,
+      createdAt: row.createdAt,
+      totpEnabled: row.totpEnabled,
+    },
   }));
 }
 

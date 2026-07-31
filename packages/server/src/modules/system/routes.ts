@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
-import { getRegistrationEnabled } from "../instanceSettings/service.js";
+import { getRegistrationEnabled, getRequire2faEnabled } from "../instanceSettings/service.js";
 
 // Same "repo root" resolution as app.ts's PACKAGE_ROOT (packages/server/src -> up three).
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
@@ -16,4 +16,10 @@ export async function registerSystemRoutes(app: FastifyInstance): Promise<void> 
   // session exists, to show whether open sign-up is currently allowed (see
   // RegisterPage.tsx). Doesn't reveal anything sensitive either way.
   app.get("/api/v1/system/registration-status", async () => ({ enabled: await getRegistrationEnabled() }));
+
+  // Unauthenticated on purpose, same reasoning as registration-status above -
+  // App.tsx's RequireAuth needs this to decide whether to redirect a logged-in
+  // user without 2FA set up to /setup-2fa, and that check has to work the
+  // instant a session exists (including right after registering).
+  app.get("/api/v1/system/2fa-required", async () => ({ required: await getRequire2faEnabled() }));
 }

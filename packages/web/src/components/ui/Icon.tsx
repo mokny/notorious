@@ -48,6 +48,7 @@ import {
   Play,
   Terminal,
   Palette,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -99,6 +100,7 @@ const ICONS: Record<string, LucideIcon> = {
   play: Play,
   terminal: Terminal,
   palette: Palette,
+  shield: ShieldCheck,
 };
 
 function isImageUrl(value: string): boolean {
