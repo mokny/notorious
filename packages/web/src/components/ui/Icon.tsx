@@ -43,6 +43,8 @@ import {
   Lock,
   Unlock,
   History,
+  Link2,
+  FileStack,
   type LucideIcon,
 } from "lucide-react";
 
@@ -89,6 +91,8 @@ const ICONS: Record<string, LucideIcon> = {
   lock: Lock,
   unlock: Unlock,
   history: History,
+  link: Link2,
+  embed: FileStack,
 };
 
 function isImageUrl(value: string): boolean {

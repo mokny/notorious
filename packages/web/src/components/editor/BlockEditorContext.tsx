@@ -6,6 +6,15 @@ export interface BlockEditorActions {
   objectId: string;
   /** For the add-block/slash menu's per-object-type "create a new X" entries - see SlashCommand.ts. */
   objectTypes: ObjectType[];
+  /**
+   * The chain of object ids "currently open," from the top-level object down
+   * to (and including) this editor's own `objectId` - a sub_object block in
+   * "embed" display mode (see SubObjectContent) reads this to detect a
+   * circular embed (A embeds B embeds A) before recursing into a nested
+   * BlockEditor, and passes `[...embedAncestorIds, objectId]` down into it.
+   * See SubObjectBlock.tsx.
+   */
+  embedAncestorIds: string[];
   createBlockAfter: (parentBlockId: string | null, afterBlockId: string | null, type: BlockType, extraContent?: Record<string, unknown>) => void;
   updateBlockContent: (blockId: string, content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see toggleChecklistItemSchema and ChecklistBlock.tsx. */

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi } from "../lib/api/resources.js";
 import { getShareRole, withShareToken } from "../lib/api/shareMode.js";
+import { READ_ONLY_CONTENT_CLASS } from "../lib/readOnlyContent.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
@@ -21,22 +22,9 @@ import { useRecentObjects } from "../hooks/useRecentObjects.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 
 // Disables interactive edit controls for a read-only (viewer/commenter) share
-// - or an object the owner has locked, see `isLocked` below - without
-// blocking `<a>`/`Link` navigation the way a blanket `pointer-events-none`
-// on the whole container would - sub-object/relation links inside otherwise-
-// read-only content still need to be clickable (see SubObjectBlock.tsx,
-// RelationPicker.tsx). `canvas` covers the whiteboard block (Excalidraw
-// draws/handles pointer events directly on a <canvas> element, not an
-// input/button) - without it a "viewer" could still draw on someone else's
-// shared whiteboard. `locked-content` (see globals.css) additionally hides
-// hover-revealed edit affordances (drag handles, add/delete buttons)
-// entirely instead of leaving them visible-but-inert. Buttons marked
-// `data-view-toggle` (an expand/collapse chevron - see CollapsibleSection.tsx,
-// SubObjectBlock.tsx, ToggleBlock.tsx) are exempted: those only reveal
-// already-there content, not an edit, and disabling them would make
-// collapsed content permanently unreachable in read-only/locked view.
-const READ_ONLY_LOCK =
-  "locked-content [&_input]:pointer-events-none [&_textarea]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable]]:pointer-events-none [&_canvas]:pointer-events-none";
+// - or an object the owner has locked, see `isLocked` below. See
+// readOnlyContent.ts for what this covers and why.
+const READ_ONLY_LOCK = READ_ONLY_CONTENT_CLASS;
 
 // Same as READ_ONLY_LOCK, but inputs marked `data-lock-exempt` (a checklist
 // item's checkbox - see ChecklistBlock.tsx) stay interactive. Used only when

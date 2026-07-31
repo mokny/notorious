@@ -84,6 +84,13 @@ export interface SubObjectContent {
    * search/create picker. Ignored once `objectId` is set.
    */
   pendingObjectTypeId?: string;
+  /**
+   * "link" (the default, when unset) shows just a title/icon card, expandable
+   * to the target's own sub-objects. "embed" additionally renders the
+   * target's actual block content inline, read-only (see SubObjectBlock.tsx)
+   * - toggled from a control on the block itself, changeable at any time.
+   */
+  displayMode?: "link" | "embed";
 }
 /** A bookmarked URL rendered as a card. `url` is empty until one has been entered; `title`/`description`/`icon` are auto-filled (title, and `icon` from the page's favicon) but freely editable afterwards, not re-fetched from the page once set. */
 export interface BookmarkContent {

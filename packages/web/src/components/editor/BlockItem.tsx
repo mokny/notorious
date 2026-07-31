@@ -12,6 +12,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
     workspaceId,
     objectId,
     objectTypes,
+    embedAncestorIds,
     createBlockAfter,
     updateBlockContent,
     toggleChecklistItem,
@@ -79,6 +80,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
             createBlockAfter(block.parentBlockId, block.id, type, extraContent)
           }
           objectTypes={objectTypes}
+          embedAncestorIds={embedAncestorIds}
           renderColumn={renderColumn}
           toggleChildren={<BlockList blocks={block.children} parentBlockId={block.id} />}
           autoFocus={block.id === pendingFocusBlockId}

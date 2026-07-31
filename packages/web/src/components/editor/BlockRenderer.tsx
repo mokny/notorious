@@ -52,6 +52,8 @@ export interface BlockRendererProps {
   onSlashSelect: (type: BlockType, extraContent?: Record<string, unknown>) => void;
   /** For the slash menu's per-object-type "create a new X" entries - only relevant for `paragraph` blocks (the only ones with a slash menu). */
   objectTypes: ObjectType[];
+  /** For a `sub_object` block's "embed" display mode - see BlockEditorContext.tsx and SubObjectBlock.tsx. Only relevant for `sub_object` blocks. */
+  embedAncestorIds: string[];
   renderColumn?: (columnIndex: number) => ReactNode;
   toggleChildren?: ReactNode;
   autoFocus?: boolean;
@@ -66,6 +68,7 @@ export function BlockRenderer({
   onToggleChecklistItem,
   onSlashSelect,
   objectTypes,
+  embedAncestorIds,
   onEnter,
   onBackspaceEmpty,
   renderColumn,
@@ -135,7 +138,9 @@ export function BlockRenderer({
     case "database_view":
       return <DatabaseViewBlock content={content<DatabaseViewContent>()} workspaceId={workspaceId} onSave={save} />;
     case "sub_object":
-      return <SubObjectBlock content={content<SubObjectContent>()} workspaceId={workspaceId} onSave={save} />;
+      return (
+        <SubObjectBlock content={content<SubObjectContent>()} workspaceId={workspaceId} onSave={save} embedAncestorIds={embedAncestorIds} />
+      );
     case "bookmark":
       return <BookmarkBlock content={content<BookmarkContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
     case "whiteboard":

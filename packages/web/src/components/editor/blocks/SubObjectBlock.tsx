@@ -7,13 +7,20 @@ import { useObjectTitle } from "../../../hooks/useObjectTitle.js";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { objectHref } from "../../../lib/api/shareMode.js";
+import { READ_ONLY_CONTENT_CLASS } from "../../../lib/readOnlyContent.js";
 import { Icon } from "../../ui/Icon.js";
+import { BlockEditor } from "../BlockEditor.js";
 
 interface SubObjectBlockProps {
   content: SubObjectContent;
   workspaceId: string;
   onSave: (content: SubObjectContent) => Promise<void>;
+  /** For detecting a circular "embed" (see EmbeddedContent below) - passed down from BlockEditorContext.tsx. */
+  embedAncestorIds: string[];
 }
+
+/** How many levels deep an "embed" is allowed to nest before falling back to a message instead of recursing further - a safety net against a long (but non-circular) embed chain being slow/unwieldy to render, on top of the circular-reference check itself. */
+const MAX_EMBED_DEPTH = 4;
 
 /**
  * One row in the recursively-expandable sub-object outline - shows an
@@ -209,7 +216,54 @@ function PendingNewSubObject({
   );
 }
 
-export function SubObjectBlock({ content, workspaceId, onSave }: SubObjectBlockProps) {
+/**
+ * The "embed" side of a sub_object block's display mode (see
+ * `SubObjectContent.displayMode`) - renders the target object's own block
+ * content inline, read-only, below the link card above it. Reuses
+ * `BlockEditor` itself (wrapped in the same read-only CSS the object-lock
+ * feature uses - see readOnlyContent.ts) rather than a second, parallel
+ * rendering path, so every block type renders exactly as it does everywhere
+ * else, for free.
+ *
+ * `embedAncestorIds` is the chain of object ids already "open" above this
+ * point (see BlockEditorContext.tsx) - if the target is already in it,
+ * embedding would recurse forever (object A embeds B, which embeds A back),
+ * so this shows a message instead of rendering another nested `BlockEditor`.
+ * `MAX_EMBED_DEPTH` caps how deep a non-circular chain can nest too, since a
+ * long chain of distinct objects all embedding each other in sequence is
+ * technically safe but still not something worth rendering in full.
+ */
+function EmbeddedContent({
+  workspaceId,
+  objectId,
+  embedAncestorIds,
+}: {
+  workspaceId: string;
+  objectId: string;
+  embedAncestorIds: string[];
+}) {
+  if (embedAncestorIds.includes(objectId)) {
+    return (
+      <p className="rounded-lg border border-dashed border-border p-2 text-xs text-ink-muted">
+        Can't embed this object's content here - it would create a circular reference.
+      </p>
+    );
+  }
+  if (embedAncestorIds.length >= MAX_EMBED_DEPTH) {
+    return (
+      <p className="rounded-lg border border-dashed border-border p-2 text-xs text-ink-muted">
+        Nested too deeply to embed here - open the object directly to see its content.
+      </p>
+    );
+  }
+  return (
+    <div className={`${READ_ONLY_CONTENT_CLASS} rounded-lg border border-border p-3`}>
+      <BlockEditor workspaceId={workspaceId} objectId={objectId} embedAncestorIds={[...embedAncestorIds, objectId]} />
+    </div>
+  );
+}
+
+export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds }: SubObjectBlockProps) {
   if (!content.objectId && content.pendingObjectTypeId) {
     return (
       <PendingNewSubObject
@@ -222,5 +276,43 @@ export function SubObjectBlock({ content, workspaceId, onSave }: SubObjectBlockP
   if (!content.objectId) {
     return <SubObjectPicker workspaceId={workspaceId} onPicked={(objectId) => onSave({ ...content, objectId })} />;
   }
-  return <SubObjectRow workspaceId={workspaceId} objectId={content.objectId} depth={0} />;
+
+  const displayMode = content.displayMode ?? "link";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start gap-1">
+        <div className="min-w-0 flex-1">
+          <SubObjectRow workspaceId={workspaceId} objectId={content.objectId} depth={0} />
+        </div>
+        <div className="mt-2 flex shrink-0 gap-0.5 rounded-md border border-border p-0.5">
+          <button
+            type="button"
+            title="Show as link"
+            // Hidden (not just disabled) in read-only/locked content - see
+            // globals.css's `[data-lock-hide]` rule. Changing the display
+            // mode is a content edit like any other, so it's blocked the
+            // same way "+ Add item" is (see ChecklistBlock.tsx).
+            data-lock-hide
+            onClick={() => onSave({ ...content, displayMode: "link" })}
+            className={`rounded p-1 ${displayMode === "link" ? "bg-accent/10 text-accent" : "text-ink-muted hover:text-ink"}`}
+          >
+            <Icon name="link" className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            title="Embed content"
+            data-lock-hide
+            onClick={() => onSave({ ...content, displayMode: "embed" })}
+            className={`rounded p-1 ${displayMode === "embed" ? "bg-accent/10 text-accent" : "text-ink-muted hover:text-ink"}`}
+          >
+            <Icon name="embed" className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      {displayMode === "embed" && (
+        <EmbeddedContent workspaceId={workspaceId} objectId={content.objectId} embedAncestorIds={embedAncestorIds} />
+      )}
+    </div>
+  );
 }

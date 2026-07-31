@@ -70,10 +70,21 @@ interface BlockEditorProps {
   /** Which block's edit history shows in the Properties sidebar - lifted to ObjectDetailPage.tsx, which renders that sidebar outside this component's own tree. */
   selectedBlockId?: string | null;
   onSelectBlock?: (blockId: string) => void;
+  /** Only passed by SubObjectBlock.tsx when nesting this editor for an "embed" display mode - see BlockEditorContext.tsx. Omitted at the top level, where this editor's own `objectId` is the start of the chain. */
+  embedAncestorIds?: string[];
 }
 
-export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onSelectBlock }: BlockEditorProps) {
+export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onSelectBlock, embedAncestorIds }: BlockEditorProps) {
   const queryClient = useQueryClient();
+  const resolvedEmbedAncestorIds = embedAncestorIds ?? [objectId];
+  // Only ever set by SubObjectBlock.tsx's own nested render (see its "embed"
+  // display mode) - the top-level call from ObjectDetailPage.tsx never
+  // passes this. Suppresses this instance's own toolbar/file-drop handling,
+  // which wrapping it in read-only CSS alone doesn't reach (a drag-and-drop
+  // file upload isn't a `button`/`input` the lock's pointer-events rules
+  // cover, and hiding the toolbar buttons via `data-lock-hide` would still
+  // leave the row itself sitting there empty).
+  const isEmbedded = Boolean(embedAncestorIds);
   const importInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
@@ -392,6 +403,7 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
         workspaceId,
         objectId,
         objectTypes: objectTypes ?? [],
+        embedAncestorIds: resolvedEmbedAncestorIds,
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),
@@ -408,12 +420,16 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
     >
       <div
         className="relative"
-        onDragEnter={handleDragEnter}
-        onDragOver={(event) => {
-          if (event.dataTransfer.types.includes("Files")) event.preventDefault();
-        }}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDragEnter={isEmbedded ? undefined : handleDragEnter}
+        onDragOver={
+          isEmbedded
+            ? undefined
+            : (event) => {
+                if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+              }
+        }
+        onDragLeave={isEmbedded ? undefined : handleDragLeave}
+        onDrop={isEmbedded ? undefined : handleDrop}
       >
         {(isDragOver || isUploadingFiles) && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-accent bg-accent/5">
@@ -423,25 +439,27 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
           </div>
         )}
 
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Button variant="ghost" onClick={() => window.open(withShareToken(blockApi.exportMarkdownUrl(objectId)), "_blank")}>
-            <Icon name="download" className="h-3.5 w-3.5" /> Export Markdown
-          </Button>
-          <Button variant="ghost" onClick={() => importInputRef.current?.click()}>
-            <Icon name="upload" className="h-3.5 w-3.5" /> Import Markdown
-          </Button>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".md,text/markdown"
-            className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              importMutation.mutate(await file.text());
-            }}
-          />
-        </div>
+        {!isEmbedded && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Button variant="ghost" onClick={() => window.open(withShareToken(blockApi.exportMarkdownUrl(objectId)), "_blank")}>
+              <Icon name="download" className="h-3.5 w-3.5" /> Export Markdown
+            </Button>
+            <Button variant="ghost" onClick={() => importInputRef.current?.click()}>
+              <Icon name="upload" className="h-3.5 w-3.5" /> Import Markdown
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".md,text/markdown"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                importMutation.mutate(await file.text());
+              }}
+            />
+          </div>
+        )}
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setIsDraggingAny(false)}>
           <div className="group/editor">
