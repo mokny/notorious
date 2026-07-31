@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import type { ImageContent, VideoContent, EmbedContent } from "@notorious/shared";
 import { fileApi } from "../../../lib/api/resources.js";
 import { withShareToken } from "../../../lib/api/shareMode.js";
@@ -30,11 +31,48 @@ function UrlPrompt({ onSave, label }: { onSave: (url: string) => void; label: st
 export function ImageBlock({ content: externalContent, workspaceId, objectId, onSave }: MediaProps<ImageContent>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [content, save] = useDebouncedSave(externalContent, onSave);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (content.url) {
     return (
       <figure>
-        <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
+        <Dialog.Root open={lightboxOpen} onOpenChange={setLightboxOpen}>
+          <Dialog.Trigger asChild>
+            <button
+              type="button"
+              title="Click to enlarge"
+              // A view action, not an edit - stays clickable even while the
+              // object is locked (see readOnlyContent.ts's blanket
+              // `button:not([data-view-toggle])` rule).
+              data-view-toggle
+              className="block w-full cursor-zoom-in"
+            >
+              <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
+            </button>
+          </Dialog.Trigger>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-40 bg-black/80" />
+            {/* Clicking anywhere (including the image itself) closes it again, matching the trigger's "click to enlarge" - a second, explicit close button covers anyone who'd rather not guess. */}
+            <Dialog.Content
+              onClick={() => setLightboxOpen(false)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-8 outline-none"
+            >
+              <Dialog.Title className="sr-only">{content.caption || "Image"}</Dialog.Title>
+              <img
+                src={withShareToken(content.url)}
+                alt={content.caption ?? ""}
+                className="max-h-full max-w-full cursor-zoom-out rounded-lg object-contain"
+              />
+              <Dialog.Close
+                title="Close"
+                data-view-toggle
+                className="fixed right-4 top-4 rounded-md bg-black/40 p-2 text-white hover:bg-black/60"
+              >
+                <Icon name="close" className="h-5 w-5" />
+              </Dialog.Close>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
         <input
           value={content.caption ?? ""}
           onChange={(e) => save({ ...content, caption: e.target.value })}

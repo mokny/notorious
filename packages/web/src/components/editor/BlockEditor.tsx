@@ -72,9 +72,11 @@ interface BlockEditorProps {
   onSelectBlock?: (blockId: string) => void;
   /** Only passed by SubObjectBlock.tsx when nesting this editor for an "embed" display mode - see BlockEditorContext.tsx. Omitted at the top level, where this editor's own `objectId` is the start of the chain. */
   embedAncestorIds?: string[];
+  /** Set by ObjectDetailPage.tsx when the object is locked (or read-only for this viewer) - see BlockEditorContext.tsx's `readOnly`. Always effectively true for an embedded instance too, regardless of this prop. */
+  readOnly?: boolean;
 }
 
-export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onSelectBlock, embedAncestorIds }: BlockEditorProps) {
+export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onSelectBlock, embedAncestorIds, readOnly = false }: BlockEditorProps) {
   const queryClient = useQueryClient();
   const resolvedEmbedAncestorIds = embedAncestorIds ?? [objectId];
   // Only ever set by SubObjectBlock.tsx's own nested render (see its "embed"
@@ -83,8 +85,10 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
   // which wrapping it in read-only CSS alone doesn't reach (a drag-and-drop
   // file upload isn't a `button`/`input` the lock's pointer-events rules
   // cover, and hiding the toolbar buttons via `data-lock-hide` would still
-  // leave the row itself sitting there empty).
+  // leave the row itself sitting there empty). An embedded preview is also
+  // always read-only, on top of that - see `readOnly` above.
   const isEmbedded = Boolean(embedAncestorIds);
+  const effectiveReadOnly = readOnly || isEmbedded;
   const importInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
@@ -404,6 +408,7 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
         objectId,
         objectTypes: objectTypes ?? [],
         embedAncestorIds: resolvedEmbedAncestorIds,
+        readOnly: effectiveReadOnly,
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),

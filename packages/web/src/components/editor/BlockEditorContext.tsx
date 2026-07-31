@@ -15,6 +15,17 @@ export interface BlockEditorActions {
    * See SubObjectBlock.tsx.
    */
   embedAncestorIds: string[];
+  /**
+   * True while this content can't be edited (the object is locked, or this
+   * is a sub_object block's embedded preview - always read-only regardless
+   * of lock state, see SubObjectBlock.tsx). Read directly by each rich-text
+   * block (ParagraphBlock, HeadingBlock, ...) and ChecklistBlock to keep
+   * text genuinely selectable/copyable while blocking edits - a plain CSS
+   * `pointer-events: none` (still used for buttons/property inputs outside
+   * the editor) would block text selection along with editing, which is
+   * exactly what a locked object shouldn't do.
+   */
+  readOnly: boolean;
   createBlockAfter: (parentBlockId: string | null, afterBlockId: string | null, type: BlockType, extraContent?: Record<string, unknown>) => void;
   updateBlockContent: (blockId: string, content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see toggleChecklistItemSchema and ChecklistBlock.tsx. */

@@ -1,6 +1,7 @@
 import type { TableContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { Icon } from "../../ui/Icon.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 export function TableBlock({
   content: externalContent,
@@ -9,6 +10,7 @@ export function TableBlock({
   content: TableContent;
   onSave: (c: TableContent) => Promise<void>;
 }) {
+  const { readOnly } = useBlockEditor();
   const [content, save] = useDebouncedSave(externalContent, onSave);
   const columns = content.columns?.length ? content.columns : ["Column 1", "Column 2"];
   const rows = content.rows ?? [];
@@ -50,6 +52,7 @@ export function TableBlock({
                 <input
                   value={column}
                   onChange={(e) => setColumn(index, e.target.value)}
+                  readOnly={readOnly}
                   autoComplete="off"
                   className="w-full border-none bg-transparent font-medium outline-none"
                 />
@@ -70,6 +73,7 @@ export function TableBlock({
                   <input
                     value={row[colIndex] ?? ""}
                     onChange={(e) => setCell(rowIndex, colIndex, e.target.value)}
+                    readOnly={readOnly}
                     autoComplete="off"
                     className="w-full border-none bg-transparent outline-none"
                   />

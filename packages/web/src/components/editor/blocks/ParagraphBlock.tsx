@@ -1,5 +1,6 @@
 import type { BlockType, ObjectType, ParagraphContent } from "@notorious/shared";
 import { RichTextEditor } from "../RichTextEditor.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 interface ParagraphBlockProps {
   content: ParagraphContent;
@@ -22,6 +23,7 @@ export function ParagraphBlock({
   autoFocus,
   onAutoFocused,
 }: ParagraphBlockProps) {
+  const { readOnly } = useBlockEditor();
   return (
     <RichTextEditor
       markdown={content.markdown ?? ""}
@@ -33,6 +35,7 @@ export function ParagraphBlock({
       objectTypes={objectTypes}
       autoFocus={autoFocus}
       onAutoFocused={onAutoFocused}
+      editable={!readOnly}
     />
   );
 }

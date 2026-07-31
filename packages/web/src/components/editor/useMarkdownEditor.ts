@@ -16,6 +16,15 @@ interface UseMarkdownEditorOptions {
   onSlashSelect?: (type: BlockType, extraContent?: Record<string, unknown>) => void;
   /** For the slash menu's per-object-type "create a new X" entries - see SlashCommand.ts. */
   objectTypes?: ObjectType[];
+  /**
+   * Defaults to true. Set to false for a locked object/embedded preview
+   * (see BlockEditorContext.tsx's `readOnly`) - TipTap then blocks edits at
+   * the ProseMirror level (`contenteditable="false"` on the DOM node)
+   * instead of this app's usual `pointer-events: none` CSS trick, which
+   * would also block text selection/copy - exactly what should still work
+   * while read-only.
+   */
+  editable?: boolean;
 }
 
 function isEmptyEditor(target: HTMLElement): boolean {
@@ -103,11 +112,20 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
     extensions,
     content: options.markdown,
     editorProps,
+    editable: options.editable ?? true,
     onUpdate: ({ editor: updatedEditor }) => {
       const storage = updatedEditor.storage as { markdown: { getMarkdown: () => string } };
       onChangeRef.current?.(storage.markdown.getMarkdown().trim());
     },
   });
+
+  // `editable` above only seeds the editor once, on creation (same caveat
+  // as `content` below) - an object being locked/unlocked after this editor
+  // already mounted needs to actually flip ProseMirror's own editable state
+  // via `setEditable`, not just get a new (ignored) constructor option.
+  useEffect(() => {
+    editor?.setEditable(options.editable ?? true);
+  }, [options.editable, editor]);
 
   // `content` above only seeds the editor once, on creation - by itself it
   // never notices later prop changes, so a block another collaborator (or

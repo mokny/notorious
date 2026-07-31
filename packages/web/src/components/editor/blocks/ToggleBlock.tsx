@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { ToggleContent } from "@notorious/shared";
 import { RichTextEditor } from "../RichTextEditor.js";
 import { Icon } from "../../ui/Icon.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 interface ToggleBlockProps {
   content: ToggleContent;
@@ -11,6 +12,7 @@ interface ToggleBlockProps {
 
 export function ToggleBlock({ content, onSave, children }: ToggleBlockProps) {
   const [open, setOpen] = useState(true);
+  const { readOnly } = useBlockEditor();
 
   return (
     <div>
@@ -23,6 +25,7 @@ export function ToggleBlock({ content, onSave, children }: ToggleBlockProps) {
             markdown={content.summaryMarkdown ?? ""}
             placeholder="Toggle"
             onSave={(summaryMarkdown) => onSave({ ...content, summaryMarkdown })}
+            editable={!readOnly}
           />
         </div>
       </div>

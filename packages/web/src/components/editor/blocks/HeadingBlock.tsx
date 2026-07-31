@@ -1,6 +1,7 @@
 import type { HeadingContent } from "@notorious/shared";
 import { RichTextEditor } from "../RichTextEditor.js";
 import { useFocusWithin } from "../../../hooks/useFocusWithin.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 const SIZE_CLASS: Record<1 | 2 | 3, string> = {
   1: "text-2xl font-semibold",
@@ -17,6 +18,7 @@ interface HeadingBlockProps {
 
 export function HeadingBlock({ content, onSave, onEnter, onBackspaceEmpty }: HeadingBlockProps) {
   const { isFocused, handlers } = useFocusWithin();
+  const { readOnly } = useBlockEditor();
 
   return (
     <div className={SIZE_CLASS[content.level]}>
@@ -42,6 +44,7 @@ export function HeadingBlock({ content, onSave, onEnter, onBackspaceEmpty }: Hea
           onSave={(markdown) => onSave({ ...content, markdown })}
           onEnter={onEnter}
           onBackspaceEmpty={onBackspaceEmpty}
+          editable={!readOnly}
         />
       </div>
     </div>

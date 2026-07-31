@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Block, BlockType } from "@notorious/shared";
 import { blockApi } from "../lib/api/resources.js";
 import { SLASH_COMMAND_ITEMS } from "./editor/SlashCommand.js";
-import { Icon } from "./ui/Icon.js";
+import { CollapsibleSection } from "./ui/CollapsibleSection.js";
 
 function truncate(text: string, max = 40): string {
   const trimmed = text.trim().replace(/\s+/g, " ");
@@ -74,10 +74,7 @@ export function BlockHistoryPanel({ objectId, blockId }: { objectId: string; blo
   });
 
   return (
-    <div className="mt-6 border-t border-border pt-4">
-      <h3 className="mb-1 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-ink-muted">
-        <Icon name="history" className="h-3.5 w-3.5" /> History
-      </h3>
+    <CollapsibleSection title="History">
       <p className="mb-2 truncate text-xs text-ink-muted" title={describeBlock(block)}>
         {describeBlock(block)}
       </p>
@@ -95,6 +92,6 @@ export function BlockHistoryPanel({ objectId, blockId }: { objectId: string; blo
           ))}
         </ul>
       )}
-    </div>
+    </CollapsibleSection>
   );
 }

@@ -257,7 +257,15 @@ function EmbeddedContent({
     );
   }
   return (
-    <div className={`${READ_ONLY_CONTENT_CLASS} rounded-lg border border-border p-3`}>
+    // Pulled left past the surrounding block row's own drag-handle/add-button
+    // gutter (see BlockItem.tsx) and given no side padding of its own - the
+    // embedded BlockEditor gets its blocks' *own* matching gutter one level
+    // down, so without this the content would be squeezed by that gutter
+    // twice (once for this sub_object block, once again for each of the
+    // embedded object's blocks) and end up noticeably narrower than opening
+    // the object directly. Wide block types (whiteboards especially) made
+    // this the most visible.
+    <div className={`${READ_ONLY_CONTENT_CLASS} -ml-11 border-t border-border pt-2`}>
       <BlockEditor workspaceId={workspaceId} objectId={objectId} embedAncestorIds={[...embedAncestorIds, objectId]} />
     </div>
   );

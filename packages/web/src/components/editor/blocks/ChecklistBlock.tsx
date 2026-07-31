@@ -6,6 +6,7 @@ import type { ChecklistContent, ChecklistItem } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { randomId } from "../../../lib/randomId.js";
 import { Icon } from "../../ui/Icon.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 /** Grows a textarea to fit its (possibly wrapped, no literal newlines) content instead of scrolling/clipping it - reset to "auto" first so it can shrink back down too, not just grow. */
 function resizeTextarea(el: HTMLTextAreaElement | null): void {
@@ -28,6 +29,7 @@ function ChecklistItemRow({
   onEnter,
   onRemove,
   registerInputRef,
+  readOnly,
 }: {
   sortableId: string;
   item: ChecklistItem;
@@ -38,6 +40,8 @@ function ChecklistItemRow({
   onEnter: () => void;
   onRemove: () => void;
   registerInputRef: (el: HTMLTextAreaElement | null) => void;
+  /** Native `readOnly`, not `disabled` - keeps the item's text selectable/copyable while the object is locked (see BlockEditorContext.tsx and readOnlyContent.ts's `:not([readonly])` carve-out), unlike the checkbox above, which stays interactive either way. */
+  readOnly: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -82,6 +86,7 @@ function ChecklistItemRow({
             onEnter();
           }
         }}
+        readOnly={readOnly}
         placeholder="To-do"
         autoComplete="off"
         rows={1}
@@ -117,6 +122,7 @@ export function ChecklistBlock({
   /** Exempt-from-lock path for checking an item off - see toggleChecklistItemSchema. */
   onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
 }) {
+  const { readOnly } = useBlockEditor();
   const [content, save] = useDebouncedSave(externalContent, onSave);
   const items = content.items ?? [];
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
@@ -186,6 +192,7 @@ export function ChecklistBlock({
               onChangeText={(markdown) => updateItem(index, { markdown })}
               onEnter={addItem}
               onRemove={() => removeItem(index)}
+              readOnly={readOnly}
               registerInputRef={(el) => {
                 inputRefs.current[index] = el;
                 resizeTextarea(el);

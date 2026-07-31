@@ -16,6 +16,8 @@ interface RichTextEditorProps {
   /** Focuses this editor once, then calls `onAutoFocused` - used after Enter creates a new block. */
   autoFocus?: boolean;
   onAutoFocused?: () => void;
+  /** See useMarkdownEditor.ts - defaults to true. */
+  editable?: boolean;
 }
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -38,6 +40,7 @@ export function RichTextEditor({
   objectTypes,
   autoFocus,
   onAutoFocused,
+  editable,
 }: RichTextEditorProps) {
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isSavingRef = useRef(false);
@@ -71,6 +74,7 @@ export function RichTextEditor({
     onBackspaceEmpty,
     onSlashSelect,
     objectTypes,
+    editable,
     onChange: (value) => {
       pendingValueRef.current = value;
       clearTimeout(saveTimeout.current);
