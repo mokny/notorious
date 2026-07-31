@@ -76,6 +76,14 @@ export interface ToggleContent {
 /** Embeds a link to another object inline in the document, expandable to that object's own sub-objects (recursively). `objectId` is null until a target has been picked. */
 export interface SubObjectContent {
   objectId: string | null;
+  /**
+   * Set only when this block was created by picking one of the per-object-type
+   * entries in the add-block/slash menu (see SlashCommand.ts) rather than the
+   * plain "Existing Object" entry - tells SubObjectBlock.tsx to immediately
+   * create a new object of this type and link it, instead of showing the
+   * search/create picker. Ignored once `objectId` is set.
+   */
+  pendingObjectTypeId?: string;
 }
 /** A bookmarked URL rendered as a card. `url` is empty until one has been entered; `title`/`description`/`icon` are auto-filled (title, and `icon` from the page's favicon) but freely editable afterwards, not re-fetched from the page once set. */
 export interface BookmarkContent {

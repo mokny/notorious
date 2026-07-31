@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type {
   BlockType,
+  ObjectType,
   ParagraphContent,
   HeadingContent,
   QuoteContent,
@@ -48,7 +49,9 @@ export interface BlockRendererProps {
   onToggleChecklistItem: (itemId: string, checked: boolean) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
-  onSlashSelect: (type: BlockType) => void;
+  onSlashSelect: (type: BlockType, extraContent?: Record<string, unknown>) => void;
+  /** For the slash menu's per-object-type "create a new X" entries - only relevant for `paragraph` blocks (the only ones with a slash menu). */
+  objectTypes: ObjectType[];
   renderColumn?: (columnIndex: number) => ReactNode;
   toggleChildren?: ReactNode;
   autoFocus?: boolean;
@@ -61,9 +64,10 @@ export function BlockRenderer({
   objectId,
   onSave,
   onToggleChecklistItem,
+  onSlashSelect,
+  objectTypes,
   onEnter,
   onBackspaceEmpty,
-  onSlashSelect,
   renderColumn,
   toggleChildren,
   autoFocus,
@@ -91,6 +95,7 @@ export function BlockRenderer({
           onEnter={onEnter}
           onBackspaceEmpty={onBackspaceEmpty}
           onSlashSelect={onSlashSelect}
+          objectTypes={objectTypes}
           autoFocus={autoFocus}
           onAutoFocused={onAutoFocused}
         />

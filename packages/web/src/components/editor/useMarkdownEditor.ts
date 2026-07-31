@@ -4,7 +4,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
-import type { BlockType } from "@notorious/shared";
+import type { BlockType, ObjectType } from "@notorious/shared";
 import { SlashCommand } from "./SlashCommand.js";
 
 interface UseMarkdownEditorOptions {
@@ -13,7 +13,9 @@ interface UseMarkdownEditorOptions {
   onChange: (markdown: string) => void;
   onEnter?: () => void;
   onBackspaceEmpty?: () => void;
-  onSlashSelect?: (type: BlockType) => void;
+  onSlashSelect?: (type: BlockType, extraContent?: Record<string, unknown>) => void;
+  /** For the slash menu's per-object-type "create a new X" entries - see SlashCommand.ts. */
+  objectTypes?: ObjectType[];
 }
 
 function isEmptyEditor(target: HTMLElement): boolean {
@@ -42,11 +44,16 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   const onEnterRef = useRef(options.onEnter);
   const onBackspaceEmptyRef = useRef(options.onBackspaceEmpty);
   const onSlashSelectRef = useRef(options.onSlashSelect);
+  // Read at call-time by the extension (see SlashCommand.ts's `objectTypesRef`
+  // param), not just when it's configured below - object types can still be
+  // loading (or change) after this editor instance is created.
+  const objectTypesRef = useRef<ObjectType[]>(options.objectTypes ?? []);
 
   onChangeRef.current = options.onChange;
   onEnterRef.current = options.onEnter;
   onBackspaceEmptyRef.current = options.onBackspaceEmpty;
   onSlashSelectRef.current = options.onSlashSelect;
+  objectTypesRef.current = options.objectTypes ?? [];
 
   const hasSlashCommand = Boolean(options.onSlashSelect);
 
@@ -64,7 +71,14 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: options.placeholder ?? "Type '/' for commands…" }),
       Markdown.configure({ html: false, transformPastedText: true }),
-      ...(hasSlashCommand ? [SlashCommand.configure({ onSelect: (type) => onSlashSelectRef.current?.(type) })] : []),
+      ...(hasSlashCommand
+        ? [
+            SlashCommand.configure({
+              onSelect: (type, extraContent) => onSlashSelectRef.current?.(type, extraContent),
+              objectTypesRef,
+            }),
+          ]
+        : []),
     ],
     [options.placeholder, hasSlashCommand],
   );

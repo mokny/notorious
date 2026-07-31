@@ -1,12 +1,20 @@
 import { Extension } from "@tiptap/core";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
-import type { BlockType } from "@notorious/shared";
+import type { BlockType, ObjectType } from "@notorious/shared";
 
 export interface SlashCommandItem {
   type: BlockType;
   label: string;
   description: string;
+  /**
+   * Set only on the per-object-type entries `buildSlashCommandItems` appends
+   * (one per workspace object type) - picking one creates a brand-new object
+   * of this type and embeds it immediately (see SubObjectBlock.tsx), instead
+   * of the plain "Existing Object" entry below, which links to something that
+   * already exists via its own search/create picker.
+   */
+  objectTypeId?: string;
 }
 
 export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
@@ -26,26 +34,58 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "divider", label: "Divider", description: "Horizontal rule" },
   { type: "columns", label: "Columns", description: "Side-by-side layout" },
   { type: "database_view", label: "Linked view", description: "Embed a saved view of objects" },
-  { type: "sub_object", label: "Sub-object", description: "Embed a linked object, expandable to its own sub-objects" },
+  { type: "sub_object", label: "Existing Object", description: "Link an existing object, expandable to its own sub-objects" },
   { type: "bookmark", label: "Bookmark", description: "Save a link with a title and description" },
   { type: "whiteboard", label: "Whiteboard", description: "Sketch with shapes, arrows and freehand drawing" },
 ];
 
-/** Extension options: the host component supplies what happens when a block type is chosen. */
-export interface SlashCommandExtensionOptions {
-  onSelect: (type: BlockType) => void;
+/**
+ * Appends one "create a new X" entry per workspace object type after the
+ * fixed list above - each one, when picked, creates a brand-new object of
+ * that type and embeds it as a sub_object block right away (see
+ * `pendingObjectTypeId` on `SubObjectContent`), rather than making the user
+ * go through "Existing Object" -> its own picker -> "+ New" -> pick a type,
+ * three steps in to do the same thing.
+ */
+export function buildSlashCommandItems(objectTypes: ObjectType[]): SlashCommandItem[] {
+  const perType: SlashCommandItem[] = objectTypes
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((objectType) => ({
+      type: "sub_object",
+      label: objectType.name,
+      description: `Create a new ${objectType.name} and embed it here`,
+      objectTypeId: objectType.id,
+    }));
+  return [...SLASH_COMMAND_ITEMS, ...perType];
 }
 
-function buildSuggestion(onSelect: (type: BlockType) => void): Omit<SuggestionOptions, "editor"> {
+/** Extension options: the host component supplies what happens when a block type is chosen, and a ref to the current object types (read at call-time, not just when the extension is first configured - see useMarkdownEditor.ts). */
+export interface SlashCommandExtensionOptions {
+  onSelect: (type: BlockType, extraContent?: Record<string, unknown>) => void;
+  objectTypesRef: { current: ObjectType[] };
+}
+
+function buildSuggestion(
+  onSelect: (type: BlockType, extraContent?: Record<string, unknown>) => void,
+  objectTypesRef: { current: ObjectType[] },
+): Omit<SuggestionOptions, "editor"> {
   return {
     char: "/",
     startOfLine: false,
     items: ({ query }) =>
-      SLASH_COMMAND_ITEMS.filter((item) => item.label.toLowerCase().includes(query.toLowerCase())).slice(0, 10),
+      buildSlashCommandItems(objectTypesRef.current)
+        .filter((item) => item.label.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 10),
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
     },
     render: () => {
+      /** `{ objectId: null, pendingObjectTypeId }` for a per-type entry, or nothing for a plain block-type entry - see `pendingObjectTypeId` on `SubObjectContent`. */
+      function extraContentFor(item: SlashCommandItem): Record<string, unknown> | undefined {
+        return item.objectTypeId ? { objectId: null, pendingObjectTypeId: item.objectTypeId } : undefined;
+      }
+
       let popup: TippyInstance | undefined;
       let container: HTMLDivElement;
       let selectedIndex = 0;
@@ -75,7 +115,7 @@ function buildSuggestion(onSelect: (type: BlockType) => void): Omit<SuggestionOp
           currentItems = props.items as SlashCommandItem[];
           pick = (item) => {
             props.command({ id: item.type });
-            onSelect(item.type);
+            onSelect(item.type, extraContentFor(item));
           };
           renderList();
 
@@ -93,7 +133,7 @@ function buildSuggestion(onSelect: (type: BlockType) => void): Omit<SuggestionOp
           currentItems = props.items as SlashCommandItem[];
           pick = (item) => {
             props.command({ id: item.type });
-            onSelect(item.type);
+            onSelect(item.type, extraContentFor(item));
           };
           renderList();
           popup?.setProps({ getReferenceClientRect: () => props.clientRect?.() ?? new DOMRect() });
@@ -132,14 +172,14 @@ export const SlashCommand = Extension.create<SlashCommandExtensionOptions>({
   name: "slashCommand",
 
   addOptions() {
-    return { onSelect: () => {} };
+    return { onSelect: () => {}, objectTypesRef: { current: [] } };
   },
 
   addProseMirrorPlugins() {
     return [
       Suggestion({
         editor: this.editor,
-        ...buildSuggestion(this.options.onSelect),
+        ...buildSuggestion(this.options.onSelect, this.options.objectTypesRef),
       }),
     ];
   },

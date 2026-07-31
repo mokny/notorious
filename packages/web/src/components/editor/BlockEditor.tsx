@@ -4,7 +4,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, ty
 import { arrayMove } from "@dnd-kit/sortable";
 import { generateKeyBetween } from "fractional-indexing";
 import type { Block, BlockType } from "@notorious/shared";
-import { blockApi, fileApi } from "../../lib/api/resources.js";
+import { blockApi, fileApi, schemaApi } from "../../lib/api/resources.js";
 import { withShareToken } from "../../lib/api/shareMode.js";
 import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
@@ -84,6 +84,13 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
 
   const { data: blocks } = useQuery({ queryKey: ["blocks", objectId], queryFn: () => blockApi.list(objectId) });
   const tree = buildBlockTree(blocks ?? []);
+
+  // Same query key ObjectDetailPage.tsx and SubObjectBlock.tsx's picker
+  // already use for this workspace's object types - shares their cache
+  // instead of triggering its own fetch when either is mounted alongside
+  // this editor. Feeds the add-block/slash menu's per-type entries (see
+  // SlashCommand.ts) further down.
+  const { data: objectTypes } = useQuery({ queryKey: ["objectTypes", workspaceId], queryFn: () => schemaApi.objectTypes(workspaceId) });
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ["blocks", objectId] });
@@ -384,6 +391,7 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
       value={{
         workspaceId,
         objectId,
+        objectTypes: objectTypes ?? [],
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),

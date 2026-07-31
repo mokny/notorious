@@ -1,9 +1,11 @@
 import { createContext, useContext } from "react";
-import type { BlockType } from "@notorious/shared";
+import type { BlockType, ObjectType } from "@notorious/shared";
 
 export interface BlockEditorActions {
   workspaceId: string;
   objectId: string;
+  /** For the add-block/slash menu's per-object-type "create a new X" entries - see SlashCommand.ts. */
+  objectTypes: ObjectType[];
   createBlockAfter: (parentBlockId: string | null, afterBlockId: string | null, type: BlockType, extraContent?: Record<string, unknown>) => void;
   updateBlockContent: (blockId: string, content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see toggleChecklistItemSchema and ChecklistBlock.tsx. */

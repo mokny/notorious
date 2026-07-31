@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { EditorContent } from "@tiptap/react";
-import type { BlockType } from "@notorious/shared";
+import type { BlockType, ObjectType } from "@notorious/shared";
 import { useMarkdownEditor } from "./useMarkdownEditor.js";
 
 interface RichTextEditorProps {
@@ -10,7 +10,9 @@ interface RichTextEditorProps {
   onSave: (markdown: string) => Promise<void>;
   onEnter?: () => void;
   onBackspaceEmpty?: () => void;
-  onSlashSelect?: (type: BlockType) => void;
+  onSlashSelect?: (type: BlockType, extraContent?: Record<string, unknown>) => void;
+  /** For the slash menu's per-object-type "create a new X" entries - see SlashCommand.ts. */
+  objectTypes?: ObjectType[];
   /** Focuses this editor once, then calls `onAutoFocused` - used after Enter creates a new block. */
   autoFocus?: boolean;
   onAutoFocused?: () => void;
@@ -33,6 +35,7 @@ export function RichTextEditor({
   onEnter,
   onBackspaceEmpty,
   onSlashSelect,
+  objectTypes,
   autoFocus,
   onAutoFocused,
 }: RichTextEditorProps) {
@@ -67,6 +70,7 @@ export function RichTextEditor({
     onEnter,
     onBackspaceEmpty,
     onSlashSelect,
+    objectTypes,
     onChange: (value) => {
       pendingValueRef.current = value;
       clearTimeout(saveTimeout.current);

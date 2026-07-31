@@ -4,7 +4,7 @@ import type { BlockType } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { BlockItem } from "./BlockItem.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
-import { SLASH_COMMAND_ITEMS } from "./SlashCommand.js";
+import { buildSlashCommandItems } from "./SlashCommand.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -16,10 +16,11 @@ interface BlockListProps {
 
 /** Renders one nesting level's siblings as a sortable list, with an "add block" affordance at the end. */
 export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: BlockListProps) {
-  const { createBlockAfter } = useBlockEditor();
+  const { createBlockAfter, objectTypes } = useBlockEditor();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   useClickOutside(pickerRef, () => setPickerOpen(false), pickerOpen);
+  const items = buildSlashCommandItems(objectTypes);
 
   return (
     <div className="space-y-0.5">
@@ -38,13 +39,20 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
         </button>
         {pickerOpen && (
           <div className="slash-menu absolute left-0 z-20 mt-1">
-            {SLASH_COMMAND_ITEMS.map((item) => (
+            {items.map((item, index) => (
               <button
-                key={item.type}
+                // Object types can share a type/label with each other (never
+                // with the fixed items above them, which all have distinct
+                // `type`s) - index disambiguates without needing every
+                // `SlashCommandItem` to carry its own unique key field.
+                key={`${item.type}-${item.objectTypeId ?? index}`}
                 className="slash-item"
                 onClick={() => {
                   const lastId = blocks[blocks.length - 1]?.id ?? null;
-                  createBlockAfter(parentBlockId, lastId, item.type as BlockType, extraContentForNewBlocks);
+                  const extra = item.objectTypeId
+                    ? { ...extraContentForNewBlocks, objectId: null, pendingObjectTypeId: item.objectTypeId }
+                    : extraContentForNewBlocks;
+                  createBlockAfter(parentBlockId, lastId, item.type as BlockType, extra);
                   setPickerOpen(false);
                 }}
               >

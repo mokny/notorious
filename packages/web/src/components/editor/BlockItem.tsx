@@ -11,6 +11,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
   const {
     workspaceId,
     objectId,
+    objectTypes,
     createBlockAfter,
     updateBlockContent,
     toggleChecklistItem,
@@ -74,7 +75,10 @@ export function BlockItem({ block }: { block: BlockNode }) {
           onToggleChecklistItem={(itemId, checked) => toggleChecklistItem(block.id, itemId, checked)}
           onEnter={() => createBlockAfter(block.parentBlockId, block.id, "paragraph")}
           onBackspaceEmpty={() => deleteBlock(block.id)}
-          onSlashSelect={(type: BlockType) => createBlockAfter(block.parentBlockId, block.id, type)}
+          onSlashSelect={(type: BlockType, extraContent?: Record<string, unknown>) =>
+            createBlockAfter(block.parentBlockId, block.id, type, extraContent)
+          }
+          objectTypes={objectTypes}
           renderColumn={renderColumn}
           toggleChildren={<BlockList blocks={block.children} parentBlockId={block.id} />}
           autoFocus={block.id === pendingFocusBlockId}

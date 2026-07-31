@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { SubObjectContent } from "@notorious/shared";
@@ -168,7 +168,57 @@ function SubObjectPicker({ workspaceId, onPicked }: { workspaceId: string; onPic
   );
 }
 
+/**
+ * Fires the instant it mounts - creates a brand-new object of `objectTypeId`
+ * and links it, no user interaction needed. Exists because the add-block/
+ * slash menu now lists every object type as its own entry (see
+ * `pendingObjectTypeId` on `SubObjectContent` and SlashCommand.ts's
+ * `buildSlashCommandItems`); picking one of those entries creates this block
+ * already "in progress" instead of landing on the interactive
+ * `SubObjectPicker` below. Only ever mounts once per pending block: `onSave`
+ * sets a real `objectId` the moment the object exists, which swaps this out
+ * for `SubObjectRow` for good.
+ */
+function PendingNewSubObject({
+  workspaceId,
+  objectTypeId,
+  onCreated,
+}: {
+  workspaceId: string;
+  objectTypeId: string;
+  onCreated: (objectId: string) => void;
+}) {
+  const hasStarted = useRef(false);
+  const createMutation = useMutation({
+    mutationFn: () => objectApi.create(workspaceId, { objectTypeId, title: "Untitled", values: {} }),
+    onSuccess: (created) => onCreated(created.id),
+  });
+
+  useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+    createMutation.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-2 text-sm text-ink-muted">
+      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+      Creating…
+    </div>
+  );
+}
+
 export function SubObjectBlock({ content, workspaceId, onSave }: SubObjectBlockProps) {
+  if (!content.objectId && content.pendingObjectTypeId) {
+    return (
+      <PendingNewSubObject
+        workspaceId={workspaceId}
+        objectTypeId={content.pendingObjectTypeId}
+        onCreated={(objectId) => onSave({ objectId })}
+      />
+    );
+  }
   if (!content.objectId) {
     return <SubObjectPicker workspaceId={workspaceId} onPicked={(objectId) => onSave({ ...content, objectId })} />;
   }
