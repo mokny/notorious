@@ -144,7 +144,7 @@ export function BlockRenderer({
     case "bookmark":
       return <BookmarkBlock content={content<BookmarkContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
     case "whiteboard":
-      return <WhiteboardBlock content={content<WhiteboardContent>()} onSave={save} />;
+      return <WhiteboardBlock content={content<WhiteboardContent>()} workspaceId={workspaceId} onSave={save} />;
     default:
       return null;
   }

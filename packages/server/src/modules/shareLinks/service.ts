@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { eq, and, isNull } from "drizzle-orm";
-import type { ShareLink, CreateShareLinkInput, WorkspaceRole } from "@notorious/shared";
+import { eq, and, isNull, or, gt } from "drizzle-orm";
+import type { ShareLink, ShareLinkSummary, CreateShareLinkInput, WorkspaceRole } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { shareLinks, objects } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -40,6 +40,41 @@ export async function listShareLinks(workspaceId: string, objectId: string | nul
     .select()
     .from(shareLinks)
     .where(and(eq(shareLinks.workspaceId, workspaceId), scopeCondition));
+}
+
+/**
+ * Every currently-active (non-expired) share link in the workspace, whole-
+ * workspace and per-object alike, newest first - for the Settings page's
+ * consolidated "Public sharing" list (see ShareDialog.tsx's own per-scope
+ * list for the create/manage flow this complements, not replaces). Deleted
+ * outright rather than soft-expired (see `revokeShareLink`), so "active"
+ * here just means "not past its own `expiresAt`" - an expired-but-not-yet-
+ * revoked row is filtered out rather than shown as stale.
+ */
+export async function listActiveShareLinksForWorkspace(workspaceId: string): Promise<ShareLinkSummary[]> {
+  const rows = await db
+    .select({
+      id: shareLinks.id,
+      workspaceId: shareLinks.workspaceId,
+      objectId: shareLinks.objectId,
+      token: shareLinks.token,
+      role: shareLinks.role,
+      expiresAt: shareLinks.expiresAt,
+      createdBy: shareLinks.createdBy,
+      createdAt: shareLinks.createdAt,
+      objectTitle: objects.title,
+    })
+    .from(shareLinks)
+    .leftJoin(objects, eq(shareLinks.objectId, objects.id))
+    .where(
+      and(
+        eq(shareLinks.workspaceId, workspaceId),
+        or(isNull(shareLinks.expiresAt), gt(shareLinks.expiresAt, nowIso())),
+      ),
+    )
+    .orderBy(shareLinks.createdAt);
+
+  return rows.map((row) => ({ ...row, objectTitle: row.objectId ? (row.objectTitle ?? "Untitled") : null }));
 }
 
 export async function revokeShareLink(workspaceId: string, id: string): Promise<void> {

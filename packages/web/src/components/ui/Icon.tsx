@@ -49,6 +49,9 @@ import {
   Terminal,
   Palette,
   ShieldCheck,
+  Maximize2,
+  Minimize2,
+  Presentation,
   type LucideIcon,
 } from "lucide-react";
 
@@ -101,6 +104,9 @@ const ICONS: Record<string, LucideIcon> = {
   terminal: Terminal,
   palette: Palette,
   shield: ShieldCheck,
+  maximize: Maximize2,
+  minimize: Minimize2,
+  presentation: Presentation,
 };
 
 function isImageUrl(value: string): boolean {

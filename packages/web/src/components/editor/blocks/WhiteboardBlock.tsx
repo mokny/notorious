@@ -1,8 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { ExcalidrawImperativeAPI, ExcalidrawProps } from "@excalidraw/excalidraw/types";
 import type { ImportedDataState } from "@excalidraw/excalidraw/data/types";
 import type { WhiteboardContent } from "@notorious/shared";
 import { useTheme } from "../../../context/ThemeContext.js";
+import { useAuth } from "../../../context/AuthContext.js";
+import { workspaceApi } from "../../../lib/api/resources.js";
+import { Icon } from "../../ui/Icon.js";
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -36,12 +40,28 @@ function parseInitialData(sceneJson: string | undefined): ImportedDataState | nu
 
 export function WhiteboardBlock({
   content: externalContent,
+  workspaceId,
   onSave,
 }: {
   content: WhiteboardContent;
+  workspaceId: string;
   onSave: (c: WhiteboardContent) => Promise<void>;
 }) {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  // Same query key ObjectDetailPage.tsx/WorkspaceLayout.tsx already use for
+  // this workspace - reads from their cache instead of an extra fetch.
+  const { data: workspace } = useQuery({ queryKey: ["workspace", workspaceId], queryFn: () => workspaceApi.get(workspaceId) });
+  const isOwner = Boolean(workspace && user && workspace.ownerId === user.id);
+  // Read straight from the reactive `content` prop, not the drawing-only
+  // `contentRef` below (which is deliberately non-reactive to avoid a
+  // render loop - see its own doc comment) - a collaborator starting/
+  // stopping a presentation needs to flip everyone else's view mode the
+  // moment that update arrives, the same as any other synced field.
+  const presenting = externalContent.presenting ?? false;
+  // Purely local - which browser tab has this whiteboard enlarged is not
+  // shared state, unlike `presenting`.
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   /**
    * Deliberately NOT `useDebouncedSave` (used by every other block type):
@@ -159,12 +179,57 @@ export function WhiteboardBlock({
     });
   }, [externalContent]);
 
+  // Deliberately based on the current `externalContent` prop, not the
+  // drawing-only `contentRef` (which only tracks `sceneJson` changes - see
+  // the remote-apply effect above skipping this exact update when only
+  // `presenting` changed). A rare, discrete click, not the hot drawing path,
+  // so there's no reason to route it through that ref/debounce machinery.
+  async function togglePresenting(): Promise<void> {
+    await onSaveRef.current({ ...externalContent, presenting: !presenting });
+  }
+
   return (
-    <div className="h-[600px] w-full overflow-hidden rounded-lg border border-border">
+    <div className={isFullscreen ? "fixed inset-0 z-50 bg-surface" : "relative h-[600px] w-full overflow-hidden rounded-lg border border-border"}>
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-md border border-border bg-surface-raised/90 p-1 shadow-sm backdrop-blur-sm">
+        {presenting && !isOwner && (
+          <span className="flex items-center gap-1 px-1.5 text-xs text-accent">
+            <Icon name="presentation" className="h-3.5 w-3.5" /> Presenting
+          </span>
+        )}
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => void togglePresenting()}
+            title={presenting ? "Stop presenting - everyone can draw again" : "Start presenting - only you can draw while this is on"}
+            className={`flex items-center gap-1 rounded p-1.5 text-xs ${
+              presenting ? "bg-accent/10 text-accent" : "text-ink-muted hover:bg-surface hover:text-ink"
+            }`}
+          >
+            <Icon name="presentation" className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setIsFullscreen((v) => !v)}
+          title={isFullscreen ? "Exit fullscreen" : "Fill the browser window"}
+          // A personal view preference, not shared content - stays usable
+          // even while the object is locked (see readOnlyContent.ts).
+          data-view-toggle
+          className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
+        >
+          <Icon name={isFullscreen ? "minimize" : "maximize"} className="h-3.5 w-3.5" />
+        </button>
+      </div>
       <Suspense
         fallback={<div className="flex h-full items-center justify-center text-sm text-ink-muted">Loading whiteboard…</div>}
       >
-        <ExcalidrawLazy initialData={initialDataArg} onChange={handleChange} theme={theme} excalidrawAPI={onExcalidrawApi} />
+        <ExcalidrawLazy
+          initialData={initialDataArg}
+          onChange={handleChange}
+          theme={theme}
+          excalidrawAPI={onExcalidrawApi}
+          viewModeEnabled={presenting && !isOwner}
+        />
       </Suspense>
     </div>
   );

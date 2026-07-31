@@ -30,6 +30,17 @@ export async function registerShareLinkRoutes(app: FastifyInstance): Promise<voi
     return shareLinkService.listShareLinks(workspaceId, objectId ?? null);
   });
 
+  // Owner-only: every active share in the workspace at once (whole-workspace
+  // and per-object alike), for Settings' consolidated list - a plain member
+  // with editor access to one object shouldn't see every other object's
+  // share links too, unlike the scoped listing above.
+  app.get("/api/v1/workspaces/:workspaceId/share-links/all", async (request) => {
+    const user = requireUser(request);
+    const { workspaceId } = request.params as { workspaceId: string };
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    return shareLinkService.listActiveShareLinksForWorkspace(workspaceId);
+  });
+
   app.delete("/api/v1/workspaces/:workspaceId/share-links/:id", async (request, reply) => {
     const user = requireUser(request);
     const { workspaceId, id } = request.params as { workspaceId: string; id: string };

@@ -13,6 +13,7 @@ import { NotificationSettings } from "../components/NotificationSettings.js";
 import { ApiKeysSettings } from "../components/ApiKeysSettings.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { ShareDialog } from "../components/ShareDialog.js";
+import { ActiveShareLinksList } from "../components/ActiveShareLinksList.js";
 
 const ROLES = ["viewer", "commenter", "editor"] as const;
 
@@ -221,6 +222,11 @@ export function SettingsPage() {
           <div className="mt-4">
             <ShareDialog workspaceId={workspaceId!} objectId={null} label="Share workspace" />
           </div>
+
+          <p className="mt-6 text-xs font-medium uppercase tracking-wide text-ink-muted">
+            Active share links (workspace and individual objects)
+          </p>
+          <ActiveShareLinksList workspaceId={workspaceId!} />
         </section>
       )}
 

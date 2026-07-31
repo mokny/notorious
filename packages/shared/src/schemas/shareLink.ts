@@ -20,6 +20,11 @@ export interface ShareLink {
   createdAt: string;
 }
 
+/** A `ShareLink` plus enough context to label it in a consolidated, cross-object list (see Settings' "Public sharing" section) - `objectTitle` is null for a whole-workspace share, the target object's title otherwise. */
+export interface ShareLinkSummary extends ShareLink {
+  objectTitle: string | null;
+}
+
 /** What an anonymous visitor following a share link gets back to bootstrap the public view. */
 export interface ResolvedShareLink {
   role: WorkspaceRole;

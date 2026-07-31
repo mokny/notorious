@@ -111,4 +111,6 @@ export interface BookmarkContent {
  */
 export interface WhiteboardContent {
   sceneJson?: string;
+  /** Presentation mode - while true, only the workspace owner can draw/edit; everyone else gets a live, view-only canvas (still pans/zooms, still sees updates in real time). Toggled by WhiteboardBlock.tsx, persisted like any other content field so it's in sync for every viewer. */
+  presenting?: boolean;
 }

@@ -38,6 +38,7 @@ import type {
   CreatedApiKey,
   CreateApiKeyInput,
   ShareLink,
+  ShareLinkSummary,
   CreateShareLinkInput,
   ResolvedShareLink,
   UpdateObjectScriptInput,
@@ -250,6 +251,8 @@ export const systemApi = {
 export const shareLinkApi = {
   list: (workspaceId: string, objectId: string | null) =>
     apiRequest<ShareLink[]>(`/api/v1/workspaces/${workspaceId}/share-links`, { query: { objectId: objectId ?? undefined } }),
+  /** Owner-only: every active share in the workspace at once - see SettingsPage.tsx's "Public sharing" list. */
+  listAll: (workspaceId: string) => apiRequest<ShareLinkSummary[]>(`/api/v1/workspaces/${workspaceId}/share-links/all`),
   create: (workspaceId: string, input: CreateShareLinkInput) =>
     apiRequest<ShareLink>(`/api/v1/workspaces/${workspaceId}/share-links`, { method: "POST", body: input }),
   revoke: (workspaceId: string, id: string) =>
