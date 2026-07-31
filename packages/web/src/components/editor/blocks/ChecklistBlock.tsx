@@ -194,7 +194,16 @@ export function ChecklistBlock({
           ))}
         </SortableContext>
       </DndContext>
-      <button onClick={addItem} className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent">
+      <button
+        onClick={addItem}
+        // Hidden (not just disabled) in read-only/locked content - see
+        // globals.css's `[data-lock-hide]` rule. Unlike the per-item drag
+        // handle/remove button above, this one isn't hover-revealed, so it
+        // isn't already covered by that rule's `group-hover`/`opacity-100`
+        // matching.
+        data-lock-hide
+        className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent"
+      >
         <Icon name="plus" className="h-3 w-3" /> Add item
       </button>
     </div>

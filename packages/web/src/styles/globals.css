@@ -81,3 +81,16 @@ body {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* Same idea as the hover-reveal rule above, for edit controls that are
+   always visible rather than hover-revealed (e.g. a checklist's "+ Add
+   item" - see ChecklistBlock.tsx) - `[&_button]:pointer-events-none`
+   already made these inert in read-only/locked content, but left them
+   looking exactly as clickable as normal, unlike every other edit
+   affordance the rule above actually hides. Marked explicitly with
+   `data-lock-hide` rather than caught by a blanket selector, since unlike
+   the hover-reveal controls above there's no shared class convention to
+   match against. */
+.locked-content [data-lock-hide] {
+  display: none;
+}
