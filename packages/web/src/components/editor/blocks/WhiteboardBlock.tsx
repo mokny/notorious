@@ -179,13 +179,24 @@ export function WhiteboardBlock({
     });
   }, [externalContent]);
 
-  // Deliberately based on the current `externalContent` prop, not the
-  // drawing-only `contentRef` (which only tracks `sceneJson` changes - see
-  // the remote-apply effect above skipping this exact update when only
-  // `presenting` changed). A rare, discrete click, not the hot drawing path,
-  // so there's no reason to route it through that ref/debounce machinery.
-  async function togglePresenting(): Promise<void> {
-    await onSaveRef.current({ ...externalContent, presenting: !presenting });
+  /**
+   * Routed through the same `contentRef`/`pendingRef` pipeline `onChangeImpl`
+   * uses, not a separate direct `onSave` call - a save already queued from
+   * drawing (debounced up to `SAVE_DEBOUNCE_MS`) still holds whatever
+   * `presenting` value was true *when that stroke was drawn*, baked in by
+   * `onChangeImpl`'s `{ ...contentRef.current, sceneJson }` spread. If this
+   * toggle saved independently, that stale queued save would land *after*
+   * it and silently flip `presenting` back - exactly the "turns itself back
+   * on shortly after I disabled it" bug. Folding the new value into the same
+   * pending value (and flushing immediately, ahead of the debounce timer)
+   * keeps there being only one, always-current save in flight/queued.
+   */
+  function togglePresenting(): void {
+    const next = { ...(pendingRef.current ?? contentRef.current), presenting: !presenting };
+    contentRef.current = next;
+    pendingRef.current = next;
+    clearTimeout(saveTimeout.current);
+    flush();
   }
 
   return (
@@ -199,7 +210,7 @@ export function WhiteboardBlock({
         {isOwner && (
           <button
             type="button"
-            onClick={() => void togglePresenting()}
+            onClick={togglePresenting}
             title={presenting ? "Stop presenting - everyone can draw again" : "Start presenting - only you can draw while this is on"}
             className={`flex items-center gap-1 rounded p-1.5 text-xs ${
               presenting ? "bg-accent/10 text-accent" : "text-ink-muted hover:bg-surface hover:text-ink"
