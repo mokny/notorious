@@ -17,17 +17,34 @@ interface SubObjectBlockProps {
   onSave: (content: SubObjectContent) => Promise<void>;
 }
 
-/** One row in the recursively-expandable sub-object outline - shows an object's title/icon, and (if it has its own sub-objects) a chevron that reveals them, indented, at any depth. */
+/**
+ * One row in the recursively-expandable sub-object outline - shows an
+ * object's title/icon, and (if it has its own sub-objects) a chevron that
+ * reveals them, indented, at any depth.
+ *
+ * Only the root row (depth 0 - the block itself, before anyone expands it)
+ * gets the bigger/bold/bordered "card" treatment: it's what makes a
+ * sub-object block visually distinct from a plain link at a glance. Nested
+ * rows shown after expanding stay at the original compact size - giving
+ * every depth the same heavy styling would make a several-levels-deep
+ * outline look like a stack of cards instead of a tree.
+ */
 function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; objectId: string; depth: number }) {
   const [expanded, setExpanded] = useState(false);
   const { title, icon } = useObjectTitle(workspaceId, objectId);
   const { data: object } = useQuery({ queryKey: ["object", objectId], queryFn: () => objectApi.get(objectId) });
   const childIds = Array.isArray(object?.values.sub_objects) ? object.values.sub_objects : [];
   const hasChildren = childIds.length > 0;
+  const isRoot = depth === 0;
 
   return (
     <div>
-      <div className="flex items-center gap-1 rounded-md py-1 pr-1 hover:bg-surface-raised" style={{ paddingLeft: depth * 20 }}>
+      <div
+        className={`flex items-center rounded-md hover:bg-surface-raised ${
+          isRoot ? "gap-1.5 rounded-lg border border-border p-2" : "gap-1 py-1 pr-1"
+        }`}
+        style={isRoot ? undefined : { paddingLeft: depth * 20 }}
+      >
         <button
           onClick={() => setExpanded((v) => !v)}
           className={`shrink-0 rounded p-0.5 text-ink-muted hover:text-ink ${hasChildren ? "" : "invisible"}`}
@@ -35,9 +52,9 @@ function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; o
         >
           <Icon name={expanded ? "chevron-down" : "chevron-right"} className="h-3.5 w-3.5" />
         </button>
-        <Link to={objectHref(workspaceId, objectId)} className="flex min-w-0 flex-1 items-center gap-1.5 hover:underline">
-          <Icon name={icon} className="h-4 w-4 shrink-0 text-ink-muted" />
-          <span className="truncate text-sm">{title}</span>
+        <Link to={objectHref(workspaceId, objectId)} className={`flex min-w-0 flex-1 items-center hover:underline ${isRoot ? "gap-2" : "gap-1.5"}`}>
+          <Icon name={icon} className={`shrink-0 text-ink-muted ${isRoot ? "h-5 w-5" : "h-4 w-4"}`} />
+          <span className={`truncate ${isRoot ? "text-base font-semibold" : "text-sm"}`}>{title}</span>
         </Link>
       </div>
       {expanded && hasChildren && (

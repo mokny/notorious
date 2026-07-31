@@ -77,7 +77,15 @@ function ChecklistItemRow({
       />
       <button
         onClick={onRemove}
-        className="mt-1 hidden shrink-0 rounded p-0.5 text-ink-muted hover:bg-surface hover:text-red-500 group-hover/checklistitem:block"
+        // `opacity-0`, not `hidden` (its pre-drag-and-drop original state):
+        // `hidden` removes it from layout entirely, so the textarea's
+        // `flex-1` width recalculates the instant it appears/disappears on
+        // hover - exactly the kind of end-of-line text reflow ("jumping")
+        // that's disorienting to read mid-hover. Reserving its space and
+        // just fading it in matches the drag handle above and every other
+        // hover-reveal control in the editor (see BlockItem.tsx's own
+        // delete button).
+        className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover/checklistitem:opacity-100"
       >
         <Icon name="close" className="h-3.5 w-3.5" />
       </button>
