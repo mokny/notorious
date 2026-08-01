@@ -9,7 +9,7 @@ rendered instead, read-only.
 
 ```
 {% set total = 0 %}
-{% for row in table.rows %}{% set total = total + (row[0] | int) %}{% endfor %}
+{% for row in blocks.prices.rows %}{% set total = total + (row[0] | int) %}{% endfor %}
 **Total: {{ total }}**
 ```
 
@@ -37,6 +37,55 @@ instead of needing to fit in one.
 `{{ value | filter }}` or `{{ value | filter(arg) }}`: `upper`, `lower`, `trim`, `capitalize`,
 `length`, `default(fallback)`, `round(digits)`, `abs`, `int`, `float`, `string`, `first`, `last`,
 `join(sep)`, `sort`, `reverse`, `truncate(n)`.
+
+## Examples
+
+**Table total, spread across two blocks** (a table block with id `prices`, followed by a
+paragraph below it - this is the same idea as the quick example at the top, just laid out the way
+you'd actually type it as two separate blocks)
+
+Table block (id `prices`):
+
+| Item | Cost |
+| --- | --- |
+| Hosting | 12 |
+| Domain | 9 |
+
+Paragraph block right below it:
+```
+{% set total = 0 %}
+{% for row in blocks.prices.rows %}{% set total = total + (row[1] | int) %}{% endfor %}
+**Total: {{ total }} $**
+```
+
+**Checklist progress, written into a paragraph below it** (checklist block with id `tasks`)
+```
+{{ blocks.tasks.checked_count }} / {{ blocks.tasks.total_count }} done
+{% if blocks.tasks.checked_count == blocks.tasks.total_count %}🎉 All done!{% endif %}
+```
+
+**Conditional text based on a property value**
+```
+{% if object.properties.status == "done" %}✅ Finished{% elif object.properties.status == "blocked" %}🚧 Blocked{% else %}⏳ In progress{% endif %}
+```
+
+**Pulling in another object's data** (a Project object with id `website_relaunch`, referenced
+from a task that belongs to it)
+```
+Part of {{ objects.website_relaunch.title }} (owner: {{ objects.website_relaunch.properties.owner | default("unassigned") }})
+```
+
+**Filters, chained**
+```
+{{ object.title | trim | upper }}
+{{ object.properties.tags | join(", ") }}
+{{ object.properties.description | default("No description yet") | truncate(80) }}
+```
+
+**A comment left for whoever edits this next** - never shown, not even in Preview
+```
+{# TODO: once the "priority" property exists, sort this list by it instead #}
+```
 
 ## How rendering works
 
