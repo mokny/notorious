@@ -158,10 +158,17 @@ export function Icon({ name, className, style }: { name: string; className?: str
 
   const Component = ICONS[name];
   if (!Component) {
+    // An emoji/custom-text icon's glyph is sized by `font-size`, unlike
+    // every other branch above (an SVG or `<img>`, both sized by
+    // `width`/`height` alone) - `text-base` is a fixed 1rem otherwise, so
+    // passing a bigger box via `style.width` (see IconPicker.tsx/
+    // ObjectDetailPage.tsx, which scale this to match a cover's title text)
+    // would grow the box without growing what's actually drawn inside it.
+    const fontSize = typeof style?.width === "number" ? style.width : undefined;
     return (
       <span
-        className={`${className ?? "h-4 w-4"} inline-flex shrink-0 items-center justify-center text-base leading-none`}
-        style={style}
+        className={`${className ?? "h-4 w-4"} inline-flex shrink-0 items-center justify-center ${fontSize ? "" : "text-base"} leading-none`}
+        style={{ ...style, ...(fontSize ? { fontSize } : {}) }}
       >
         {name}
       </span>
