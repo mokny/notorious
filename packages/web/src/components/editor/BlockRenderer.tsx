@@ -93,6 +93,7 @@ export function BlockRenderer({
     case "paragraph":
       return (
         <ParagraphBlock
+          blockId={block.id}
           content={content<ParagraphContent>()}
           onSave={save}
           onEnter={onEnter}
@@ -104,15 +105,15 @@ export function BlockRenderer({
         />
       );
     case "heading":
-      return <HeadingBlock content={content<HeadingContent>()} onSave={save} onEnter={onEnter} onBackspaceEmpty={onBackspaceEmpty} />;
+      return <HeadingBlock blockId={block.id} content={content<HeadingContent>()} onSave={save} onEnter={onEnter} onBackspaceEmpty={onBackspaceEmpty} />;
     case "quote":
-      return <QuoteBlock content={content<QuoteContent>()} onSave={save} onEnter={onEnter} />;
+      return <QuoteBlock blockId={block.id} content={content<QuoteContent>()} onSave={save} onEnter={onEnter} />;
     case "callout":
-      return <CalloutBlock content={content<CalloutContent>()} onSave={save} onEnter={onEnter} />;
+      return <CalloutBlock blockId={block.id} content={content<CalloutContent>()} onSave={save} onEnter={onEnter} />;
     case "checklist":
-      return <ChecklistBlock content={content<ChecklistContent>()} onSave={save} onToggleItem={onToggleChecklistItem} />;
+      return <ChecklistBlock blockId={block.id} content={content<ChecklistContent>()} onSave={save} onToggleItem={onToggleChecklistItem} />;
     case "table":
-      return <TableBlock content={content<TableContent>()} onSave={save} />;
+      return <TableBlock blockId={block.id} content={content<TableContent>()} onSave={save} />;
     case "code":
       return <CodeBlock content={content<CodeContent>()} onSave={save} />;
     case "image":
@@ -127,7 +128,7 @@ export function BlockRenderer({
       return <MermaidBlock content={content<MermaidContent>()} onSave={save} />;
     case "toggle":
       return (
-        <ToggleBlock content={content<ToggleContent>()} onSave={save}>
+        <ToggleBlock blockId={block.id} content={content<ToggleContent>()} onSave={save}>
           {toggleChildren}
         </ToggleBlock>
       );

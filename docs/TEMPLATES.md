@@ -3,9 +3,11 @@
 Paragraph, heading, quote, callout, toggle-summary, checklist and table text can contain template
 code, in the same style as Home Assistant's templating: `{{ expr }}` computes an expression and
 outputs the result, `{% stmt %}` runs logic without outputting anything itself (`set`, `if`, `for`),
-and `{# comment #}` is stripped and never shown. The raw `{{ }}`/`{% %}` source is always what you
-edit - click **Preview** (the eye icon next to Lock/Share at the top of an object) to see it
-rendered instead, read-only.
+and `{# comment #}` is stripped and never shown. Rendering happens inline, per field: while you're
+typing in a field, you see and edit its raw `{{ }}`/`{% %}` source; the moment it loses focus, it
+shows the rendered result instead - click back into it to see and edit the source again. A locked
+object or a shared read-only page always shows the rendered result, since there's no editing to
+switch back to.
 
 ```
 {% set total = 0 %}
@@ -82,7 +84,7 @@ Part of {{ objects.website_relaunch.title }} (owner: {{ objects.website_relaunch
 {{ object.properties.description | default("No description yet") | truncate(80) }}
 ```
 
-**A comment left for whoever edits this next** - never shown, not even in Preview
+**A comment left for whoever edits this next** - never shown, not even in the rendered result
 ```
 {# TODO: once the "priority" property exists, sort this list by it instead #}
 ```
@@ -110,5 +112,5 @@ viewing the page (a real workspace member's role, or exactly what an anonymous s
 a template can never surface data its viewer couldn't already see through the normal UI.
 
 Output is inserted as plain text into the same Markdown pipeline every block already uses (which
-never interprets raw HTML) - previewing a template introduces no new risk beyond what any user
+never interprets raw HTML) - rendering a template introduces no new risk beyond what any user
 typing Markdown directly could already do.

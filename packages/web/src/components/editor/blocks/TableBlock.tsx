@@ -1,12 +1,67 @@
+import { useRef } from "react";
 import type { TableContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
+import { useTemplatableField } from "../useTemplatableField.js";
+
+/** One column header or cell - see ChecklistBlock.tsx's identical rendered/editing split for why this isn't just an `<input>`. */
+function TableCellInput({
+  blockId,
+  field,
+  value,
+  onChange,
+  readOnly,
+  className,
+}: {
+  blockId: string;
+  field: string;
+  value: string;
+  onChange: (value: string) => void;
+  readOnly: boolean;
+  className: string;
+}) {
+  const { rendered, showRendered, startEditing, stopEditing } = useTemplatableField(blockId, field);
+  const focusOnEditRef = useRef(false);
+
+  if (showRendered) {
+    return (
+      <div
+        onClick={() => {
+          focusOnEditRef.current = true;
+          startEditing();
+        }}
+        className={`${className} ${readOnly ? "" : "cursor-text"}`}
+      >
+        {rendered || " "}
+      </div>
+    );
+  }
+
+  return (
+    <input
+      ref={(el) => {
+        if (el && focusOnEditRef.current) {
+          el.focus();
+          focusOnEditRef.current = false;
+        }
+      }}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={stopEditing}
+      readOnly={readOnly}
+      autoComplete="off"
+      className={className}
+    />
+  );
+}
 
 export function TableBlock({
+  blockId,
   content: externalContent,
   onSave,
 }: {
+  blockId: string;
   content: TableContent;
   onSave: (c: TableContent) => Promise<void>;
 }) {
@@ -49,11 +104,12 @@ export function TableBlock({
           <tr>
             {columns.map((column, index) => (
               <th key={index} className="border-b border-border bg-surface-raised p-1.5 text-left">
-                <input
+                <TableCellInput
+                  blockId={blockId}
+                  field={`columns.${index}`}
                   value={column}
-                  onChange={(e) => setColumn(index, e.target.value)}
+                  onChange={(value) => setColumn(index, value)}
                   readOnly={readOnly}
-                  autoComplete="off"
                   className="w-full border-none bg-transparent font-medium outline-none"
                 />
               </th>
@@ -70,11 +126,12 @@ export function TableBlock({
             <tr key={rowIndex}>
               {columns.map((_, colIndex) => (
                 <td key={colIndex} className="border-b border-border p-1.5">
-                  <input
+                  <TableCellInput
+                    blockId={blockId}
+                    field={`rows.${rowIndex}.${colIndex}`}
                     value={row[colIndex] ?? ""}
-                    onChange={(e) => setCell(rowIndex, colIndex, e.target.value)}
+                    onChange={(value) => setCell(rowIndex, colIndex, value)}
                     readOnly={readOnly}
-                    autoComplete="off"
                     className="w-full border-none bg-transparent outline-none"
                   />
                 </td>

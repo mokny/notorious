@@ -1,7 +1,6 @@
 import type { HeadingContent } from "@notorious/shared";
-import { RichTextEditor } from "../RichTextEditor.js";
+import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 import { useFocusWithin } from "../../../hooks/useFocusWithin.js";
-import { useBlockEditor } from "../BlockEditorContext.js";
 
 const SIZE_CLASS: Record<1 | 2 | 3, string> = {
   1: "text-2xl font-semibold",
@@ -10,15 +9,15 @@ const SIZE_CLASS: Record<1 | 2 | 3, string> = {
 };
 
 interface HeadingBlockProps {
+  blockId: string;
   content: HeadingContent;
   onSave: (content: HeadingContent) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
 }
 
-export function HeadingBlock({ content, onSave, onEnter, onBackspaceEmpty }: HeadingBlockProps) {
+export function HeadingBlock({ blockId, content, onSave, onEnter, onBackspaceEmpty }: HeadingBlockProps) {
   const { isFocused, handlers } = useFocusWithin();
-  const { readOnly } = useBlockEditor();
 
   return (
     <div className={SIZE_CLASS[content.level]}>
@@ -37,14 +36,15 @@ export function HeadingBlock({ content, onSave, onEnter, onBackspaceEmpty }: Hea
             <option value={3}>H3</option>
           </select>
         )}
-        <RichTextEditor
+        <TemplatableMarkdown
+          blockId={blockId}
+          field="markdown"
           markdown={content.markdown ?? ""}
           className="tiptap flex-1"
           placeholder="Heading"
           onSave={(markdown) => onSave({ ...content, markdown })}
           onEnter={onEnter}
           onBackspaceEmpty={onBackspaceEmpty}
-          editable={!readOnly}
         />
       </div>
     </div>

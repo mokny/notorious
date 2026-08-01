@@ -16,6 +16,8 @@ interface UseMarkdownEditorOptions {
   onSlashSelect?: (type: BlockType, extraContent?: Record<string, unknown>) => void;
   /** For the slash menu's per-object-type "create a new X" entries - see SlashCommand.ts. */
   objectTypes?: ObjectType[];
+  /** Fired when this editor loses focus - see TemplatableMarkdown.tsx, which uses it to switch a templated field back to its rendered display. */
+  onBlur?: () => void;
   /**
    * Defaults to true. Set to false for a locked object/embedded preview
    * (see BlockEditorContext.tsx's `readOnly`) - TipTap then blocks edits at
@@ -53,6 +55,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   const onEnterRef = useRef(options.onEnter);
   const onBackspaceEmptyRef = useRef(options.onBackspaceEmpty);
   const onSlashSelectRef = useRef(options.onSlashSelect);
+  const onBlurRef = useRef(options.onBlur);
   // Read fresh (not closed over) inside `onUpdate` below - toggling editable
   // off doesn't recreate the editor, so a stale closure here would keep
   // whatever `editable` was true at creation time.
@@ -67,6 +70,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   onEnterRef.current = options.onEnter;
   onBackspaceEmptyRef.current = options.onBackspaceEmpty;
   onSlashSelectRef.current = options.onSlashSelect;
+  onBlurRef.current = options.onBlur;
   objectTypesRef.current = options.objectTypes ?? [];
 
   const hasSlashCommand = Boolean(options.onSlashSelect);
@@ -131,6 +135,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       const storage = updatedEditor.storage as { markdown: { getMarkdown: () => string } };
       onChangeRef.current?.(storage.markdown.getMarkdown().trim());
     },
+    onBlur: () => onBlurRef.current?.(),
   });
 
   // `editable` above only seeds the editor once, on creation (same caveat

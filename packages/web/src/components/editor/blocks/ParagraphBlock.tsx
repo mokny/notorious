@@ -1,8 +1,8 @@
 import type { BlockType, ObjectType, ParagraphContent } from "@notorious/shared";
-import { RichTextEditor } from "../RichTextEditor.js";
-import { useBlockEditor } from "../BlockEditorContext.js";
+import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 
 interface ParagraphBlockProps {
+  blockId: string;
   content: ParagraphContent;
   onSave: (content: ParagraphContent) => Promise<void>;
   onEnter: () => void;
@@ -14,6 +14,7 @@ interface ParagraphBlockProps {
 }
 
 export function ParagraphBlock({
+  blockId,
   content,
   onSave,
   onEnter,
@@ -23,9 +24,10 @@ export function ParagraphBlock({
   autoFocus,
   onAutoFocused,
 }: ParagraphBlockProps) {
-  const { readOnly } = useBlockEditor();
   return (
-    <RichTextEditor
+    <TemplatableMarkdown
+      blockId={blockId}
+      field="markdown"
       markdown={content.markdown ?? ""}
       className="tiptap prose-p:my-0 text-sm leading-relaxed"
       onSave={(markdown) => onSave({ ...content, markdown })}
@@ -35,7 +37,6 @@ export function ParagraphBlock({
       objectTypes={objectTypes}
       autoFocus={autoFocus}
       onAutoFocused={onAutoFocused}
-      editable={!readOnly}
     />
   );
 }

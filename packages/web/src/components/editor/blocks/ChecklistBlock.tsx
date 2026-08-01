@@ -7,6 +7,7 @@ import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { randomId } from "../../../lib/randomId.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
+import { useTemplatableField } from "../useTemplatableField.js";
 
 /** Grows a textarea to fit its (possibly wrapped, no literal newlines) content instead of scrolling/clipping it - reset to "auto" first so it can shrink back down too, not just grow. */
 function resizeTextarea(el: HTMLTextAreaElement | null): void {
@@ -22,6 +23,8 @@ function withIds(items: ChecklistItem[]): ChecklistItem[] {
 
 function ChecklistItemRow({
   sortableId,
+  blockId,
+  field,
   item,
   onToggle,
   onToggleItem,
@@ -32,6 +35,9 @@ function ChecklistItemRow({
   readOnly,
 }: {
   sortableId: string;
+  /** This item's owning block id and its key in `renderedBlocks` (`items.<index>` - see modules/templates/renderer.ts and useTemplatableField.ts). */
+  blockId: string;
+  field: string;
   item: ChecklistItem;
   onToggle: (checked: boolean) => void;
   /** Exempt-from-lock path (see ChecklistBlock's own doc comment) - used instead of `onToggle` whenever the item has a stable id to address. */
@@ -46,6 +52,12 @@ function ChecklistItemRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   const canToggleWhileLocked = Boolean(item.id && onToggleItem);
+  const { rendered, showRendered, startEditing, stopEditing } = useTemplatableField(blockId, field);
+  // Only autofocus the textarea after the *user* clicked the rendered text
+  // to start editing it - not on every mount, which would otherwise steal
+  // focus from whatever else is on the page whenever a templated item first
+  // renders in its rendered state.
+  const focusOnEditRef = useRef(false);
 
   return (
     <div ref={setNodeRef} style={style} className="group/checklistitem flex items-start gap-1">
@@ -73,27 +85,46 @@ function ChecklistItemRow({
         {...(canToggleWhileLocked ? { "data-lock-exempt": "" } : {})}
         className="mt-1 h-4 w-4 shrink-0 accent-accent"
       />
-      <textarea
-        ref={registerInputRef}
-        value={item.markdown}
-        onChange={(e) => {
-          onChangeText(e.target.value);
-          resizeTextarea(e.target);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            onEnter();
-          }
-        }}
-        readOnly={readOnly}
-        placeholder="To-do"
-        autoComplete="off"
-        rows={1}
-        className={`flex-1 resize-none overflow-hidden border-none bg-transparent py-0.5 text-sm outline-none ${
-          item.checked ? "text-ink-muted line-through" : ""
-        }`}
-      />
+      {showRendered ? (
+        <div
+          onClick={() => {
+            focusOnEditRef.current = true;
+            startEditing();
+          }}
+          className={`flex-1 py-0.5 text-sm ${readOnly ? "" : "cursor-text"} ${item.checked ? "text-ink-muted line-through" : ""}`}
+        >
+          {rendered || " "}
+        </div>
+      ) : (
+        <textarea
+          ref={(el) => {
+            registerInputRef(el);
+            if (el && focusOnEditRef.current) {
+              el.focus();
+              focusOnEditRef.current = false;
+            }
+          }}
+          value={item.markdown}
+          onChange={(e) => {
+            onChangeText(e.target.value);
+            resizeTextarea(e.target);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onEnter();
+            }
+          }}
+          onBlur={stopEditing}
+          readOnly={readOnly}
+          placeholder="To-do"
+          autoComplete="off"
+          rows={1}
+          className={`flex-1 resize-none overflow-hidden border-none bg-transparent py-0.5 text-sm outline-none ${
+            item.checked ? "text-ink-muted line-through" : ""
+          }`}
+        />
+      )}
       <button
         onClick={onRemove}
         // `opacity-0`, not `hidden` (its pre-drag-and-drop original state):
@@ -113,10 +144,12 @@ function ChecklistItemRow({
 }
 
 export function ChecklistBlock({
+  blockId,
   content: externalContent,
   onSave,
   onToggleItem,
 }: {
+  blockId: string;
   content: ChecklistContent;
   onSave: (c: ChecklistContent) => Promise<void>;
   /** Exempt-from-lock path for checking an item off - see toggleChecklistItemSchema. */
@@ -186,6 +219,8 @@ export function ChecklistBlock({
             <ChecklistItemRow
               key={item.id ?? index}
               sortableId={item.id ?? `unindexed-${index}`}
+              blockId={blockId}
+              field={`items.${index}`}
               item={item}
               onToggle={(checked) => updateItem(index, { checked })}
               onToggleItem={onToggleItem}

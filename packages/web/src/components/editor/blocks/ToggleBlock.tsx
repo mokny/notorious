@@ -1,18 +1,17 @@
 import { useState, type ReactNode } from "react";
 import type { ToggleContent } from "@notorious/shared";
-import { RichTextEditor } from "../RichTextEditor.js";
+import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 import { Icon } from "../../ui/Icon.js";
-import { useBlockEditor } from "../BlockEditorContext.js";
 
 interface ToggleBlockProps {
+  blockId: string;
   content: ToggleContent;
   onSave: (content: ToggleContent) => Promise<void>;
   children: ReactNode;
 }
 
-export function ToggleBlock({ content, onSave, children }: ToggleBlockProps) {
+export function ToggleBlock({ blockId, content, onSave, children }: ToggleBlockProps) {
   const [open, setOpen] = useState(true);
-  const { readOnly } = useBlockEditor();
 
   return (
     <div>
@@ -21,11 +20,12 @@ export function ToggleBlock({ content, onSave, children }: ToggleBlockProps) {
           <Icon name={open ? "chevron-down" : "chevron-right"} className="h-4 w-4" />
         </button>
         <div className="flex-1">
-          <RichTextEditor
+          <TemplatableMarkdown
+            blockId={blockId}
+            field="summaryMarkdown"
             markdown={content.summaryMarkdown ?? ""}
             placeholder="Toggle"
             onSave={(summaryMarkdown) => onSave({ ...content, summaryMarkdown })}
-            editable={!readOnly}
           />
         </div>
       </div>

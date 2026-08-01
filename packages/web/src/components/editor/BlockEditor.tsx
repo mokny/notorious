@@ -74,8 +74,8 @@ interface BlockEditorProps {
   embedAncestorIds?: string[];
   /** Set by ObjectDetailPage.tsx when the object is locked (or read-only for this viewer) - see BlockEditorContext.tsx's `readOnly`. Always effectively true for an embedded instance too, regardless of this prop. */
   readOnly?: boolean;
-  /** Set by ObjectDetailPage.tsx's Preview toggle - see BlockEditorContext.tsx's `renderedOverrides`. */
-  renderedOverrides?: Record<string, Record<string, string>> | null;
+  /** This object's template-rendered block text (see modules/templates/ on the server) - blockId -> field -> rendered text, only for fields whose raw source actually has `{{ }}`/`{% %}` syntax. See BlockEditorContext.tsx's `renderedBlocks` for how each templatable field uses this. */
+  renderedBlocks?: Record<string, Record<string, string>> | null;
 }
 
 export function BlockEditor({
@@ -85,7 +85,7 @@ export function BlockEditor({
   onSelectBlock,
   embedAncestorIds,
   readOnly = false,
-  renderedOverrides = null,
+  renderedBlocks = null,
 }: BlockEditorProps) {
   const queryClient = useQueryClient();
   const resolvedEmbedAncestorIds = embedAncestorIds ?? [objectId];
@@ -119,6 +119,11 @@ export function BlockEditor({
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ["blocks", objectId] });
+    // A block's own template-rendered text, and potentially another block's
+    // (an earlier `{% set %}`) or another object's referencing this one -
+    // rendering is cheap to redo (see modules/templates/renderer.ts) so this
+    // just refetches rather than trying to patch the cache in place.
+    void queryClient.invalidateQueries({ queryKey: ["blocksRendered", objectId] });
     void queryClient.invalidateQueries({ queryKey: ["recentEdits", workspaceId] });
     // Prefix match, no specific block id: only one BlockHistoryPanel is ever
     // mounted at a time (see ObjectDetailPage.tsx's selectedBlockId), so
@@ -428,7 +433,7 @@ export function BlockEditor({
         objectTypes: objectTypes ?? [],
         embedAncestorIds: resolvedEmbedAncestorIds,
         readOnly: effectiveReadOnly,
-        renderedOverrides,
+        renderedBlocks,
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),

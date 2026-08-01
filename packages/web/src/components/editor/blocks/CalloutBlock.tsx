@@ -1,11 +1,19 @@
 import type { CalloutContent } from "@notorious/shared";
-import { RichTextEditor } from "../RichTextEditor.js";
-import { useBlockEditor } from "../BlockEditorContext.js";
+import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 
 const ICONS = ["💡", "⚠️", "📌", "✅", "🔥", "❗"];
 
-export function CalloutBlock({ content, onSave, onEnter }: { content: CalloutContent; onSave: (c: CalloutContent) => Promise<void>; onEnter: () => void }) {
-  const { readOnly } = useBlockEditor();
+export function CalloutBlock({
+  blockId,
+  content,
+  onSave,
+  onEnter,
+}: {
+  blockId: string;
+  content: CalloutContent;
+  onSave: (c: CalloutContent) => Promise<void>;
+  onEnter: () => void;
+}) {
   return (
     <div className="group/callout flex items-start gap-2 rounded-lg bg-accent/5 p-3">
       <select
@@ -20,12 +28,13 @@ export function CalloutBlock({ content, onSave, onEnter }: { content: CalloutCon
         ))}
       </select>
       <div className="flex-1 pt-1">
-        <RichTextEditor
+        <TemplatableMarkdown
+          blockId={blockId}
+          field="markdown"
           markdown={content.markdown ?? ""}
           placeholder="Callout"
           onSave={(markdown) => onSave({ ...content, markdown })}
           onEnter={onEnter}
-          editable={!readOnly}
         />
       </div>
     </div>

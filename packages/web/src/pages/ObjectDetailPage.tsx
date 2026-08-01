@@ -112,16 +112,15 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   useEffect(() => setSelectedBlockId(null), [objectId]);
 
-  // Shows every block's template-rendered text (see modules/templates/ on
-  // the server) read-only, instead of the editable raw `{{ }}` source -
-  // reset on navigating to a different object so a stale toggle state from
-  // the last one doesn't linger.
-  const [previewMode, setPreviewMode] = useState(false);
-  useEffect(() => setPreviewMode(false), [objectId]);
+  // Every block's template-rendered text (see modules/templates/ on the
+  // server) - always fetched (cheap: the server itself skips the render
+  // pass entirely for an object with no template syntax at all), not gated
+  // behind a separate mode. Each templatable field shows this instead of its
+  // raw `{{ }}` source whenever it isn't focused - see TemplatableMarkdown.tsx.
   const { data: renderedBlocks } = useQuery({
     queryKey: ["blocksRendered", objectId],
     queryFn: () => blockApi.rendered(objectId!),
-    enabled: Boolean(objectId) && previewMode,
+    enabled: Boolean(objectId),
   });
 
   const setIconMutation = useMutation({
@@ -217,11 +216,6 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // of the object's current lock state.
   const isLocked = Boolean(object.lockedAt);
   const effectiveCanEdit = canEdit && !isLocked;
-  // Preview is always strict read-only (no checklist-toggle exemption,
-  // unlike a plain lock) - it's showing computed template output, not the
-  // object's own edit-lock state.
-  const blockEditorReadOnly = previewMode || !effectiveCanEdit;
-  const blockEditorLockClass = !blockEditorReadOnly ? "" : canEdit && !previewMode ? READ_ONLY_LOCK_ALLOW_CHECKLIST : READ_ONLY_LOCK;
 
   return (
     <div>
@@ -285,13 +279,6 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </span>
               )
             )}
-            <button
-              onClick={() => setPreviewMode((v) => !v)}
-              title={previewMode ? "Back to editing" : "Preview rendered templates"}
-              className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${previewMode ? "text-accent" : "text-ink-muted"}`}
-            >
-              <Icon name="eye" className="h-4 w-4" />
-            </button>
             {!share && <ObjectSlugButton objectId={object.id} slug={object.slug} />}
             {!share && (
               <>
@@ -329,22 +316,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             </Button>
           )}
 
-          <div className={`mt-6 ${blockEditorLockClass}`}>
+          <div className={`mt-6 ${effectiveCanEdit ? "" : canEdit ? READ_ONLY_LOCK_ALLOW_CHECKLIST : READ_ONLY_LOCK}`}>
             <BlockEditor
-              // Forces a full remount on every Preview toggle, rather than
-              // flipping `editable` on a live TipTap instance that's already
-              // showing substituted (rendered) text - that transition was
-              // observed to race and persist the rendered text as if it
-              // were a real edit (see performUpdate's own guard for the
-              // other half of this fix). A clean remount means Preview and
-              // editing never share a single editor instance's lifecycle.
-              key={previewMode ? "preview" : "edit"}
               workspaceId={workspaceId}
               objectId={object.id}
               selectedBlockId={selectedBlockId}
               onSelectBlock={setSelectedBlockId}
-              readOnly={blockEditorReadOnly}
-              renderedOverrides={previewMode ? (renderedBlocks?.rendered ?? {}) : null}
+              readOnly={!effectiveCanEdit}
+              renderedBlocks={renderedBlocks?.rendered ?? null}
             />
 
             {/* Hidden only for a single-object share (it can't grant access
