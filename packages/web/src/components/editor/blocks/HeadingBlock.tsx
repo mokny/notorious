@@ -17,11 +17,11 @@ interface HeadingBlockProps {
 }
 
 export function HeadingBlock({ blockId, content, onSave, onEnter, onBackspaceEmpty }: HeadingBlockProps) {
-  const { isFocused, handlers } = useFocusWithin();
+  const { isFocused, containerRef, handlers } = useFocusWithin<HTMLDivElement>();
 
   return (
     <div className={SIZE_CLASS[content.level]}>
-      <div className="flex items-center gap-2" {...handlers}>
+      <div ref={containerRef} className="flex items-center gap-2" {...handlers}>
         {/* Rendered only while focused, not just visually hidden - an
             `invisible` select still reserves its box, indenting the heading
             text to make room for a control nobody can see. */}

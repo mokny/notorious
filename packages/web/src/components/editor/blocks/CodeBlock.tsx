@@ -12,10 +12,10 @@ export function CodeBlock({
   onSave: (c: CodeContent) => Promise<void>;
 }) {
   const [content, save] = useDebouncedSave(externalContent, onSave);
-  const { isFocused, handlers } = useFocusWithin();
+  const { isFocused, containerRef, handlers } = useFocusWithin<HTMLDivElement>();
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-[#0d1117]" {...handlers}>
+    <div ref={containerRef} className="overflow-hidden rounded-lg border border-border bg-[#0d1117]" {...handlers}>
       {/* Rendered only while focused, not just visually hidden - an
           `invisible` select still reserves this whole header bar, leaving an
           empty strip above the code for a control nobody can see. */}

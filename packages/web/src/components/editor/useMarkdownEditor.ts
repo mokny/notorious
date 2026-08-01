@@ -142,8 +142,17 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   // as `content` below) - an object being locked/unlocked after this editor
   // already mounted needs to actually flip ProseMirror's own editable state
   // via `setEditable`, not just get a new (ignored) constructor option.
+  // `emitUpdate: false` - `setEditable` otherwise fires a TipTap `update`
+  // event by default (even when the value isn't actually changing, e.g. on
+  // every fresh mount, since `editable` above already seeded the same value
+  // at construction) - that reached our own `onUpdate` above and queued a
+  // spurious save of the *unchanged* content. Harmless by itself, but its
+  // extra save+refetch cycle was firing every time a templated field
+  // remounted into edit mode (see TemplatableMarkdown.tsx), which was enough
+  // to desync HeadingBlock's separate focus-within tracking for its h1/h2/h3
+  // selector.
   useEffect(() => {
-    editor?.setEditable(options.editable ?? true);
+    editor?.setEditable(options.editable ?? true, false);
   }, [options.editable, editor]);
 
   // `content` above only seeds the editor once, on creation - by itself it

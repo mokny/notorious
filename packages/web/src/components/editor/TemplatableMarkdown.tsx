@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { BlockType, ObjectType } from "@notorious/shared";
 import { RichTextEditor } from "./RichTextEditor.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
@@ -47,10 +48,22 @@ export function TemplatableMarkdown({
 }: TemplatableMarkdownProps) {
   const { readOnly } = useBlockEditor();
   const { rendered, showRendered, startEditing, stopEditing } = useTemplatableField(blockId, field, autoFocus);
+  // Clicking the rendered text swaps in a brand-new "edit" instance (see the
+  // key change below), but a click that merely triggers a *remount* doesn't
+  // itself place the browser's cursor into it - without this, the user would
+  // see the raw source appear but still have to click a second time to
+  // actually type. Reset once RichTextEditor's own autoFocus effect has run.
+  const clickedToEditRef = useRef(false);
 
   if (showRendered) {
     return (
-      <div className={readOnly ? undefined : "cursor-text"} onClick={startEditing}>
+      <div
+        className={readOnly ? undefined : "cursor-text"}
+        onClick={() => {
+          clickedToEditRef.current = true;
+          startEditing();
+        }}
+      >
         <RichTextEditor key="rendered" markdown={rendered ?? ""} className={className} editable={false} onSave={() => Promise.resolve()} />
       </div>
     );
@@ -67,8 +80,11 @@ export function TemplatableMarkdown({
       onBackspaceEmpty={onBackspaceEmpty}
       onSlashSelect={onSlashSelect}
       objectTypes={objectTypes}
-      autoFocus={autoFocus}
-      onAutoFocused={onAutoFocused}
+      autoFocus={autoFocus || clickedToEditRef.current}
+      onAutoFocused={() => {
+        clickedToEditRef.current = false;
+        onAutoFocused?.();
+      }}
       editable={!readOnly}
       onBlur={stopEditing}
     />
