@@ -11,6 +11,7 @@ function TableCellInput({
   field,
   value,
   onChange,
+  onFlush,
   readOnly,
   className,
 }: {
@@ -18,6 +19,8 @@ function TableCellInput({
   field: string;
   value: string;
   onChange: (value: string) => void;
+  /** Saves a pending edit right away on blur instead of waiting out the rest of useDebouncedSave's window - see RichTextEditor.tsx's identical onBlur flush. */
+  onFlush: () => void;
   readOnly: boolean;
   className: string;
 }) {
@@ -48,7 +51,10 @@ function TableCellInput({
       }}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      onBlur={stopEditing}
+      onBlur={() => {
+        onFlush();
+        stopEditing();
+      }}
       readOnly={readOnly}
       autoComplete="off"
       className={className}
@@ -66,7 +72,7 @@ export function TableBlock({
   onSave: (c: TableContent) => Promise<void>;
 }) {
   const { readOnly } = useBlockEditor();
-  const [content, save] = useDebouncedSave(externalContent, onSave);
+  const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const columns = content.columns?.length ? content.columns : ["Column 1", "Column 2"];
   const rows = content.rows ?? [];
 
@@ -109,6 +115,7 @@ export function TableBlock({
                   field={`columns.${index}`}
                   value={column}
                   onChange={(value) => setColumn(index, value)}
+                  onFlush={flushSave}
                   readOnly={readOnly}
                   className="w-full border-none bg-transparent font-medium outline-none"
                 />
@@ -131,6 +138,7 @@ export function TableBlock({
                     field={`rows.${rowIndex}.${colIndex}`}
                     value={row[colIndex] ?? ""}
                     onChange={(value) => setCell(rowIndex, colIndex, value)}
+                    onFlush={flushSave}
                     readOnly={readOnly}
                     className="w-full border-none bg-transparent outline-none"
                   />

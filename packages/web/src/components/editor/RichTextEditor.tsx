@@ -78,7 +78,15 @@ export function RichTextEditor({
     onSlashSelect,
     objectTypes,
     editable,
-    onBlur,
+    // Save right away instead of waiting out the rest of the debounce below -
+    // once focus has left, there's no more typing to coalesce, and a
+    // templated field (see TemplatableMarkdown.tsx) is about to show its
+    // rendered value, which depends on this save having actually gone out.
+    onBlur: () => {
+      clearTimeout(saveTimeout.current);
+      flush();
+      onBlur?.();
+    },
     onChange: (value) => {
       pendingValueRef.current = value;
       clearTimeout(saveTimeout.current);

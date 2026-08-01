@@ -66,5 +66,11 @@ export function useDebouncedSave<T>(externalValue: T, onSave: (value: T) => Prom
     saveTimeout.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
   }
 
-  return [localValue, update] as const;
+  /** Saves a pending edit right away instead of waiting out the rest of the debounce window - see TemplatableMarkdown.tsx/useTemplatableField.ts, which call this on blur so a templated field's rendered value shows up without an extra ~500ms wait. A no-op if there's nothing pending. */
+  function flushNow(): void {
+    clearTimeout(saveTimeout.current);
+    flush();
+  }
+
+  return [localValue, update, flushNow] as const;
 }

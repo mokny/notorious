@@ -31,6 +31,7 @@ function ChecklistItemRow({
   onChangeText,
   onEnter,
   onRemove,
+  onFlush,
   registerInputRef,
   readOnly,
 }: {
@@ -45,6 +46,8 @@ function ChecklistItemRow({
   onChangeText: (markdown: string) => void;
   onEnter: () => void;
   onRemove: () => void;
+  /** Saves a pending edit right away on blur instead of waiting out the rest of useDebouncedSave's window - see RichTextEditor.tsx's identical onBlur flush, which this matches for consistency. */
+  onFlush: () => void;
   registerInputRef: (el: HTMLTextAreaElement | null) => void;
   /** Native `readOnly`, not `disabled` - keeps the item's text selectable/copyable while the object is locked (see BlockEditorContext.tsx and readOnlyContent.ts's `:not([readonly])` carve-out), unlike the checkbox above, which stays interactive either way. */
   readOnly: boolean;
@@ -115,7 +118,10 @@ function ChecklistItemRow({
               onEnter();
             }
           }}
-          onBlur={stopEditing}
+          onBlur={() => {
+            onFlush();
+            stopEditing();
+          }}
           readOnly={readOnly}
           placeholder="To-do"
           autoComplete="off"
@@ -156,7 +162,7 @@ export function ChecklistBlock({
   onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
 }) {
   const { readOnly } = useBlockEditor();
-  const [content, save] = useDebouncedSave(externalContent, onSave);
+  const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const items = content.items ?? [];
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
@@ -227,6 +233,7 @@ export function ChecklistBlock({
               onChangeText={(markdown) => updateItem(index, { markdown })}
               onEnter={addItem}
               onRemove={() => removeItem(index)}
+              onFlush={flushSave}
               readOnly={readOnly}
               registerInputRef={(el) => {
                 inputRefs.current[index] = el;
