@@ -52,6 +52,7 @@ import {
   Maximize2,
   Minimize2,
   Presentation,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 
@@ -107,6 +108,7 @@ const ICONS: Record<string, LucideIcon> = {
   maximize: Maximize2,
   minimize: Minimize2,
   presentation: Presentation,
+  bot: Bot,
 };
 
 function isImageUrl(value: string): boolean {

@@ -119,6 +119,27 @@ secret.
 - `POST /api/v1/workspaces/import` - multipart ZIP upload, always creates a **new** workspace (never
   overwrites an existing one) owned by the uploading user
 
+## Webhooks
+
+Owner-only. `GET/POST /api/v1/workspaces/:workspaceId/webhooks`, `PATCH/DELETE .../:id`,
+`POST .../:id/test`. Fires an HTTP POST for `object.created`/`updated`/`archived`/`restored`/
+`deleted` (whichever events a given webhook subscribes to), signed with `X-Notorious-Signature:
+sha256=<hex hmac>` over the raw JSON body using that webhook's own secret (returned once, at
+creation). The payload includes the full current object (title, values, timestamps) plus its
+object type, workspace and the actor who made the change - see `WebhookPayload` in
+`@notorious/shared`.
+
+## AI agent & MCP
+
+- `GET/PATCH/DELETE /api/v1/ai/config` - the current user's own AI provider configuration
+  (provider, model, API key). `GET` never returns the key itself, only whether one is set.
+- `GET/POST/DELETE /api/v1/workspaces/:workspaceId/ai/chat` - the Agent Chat's message history for
+  the current user in that workspace; `POST { message }` runs one turn of the tool-calling loop and
+  returns the messages it appended.
+- `POST /api/v1/mcp` - an MCP (Model Context Protocol) server exposing the same object-management
+  tools to external AI clients (Claude Desktop, Claude Code, ...), authenticated with a personal API
+  key like any other endpoint. See [MCP.md](MCP.md) for how to connect a client and the full tool list.
+
 ## Push notifications
 
 - `GET /api/v1/push/vapid-public-key`

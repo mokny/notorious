@@ -30,6 +30,9 @@ import { registerLinkPreviewRoutes } from "./modules/linkPreview/routes.js";
 import { registerSystemRoutes } from "./modules/system/routes.js";
 import { registerShareLinkRoutes } from "./modules/shareLinks/routes.js";
 import { registerScriptRoutes } from "./modules/scripting/routes.js";
+import { registerWebhookRoutes } from "./modules/webhooks/routes.js";
+import { registerAiRoutes } from "./modules/ai/routes.js";
+import { registerMcpRoutes } from "./modules/mcp/routes.js";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const WEB_DIST_DIR = path.join(PACKAGE_ROOT, "packages/web/dist");
@@ -95,6 +98,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerSystemRoutes(app);
   await registerShareLinkRoutes(app);
   await registerScriptRoutes(app);
+  await registerWebhookRoutes(app);
+  await registerAiRoutes(app);
+  await registerMcpRoutes(app);
 
   app.get("/api/v1/health", async () => ({ status: "ok", version: PACKAGE_VERSION }));
 

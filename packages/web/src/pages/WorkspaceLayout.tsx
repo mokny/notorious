@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-rout
 import { useQuery } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { workspaceApi, authApi } from "../lib/api/resources.js";
+import { workspaceApi, authApi, aiApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
@@ -38,6 +38,16 @@ export function WorkspaceLayout() {
     queryKey: ["workspace", workspaceId],
     queryFn: () => workspaceApi.get(workspaceId!),
     enabled: Boolean(workspaceId),
+  });
+
+  // Only relevant for a real logged-in member (see the nav link's own
+  // `!shareToken` check below) - skipped for an anonymous share visitor,
+  // whose session can't call this endpoint anyway.
+  const { data: aiConfig } = useQuery({
+    queryKey: ["aiConfig"],
+    queryFn: aiApi.getConfig,
+    enabled: !shareToken,
+    staleTime: 60_000,
   });
 
   // Close the mobile drawer whenever the route changes (desktop ignores this,
@@ -92,6 +102,11 @@ export function WorkspaceLayout() {
           <NavLink to={`/w/${workspaceId}/search`} className={({ isActive }) => navLinkClass(isActive)}>
             <Icon name="search" className="h-4 w-4" /> Search
           </NavLink>
+          {!shareToken && aiConfig?.configured && (
+            <NavLink to={`/w/${workspaceId}/chat`} className={({ isActive }) => navLinkClass(isActive)}>
+              <Icon name="bot" className="h-4 w-4" /> Agent Chat
+            </NavLink>
+          )}
 
           {pinnedIds.length > 0 && (
             <div className="mt-3">

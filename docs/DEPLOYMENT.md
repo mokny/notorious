@@ -68,6 +68,11 @@ reversed with `npm run disable-2fa-requirement`. Since there's no email-based ac
 Notorious, each user gets 8 one-time backup codes when they set up 2FA - make sure that's communicated
 if you turn the requirement on for a team.
 
+AI features (Agent Chat, MCP server) need no instance-wide setup - each user brings their own AI
+provider API key, configured from **Settings -> AI**, encrypted at rest the same way TOTP secrets
+are. There's nothing to enable/disable here; a user simply hasn't configured one until they choose
+to. See [MCP.md](MCP.md) for connecting an external MCP client.
+
 ### Running it as a systemd service
 
 `scripts/install.sh` writes and enables this unit for you if you answer "yes" to the boot-start

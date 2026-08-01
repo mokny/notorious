@@ -86,6 +86,8 @@ interface RunScriptOptions {
   isAutomated: boolean;
   /** Only present for a manual, user-triggered run - see routes.ts. */
   actor?: { actorId: string; actorName: string };
+  /** The originating browser tab for a manual run (see routes.ts's `getClientId`) - threaded through to `recordAndBroadcast` so that tab's own realtime echo is skipped, same as any other mutation. Automated runs have no tab, so this stays undefined for them. */
+  clientId?: string;
 }
 
 export async function runScript(objectId: string, options: RunScriptOptions): Promise<ScriptRunSummary> {
@@ -138,36 +140,65 @@ async function applyStagedWrites(
   options: RunScriptOptions,
 ): Promise<void> {
   const workspaceId = object.workspaceId;
-  let touchedSomething = false;
+  let touchedProperties = false;
+  let touchedBlockId: string | null = null;
 
   if (Object.keys(staged.properties).length > 0) {
     await objectService.updateObject(objectId, { values: staged.properties });
-    touchedSomething = true;
+    touchedProperties = true;
   }
   for (const [blockId, content] of staged.blockUpdates) {
     await blockService.updateBlock(blockId, { content });
-    touchedSomething = true;
+    touchedBlockId ??= blockId;
   }
   for (const { type, content } of staged.appendedBlocks) {
-    await blockService.createBlock({ objectId, parentBlockId: null, afterBlockId: null, type, content });
-    touchedSomething = true;
+    const block = await blockService.createBlock({ objectId, parentBlockId: null, afterBlockId: null, type, content });
+    touchedBlockId ??= block.id;
   }
 
-  if (!touchedSomething) return;
+  if (!touchedProperties && !touchedBlockId) return;
 
   const { actorId, actorName } = resolveScriptActor(object, options);
-  await recordAndBroadcast({
-    workspaceId,
-    objectId,
-    actorId,
-    actorName,
-    action: "updated",
-    summary: options.isAutomated ? `Script automation updated "${object.title}"` : `${actorName} ran a script on "${object.title}"`,
-    entity: "object",
-    entityId: objectId,
-    realtimeAction: "updated",
-    skipAutomationTrigger: true,
-  });
+  const summary = options.isAutomated ? `Script automation updated "${object.title}"` : `${actorName} ran a script on "${object.title}"`;
+
+  if (touchedProperties) {
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId,
+      actorName,
+      clientId: options.clientId,
+      action: "updated",
+      summary,
+      entity: "object",
+      entityId: objectId,
+      realtimeAction: "updated",
+      skipAutomationTrigger: true,
+    });
+  }
+  // A separate broadcast, not folded into the one above - a normal
+  // (non-script) block edit always broadcasts `entity: "block"` (see
+  // blocks/routes.ts), which is what useRealtime.ts actually listens for to
+  // invalidate `["blocks", objectId]`. Its `entity: "object"` handler never
+  // did that, so a script that only touches blocks (e.g. the table-summing
+  // automation example in docs/SCRIPTING.md) previously left every open tab
+  // showing a stale block list until a manual reload, even though the write
+  // itself had already landed.
+  if (touchedBlockId) {
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId,
+      actorName,
+      clientId: options.clientId,
+      action: "updated",
+      summary,
+      entity: "block",
+      entityId: touchedBlockId,
+      realtimeAction: "updated",
+      skipAutomationTrigger: true,
+    });
+  }
 }
 
 /** Manual runs attribute to the user who clicked Run; automated runs have no clicking user, so they attribute to whoever created the object - same "who to blame an automated action on" reasoning `resolveActor` already applies to anonymous share-link edits, just not a reuse of that function itself (it's specifically about share-link attribution). */

@@ -137,6 +137,24 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     const workspaceId = await objectService.getObjectWorkspaceId(id);
     await requireWorkspaceRole(workspaceId, user.id, "editor");
     await objectService.restoreObject(id);
+
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${user.name} restored an object`,
+      entity: "object",
+      entityId: id,
+      realtimeAction: "updated",
+      // `action: "updated"` has no dedicated "restored" case in the shared
+      // activity-action enum (see activity.ts) - this override keeps
+      // webhooks distinguishing a restore from a generic property edit
+      // without expanding that enum just for this.
+      webhookEvent: "object.restored",
+    });
+
     return { ok: true };
   });
 

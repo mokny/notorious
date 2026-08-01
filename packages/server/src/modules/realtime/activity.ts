@@ -1,10 +1,19 @@
 import { eq, and, notInArray } from "drizzle-orm";
-import type { RealtimeEvent, ActivityEntry } from "@notorious/shared";
+import type { RealtimeEvent, ActivityEntry, WebhookEvent } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { activityLog, blockHistory } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { broadcast } from "./hub.js";
 import { maybeScheduleAutomation } from "../scripting/automation.js";
+import { maybeDispatchWebhooks } from "../webhooks/service.js";
+
+/** `ActivityEntry["action"]` has no "restored" case (see that type's own doc comment) - callers that need a webhook event distinct from the generic "updated" one (just the restore route today) pass this explicitly instead of relying on the action->event mapping below. */
+const ACTION_TO_WEBHOOK_EVENT: Partial<Record<ActivityEntry["action"], WebhookEvent>> = {
+  created: "object.created",
+  updated: "object.updated",
+  archived: "object.archived",
+  deleted: "object.deleted",
+};
 
 const MAX_BLOCK_HISTORY = 10;
 
@@ -33,6 +42,8 @@ interface RecordChangeInput {
    * trigger an object's automation - see modules/scripting/automation.ts.
    */
   skipAutomationTrigger?: boolean;
+  /** Overrides the default action->webhook-event mapping - only needed where a single `action` value covers more than one distinct kind of change (see the restore route, which reuses `action: "updated"` but should still fire `object.restored`, not `object.updated`). */
+  webhookEvent?: WebhookEvent;
 }
 
 /** Writes an audit-log row and broadcasts the change to connected clients in one call. */
@@ -65,6 +76,11 @@ export async function recordAndBroadcast(input: RecordChangeInput): Promise<void
 
   if (!input.skipAutomationTrigger && input.objectId) {
     maybeScheduleAutomation(input.objectId);
+  }
+
+  if (input.entity === "object") {
+    const webhookEvent = input.webhookEvent ?? ACTION_TO_WEBHOOK_EVENT[input.action];
+    if (webhookEvent) maybeDispatchWebhooks(webhookEvent, input.workspaceId, input.entityId, input.actorId);
   }
 }
 

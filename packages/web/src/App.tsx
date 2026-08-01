@@ -13,6 +13,7 @@ import { ObjectTypePage } from "./pages/ObjectTypePage.js";
 import { ObjectDetailPage } from "./pages/ObjectDetailPage.js";
 import { SearchPage } from "./pages/SearchPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
+import { AgentChatPage } from "./pages/AgentChatPage.js";
 import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
 
 /**
@@ -74,6 +75,7 @@ export function App() {
         <Route path="objects/:objectId" element={<ObjectDetailPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="chat" element={<AgentChatPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

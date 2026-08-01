@@ -352,6 +352,27 @@ export const shareLinks = sqliteTable("share_links", {
   createdAt: text("created_at").notNull(),
 });
 
+export const webhooks = sqliteTable("webhooks", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  // AES-256-GCM encrypted at rest (lib/crypto.ts) - decrypted only to sign an
+  // outbound delivery's HMAC, same pattern as users.totp_secret.
+  secret: text("secret").notNull(),
+  // JSON array of WebhookEvent strings (see @notorious/shared).
+  events: text("events").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+  lastTriggeredAt: text("last_triggered_at"),
+  lastStatus: text("last_status").$type<"success" | "failure" | null>(),
+  lastError: text("last_error"),
+});
+
 // Singleton row (id is always 1, enforced at the SQL level in the migration)
 // for instance-wide settings - just registration for now, but a real table
 // rather than an env var so it can be toggled live via a script (see
@@ -370,5 +391,38 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
   endpoint: text("endpoint").notNull().unique(),
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+// One active AI provider profile per user (not per workspace - same "global,
+// user-owned secret" shape as apiKeys) - see modules/ai/service.ts.
+export const aiConfigs = sqliteTable("ai_configs", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull().$type<"openai" | "anthropic" | "openai-compatible">(),
+  // Only set for 'openai-compatible' (e.g. a local Ollama server's URL).
+  baseUrl: text("base_url"),
+  model: text("model").notNull(),
+  // AES-256-GCM encrypted at rest (lib/crypto.ts), same as totp_secret/webhooks.secret.
+  apiKey: text("api_key").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const aiChatMessages = sqliteTable("ai_chat_messages", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  role: text("role").notNull().$type<"user" | "assistant" | "tool">(),
+  content: text("content"),
+  // JSON array of the assistant's tool calls for this message, if any.
+  toolCalls: text("tool_calls"),
+  // Only set on a role='tool' message - which assistant tool call this is the result of.
+  toolCallId: text("tool_call_id"),
   createdAt: text("created_at").notNull(),
 });

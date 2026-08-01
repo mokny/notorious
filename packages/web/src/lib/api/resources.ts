@@ -47,6 +47,13 @@ import type {
   ConfirmTwoFactorInput,
   DisableTwoFactorInput,
   VerifyTwoFactorInput,
+  Webhook,
+  CreatedWebhook,
+  CreateWebhookInput,
+  UpdateWebhookInput,
+  AiConfigSummary,
+  SaveAiConfigInput,
+  AiChatMessage,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
 
@@ -236,6 +243,28 @@ export const apiKeyApi = {
   list: () => apiRequest<ApiKey[]>("/api/v1/api-keys"),
   create: (input: CreateApiKeyInput) => apiRequest<CreatedApiKey>("/api/v1/api-keys", { method: "POST", body: input }),
   revoke: (id: string) => apiRequest<void>(`/api/v1/api-keys/${id}`, { method: "DELETE" }),
+};
+
+export const webhookApi = {
+  list: (workspaceId: string) => apiRequest<Webhook[]>(`/api/v1/workspaces/${workspaceId}/webhooks`),
+  create: (workspaceId: string, input: CreateWebhookInput) =>
+    apiRequest<CreatedWebhook>(`/api/v1/workspaces/${workspaceId}/webhooks`, { method: "POST", body: input }),
+  update: (workspaceId: string, id: string, input: UpdateWebhookInput) =>
+    apiRequest<Webhook>(`/api/v1/workspaces/${workspaceId}/webhooks/${id}`, { method: "PATCH", body: input }),
+  remove: (workspaceId: string, id: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/webhooks/${id}`, { method: "DELETE" }),
+  test: (workspaceId: string, id: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/webhooks/${id}/test`, { method: "POST" }),
+};
+
+export const aiApi = {
+  getConfig: () => apiRequest<AiConfigSummary>("/api/v1/ai/config"),
+  saveConfig: (input: SaveAiConfigInput) => apiRequest<AiConfigSummary>("/api/v1/ai/config", { method: "PATCH", body: input }),
+  removeConfig: () => apiRequest<void>("/api/v1/ai/config", { method: "DELETE" }),
+  listMessages: (workspaceId: string) => apiRequest<AiChatMessage[]>(`/api/v1/workspaces/${workspaceId}/ai/chat`),
+  sendMessage: (workspaceId: string, message: string) =>
+    apiRequest<AiChatMessage[]>(`/api/v1/workspaces/${workspaceId}/ai/chat`, { method: "POST", body: { message } }),
+  clearMessages: (workspaceId: string) => apiRequest<void>(`/api/v1/workspaces/${workspaceId}/ai/chat`, { method: "DELETE" }),
 };
 
 export const linkPreviewApi = {

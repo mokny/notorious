@@ -17,3 +17,5 @@ export * from "./schemas/search.js";
 export * from "./schemas/push.js";
 export * from "./schemas/apiKey.js";
 export * from "./schemas/shareLink.js";
+export * from "./schemas/webhook.js";
+export * from "./schemas/ai.js";

@@ -70,6 +70,6 @@ export async function registerScriptRoutes(app: FastifyInstance): Promise<void> 
     // The apply-phase inside runScript issues its own recordAndBroadcast for
     // whatever the script actually wrote (see service.ts) - nothing to
     // broadcast here beyond that.
-    return scriptingService.runScript(id, { isAutomated: false, actor });
+    return scriptingService.runScript(id, { isAutomated: false, actor, clientId: getClientId(request) });
   });
 }
