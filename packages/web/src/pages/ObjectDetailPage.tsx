@@ -217,6 +217,26 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const isLocked = Boolean(object.lockedAt);
   const effectiveCanEdit = canEdit && !isLocked;
 
+  // Rendered next to the title either here (no cover - see the row below) or
+  // inside CoverImage's overlay (cover set) - built once so both spots stay
+  // in sync instead of drifting into two slightly different copies.
+  const iconElement = effectiveCanEdit ? (
+    <IconPicker
+      icon={object.icon}
+      fallbackIcon={objectType?.icon ?? "file-text"}
+      onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon).then(() => undefined)}
+      onUploadIcon={async (file) => {
+        const asset = await fileApi.upload(workspaceId, file, object.id);
+        return fileApi.downloadUrl(asset.id);
+      }}
+      resettable
+    />
+  ) : (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+      <Icon name={object.icon ?? objectType?.icon ?? "file-text"} className="h-7 w-7" />
+    </div>
+  );
+
   return (
     <div>
       <CoverImage
@@ -227,44 +247,32 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         title={title}
         onTitleChange={setTitle}
         coverTextStyle={object.coverTextStyle}
+        icon={iconElement}
       />
 
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
         <div className="min-w-0 flex-1">
-          {/* Its own row, above the icon/action-button row below - hidden
-              once there's a cover (CoverImage renders the title as an
-              overlay on top of it instead, so showing it again here too
+          {/* Icon + title, own row above the action-button row below -
+              hidden once there's a cover (CoverImage renders both as an
+              overlay on top of it instead, so showing them again here too
               would just be a redundant, differently-sized copy). Sharing a
-              row with the icon picker and every action button (lock, pin,
-              dashboard, share, delete, ...) left the title squeezed into
-              whatever space those left over, cutting it off or hiding it
-              outright for anything but a short title. */}
+              row with every action button (lock, pin, dashboard, share,
+              delete, ...) left the title squeezed into whatever space those
+              left over, cutting it off or hiding it outright for anything
+              but a short title. */}
           {!object.cover && (
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Untitled"
-              readOnly={!effectiveCanEdit}
-              className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
-            />
+            <div className="flex items-center gap-2">
+              {iconElement}
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Untitled"
+                readOnly={!effectiveCanEdit}
+                className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
+              />
+            </div>
           )}
           <div className={`flex items-center gap-2 ${object.cover ? "" : "mt-2"}`}>
-            {effectiveCanEdit ? (
-              <IconPicker
-                icon={object.icon}
-                fallbackIcon={objectType?.icon ?? "file-text"}
-                onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon).then(() => undefined)}
-                onUploadIcon={async (file) => {
-                  const asset = await fileApi.upload(workspaceId, file, object.id);
-                  return fileApi.downloadUrl(asset.id);
-                }}
-                resettable
-              />
-            ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-                <Icon name={object.icon ?? objectType?.icon ?? "file-text"} className="h-7 w-7" />
-              </div>
-            )}
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
                 else gets a plain, non-interactive indicator. */}

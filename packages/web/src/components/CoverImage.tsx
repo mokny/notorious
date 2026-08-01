@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CoverTextStyle } from "@notorious/shared";
 import { objectApi, fileApi } from "../lib/api/resources.js";
@@ -17,6 +17,8 @@ interface CoverImageProps {
   title: string;
   onTitleChange: (value: string) => void;
   coverTextStyle: CoverTextStyle | null;
+  /** The object's icon (IconPicker if editable, a plain Icon otherwise - see ObjectDetailPage.tsx), rendered beside the title overlay. */
+  icon: ReactNode;
 }
 
 /** Extracts the file id from a `fileApi.downloadUrl()`-shaped icon/cover value, so a replaced upload can clean up the one it's replacing. */
@@ -33,7 +35,7 @@ function fileIdFromUrl(url: string): string | null {
  * `coverTextStyle` (see CoverTextStyleEditor.tsx, opened via the palette
  * button next to Change/Remove).
  */
-export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTitleChange, coverTextStyle }: CoverImageProps) {
+export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTitleChange, coverTextStyle, icon }: CoverImageProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hover, setHover] = useState(false);
@@ -104,39 +106,46 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
       <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
-        <div ref={overlayRef} className="pointer-events-auto mx-auto max-w-full">
-          {/* Unconstrained, invisible twin of the title text - its natural
-              width at a fixed baseline size is what useFitText scales
-              against to make the real title span exactly this container. */}
-          <span
-            ref={measureRef}
-            aria-hidden
-            style={{
-              position: "absolute",
-              visibility: "hidden",
-              whiteSpace: "nowrap",
-              fontSize: 16,
-              fontFamily: textCss.fontFamily,
-              fontWeight: textCss.fontWeight,
-              fontStyle: textCss.fontStyle,
-              textTransform: textCss.textTransform,
-            }}
-          >
-            {displayTitle}
-          </span>
-          {canEdit ? (
-            <input
-              value={title}
-              onChange={(e) => onTitleChange(e.target.value)}
-              placeholder="Untitled"
-              className="w-full border-none bg-transparent text-center outline-none"
-              style={{ ...textCss, fontSize }}
-            />
-          ) : (
-            <div className="w-full truncate text-center" style={{ ...textCss, fontSize }}>
+        <div className="pointer-events-auto mx-auto flex max-w-full items-center justify-center gap-2">
+          {/* Fixed-size, unlike the title next to it - useFitText below
+              already accounts for it by measuring `overlayRef`'s *own*
+              width, which this flex row only leaves it once this has taken
+              its share. */}
+          <div className="shrink-0">{icon}</div>
+          <div ref={overlayRef} className="min-w-0 flex-1">
+            {/* Unconstrained, invisible twin of the title text - its natural
+                width at a fixed baseline size is what useFitText scales
+                against to make the real title span exactly this container. */}
+            <span
+              ref={measureRef}
+              aria-hidden
+              style={{
+                position: "absolute",
+                visibility: "hidden",
+                whiteSpace: "nowrap",
+                fontSize: 16,
+                fontFamily: textCss.fontFamily,
+                fontWeight: textCss.fontWeight,
+                fontStyle: textCss.fontStyle,
+                textTransform: textCss.textTransform,
+              }}
+            >
               {displayTitle}
-            </div>
-          )}
+            </span>
+            {canEdit ? (
+              <input
+                value={title}
+                onChange={(e) => onTitleChange(e.target.value)}
+                placeholder="Untitled"
+                className="w-full border-none bg-transparent text-center outline-none"
+                style={{ ...textCss, fontSize }}
+              />
+            ) : (
+              <div className="w-full truncate text-center" style={{ ...textCss, fontSize }}>
+                {displayTitle}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
