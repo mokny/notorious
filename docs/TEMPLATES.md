@@ -31,8 +31,11 @@ numbers, `-` and `_`, and must be unique (per object for blocks, per workspace f
 | `objects.<id>` | Another object *in this workspace*, by its id - same shape as `object` above, but its own blocks are exposed as raw (unrendered) text, not re-evaluated - see "How rendering works" below |
 
 A `{% set %}` in one block is visible in every block *below* it in the same object (document
-order) - that's what makes the table-total example above meaningful spread across two blocks
-instead of needing to fit in one.
+order) - so the table-total example above works whether it's typed as a single block or (as shown
+in the Examples section) spread across the table and a paragraph below it. `{% set %}` inside a
+`{% for %}` loop also reaches back and updates a same-named variable declared before the loop
+(instead of Jinja's usual behavior of requiring a `namespace()` object for this) - that's what lets
+`total = total + ...` actually accumulate across iterations.
 
 ## Filters
 
@@ -43,8 +46,9 @@ instead of needing to fit in one.
 ## Examples
 
 **Table total, spread across two blocks** (a table block with id `prices`, followed by a
-paragraph below it - this is the same idea as the quick example at the top, just laid out the way
-you'd actually type it as two separate blocks)
+paragraph below it - the same idea as the quick example at the top, just laid out the way you'd
+actually type it when the table and the total are naturally two separate blocks; typing the whole
+thing into one paragraph below the table, like the quick example does, works the same way)
 
 Table block (id `prices`):
 

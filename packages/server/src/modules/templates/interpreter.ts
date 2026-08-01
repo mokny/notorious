@@ -7,12 +7,24 @@ const DANGEROUS_KEYS = new Set(["constructor", "__proto__", "prototype"]);
 const MAX_LOOP_ITERATIONS = 1000;
 
 /**
- * Nested variable scope for `{% set %}` - reads fall through to the parent,
- * writes always land in the innermost scope. The root scope is created once
- * per object render pass (see renderer.ts) and carries `{% set %}`
- * assignments made by earlier blocks forward into later ones; each `if`/`for`
- * body gets its own child scope so a loop-local `set` doesn't leak out,
- * matching Jinja's own loop-scoping behavior.
+ * Nested variable scope for `{% set %}` - reads fall through to the parent.
+ * The root scope is created once per object render pass (see renderer.ts)
+ * and carries `{% set %}` assignments made by earlier blocks forward into
+ * later ones; each `if`/`for` body gets its own child scope so a variable
+ * that's genuinely new there doesn't leak out once the block ends.
+ *
+ * A write, though, updates whichever scope already holds that name (walking
+ * up through parents) rather than always shadowing it locally - that's what
+ * makes `{% set total = total + x %}` inside a `{% for %}` loop actually
+ * accumulate across iterations: each iteration gets its own fresh child
+ * scope, but the assignment reaches back to the *shared* `total` declared
+ * before the loop instead of writing into a scope that's discarded at the
+ * end of that one iteration. Real Jinja2 requires a `namespace()` object for
+ * this (its `set` always shadows locally, a well-known gotcha for anyone
+ * coming from Home Assistant templates too) - reaching up to the existing
+ * binding instead is simpler and matches what most people expect on first
+ * try. A name that was never set in any ancestor scope is unaffected: it's
+ * still fully local to wherever it's first assigned.
  */
 export class Scope {
   private vars = new Map<string, unknown>();
@@ -23,7 +35,15 @@ export class Scope {
     return this.parent?.get(name);
   }
   set(name: string, value: unknown): void {
-    this.vars.set(name, value);
+    if (!this.setIfExists(name, value)) this.vars.set(name, value);
+  }
+  /** Recurses up through parents looking for an existing binding to update in place; returns whether it found (and updated) one. */
+  private setIfExists(name: string, value: unknown): boolean {
+    if (this.vars.has(name)) {
+      this.vars.set(name, value);
+      return true;
+    }
+    return this.parent?.setIfExists(name, value) ?? false;
   }
   child(): Scope {
     return new Scope(this);

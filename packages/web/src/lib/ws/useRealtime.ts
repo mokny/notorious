@@ -19,6 +19,11 @@ function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient:
       queryClient.invalidateQueries({ queryKey: ["object", payload.entityId] });
       queryClient.invalidateQueries({ queryKey: ["viewResults"] });
       queryClient.invalidateQueries({ queryKey: ["backlinks", payload.entityId] });
+      // A property edit can feed a template (`object.properties.<key>`, see
+      // modules/templates/renderer.ts) - without this, another viewer's
+      // already-rendered blocks would keep showing stale output for
+      // whatever that property fed into until they reloaded the page.
+      queryClient.invalidateQueries({ queryKey: ["blocksRendered", payload.entityId] });
     }
   } else if (payload.entity === "block") {
     // Block-save events fire on every debounced keystroke. Skip the
@@ -31,6 +36,12 @@ function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient:
       // BlockHistoryPanel.tsx) if it's currently open on the block someone
       // else just changed.
       queryClient.invalidateQueries({ queryKey: ["blockHistory", payload.entityId] });
+      // A changed block can be the source a template elsewhere in the same
+      // object reads from (`blocks.<slug>`) - without this, another
+      // viewer's already-rendered output would silently go stale until they
+      // reloaded, which is what someone editing live alongside them would
+      // actually notice as "the template doesn't update".
+      queryClient.invalidateQueries({ queryKey: ["blocksRendered", payload.objectId ?? ""] });
     }
   } else if (payload.entity === "member") {
     queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
@@ -93,6 +104,7 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["object"] });
           queryClient.invalidateQueries({ queryKey: ["blocks"] });
+          queryClient.invalidateQueries({ queryKey: ["blocksRendered"] });
           queryClient.invalidateQueries({ queryKey: ["blockHistory"] });
           queryClient.invalidateQueries({ queryKey: ["viewResults"] });
           queryClient.invalidateQueries({ queryKey: ["backlinks"] });

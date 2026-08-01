@@ -18,6 +18,11 @@ export function useObjectMutations(workspaceId: string): ObjectMutations {
       queryClient.invalidateQueries({ queryKey: ["viewResults"] }),
       queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] }),
       queryClient.invalidateQueries({ queryKey: ["recentEdits", workspaceId] }),
+      // A property value can feed a template (`object.properties.<key>`, see
+      // modules/templates/renderer.ts) - without this, this object's own
+      // already-rendered blocks would keep showing the pre-edit value until
+      // the page was reloaded.
+      queryClient.invalidateQueries({ queryKey: ["blocksRendered", objectId] }),
     ]);
   }
 

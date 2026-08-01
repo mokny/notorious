@@ -6,6 +6,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import type { BlockType, ObjectType } from "@notorious/shared";
 import { SlashCommand } from "./SlashCommand.js";
+import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 
 interface UseMarkdownEditorOptions {
   markdown: string;
@@ -133,7 +134,10 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       // saves," regardless of the exact ProseMirror mechanism involved.
       if (!editableRef.current) return;
       const storage = updatedEditor.storage as { markdown: { getMarkdown: () => string } };
-      onChangeRef.current?.(storage.markdown.getMarkdown().trim());
+      // The markdown serializer escapes `{{ row[1] * 2 }}`-style template
+      // code as if it were prose (`row\[1\] \* 2`) - see templateMarkdown.ts
+      // for why and how this undoes it.
+      onChangeRef.current?.(unescapeTemplateRegions(storage.markdown.getMarkdown().trim()));
     },
     onBlur: () => onBlurRef.current?.(),
   });
@@ -165,7 +169,10 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   useEffect(() => {
     if (!editor || editor.isFocused) return;
     const storage = editor.storage as { markdown: { getMarkdown: () => string } };
-    if (storage.markdown.getMarkdown().trim() === options.markdown.trim()) return;
+    // Same unescaping as onUpdate above, so this comparison isn't fooled by
+    // the serializer re-escaping `{{ }}`/`{% %}` content that hasn't
+    // actually changed, which would otherwise call setContent needlessly.
+    if (unescapeTemplateRegions(storage.markdown.getMarkdown().trim()) === options.markdown.trim()) return;
     editor.commands.setContent(options.markdown, false);
   }, [options.markdown, editor]);
 
