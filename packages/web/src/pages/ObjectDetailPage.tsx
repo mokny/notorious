@@ -217,25 +217,41 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const isLocked = Boolean(object.lockedAt);
   const effectiveCanEdit = canEdit && !isLocked;
 
-  // Rendered next to the title either here (no cover - see the row below) or
-  // inside CoverImage's overlay (cover set) - built once so both spots stay
-  // in sync instead of drifting into two slightly different copies.
-  const iconElement = effectiveCanEdit ? (
-    <IconPicker
-      icon={object.icon}
-      fallbackIcon={objectType?.icon ?? "file-text"}
-      onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon).then(() => undefined)}
-      onUploadIcon={async (file) => {
-        const asset = await fileApi.upload(workspaceId, file, object.id);
-        return fileApi.downloadUrl(asset.id);
-      }}
-      resettable
-    />
-  ) : (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-      <Icon name={object.icon ?? objectType?.icon ?? "file-text"} className="h-7 w-7" />
-    </div>
-  );
+  // Rebound so their types stay non-optional inside the `renderIcon` closure
+  // below - TS's narrowing from the early `if (!object || ... || !workspaceId)
+  // return` above doesn't carry into a function that's *called* later rather
+  // than evaluated inline.
+  const obj = object;
+  const wsId = workspaceId;
+
+  // Rendered next to the title either here (no cover - see the row below,
+  // default 40px) or inside CoverImage's overlay (cover set, sized to match
+  // its auto-fit title text - see the `size` param) - one function so both
+  // spots stay in sync instead of drifting into two slightly different
+  // copies.
+  function renderIcon(size?: number) {
+    return effectiveCanEdit ? (
+      <IconPicker
+        icon={obj.icon}
+        fallbackIcon={objectType?.icon ?? "file-text"}
+        onChangeIcon={(newIcon) => setIconMutation.mutateAsync(newIcon).then(() => undefined)}
+        onUploadIcon={async (file) => {
+          const asset = await fileApi.upload(wsId, file, obj.id);
+          return fileApi.downloadUrl(asset.id);
+        }}
+        resettable
+        size={size}
+      />
+    ) : (
+      <div className="flex shrink-0 items-center justify-center" style={{ width: size ?? 40, height: size ?? 40 }}>
+        <Icon
+          name={obj.icon ?? objectType?.icon ?? "file-text"}
+          className={size ? undefined : "h-7 w-7"}
+          style={size ? { width: size * 0.7, height: size * 0.7 } : undefined}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -247,7 +263,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         title={title}
         onTitleChange={setTitle}
         coverTextStyle={object.coverTextStyle}
-        icon={iconElement}
+        icon={renderIcon}
       />
 
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
@@ -262,7 +278,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               but a short title. */}
           {!object.cover && (
             <div className="flex items-center gap-2">
-              {iconElement}
+              {renderIcon()}
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}

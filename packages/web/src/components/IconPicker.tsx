@@ -23,10 +23,12 @@ interface IconPickerProps {
   onUploadIcon: (file: File) => Promise<string>;
   /** Shows a "Reset" button that clears back to `fallbackIcon` via `onChangeIcon(null)` - omit where null isn't a valid icon value (e.g. workspaces, which always need some icon set). */
   resettable?: boolean;
+  /** Overrides the trigger button/icon's default 40px/28px sizing (same 10:7 ratio) - the dropdown itself always stays its normal size regardless. See CoverImage.tsx, which matches this to the object's auto-fit title text. */
+  size?: number;
 }
 
 /** Lets you set something's icon from a preset emoji grid, any typed-in emoji, or an uploaded image - used for both objects (next to the title) and workspaces (Settings). */
-export function IconPicker({ icon, fallbackIcon, onChangeIcon, onUploadIcon, resettable }: IconPickerProps) {
+export function IconPicker({ icon, fallbackIcon, onChangeIcon, onUploadIcon, resettable, size }: IconPickerProps) {
   const [open, setOpen] = useState(false);
   const [customEmoji, setCustomEmoji] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,9 +55,10 @@ export function IconPicker({ icon, fallbackIcon, onChangeIcon, onUploadIcon, res
       <button
         onClick={() => setOpen((v) => !v)}
         title="Change icon"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-surface-raised"
+        className="flex shrink-0 items-center justify-center rounded-lg hover:bg-surface-raised"
+        style={size ? { width: size, height: size } : { width: "2.5rem", height: "2.5rem" }}
       >
-        <Icon name={icon ?? fallbackIcon} className="h-7 w-7" />
+        <Icon name={icon ?? fallbackIcon} className={size ? undefined : "h-7 w-7"} style={size ? { width: size * 0.7, height: size * 0.7 } : undefined} />
       </button>
 
       {open && (

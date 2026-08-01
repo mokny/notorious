@@ -17,8 +17,8 @@ interface CoverImageProps {
   title: string;
   onTitleChange: (value: string) => void;
   coverTextStyle: CoverTextStyle | null;
-  /** The object's icon (IconPicker if editable, a plain Icon otherwise - see ObjectDetailPage.tsx), rendered beside the title overlay. */
-  icon: ReactNode;
+  /** Renders the object's icon (IconPicker if editable, a plain Icon otherwise - see ObjectDetailPage.tsx) at the given pixel size, beside the title overlay - called with the title's own auto-fit font size so the icon visually matches it. */
+  icon: (size: number) => ReactNode;
 }
 
 /** Extracts the file id from a `fileApi.downloadUrl()`-shaped icon/cover value, so a replaced upload can clean up the one it's replacing. */
@@ -107,11 +107,13 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
         <div className="pointer-events-auto mx-auto flex max-w-full items-center justify-center gap-2">
-          {/* Fixed-size, unlike the title next to it - useFitText below
-              already accounts for it by measuring `overlayRef`'s *own*
+          {/* Sized to match the title's own (auto-fit) font size, so it
+              scales with it instead of looking tiny next to a huge title or
+              oversized next to a small one - useFitText below already
+              accounts for its width by measuring `overlayRef`'s *own*
               width, which this flex row only leaves it once this has taken
               its share. */}
-          <div className="shrink-0">{icon}</div>
+          <div className="shrink-0">{icon(fontSize)}</div>
           <div ref={overlayRef} className="min-w-0 flex-1">
             {/* Unconstrained, invisible twin of the title text - its natural
                 width at a fixed baseline size is what useFitText scales

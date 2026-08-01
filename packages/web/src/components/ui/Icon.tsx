@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { withShareToken } from "../../lib/api/shareMode.js";
 import {
   FileText,
@@ -133,7 +133,7 @@ function isImageUrl(value: string): boolean {
  * a generic file icon: a URL becomes an `<img>`, anything else (an emoji,
  * typically) is rendered as literal text.
  */
-export function Icon({ name, className }: { name: string; className?: string }) {
+export function Icon({ name, className, style }: { name: string; className?: string; style?: CSSProperties }) {
   // A URL (e.g. a bookmark's auto-detected favicon, or a since-deleted
   // uploaded file) can 404/fail to load - falls back to the generic file
   // icon instead of a broken-image glyph. Reset whenever `name` itself
@@ -141,15 +141,16 @@ export function Icon({ name, className }: { name: string; className?: string }) 
   const [imageFailed, setImageFailed] = useState(false);
   useEffect(() => setImageFailed(false), [name]);
 
-  if (!name) return <FileText className={className ?? "h-4 w-4"} />;
+  if (!name) return <FileText className={className ?? "h-4 w-4"} style={style} />;
 
   if (isImageUrl(name)) {
-    if (imageFailed) return <FileText className={className ?? "h-4 w-4"} />;
+    if (imageFailed) return <FileText className={className ?? "h-4 w-4"} style={style} />;
     return (
       <img
         src={withShareToken(name)}
         alt=""
         className={`${className ?? "h-4 w-4"} shrink-0 rounded object-cover`}
+        style={style}
         onError={() => setImageFailed(true)}
       />
     );
@@ -158,11 +159,14 @@ export function Icon({ name, className }: { name: string; className?: string }) 
   const Component = ICONS[name];
   if (!Component) {
     return (
-      <span className={`${className ?? "h-4 w-4"} inline-flex shrink-0 items-center justify-center text-base leading-none`}>
+      <span
+        className={`${className ?? "h-4 w-4"} inline-flex shrink-0 items-center justify-center text-base leading-none`}
+        style={style}
+      >
         {name}
       </span>
     );
   }
 
-  return <Component className={className ?? "h-4 w-4"} />;
+  return <Component className={className ?? "h-4 w-4"} style={style} />;
 }
