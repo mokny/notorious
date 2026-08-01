@@ -26,6 +26,17 @@ export interface BlockEditorActions {
    * exactly what a locked object shouldn't do.
    */
   readOnly: boolean;
+  /**
+   * Set only in "Preview" mode (see ObjectDetailPage.tsx's preview toggle
+   * and modules/templates/ on the server) - blockId -> field name ->
+   * template-rendered text, for fields whose raw source actually contained
+   * `{{ }}`/`{% %}` syntax. `BlockItem.tsx` merges these over a block's raw
+   * `content` before handing it to `BlockRenderer`, so Preview reuses every
+   * block type's normal (read-only) rendering instead of a separate,
+   * parallel renderer. `null` outside Preview mode - every block renders its
+   * own stored content exactly as saved, template syntax included verbatim.
+   */
+  renderedOverrides: Record<string, Record<string, string>> | null;
   createBlockAfter: (parentBlockId: string | null, afterBlockId: string | null, type: BlockType, extraContent?: Record<string, unknown>) => void;
   updateBlockContent: (blockId: string, content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see toggleChecklistItemSchema and ChecklistBlock.tsx. */

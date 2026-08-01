@@ -54,6 +54,7 @@ import type {
   AiConfigSummary,
   SaveAiConfigInput,
   AiChatMessage,
+  RenderedBlocksResponse,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
 
@@ -179,6 +180,8 @@ export const blockApi = {
     apiRequest<Block[]>("/api/v1/blocks/import-markdown", { method: "POST", body: { objectId, markdown } }),
   exportMarkdownUrl: (objectId: string) => `/api/v1/objects/${objectId}/export-markdown`,
   history: (id: string) => apiRequest<BlockHistoryEntry[]>(`/api/v1/blocks/${id}/history`),
+  /** Template-rendered text for this object's blocks - see ObjectDetailPage.tsx's Preview toggle and modules/templates/ on the server. */
+  rendered: (objectId: string) => apiRequest<RenderedBlocksResponse>(`/api/v1/objects/${objectId}/blocks/rendered`),
 };
 
 export const viewApi = {

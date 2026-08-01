@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BLOCK_TYPES } from "../constants/blockTypes.js";
+import { slugSchema } from "./slug.js";
 
 export const createBlockSchema = z.object({
   objectId: z.string(),
@@ -13,6 +14,7 @@ export type CreateBlockInput = z.infer<typeof createBlockSchema>;
 
 export const updateBlockSchema = z.object({
   content: z.record(z.string(), z.unknown()).optional(),
+  slug: slugSchema.optional(),
 });
 export type UpdateBlockInput = z.infer<typeof updateBlockSchema>;
 

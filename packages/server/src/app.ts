@@ -33,6 +33,7 @@ import { registerScriptRoutes } from "./modules/scripting/routes.js";
 import { registerWebhookRoutes } from "./modules/webhooks/routes.js";
 import { registerAiRoutes } from "./modules/ai/routes.js";
 import { registerMcpRoutes } from "./modules/mcp/routes.js";
+import { registerTemplateRoutes } from "./modules/templates/routes.js";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const WEB_DIST_DIR = path.join(PACKAGE_ROOT, "packages/web/dist");
@@ -101,6 +102,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerWebhookRoutes(app);
   await registerAiRoutes(app);
   await registerMcpRoutes(app);
+  await registerTemplateRoutes(app);
 
   app.get("/api/v1/health", async () => ({ status: "ok", version: PACKAGE_VERSION }));
 

@@ -111,6 +111,8 @@ export interface ObjectRecord {
   scriptLastRun: ScriptRunSummary | null;
   /** User-configurable styling for the title overlaid on `cover` (see CoverImage.tsx) - null means "use the frontend's own default styling". */
   coverTextStyle: CoverTextStyle | null;
+  /** Human-assignable, unique within this workspace - see modules/templates/ for how another object's template addresses this one by slug instead of its UUID. Null until set. */
+  slug: string | null;
   values: Record<string, PropertyValue>;
 }
 
@@ -163,6 +165,8 @@ export interface Block {
   position: string;
   createdAt: ISODateString;
   updatedAt: ISODateString;
+  /** Human-assignable, unique within this object - see modules/templates/ for how it's used to address this block from template expressions (`blocks.<slug>`). Null until set. */
+  slug: string | null;
 }
 
 export interface View {

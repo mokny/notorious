@@ -53,6 +53,11 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   const onEnterRef = useRef(options.onEnter);
   const onBackspaceEmptyRef = useRef(options.onBackspaceEmpty);
   const onSlashSelectRef = useRef(options.onSlashSelect);
+  // Read fresh (not closed over) inside `onUpdate` below - toggling editable
+  // off doesn't recreate the editor, so a stale closure here would keep
+  // whatever `editable` was true at creation time.
+  const editableRef = useRef(options.editable ?? true);
+  editableRef.current = options.editable ?? true;
   // Read at call-time by the extension (see SlashCommand.ts's `objectTypesRef`
   // param), not just when it's configured below - object types can still be
   // loading (or change) after this editor instance is created.
@@ -114,6 +119,15 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
     editorProps,
     editable: options.editable ?? true,
     onUpdate: ({ editor: updatedEditor }) => {
+      // Belt-and-suspenders: never persist a change while this editor is
+      // read-only, no matter what triggered `onUpdate` - a locked object or
+      // Preview mode toggling `editable` can apparently still produce a
+      // spurious update event around the transition (observed: switching
+      // Preview back off fired one carrying the *rendered* text, which would
+      // otherwise have silently overwritten the block's real template
+      // source). The actual invariant that matters is "read-only never
+      // saves," regardless of the exact ProseMirror mechanism involved.
+      if (!editableRef.current) return;
       const storage = updatedEditor.storage as { markdown: { getMarkdown: () => string } };
       onChangeRef.current?.(storage.markdown.getMarkdown().trim());
     },

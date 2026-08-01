@@ -74,9 +74,19 @@ interface BlockEditorProps {
   embedAncestorIds?: string[];
   /** Set by ObjectDetailPage.tsx when the object is locked (or read-only for this viewer) - see BlockEditorContext.tsx's `readOnly`. Always effectively true for an embedded instance too, regardless of this prop. */
   readOnly?: boolean;
+  /** Set by ObjectDetailPage.tsx's Preview toggle - see BlockEditorContext.tsx's `renderedOverrides`. */
+  renderedOverrides?: Record<string, Record<string, string>> | null;
 }
 
-export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onSelectBlock, embedAncestorIds, readOnly = false }: BlockEditorProps) {
+export function BlockEditor({
+  workspaceId,
+  objectId,
+  selectedBlockId = null,
+  onSelectBlock,
+  embedAncestorIds,
+  readOnly = false,
+  renderedOverrides = null,
+}: BlockEditorProps) {
   const queryClient = useQueryClient();
   const resolvedEmbedAncestorIds = embedAncestorIds ?? [objectId];
   // Only ever set by SubObjectBlock.tsx's own nested render (see its "embed"
@@ -225,6 +235,15 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
    * both sides to restore correctly.
    */
   function performUpdate(blockId: string, content: Record<string, unknown>): Promise<void> {
+    // The definitive guard against a locked object or Preview mode ever
+    // persisting a change, regardless of what triggered this call - a
+    // read-only TipTap editor has still been observed to fire a spurious
+    // `onUpdate` around an editable-state transition (see
+    // useMarkdownEditor.ts's own `editableRef` guard, kept as defense in
+    // depth) - this is the one choke point every block content save goes
+    // through, so it's the most robust place to enforce "read-only never
+    // saves" no matter which editor/mechanism tried to.
+    if (effectiveReadOnly) return Promise.resolve();
     const before = (blocks ?? []).find((b) => b.id === blockId);
     return updateMutation
       .mutateAsync(
@@ -409,6 +428,7 @@ export function BlockEditor({ workspaceId, objectId, selectedBlockId = null, onS
         objectTypes: objectTypes ?? [],
         embedAncestorIds: resolvedEmbedAncestorIds,
         readOnly: effectiveReadOnly,
+        renderedOverrides,
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),

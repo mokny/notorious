@@ -12,7 +12,8 @@ import type {
 import { db } from "../../db/client.js";
 import { objects, relations, objectValues, objectTypes, blocks } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
-import { notFound, locked } from "../../lib/httpError.js";
+import { notFound, locked, conflict } from "../../lib/httpError.js";
+import { slugify, randomSlugSuffix } from "../../lib/slug.js";
 import { listProperties } from "../schema/service.js";
 import { resolveValuesForObjects } from "./valueResolver.js";
 import { applyFilters, compareForSort, MAX_SCAN } from "./query.js";
@@ -47,8 +48,31 @@ function toRecord(row: typeof objects.$inferSelect, values: Record<string, unkno
         }
       : null,
     coverTextStyle: row.coverTextStyle ? (JSON.parse(row.coverTextStyle) as CoverTextStyle) : null,
+    slug: row.slug,
     values: values as ObjectRecord["values"],
   };
+}
+
+/** Derives a default slug from the title, unique within the workspace - see db/schema.ts's `objects.slug`. Collision is checked once; a random suffix makes a second one astronomically unlikely, not worth retry-looping over. */
+async function generateUniqueObjectSlug(workspaceId: string, title: string): Promise<string> {
+  const base = slugify(title) || "object";
+  const existing = await db
+    .select({ id: objects.id })
+    .from(objects)
+    .where(and(eq(objects.workspaceId, workspaceId), eq(objects.slug, base)))
+    .limit(1);
+  return existing[0] ? `${base}-${randomSlugSuffix()}` : base;
+}
+
+async function assertObjectSlugAvailable(workspaceId: string, slug: string, excludeObjectId: string): Promise<void> {
+  const existing = await db
+    .select({ id: objects.id })
+    .from(objects)
+    .where(and(eq(objects.workspaceId, workspaceId), eq(objects.slug, slug)))
+    .limit(1);
+  if (existing[0] && existing[0].id !== excludeObjectId) {
+    throw conflict(`Another object in this workspace already uses the id "${slug}"`);
+  }
 }
 
 /**
@@ -91,6 +115,7 @@ export async function createObject(
 ): Promise<ObjectRecord> {
   const id = newId();
   const now = nowIso();
+  const slug = await generateUniqueObjectSlug(workspaceId, input.title);
 
   await db.insert(objects).values({
     id,
@@ -103,6 +128,7 @@ export async function createObject(
     createdAt: now,
     updatedAt: now,
     archivedAt: null,
+    slug,
   });
 
   if (Object.keys(input.values).length > 0) {
@@ -166,6 +192,10 @@ export async function updateObject(
   if (input.icon !== undefined) patch.icon = input.icon;
   if (input.cover !== undefined) patch.cover = input.cover;
   if (input.coverTextStyle !== undefined) patch.coverTextStyle = input.coverTextStyle ? JSON.stringify(input.coverTextStyle) : null;
+  if (input.slug !== undefined) {
+    if (input.slug) await assertObjectSlugAvailable(row.workspaceId, input.slug, objectId);
+    patch.slug = input.slug;
+  }
 
   await db.update(objects).set(patch).where(eq(objects.id, objectId));
 

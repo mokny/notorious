@@ -3,8 +3,9 @@ import type { CreateBlockInput, UpdateBlockInput, MoveBlockInput, RestoreBlockIn
 import { db } from "../../db/client.js";
 import { blocks, objects, blockHistory } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
-import { notFound, badRequest } from "../../lib/httpError.js";
+import { notFound, badRequest, conflict } from "../../lib/httpError.js";
 import { positionBetween } from "../../lib/position.js";
+import { randomSlugSuffix } from "../../lib/slug.js";
 import { reindexObjectBody } from "../search/indexer.js";
 import { createRelation, deleteRelationByTriple, getObjectWorkspaceId } from "../objects/service.js";
 import { listProperties } from "../schema/service.js";
@@ -20,7 +21,30 @@ function toBlock(row: typeof blocks.$inferSelect): Block {
     position: row.position,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    slug: row.slug,
   };
+}
+
+/** Derives a default slug from the block type, unique within the object - see db/schema.ts's `blocks.slug`. Collision (two blocks of the same type created in the same instant) is checked once; a random suffix makes a second one astronomically unlikely. */
+async function generateUniqueBlockSlug(objectId: string, type: string): Promise<string> {
+  const base = type.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const existing = await db
+    .select({ id: blocks.id })
+    .from(blocks)
+    .where(and(eq(blocks.objectId, objectId), eq(blocks.slug, base)))
+    .limit(1);
+  return existing[0] ? `${base}-${randomSlugSuffix()}` : base;
+}
+
+async function assertBlockSlugAvailable(objectId: string, slug: string, excludeBlockId: string): Promise<void> {
+  const existing = await db
+    .select({ id: blocks.id })
+    .from(blocks)
+    .where(and(eq(blocks.objectId, objectId), eq(blocks.slug, slug)))
+    .limit(1);
+  if (existing[0] && existing[0].id !== excludeBlockId) {
+    throw conflict(`Another block in this object already uses the id "${slug}"`);
+  }
 }
 
 /** Most-recent-first, capped at 10 - see recordAndBroadcast/recordBlockHistory, which already trims the table itself to the same limit at write time. */
@@ -137,6 +161,7 @@ export async function createBlock(input: CreateBlockInput): Promise<Block> {
   const id = newId();
   const now = nowIso();
   const position = await positionForInsert(input.objectId, input.parentBlockId, input.afterBlockId);
+  const slug = await generateUniqueBlockSlug(input.objectId, input.type);
 
   await db.insert(blocks).values({
     id,
@@ -147,6 +172,7 @@ export async function createBlock(input: CreateBlockInput): Promise<Block> {
     position,
     createdAt: now,
     updatedAt: now,
+    slug,
   });
 
   await touchObject(input.objectId);
@@ -165,6 +191,7 @@ export async function createBlock(input: CreateBlockInput): Promise<Block> {
     position,
     createdAt: now,
     updatedAt: now,
+    slug,
   };
 }
 
@@ -191,14 +218,19 @@ export async function updateBlock(blockId: string, input: UpdateBlockInput): Pro
   // exactly the "typing makes the block vanish" bug this guards against.
   const content =
     input.content !== undefined ? JSON.stringify({ ...JSON.parse(row.content), ...input.content }) : row.content;
-  await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
+  let slug = row.slug;
+  if (input.slug !== undefined) {
+    if (input.slug) await assertBlockSlugAvailable(row.objectId, input.slug, blockId);
+    slug = input.slug;
+  }
+  await db.update(blocks).set({ content, updatedAt, slug }).where(eq(blocks.id, blockId));
   await touchObject(row.objectId);
 
   if (row.type === "sub_object") {
     await syncSubObjectRelation(row.objectId, subObjectTargetOf(row.content), subObjectTargetOf(content), blockId);
   }
 
-  return toBlock({ ...row, content, updatedAt });
+  return toBlock({ ...row, content, updatedAt, slug });
 }
 
 /**
@@ -268,6 +300,11 @@ export async function deleteBlock(blockId: string): Promise<void> {
  */
 export async function restoreBlock(input: RestoreBlockInput): Promise<Block> {
   const now = nowIso();
+  // Undo/redo's own snapshot (see useEditorHistory.ts's BlockSnapshot) doesn't
+  // carry a slug - a restored block just gets a fresh default one, same as
+  // any other newly-created block, rather than plumbing slug fidelity
+  // through the whole undo/redo stack for this edge case.
+  const slug = await generateUniqueBlockSlug(input.objectId, input.type);
   await db.insert(blocks).values({
     id: input.id,
     objectId: input.objectId,
@@ -277,6 +314,7 @@ export async function restoreBlock(input: RestoreBlockInput): Promise<Block> {
     position: input.position,
     createdAt: now,
     updatedAt: now,
+    slug,
   });
   await touchObject(input.objectId);
 
@@ -294,6 +332,7 @@ export async function restoreBlock(input: RestoreBlockInput): Promise<Block> {
     position: input.position,
     createdAt: now,
     updatedAt: now,
+    slug,
   };
 }
 

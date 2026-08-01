@@ -5,7 +5,9 @@ import type { BlockNode } from "./blockTree.js";
 import { BlockRenderer } from "./BlockRenderer.js";
 import { BlockList } from "./BlockList.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
+import { BlockSlugButton } from "./BlockSlugButton.js";
 import { Icon } from "../ui/Icon.js";
+import { applyRenderedOverrides } from "../../lib/applyRenderedOverrides.js";
 
 export function BlockItem({ block }: { block: BlockNode }) {
   const {
@@ -21,7 +23,9 @@ export function BlockItem({ block }: { block: BlockNode }) {
     clearPendingFocus,
     isDraggingAny,
     selectBlock,
+    renderedOverrides,
   } = useBlockEditor();
+  const displayBlock = renderedOverrides ? applyRenderedOverrides(block, renderedOverrides[block.id]) : block;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -69,7 +73,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
 
       <div className="min-w-0 flex-1">
         <BlockRenderer
-          block={block}
+          block={displayBlock}
           workspaceId={workspaceId}
           objectId={objectId}
           onSave={(content) => updateBlockContent(block.id, content)}
@@ -87,6 +91,8 @@ export function BlockItem({ block }: { block: BlockNode }) {
           onAutoFocused={clearPendingFocus}
         />
       </div>
+
+      <BlockSlugButton objectId={objectId} blockId={block.id} slug={block.slug} />
 
       <button
         onClick={() => deleteBlock(block.id)}

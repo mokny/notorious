@@ -53,6 +53,8 @@ import {
   Minimize2,
   Presentation,
   Bot,
+  Braces,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 
@@ -109,6 +111,8 @@ const ICONS: Record<string, LucideIcon> = {
   minimize: Minimize2,
   presentation: Presentation,
   bot: Bot,
+  braces: Braces,
+  eye: Eye,
 };
 
 function isImageUrl(value: string): boolean {

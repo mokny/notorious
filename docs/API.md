@@ -93,6 +93,9 @@ secret.
 - `PATCH /api/v1/blocks/:id`, `POST /api/v1/blocks/:id/move`, `DELETE /api/v1/blocks/:id`
 - `POST /api/v1/blocks/import-markdown` - `{ objectId, markdown }`, replaces the object's entire block tree
 - `GET /api/v1/objects/:objectId/export-markdown` - downloads a `.md` file
+- `GET /api/v1/objects/:objectId/blocks/rendered` - `{ rendered: { [blockId]: { [field]: string } } }`, the
+  object's blocks with any `{{ }}`/`{% %}` template syntax (see [TEMPLATES.md](TEMPLATES.md)) evaluated -
+  only fields that actually contained template syntax are included
 
 ## Views
 

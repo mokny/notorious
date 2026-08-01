@@ -150,6 +150,10 @@ export const objects = sqliteTable("objects", {
   scriptLastRunError: text("script_last_run_error"),
   scriptLastRunLog: text("script_last_run_log"),
   coverTextStyle: text("cover_text_style"),
+  // Human-assignable, unique per workspace - lets templates (modules/templates/) address this
+  // object by a stable name instead of its UUID. Null until the user (or the auto-generated
+  // default at creation) sets one - see objects/service.ts's `generateSlug`.
+  slug: text("slug"),
 });
 
 export const objectValues = sqliteTable(
@@ -198,6 +202,9 @@ export const blocks = sqliteTable("blocks", {
   position: text("position").notNull(),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+  // Human-assignable, unique per object - lets templates (modules/templates/) address this block
+  // as `blocks.<slug>` instead of its UUID. Same pattern as objects.slug above.
+  slug: text("slug"),
 });
 
 export const files = sqliteTable("files", {

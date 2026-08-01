@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { slugSchema } from "./slug.js";
 
 const propertyValueSchema = z.union([
   z.string(),
@@ -40,6 +41,7 @@ export const updateObjectSchema = z.object({
   icon: z.string().max(500).nullable().optional(),
   cover: z.string().max(2000).nullable().optional(),
   coverTextStyle: coverTextStyleSchema.nullable().optional(),
+  slug: slugSchema.optional(),
   values: z.record(z.string(), propertyValueSchema).optional(),
 });
 export type UpdateObjectInput = z.infer<typeof updateObjectSchema>;
