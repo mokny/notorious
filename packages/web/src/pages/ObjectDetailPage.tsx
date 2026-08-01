@@ -231,7 +231,24 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          {/* Its own row, above the icon/action-button row below - hidden
+              once there's a cover (CoverImage renders the title as an
+              overlay on top of it instead, so showing it again here too
+              would just be a redundant, differently-sized copy). Sharing a
+              row with the icon picker and every action button (lock, pin,
+              dashboard, share, delete, ...) left the title squeezed into
+              whatever space those left over, cutting it off or hiding it
+              outright for anything but a short title. */}
+          {!object.cover && (
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Untitled"
+              readOnly={!effectiveCanEdit}
+              className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
+            />
+          )}
+          <div className={`flex items-center gap-2 ${object.cover ? "" : "mt-2"}`}>
             {effectiveCanEdit ? (
               <IconPicker
                 icon={object.icon}
@@ -247,18 +264,6 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               <div className="flex h-10 w-10 shrink-0 items-center justify-center">
                 <Icon name={object.icon ?? objectType?.icon ?? "file-text"} className="h-7 w-7" />
               </div>
-            )}
-            {/* Hidden once there's a cover - CoverImage renders the title as
-                an overlay on top of it instead, so showing it again here
-                too would just be a redundant, differently-sized copy. */}
-            {!object.cover && (
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Untitled"
-                readOnly={!effectiveCanEdit}
-                className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
-              />
             )}
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
