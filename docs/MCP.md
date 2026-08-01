@@ -65,6 +65,6 @@ apart.
 ## In-app alternative: Agent Chat
 
 If you'd rather not run a separate MCP client, configure your own AI provider's API key in
-**Settings -> AI** (OpenAI, Anthropic, or any OpenAI-compatible server, e.g. a local Ollama
-instance) and use the **Agent Chat** page that appears in the sidebar once configured. It's the
-same tool set, driven by a plain chat instead of an external client.
+**Settings -> AI** (OpenAI, Anthropic, Google Gemini, or any OpenAI-compatible server, e.g. a local
+Ollama instance) and use the **Agent Chat** page that appears in the sidebar once configured. It's
+the same tool set, driven by a plain chat instead of an external client.

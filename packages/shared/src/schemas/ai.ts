@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const AI_PROVIDERS = ["openai", "anthropic", "openai-compatible"] as const;
+export const AI_PROVIDERS = ["openai", "anthropic", "google", "openai-compatible"] as const;
 export type AiProvider = (typeof AI_PROVIDERS)[number];
 
 export const saveAiConfigSchema = z.object({

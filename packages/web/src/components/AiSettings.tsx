@@ -8,8 +8,26 @@ import { TextField } from "./ui/TextField.js";
 const PROVIDER_LABELS: Record<AiProvider, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
+  google: "Google (Gemini)",
   "openai-compatible": "OpenAI-compatible (Ollama, local models, ...)",
 };
+
+/**
+ * Suggestions only, not a fixed enum - `model` stays a free-text field (see
+ * SaveAiConfigInput) since Google ships new Gemini models faster than this
+ * list could be kept in sync. Shown via a `<datalist>` so picking one is a
+ * click, but typing any other model id future releases add still works.
+ */
+const GEMINI_MODEL_SUGGESTIONS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-3.5-pro",
+  "gemini-3-flash",
+  "gemini-3-pro",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+];
 
 /** Lets the current user pick and configure one AI provider profile (own API key, encrypted at rest) - powers both the Agent Chat page and, indirectly, nothing else: the MCP server authenticates separately, with a personal API key, not this. */
 export function AiSettings() {
@@ -75,12 +93,20 @@ export function AiSettings() {
             ))}
           </select>
           <TextField
-            placeholder="Model (e.g. gpt-4o, claude-sonnet-5)"
+            placeholder={provider === "google" ? "Model (e.g. gemini-3.5-flash-lite)" : "Model (e.g. gpt-4o, claude-sonnet-5)"}
             value={model}
             onChange={(e) => setModel(e.target.value)}
             className="max-w-xs"
+            list={provider === "google" ? "gemini-model-suggestions" : undefined}
             required
           />
+          {provider === "google" && (
+            <datalist id="gemini-model-suggestions">
+              {GEMINI_MODEL_SUGGESTIONS.map((suggestion) => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
+          )}
         </div>
         {provider === "openai-compatible" && (
           <TextField

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AiChatMessage } from "@notorious/shared";
 import { badRequest } from "../../lib/httpError.js";
 import { getDecryptedAiConfig, listChatMessages, appendChatMessage } from "./service.js";
-import { getProviderAdapter, type ChatMessage } from "./providers/index.js";
+import { getProviderAdapter, resolveBaseUrl, type ChatMessage } from "./providers/index.js";
 import { AI_TOOLS, findTool, toolParametersJsonSchema } from "./tools.js";
 
 const MAX_TOOL_ITERATIONS = 8;
@@ -50,7 +50,7 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const result = await adapter.chat({
       apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
+      baseUrl: resolveBaseUrl(config.provider, config.baseUrl),
       model: config.model,
       systemPrompt: systemPrompt(workspaceId),
       messages: history,

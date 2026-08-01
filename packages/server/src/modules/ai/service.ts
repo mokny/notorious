@@ -6,7 +6,7 @@ import { newId, nowIso } from "../../lib/ids.js";
 import { encrypt, decrypt } from "../../lib/crypto.js";
 
 export interface DecryptedAiConfig {
-  provider: "openai" | "anthropic" | "openai-compatible";
+  provider: "openai" | "anthropic" | "google" | "openai-compatible";
   model: string;
   baseUrl: string | null;
   apiKey: string;

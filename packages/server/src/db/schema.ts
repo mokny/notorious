@@ -400,7 +400,7 @@ export const aiConfigs = sqliteTable("ai_configs", {
   userId: text("user_id")
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
-  provider: text("provider").notNull().$type<"openai" | "anthropic" | "openai-compatible">(),
+  provider: text("provider").notNull().$type<"openai" | "anthropic" | "google" | "openai-compatible">(),
   // Only set for 'openai-compatible' (e.g. a local Ollama server's URL).
   baseUrl: text("base_url"),
   model: text("model").notNull(),
