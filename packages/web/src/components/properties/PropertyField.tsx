@@ -65,7 +65,7 @@ export function PropertyField({
       return (
         <input
           type="checkbox"
-          className="h-4 w-4 accent-accent"
+          className="accent-accent"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
         />

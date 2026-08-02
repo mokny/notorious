@@ -61,6 +61,17 @@ body {
   @apply bg-accent/10;
 }
 
+/* A native checkbox's default size (or the app's own previous h-4/w-4) is a
+   fiddly target to tap accurately with a finger - sized here once, app-wide
+   (checklist items, property values, settings toggles, ...) rather than in
+   each component, so every checkbox stays consistent. Width/height, not
+   `transform: scale`, so the enlarged box is also what actually gets hit-
+   tested, not just what's drawn. */
+input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .tiptap.ProseMirror-focused p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;

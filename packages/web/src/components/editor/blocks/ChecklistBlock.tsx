@@ -86,7 +86,7 @@ function ChecklistItemRow({
         // correctly stays disabled instead of looking clickable and
         // silently failing.
         {...(canToggleWhileLocked ? { "data-lock-exempt": "" } : {})}
-        className="mt-1 h-4 w-4 shrink-0 accent-accent"
+        className="mt-1 shrink-0 accent-accent"
       />
       {showRendered ? (
         <div
