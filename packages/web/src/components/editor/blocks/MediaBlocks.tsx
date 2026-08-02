@@ -36,43 +36,58 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
   if (content.url) {
     return (
       <figure>
-        <Dialog.Root open={lightboxOpen} onOpenChange={setLightboxOpen}>
-          <Dialog.Trigger asChild>
-            <button
-              type="button"
-              title="Click to enlarge"
-              // A view action, not an edit - stays clickable even while the
-              // object is locked (see readOnlyContent.ts's blanket
-              // `button:not([data-view-toggle])` rule).
-              data-view-toggle
-              className="block w-full cursor-zoom-in"
-            >
-              <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
-            </button>
-          </Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-40 bg-black/80" />
-            {/* Clicking anywhere (including the image itself) closes it again, matching the trigger's "click to enlarge" - a second, explicit close button covers anyone who'd rather not guess. */}
-            <Dialog.Content
-              onClick={() => setLightboxOpen(false)}
-              className="fixed inset-0 z-50 flex items-center justify-center p-8 outline-none"
-            >
-              <Dialog.Title className="sr-only">{content.caption || "Image"}</Dialog.Title>
-              <img
-                src={withShareToken(content.url)}
-                alt={content.caption ?? ""}
-                className="max-h-full max-w-full cursor-zoom-out rounded-lg object-contain"
-              />
-              <Dialog.Close
-                title="Close"
+        <div className="group relative">
+          <Dialog.Root open={lightboxOpen} onOpenChange={setLightboxOpen}>
+            <Dialog.Trigger asChild>
+              <button
+                type="button"
+                title="Click to enlarge"
+                // A view action, not an edit - stays clickable even while the
+                // object is locked (see readOnlyContent.ts's blanket
+                // `button:not([data-view-toggle])` rule).
                 data-view-toggle
-                className="fixed right-4 top-4 rounded-md bg-black/40 p-2 text-white hover:bg-black/60"
+                className="block w-full cursor-zoom-in"
               >
-                <Icon name="close" className="h-5 w-5" />
-              </Dialog.Close>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
+                <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
+              </button>
+            </Dialog.Trigger>
+            <Dialog.Portal>
+              <Dialog.Overlay className="fixed inset-0 z-40 bg-black/80" />
+              {/* Clicking anywhere (including the image itself) closes it again, matching the trigger's "click to enlarge" - a second, explicit close button covers anyone who'd rather not guess. */}
+              <Dialog.Content
+                onClick={() => setLightboxOpen(false)}
+                className="fixed inset-0 z-50 flex items-center justify-center p-8 outline-none"
+              >
+                <Dialog.Title className="sr-only">{content.caption || "Image"}</Dialog.Title>
+                <img
+                  src={withShareToken(content.url)}
+                  alt={content.caption ?? ""}
+                  className="max-h-full max-w-full cursor-zoom-out rounded-lg object-contain"
+                />
+                <Dialog.Close
+                  title="Close"
+                  data-view-toggle
+                  className="fixed right-4 top-4 rounded-md bg-black/40 p-2 text-white hover:bg-black/60"
+                >
+                  <Icon name="close" className="h-5 w-5" />
+                </Dialog.Close>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
+          {/* An <a download>, not a button - readOnlyContent.ts's lock only
+              disables input/textarea/select/button/contenteditable/canvas, so
+              this stays clickable while the object is locked without needing
+              a data-view-toggle escape hatch. Hover-revealed like
+              CoverImage.tsx's own Change/Remove controls. */}
+          <a
+            href={withShareToken(content.url)}
+            download
+            title="Download image"
+            className="absolute right-2 top-2 rounded-md bg-black/40 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/60 group-hover:opacity-100"
+          >
+            <Icon name="download" className="h-4 w-4" />
+          </a>
+        </div>
         <input
           value={content.caption ?? ""}
           onChange={(e) => save({ ...content, caption: e.target.value })}

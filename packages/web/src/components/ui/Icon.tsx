@@ -55,6 +55,7 @@ import {
   Bot,
   Braces,
   Eye,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 
@@ -113,6 +114,7 @@ const ICONS: Record<string, LucideIcon> = {
   bot: Bot,
   braces: Braces,
   eye: Eye,
+  smartphone: Smartphone,
 };
 
 function isImageUrl(value: string): boolean {

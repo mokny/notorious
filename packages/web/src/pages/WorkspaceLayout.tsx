@@ -12,6 +12,7 @@ import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
 import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
 import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
+import { InstallAppHint } from "../components/nav/InstallAppHint.js";
 import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
@@ -185,6 +186,9 @@ export function WorkspaceLayout() {
           </button>
           <span className="truncate text-sm font-medium">{workspace?.name}</span>
         </div>
+        {/* Only for a real member - an anonymous share visitor has no
+            account to "install their copy" of the app for. */}
+        {!shareToken && <InstallAppHint />}
         <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
