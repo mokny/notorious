@@ -56,6 +56,9 @@ import {
   Braces,
   Eye,
   Smartphone,
+  ZoomIn,
+  ZoomOut,
+  Scan,
   type LucideIcon,
 } from "lucide-react";
 
@@ -115,6 +118,9 @@ const ICONS: Record<string, LucideIcon> = {
   braces: Braces,
   eye: Eye,
   smartphone: Smartphone,
+  "zoom-in": ZoomIn,
+  "zoom-out": ZoomOut,
+  scan: Scan,
 };
 
 function isImageUrl(value: string): boolean {

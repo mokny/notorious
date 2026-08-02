@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ExcalidrawImperativeAPI, ExcalidrawProps } from "@excalidraw/excalidraw/types";
+import type { ExcalidrawImperativeAPI, ExcalidrawProps, NormalizedZoomValue } from "@excalidraw/excalidraw/types";
 import type { ImportedDataState } from "@excalidraw/excalidraw/data/types";
 import type { WhiteboardContent } from "@notorious/shared";
 import { useTheme } from "../../../context/ThemeContext.js";
@@ -9,6 +9,12 @@ import { workspaceApi } from "../../../lib/api/resources.js";
 import { Icon } from "../../ui/Icon.js";
 
 const SAVE_DEBOUNCE_MS = 500;
+// Matches Excalidraw's own (undocumented-as-a-prop, so mirrored here rather
+// than imported) zoom bounds and step - see MIN_ZOOM/MAX_ZOOM/ZOOM_STEP in
+// its constants.ts.
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 30;
+const ZOOM_STEP_FACTOR = 1.2;
 
 /**
  * Excalidraw (shapes, freehand drawing, arrows, text, a color picker, and an
@@ -109,15 +115,45 @@ export function WhiteboardBlock({
       });
   }
 
+  // Whatever tool was last active when the scene was saved (almost always
+  // "selection", Excalidraw's own default) isn't what we want to reopen
+  // into - a whiteboard embedded in a block is looked at/panned around far
+  // more often than it's drawn on, so every fresh open should start on the
+  // hand tool instead of requiring a click to get there first.
+  const HAND_TOOL = { type: "hand", customType: null, lastActiveTool: null, locked: false } as const;
+
   const [initialDataArg] = useState<ExcalidrawProps["initialData"]>(() => async () => {
     const mod = await import("@excalidraw/excalidraw");
     const parsed = parseInitialData(contentRef.current.sceneJson);
-    if (!parsed) return null;
-    return mod.restore(parsed, null, null);
+    const restored = parsed ? mod.restore(parsed, null, null) : null;
+    return {
+      ...restored,
+      // Centers/fits the view on whatever's actually drawn instead of
+      // reopening at the scroll position + zoom level baked into the saved
+      // scene (which may have been mid-edit, panned off to one side, ...) -
+      // see ImportedDataState's own `scrollToContent` field, consumed
+      // internally by Excalidraw's own mount logic.
+      scrollToContent: true,
+      appState: { ...restored?.appState, activeTool: HAND_TOOL },
+    };
   });
 
   const onChangeImpl: NonNullable<ExcalidrawProps["onChange"]> = (elements, appState, files) => {
     if (isApplyingRemoteRef.current) return;
+    if (appState.zenModeEnabled) {
+      // Zen mode (a built-in Excalidraw toggle, not something this app
+      // exposes deliberately) slides the entire footer - including the
+      // zoom controls - off-screen. Zoom needs to stay reachable
+      // unconditionally, so immediately force it back off instead of
+      // saving/allowing this state. Skips the save below for *this*
+      // particular onChange - the corrective `updateScene` call fires its
+      // own onChange once zenModeEnabled is actually false again, and
+      // that's the one that ends up persisted.
+      void import("@excalidraw/excalidraw").then(({ CaptureUpdateAction }) => {
+        excalidrawApiRef.current?.updateScene({ appState: { zenModeEnabled: false }, captureUpdate: CaptureUpdateAction.NEVER });
+      });
+      return;
+    }
     void import("@excalidraw/excalidraw").then(({ serializeAsJSON }) => {
       const value = { ...contentRef.current, sceneJson: serializeAsJSON(elements, appState, files, "local") };
       contentRef.current = value;
@@ -199,6 +235,51 @@ export function WhiteboardBlock({
     flush();
   }
 
+  /**
+   * Excalidraw's own zoom controls (the bottom-left "- 100% +" widget) only
+   * render once its container is wide enough to clear its internal
+   * mobile/desktop breakpoint (730px, see MQ_MAX_WIDTH_PORTRAIT in its own
+   * constants) - this block is a fixed 600px-tall card embedded in a
+   * narrower content column, so that widget never actually appears unless
+   * fullscreened, and there's no other reachable UI for zooming (no menu
+   * item either) - only an undiscoverable ctrl/cmd+scroll or pinch. These
+   * buttons replace that with something always visible regardless of the
+   * block's own width or fullscreen state.
+   */
+  async function zoomBy(factor: number): Promise<void> {
+    const api = excalidrawApiRef.current;
+    if (!api) return;
+    const { CaptureUpdateAction, viewportCoordsToSceneCoords } = await import("@excalidraw/excalidraw");
+    const state = api.getAppState();
+    const nextValue = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, state.zoom.value * factor));
+    if (nextValue === state.zoom.value) return;
+    // Zooms toward the middle of the visible canvas - there's no cursor
+    // position to anchor to from a button click, unlike Excalidraw's own
+    // ctrl+scroll handling. Just setting `zoom.value` alone would instead
+    // scale from the canvas's own (0,0) origin, visibly yanking the current
+    // view toward its top-left corner on every click.
+    const center = { clientX: state.width / 2, clientY: state.height / 2 };
+    const anchor = viewportCoordsToSceneCoords(center, {
+      zoom: state.zoom,
+      offsetLeft: 0,
+      offsetTop: 0,
+      scrollX: state.scrollX,
+      scrollY: state.scrollY,
+    });
+    api.updateScene({
+      appState: {
+        zoom: { value: nextValue as NormalizedZoomValue },
+        scrollX: center.clientX / nextValue - anchor.x,
+        scrollY: center.clientY / nextValue - anchor.y,
+      },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
+  }
+
+  function zoomToFit(): void {
+    excalidrawApiRef.current?.scrollToContent(undefined, { fitToContent: true, animate: true });
+  }
+
   return (
     <div className={isFullscreen ? "fixed inset-0 z-50 bg-surface" : "relative h-[600px] w-full overflow-hidden rounded-lg border border-border"}>
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-md border border-border bg-surface-raised/90 p-1 shadow-sm backdrop-blur-sm">
@@ -219,6 +300,38 @@ export function WhiteboardBlock({
             <Icon name="presentation" className="h-3.5 w-3.5" />
           </button>
         )}
+        {/* Own zoom controls, always shown regardless of the block's width
+            or fullscreen state - see zoomBy/zoomToFit's own doc comment for
+            why Excalidraw's built-in ones can't be relied on here. A view
+            action like fullscreen below, not an edit - stays usable while
+            the object is locked. */}
+        <button
+          type="button"
+          onClick={() => void zoomBy(1 / ZOOM_STEP_FACTOR)}
+          title="Zoom out"
+          data-view-toggle
+          className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
+        >
+          <Icon name="zoom-out" className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => void zoomBy(ZOOM_STEP_FACTOR)}
+          title="Zoom in"
+          data-view-toggle
+          className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
+        >
+          <Icon name="zoom-in" className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={zoomToFit}
+          title="Fit to content"
+          data-view-toggle
+          className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
+        >
+          <Icon name="scan" className="h-3.5 w-3.5" />
+        </button>
         <button
           type="button"
           onClick={() => setIsFullscreen((v) => !v)}
