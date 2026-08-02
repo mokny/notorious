@@ -338,7 +338,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </span>
               )
             )}
-            {!share && <ObjectSlugButton objectId={object.id} slug={object.slug} disabled={isLocked} />}
+            {/* `key={object.id}` forces a full remount on every object
+                change, same reasoning as CoverImage's own `key` above -
+                without it, navigating from one object to another reuses
+                this same component instance, and its internal state
+                (the portaled button's last-measured screen position, the
+                open/closed popover, the in-progress slug edit) would carry
+                over from the *previous* object instead of resetting. */}
+            {!share && <ObjectSlugButton key={object.id} objectId={object.id} slug={object.slug} disabled={isLocked} />}
             {!share && (
               <>
                 <button
