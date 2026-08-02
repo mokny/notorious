@@ -338,7 +338,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </span>
               )
             )}
-            {!share && <ObjectSlugButton objectId={object.id} slug={object.slug} />}
+            {!share && <ObjectSlugButton objectId={object.id} slug={object.slug} disabled={isLocked} />}
             {!share && (
               <>
                 <button

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { objectApi } from "../lib/api/resources.js";
@@ -8,8 +8,24 @@ import { useOverlayPosition } from "../hooks/useOverlayPosition.js";
 import { ApiError } from "../lib/api/client.js";
 import { Icon } from "./ui/Icon.js";
 
-/** Same idea as BlockSlugButton.tsx, for an object's own slug - lets another object's template address this one (`objects.<slug>`) instead of its UUID, see modules/templates/ on the server. Unique per workspace, auto-generated from the title at creation, renameable here. */
-export function ObjectSlugButton({ objectId, slug }: { objectId: string; slug: string | null }) {
+/**
+ * Same idea as BlockSlugButton.tsx, for an object's own slug - lets another
+ * object's template address this one (`objects.<slug>`) instead of its
+ * UUID, see modules/templates/ on the server. Unique per workspace,
+ * auto-generated from the title at creation, renameable here.
+ *
+ * `disabled` (passed as `isLocked` from ObjectDetailPage.tsx): renaming the
+ * id is an edit like any other, so it disables the same way the trash
+ * button next to it does (`disabled` + `disabled:opacity-50`) - grayed out,
+ * not hidden, so a locked object still shows *that* this control exists,
+ * just not usable right now. It stays permanently visible either way: this
+ * button lives in a portal (see below), entirely outside
+ * ObjectDetailPage.tsx's `READ_ONLY_LOCK`-wrapped content, so it was never
+ * subject to that class's CSS in the first place - `disabled` here is an
+ * explicit, independent check for exactly that reason, not a fallback for
+ * a rule that would otherwise apply.
+ */
+export function ObjectSlugButton({ objectId, slug, disabled }: { objectId: string; slug: string | null; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(slug ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +36,14 @@ export function ObjectSlugButton({ objectId, slug }: { objectId: string; slug: s
   useClickOutside(containerRef, () => setOpen(false), open);
   const clampStyle = useKeepInViewport(popoverRef, open);
   const overlay = useOverlayPosition(placeholderRef);
+
+  // Covers the object being locked by someone else mid-session (realtime),
+  // while this popover happens to already be open - closes it instead of
+  // leaving an editable-looking form sitting open for a control that just
+  // became disabled out from under it.
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   const mutation = useMutation({
     mutationFn: () => objectApi.update(objectId, { slug: value || null }),
@@ -59,8 +83,9 @@ export function ObjectSlugButton({ objectId, slug }: { objectId: string; slug: s
                 setError(null);
                 setOpen((v) => !v);
               }}
-              title="Object id (for templates)"
-              className="flex h-full w-full items-center justify-center rounded-md text-ink-muted hover:bg-surface-raised"
+              disabled={disabled}
+              title={disabled ? "Unlock this object to edit its id" : "Object id (for templates)"}
+              className="flex h-full w-full items-center justify-center rounded-md text-ink-muted hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
             >
               <Icon name="braces" className="h-4 w-4" />
             </button>
