@@ -9,6 +9,7 @@ import { useTheme } from "../context/ThemeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
+import { useSwipeToOpen } from "../hooks/useSwipeToOpen.js";
 import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
 import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
@@ -24,6 +25,12 @@ export function WorkspaceLayout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const shareToken = getShareToken();
+  // Edge-swipe from the left as an alternative to the hamburger button below
+  // - `!sidebarOpen` just skips re-triggering an already-open drawer, it's
+  // not gating this to mobile specifically (desktop's `md:translate-x-0`
+  // already makes the drawer permanently visible regardless of this state,
+  // and nothing here fires without an actual touchscreen to begin with).
+  useSwipeToOpen(() => setSidebarOpen(true), !sidebarOpen);
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);

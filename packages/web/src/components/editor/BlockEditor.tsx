@@ -5,13 +5,10 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { generateKeyBetween } from "fractional-indexing";
 import type { Block, BlockType } from "@notorious/shared";
 import { blockApi, fileApi, schemaApi } from "../../lib/api/resources.js";
-import { withShareToken } from "../../lib/api/shareMode.js";
 import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
 import { BlockList } from "./BlockList.js";
 import { useEditorHistory, type BlockSnapshot } from "./useEditorHistory.js";
-import { Button } from "../ui/Button.js";
-import { Icon } from "../ui/Icon.js";
 
 function isEditableElementFocused(): boolean {
   const el = document.activeElement as HTMLElement | null;
@@ -99,7 +96,6 @@ export function BlockEditor({
   // always read-only, on top of that - see `readOnly` above.
   const isEmbedded = Boolean(embedAncestorIds);
   const effectiveReadOnly = readOnly || isEmbedded;
-  const importInputRef = useRef<HTMLInputElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
@@ -198,11 +194,6 @@ export function BlockEditor({
 
   const restoreMutation = useMutation({
     mutationFn: (block: BlockSnapshot) => blockApi.restore({ objectId, ...block }),
-    onSuccess: invalidate,
-  });
-
-  const importMutation = useMutation({
-    mutationFn: (markdown: string) => blockApi.importMarkdown(objectId, markdown),
     onSuccess: invalidate,
   });
 
@@ -466,28 +457,6 @@ export function BlockEditor({
             <p className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-accent shadow-lg">
               {isUploadingFiles ? "Uploading…" : "Drop files to attach them"}
             </p>
-          </div>
-        )}
-
-        {!isEmbedded && (
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Button variant="ghost" onClick={() => window.open(withShareToken(blockApi.exportMarkdownUrl(objectId)), "_blank")}>
-              <Icon name="download" className="h-3.5 w-3.5" /> Export Markdown
-            </Button>
-            <Button variant="ghost" onClick={() => importInputRef.current?.click()}>
-              <Icon name="upload" className="h-3.5 w-3.5" /> Import Markdown
-            </Button>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".md,text/markdown"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                importMutation.mutate(await file.text());
-              }}
-            />
           </div>
         )}
 
