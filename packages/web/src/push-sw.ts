@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
+import { registerRoute, NavigationRoute } from "workbox-routing";
+import { NetworkFirst } from "workbox-strategies";
 import { clientsClaim } from "workbox-core";
 
 declare const self: ServiceWorkerGlobalScope;
@@ -20,8 +22,31 @@ self.skipWaiting();
 clientsClaim();
 cleanupOutdatedCaches();
 
-// Injected at build time by vite-plugin-pwa (injectManifest strategy).
-precacheAndRoute(self.__WB_MANIFEST);
+// Injected at build time by vite-plugin-pwa (injectManifest strategy) - the
+// HTML entry is filtered out here and given its own NetworkFirst route
+// below instead of precache's usual cache-first handling. Unlike every
+// other entry (JS/CSS/... all hashed per build, so a cached copy can never
+// go stale under a filename a later deploy would reuse), index.html's own
+// URL never changes between deploys - cache-first for it risks serving an
+// old shell whose script tags reference chunk files a *later* deploy already
+// deleted from disk. That's exactly the "stale shell + already-gone chunks"
+// combination that caused a blank white screen on a fresh cold launch of
+// the installed PWA: `skipWaiting`/`clientsClaim` above only help a tab
+// that's already open when an update lands (see main.tsx's own
+// `controllerchange` reload) - they can't do anything for the very first
+// navigation of a cold start, which is served by whatever service worker
+// was *already* active before this one even finished installing.
+function urlOf(entry: (typeof self.__WB_MANIFEST)[number]): string {
+  return typeof entry === "string" ? entry : entry.url;
+}
+precacheAndRoute(self.__WB_MANIFEST.filter((entry) => !urlOf(entry).endsWith(".html")));
+
+// Always tries the network first for a full-page navigation (falling back
+// to whatever was last successfully cached only if the network is
+// unreachable within 3s) - the same "prefer freshness over a stale cache"
+// policy this service worker already applies to object/API data (see
+// vite.config.ts's own comment on that), now applied to the app shell too.
+registerRoute(new NavigationRoute(new NetworkFirst({ cacheName: "pages", networkTimeoutSeconds: 3 })));
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;

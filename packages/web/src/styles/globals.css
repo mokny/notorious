@@ -56,9 +56,19 @@ body {
 .slash-item span {
   @apply text-xs text-ink-muted;
 }
-.slash-item-active,
-.slash-item:hover {
+.slash-item-active {
   @apply bg-accent/10;
+}
+/* Same `(hover: hover)` gating Tailwind's own `hover:` classes get from
+   tailwind.config.js's `hoverOnlyWhenSupported` flag - this one rule is
+   hand-written CSS instead of a `hover:` utility class, so the flag alone
+   doesn't reach it. Without this, a touch tap on a slash-command item would
+   need a second tap to actually select it, the same "first tap simulates
+   hover" issue that flag fixes everywhere else. */
+@media (hover: hover) and (pointer: fine) {
+  .slash-item:hover {
+    @apply bg-accent/10;
+  }
 }
 
 /* A native checkbox's default size (or the app's own previous h-4/w-4) is a
