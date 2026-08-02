@@ -6,6 +6,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { blockApi, objectApi } from "../../lib/api/resources.js";
 import { useObjectTitle } from "../../hooks/useObjectTitle.js";
 import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
+import { useHasHover } from "../../hooks/useHasHover.js";
+import { useTouchReveal } from "../../hooks/useTouchReveal.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { Icon } from "../ui/Icon.js";
 import { navLinkClass } from "./navLinkClass.js";
@@ -27,6 +29,15 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
   const { title, icon } = useObjectTitle(workspaceId, objectId);
   const { toggle: togglePin } = useWorkspacePins(workspaceId);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: objectId });
+  // A touch browser treats the first tap on anything inside a `:hover`-
+  // styled ancestor as simulating that hover rather than following through
+  // to a click - the row below both navigates (the NavLink) and reveals
+  // the drag handle/unpin button on hover, so on a device that can't
+  // genuinely hover, that CSS is swapped for a real touchstart-driven
+  // reveal instead (see useHasHover.ts/useTouchReveal.ts) - otherwise the
+  // link itself would need a second tap too, not just the buttons.
+  const hasHover = useHasHover();
+  const { touched, containerRef, onTouchStart } = useTouchReveal<HTMLDivElement>();
 
   const { data: object } = useQuery({
     queryKey: ["object", objectId],
@@ -69,12 +80,18 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
 
   return (
     <div ref={setNodeRef} style={style}>
-      <div className="group flex items-center gap-0.5 rounded-lg pr-1 hover:bg-surface">
+      <div
+        ref={containerRef}
+        onTouchStart={onTouchStart}
+        className={`group flex items-center gap-0.5 rounded-lg pr-1 ${hasHover ? "hover:bg-surface" : touched ? "bg-surface" : ""}`}
+      >
         {canCurate && (
           <button
             {...attributes}
             {...listeners}
-            className="shrink-0 cursor-grab rounded p-1 text-ink-muted opacity-0 hover:text-ink group-hover:opacity-100"
+            className={`shrink-0 cursor-grab rounded p-1 text-ink-muted ${
+              hasHover ? "opacity-0 hover:text-ink group-hover:opacity-100" : touched ? "opacity-100" : "opacity-0"
+            }`}
             title="Drag to reorder"
           >
             <Icon name="grip-vertical" className="h-3 w-3" />
@@ -94,7 +111,9 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
         {canCurate && (
           <button
             onClick={() => togglePin(objectId)}
-            className="shrink-0 rounded p-1 text-ink-muted opacity-0 hover:text-red-500 group-hover:opacity-100"
+            className={`shrink-0 rounded p-1 text-ink-muted ${
+              hasHover ? "opacity-0 hover:text-red-500 group-hover:opacity-100" : touched ? "opacity-100" : "opacity-0"
+            }`}
             title="Unpin"
           >
             <Icon name="pin-off" className="h-3.5 w-3.5" />
