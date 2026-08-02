@@ -126,16 +126,27 @@ export function WhiteboardBlock({
     const mod = await import("@excalidraw/excalidraw");
     const parsed = parseInitialData(contentRef.current.sceneJson);
     const restored = parsed ? mod.restore(parsed, null, null) : null;
-    return {
-      ...restored,
-      // Centers/fits the view on whatever's actually drawn instead of
-      // reopening at the scroll position + zoom level baked into the saved
-      // scene (which may have been mid-edit, panned off to one side, ...) -
-      // see ImportedDataState's own `scrollToContent` field, consumed
-      // internally by Excalidraw's own mount logic.
-      scrollToContent: true,
-      appState: { ...restored?.appState, activeTool: HAND_TOOL },
-    };
+    if (restored?.elements.length) {
+      // `excalidrawApiRef` is already set at this point - Excalidraw hands
+      // it out from its constructor, which always runs (synchronously,
+      // during render) before this function is even invoked (from inside
+      // componentDidMount, to await this exact `initialData` prop). But
+      // calling `scrollToContent` *right now* would still act on the empty
+      // scene this component mounted with - Excalidraw only applies the
+      // `elements`/`appState` we're about to return once this promise
+      // resolves and its own `.then()` continuation runs. A macrotask
+      // (`setTimeout(0)`, not just a microtask/`queueMicrotask`) reliably
+      // fires after that continuation, once the restored scene is actually
+      // in place - which is what makes `fitToContent` see real content
+      // instead of nothing. `animate: false` here (unlike the "Fit to
+      // content" button below, which deliberately animates a click the user
+      // is watching) - this one should already look correct on the very
+      // first paint, not visibly snap into place a moment later.
+      setTimeout(() => {
+        excalidrawApiRef.current?.scrollToContent(restored.elements, { fitToContent: true, animate: false });
+      }, 0);
+    }
+    return { ...restored, appState: { ...restored?.appState, activeTool: HAND_TOOL } };
   });
 
   const onChangeImpl: NonNullable<ExcalidrawProps["onChange"]> = (elements, appState, files) => {
