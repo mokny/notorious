@@ -20,6 +20,8 @@ interface RichTextEditorProps {
   editable?: boolean;
   /** See useMarkdownEditor.ts. */
   onBlur?: () => void;
+  /** See useMarkdownEditor.ts. */
+  onFocus?: () => void;
 }
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -44,6 +46,7 @@ export function RichTextEditor({
   onAutoFocused,
   editable,
   onBlur,
+  onFocus,
 }: RichTextEditorProps) {
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isSavingRef = useRef(false);
@@ -87,6 +90,7 @@ export function RichTextEditor({
       flush();
       onBlur?.();
     },
+    onFocus,
     onChange: (value) => {
       pendingValueRef.current = value;
       clearTimeout(saveTimeout.current);

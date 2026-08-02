@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -53,6 +53,16 @@ export function WorkspaceLayout() {
   // Close the mobile drawer whenever the route changes (desktop ignores this,
   // since the sidebar there is always visible regardless of this state).
   useEffect(() => setSidebarOpen(false), [location.pathname]);
+
+  // Scroll back to the top on every page change - `<main>` below is the
+  // actual scrolling element (not the window/body), so the browser's own
+  // scroll-restoration-on-navigate never kicks in for it: without this,
+  // opening a new object while scrolled halfway down the previous one left
+  // it starting at that same scroll position instead of at the top.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [location.pathname]);
 
   async function handleLogout() {
     await authApi.logout();
@@ -175,7 +185,7 @@ export function WorkspaceLayout() {
           </button>
           <span className="truncate text-sm font-medium">{workspace?.name}</span>
         </div>
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

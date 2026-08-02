@@ -118,6 +118,14 @@ function ChecklistItemRow({
               onEnter();
             }
           }}
+          // Without this, a *brand-new* item (never opened via clicking a
+          // rendered value, so `editing` never otherwise turns true) could
+          // have its debounced save+refetch land while still focused and
+          // being typed into - `showRendered` would flip true right out
+          // from under the cursor the instant a rendered value first
+          // appears, exactly the "focus jumps out of a checklist item
+          // right after creating it" bug this fixes.
+          onFocus={startEditing}
           onBlur={() => {
             onFlush();
             stopEditing();

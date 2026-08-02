@@ -256,6 +256,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   return (
     <div>
       <CoverImage
+        // Forces a full remount on every object change, so its <img> starts
+        // blank instead of carrying over the *previous* object's cover -
+        // when navigating to an object whose data is already cached (e.g.
+        // one recently viewed), this same CoverImage instance never
+        // otherwise unmounts, and a plain <img> keeps showing its old
+        // bitmap on screen until the new cover's fetch finishes, which
+        // looks exactly like the previous page's cover briefly flashing.
+        key={object.id}
         workspaceId={workspaceId}
         objectId={object.id}
         cover={object.cover}

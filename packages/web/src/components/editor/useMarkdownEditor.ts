@@ -19,6 +19,8 @@ interface UseMarkdownEditorOptions {
   objectTypes?: ObjectType[];
   /** Fired when this editor loses focus - see TemplatableMarkdown.tsx, which uses it to switch a templated field back to its rendered display. */
   onBlur?: () => void;
+  /** Fired when this editor gains focus - see TemplatableMarkdown.tsx, which uses it to mark a templated field as actively being edited (so it can't involuntarily flip to its rendered display mid-typing if a save+refetch lands while still focused). */
+  onFocus?: () => void;
   /**
    * Defaults to true. Set to false for a locked object/embedded preview
    * (see BlockEditorContext.tsx's `readOnly`) - TipTap then blocks edits at
@@ -57,6 +59,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   const onBackspaceEmptyRef = useRef(options.onBackspaceEmpty);
   const onSlashSelectRef = useRef(options.onSlashSelect);
   const onBlurRef = useRef(options.onBlur);
+  const onFocusRef = useRef(options.onFocus);
   // Read fresh (not closed over) inside `onUpdate` below - toggling editable
   // off doesn't recreate the editor, so a stale closure here would keep
   // whatever `editable` was true at creation time.
@@ -72,6 +75,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   onBackspaceEmptyRef.current = options.onBackspaceEmpty;
   onSlashSelectRef.current = options.onSlashSelect;
   onBlurRef.current = options.onBlur;
+  onFocusRef.current = options.onFocus;
   objectTypesRef.current = options.objectTypes ?? [];
 
   const hasSlashCommand = Boolean(options.onSlashSelect);
@@ -140,6 +144,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       onChangeRef.current?.(unescapeTemplateRegions(storage.markdown.getMarkdown().trim()));
     },
     onBlur: () => onBlurRef.current?.(),
+    onFocus: () => onFocusRef.current?.(),
   });
 
   // `editable` above only seeds the editor once, on creation (same caveat

@@ -51,6 +51,12 @@ function TableCellInput({
       }}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      // Same reasoning as ChecklistBlock.tsx's identical onFocus - without
+      // it, a cell that's never been opened via clicking a rendered value
+      // (e.g. one freshly typed into for the first time) could have its
+      // rendered value arrive mid-typing and yank focus out from under the
+      // cursor.
+      onFocus={startEditing}
       onBlur={() => {
         onFlush();
         stopEditing();

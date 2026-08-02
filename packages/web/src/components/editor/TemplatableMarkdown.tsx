@@ -86,6 +86,7 @@ export function TemplatableMarkdown({
         onAutoFocused?.();
       }}
       editable={!readOnly}
+      onFocus={startEditing}
       onBlur={stopEditing}
     />
   );
