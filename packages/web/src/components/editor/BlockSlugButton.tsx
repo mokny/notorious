@@ -1,9 +1,8 @@
 import { useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { blockApi } from "../../lib/api/resources.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
-import { useAnchoredPosition } from "../../hooks/useAnchoredPosition.js";
+import { useKeepInViewport } from "../../hooks/useKeepInViewport.js";
 import { ApiError } from "../../lib/api/client.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -21,15 +20,11 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(slug ?? "");
   const [error, setError] = useState<string | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
-  // Portaled into `document.body` (see the JSX below) - `extraRefs` covers
-  // it too, since it's no longer a DOM descendant of `buttonRef` for
-  // useClickOutside's own containment check. Same reasoning as
-  // ObjectSlugButton.tsx's identical setup.
-  useClickOutside(buttonRef, () => setOpen(false), open, [popoverRef]);
-  const position = useAnchoredPosition(buttonRef, popoverRef, open);
+  useClickOutside(containerRef, () => setOpen(false), open);
+  const clampStyle = useKeepInViewport(popoverRef, open);
 
   const mutation = useMutation({
     mutationFn: () => blockApi.update(blockId, { slug: value || null }),
@@ -42,9 +37,18 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
   });
 
   return (
-    <>
+    // z-50: without its own elevated z-index, WorkspaceLayout.tsx's mobile
+    // sidebar (`fixed`, z-40) would render on top of this button whenever
+    // it's open, since anything in that sidebar's 0-256px band gets covered
+    // otherwise, regardless of DOM nesting. A plain `relative z-50` is
+    // enough here (unlike ObjectSlugButton.tsx's own version of this same
+    // problem) because nothing between this button and the page root is
+    // `position: sticky` - that's the one thing that traps a descendant's
+    // z-index unconditionally, sticky or not; see ObjectDetailPage.tsx's
+    // toolbar (which *is* sticky) and ObjectSlugButton.tsx's own comment on
+    // why it has to portal out of that container instead.
+    <div ref={containerRef} className="relative z-50">
       <button
-        ref={buttonRef}
         type="button"
         onClick={() => {
           setValue(slug ?? "");
@@ -56,44 +60,33 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
       >
         <Icon name="braces" className="h-3.5 w-3.5" />
       </button>
-      {open &&
-        createPortal(
-          // Portaled straight into `document.body` rather than `absolute`
-          // under a `relative` wrapper here - see ObjectSlugButton.tsx's
-          // identical setup and its longer comment on why (a sibling
-          // stacking context can otherwise cap this popover's z-index no
-          // matter how high it's set locally). This block toolbar isn't
-          // itself trapped that way today, but portaling both consistently
-          // means neither one silently breaks again if an ancestor ever
-          // gains its own `position`+`z-index` (e.g. a sticky block group
-          // header) in the future.
-          <div
-            ref={popoverRef}
-            style={position}
-            className="z-50 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
+      {open && (
+        <div
+          ref={popoverRef}
+          style={clampStyle}
+          className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Block id</p>
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="e.g. total_price"
+            autoComplete="off"
+            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
+          />
+          <p className="mt-1 text-[11px] text-ink-muted">Reference this block from templates as blocks.{value || "…"}.</p>
+          {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+          <button
+            type="button"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className="mt-2 w-full rounded-md bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Block id</p>
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="e.g. total_price"
-              autoComplete="off"
-              className="w-full rounded-md border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
-            />
-            <p className="mt-1 text-[11px] text-ink-muted">Reference this block from templates as blocks.{value || "…"}.</p>
-            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-            <button
-              type="button"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-              className="mt-2 w-full rounded-md bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-            >
-              Save
-            </button>
-          </div>,
-          document.body,
-        )}
-    </>
+            Save
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

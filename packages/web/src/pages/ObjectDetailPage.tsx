@@ -307,13 +307,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               underneath it. z-10 is just enough to sit above the scrolled-
               under blocks below it (which don't set a z-index at all) -
               deliberately still *below* WorkspaceLayout.tsx's mobile sidebar
-              (z-40), so this row (and its icons) stays hidden behind an open
-              sidebar like the rest of the page's content, instead of
-              floating over it. ObjectSlugButton's own popover needs to
-              render above that sidebar despite that - it portals itself
-              into `document.body` to get there instead of this row needing
-              a z-index that would also drag its plain, non-popover icons
-              (lock, pin, share, ...) along with it. */}
+              (z-40), so this row (and its plain icons - lock, pin, share,
+              ...) stays hidden behind an open sidebar like the rest of the
+              page's content, instead of floating over it. `position:
+              sticky` here creates its own stacking context *unconditionally*
+              (confirmed empirically - unlike `relative`/`absolute`, this
+              happens even with no `z-*` utility at all), which caps every
+              descendant's z-index at whatever this row's own is, no matter
+              how high the descendant sets its own value - ObjectSlugButton's
+              `{}` button needs to stay reachable regardless, so it portals
+              itself into `document.body` entirely rather than trying to
+              out-z-index a trap that no z-index value could escape. */}
           <div className={`sticky top-0 z-10 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}>
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
