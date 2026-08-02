@@ -288,7 +288,16 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               />
             </div>
           )}
-          <div className={`flex items-center gap-2 ${object.cover ? "" : "mt-2"}`}>
+          {/* Sticky, not just at its natural spot under the title - these
+              are the controls you're most likely to reach for mid-scroll
+              (unlock to fix a typo, re-share, ...), so they stay reachable
+              instead of requiring a scroll back to the top every time.
+              `bg-surface` matches the page's own background (see
+              globals.css's `body` rule), so it blends in seamlessly rather
+              than needing full-bleed negative margins to avoid a visible
+              seam at this column's edges while scrolled content passes
+              underneath it. */}
+          <div className={`sticky top-0 z-10 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}>
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
                 else gets a plain, non-interactive indicator. */}

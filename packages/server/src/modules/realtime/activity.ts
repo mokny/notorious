@@ -5,7 +5,7 @@ import { activityLog, blockHistory } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { broadcast } from "./hub.js";
 import { maybeScheduleAutomation } from "../scripting/automation.js";
-import { maybeDispatchWebhooks } from "../webhooks/service.js";
+import { maybeDispatchWebhooks, scheduleWebhookUpdate } from "../webhooks/service.js";
 
 /** `ActivityEntry["action"]` has no "restored" case (see that type's own doc comment) - callers that need a webhook event distinct from the generic "updated" one (just the restore route today) pass this explicitly instead of relying on the action->event mapping below. */
 const ACTION_TO_WEBHOOK_EVENT: Partial<Record<ActivityEntry["action"], WebhookEvent>> = {
@@ -80,7 +80,17 @@ export async function recordAndBroadcast(input: RecordChangeInput): Promise<void
 
   if (input.entity === "object") {
     const webhookEvent = input.webhookEvent ?? ACTION_TO_WEBHOOK_EVENT[input.action];
-    if (webhookEvent) maybeDispatchWebhooks(webhookEvent, input.workspaceId, input.entityId, input.actorId);
+    if (webhookEvent === "object.updated") {
+      scheduleWebhookUpdate(input.workspaceId, input.entityId, input.actorId);
+    } else if (webhookEvent) {
+      maybeDispatchWebhooks(webhookEvent, input.workspaceId, input.entityId, input.actorId);
+    }
+  } else if (input.entity === "block" && input.objectId) {
+    // A block has no lifecycle events of its own to subscribe to (see
+    // WEBHOOK_EVENTS's own doc comment) - editing one's content is still an
+    // update to the object it belongs to, so it feeds the same debounced
+    // `object.updated` delivery a direct object edit would.
+    scheduleWebhookUpdate(input.workspaceId, input.objectId, input.actorId);
   }
 }
 

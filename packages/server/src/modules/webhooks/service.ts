@@ -190,6 +190,36 @@ export function maybeDispatchWebhooks(event: WebhookEvent, workspaceId: string, 
   })();
 }
 
+const UPDATE_DEBOUNCE_MS = 2000;
+const updateDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * Debounced entry point for "this object was updated" specifically - both a
+ * direct object edit (title, a property, ...) and a content edit to one of
+ * its blocks (typing in a paragraph, checking off a to-do, ...) route
+ * through here (see realtime/activity.ts's `recordAndBroadcast`) rather than
+ * calling `maybeDispatchWebhooks` directly. Both are saved via a debounced
+ * PATCH already (see useDebouncedSave.ts/RichTextEditor.tsx client-side),
+ * but that alone still fires once per those saves - this coalesces a whole
+ * flurry of them into a single delivery shortly after editing actually
+ * stops, not one per keystroke-triggered save. Mirrors
+ * scripting/automation.ts's `maybeScheduleAutomation`; lifecycle events
+ * (created/archived/deleted/restored) are discrete one-shot actions that
+ * can't repeat in quick succession the way an in-progress edit can, so they
+ * still go through `maybeDispatchWebhooks` directly, undebounced.
+ */
+export function scheduleWebhookUpdate(workspaceId: string, objectId: string, actorId: string): void {
+  const existing = updateDebounceTimers.get(objectId);
+  if (existing) clearTimeout(existing);
+  updateDebounceTimers.set(
+    objectId,
+    setTimeout(() => {
+      updateDebounceTimers.delete(objectId);
+      maybeDispatchWebhooks("object.updated", workspaceId, objectId, actorId);
+    }, UPDATE_DEBOUNCE_MS),
+  );
+}
+
 /** Sends a synthetic ping so a user can verify their endpoint before relying on it - see WebhooksSettings.tsx's "Send test" button. */
 export async function sendTestWebhook(workspaceId: string, id: string): Promise<void> {
   const row = await getWebhookRow(workspaceId, id);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Object-change events a webhook can subscribe to - see modules/webhooks/service.ts's event mapping. Block-level changes deliberately don't get their own webhook events (see the plan) - "object changed" already covers title/property/lifecycle changes. */
+/** Object-change events a webhook can subscribe to - see modules/webhooks/service.ts's event mapping. Block-level changes (typing in a paragraph, checking off a to-do, ...) have no event of their own - they feed the same debounced "object.updated" delivery a direct title/property edit would (see realtime/activity.ts), rather than getting a distinct event type. */
 export const WEBHOOK_EVENTS = ["object.created", "object.updated", "object.archived", "object.restored", "object.deleted"] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
