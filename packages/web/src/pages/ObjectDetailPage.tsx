@@ -307,17 +307,19 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               underneath it. z-10 is just enough to sit above the scrolled-
               under blocks below it (which don't set a z-index at all) -
               deliberately still *below* WorkspaceLayout.tsx's mobile sidebar
-              (z-40), so this row (and its plain icons - lock, pin, share,
-              ...) stays hidden behind an open sidebar like the rest of the
-              page's content, instead of floating over it. `position:
-              sticky` here creates its own stacking context *unconditionally*
-              (confirmed empirically - unlike `relative`/`absolute`, this
-              happens even with no `z-*` utility at all), which caps every
-              descendant's z-index at whatever this row's own is, no matter
-              how high the descendant sets its own value - ObjectSlugButton's
-              `{}` button needs to stay reachable regardless, so it portals
-              itself into `document.body` entirely rather than trying to
-              out-z-index a trap that no z-index value could escape. */}
+              (z-40), so this whole row - including ObjectSlugButton's `{}`
+              button - stays hidden behind an open sidebar like the rest of
+              the page's content, instead of floating over it. See
+              ObjectSlugButton.tsx's own comment: an earlier version tried
+              making that one button the exception (reachable even with the
+              sidebar open), but a `position: sticky` ancestor like this one
+              creates its own stacking context *unconditionally* (confirmed
+              empirically - unlike `relative`/`absolute`, this happens even
+              with no `z-*` utility at all), so the only way to actually pull
+              that off was portaling the button out of this row's DOM
+              subtree entirely - which visually looked like a stray, floating
+              icon sitting on top of whatever the sidebar's own content
+              happened to be underneath it. Not worth it for one button. */}
           <div className={`sticky top-0 z-10 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}>
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
@@ -341,8 +343,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             {/* `key={object.id}` forces a full remount on every object
                 change, same reasoning as CoverImage's own `key` above -
                 without it, navigating from one object to another reuses
-                this same component instance, and its internal state
-                (the portaled button's last-measured screen position, the
+                this same component instance, and its internal state (the
                 open/closed popover, the in-progress slug edit) would carry
                 over from the *previous* object instead of resetting. */}
             {!share && <ObjectSlugButton key={object.id} objectId={object.id} slug={object.slug} disabled={isLocked} />}
