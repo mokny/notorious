@@ -74,15 +74,21 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
               </Dialog.Content>
             </Dialog.Portal>
           </Dialog.Root>
-          {/* An <a download>, not a button - readOnlyContent.ts's lock only
-              disables input/textarea/select/button/contenteditable/canvas, so
-              this stays clickable while the object is locked without needing
-              a data-view-toggle escape hatch. Hover-revealed like
-              CoverImage.tsx's own Change/Remove controls. */}
+          {/* A view action, not an edit - stays reachable while the object
+              is locked. readOnlyContent.ts's lock only disables input/
+              textarea/select/button/contenteditable/canvas, so an `<a>`
+              would already stay clickable either way - but this also uses
+              the app's hover-reveal `opacity-0 ... group-hover:opacity-100`
+              convention, which globals.css's `.locked-content` rule hides
+              *unconditionally* for anything matching it (drag handles,
+              delete buttons, ...) regardless of tag. `data-view-toggle`
+              exempts it from that rule too (see globals.css's own comment),
+              same escape hatch the lightbox trigger button above uses. */}
           <a
             href={withShareToken(content.url)}
             download
             title="Download image"
+            data-view-toggle
             className="absolute right-2 top-2 rounded-md bg-black/40 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/60 group-hover:opacity-100"
           >
             <Icon name="download" className="h-4 w-4" />

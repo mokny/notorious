@@ -97,8 +97,12 @@ input[type="checkbox"] {
    visitor) - hovering shouldn't tease a control that would just fail (or
    sit there invisible-but-clickable) anyway. Matched by substring since the
    "group" name suffix varies per component (group-hover/item,
-   group-hover/checklistitem, ...), not by one exact class name. */
-.locked-content [class*="group-hover"][class*="opacity-100"] {
+   group-hover/checklistitem, ...), not by one exact class name.
+   `:not([data-view-toggle])` exempts the same "view, not edit" controls the
+   button pointer-events rule below already exempts (e.g. MediaBlocks.tsx's
+   image download button) - those should stay reachable while locked, same
+   as everything else marked `data-view-toggle`. */
+.locked-content [class*="group-hover"][class*="opacity-100"]:not([data-view-toggle]) {
   opacity: 0 !important;
   pointer-events: none !important;
 }
