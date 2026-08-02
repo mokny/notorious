@@ -16,6 +16,7 @@ import { IconPicker } from "../components/IconPicker.js";
 import { CoverImage } from "../components/CoverImage.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
+import { PresencePanel } from "../components/PresencePanel.js";
 import { useConfirm } from "../context/ConfirmContext.js";
 import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
@@ -423,6 +424,12 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         </div>
 
         <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+          {/* Shown for anonymous share visitors too, not just real members -
+              they're exactly who gets the "Anonymous <Animal>" identity and
+              rename affordance this feature is for (see PresencePanel.tsx),
+              same as `object.id` below is already safe to dereference
+              unguarded for either audience once `object` has loaded. */}
+          <PresencePanel objectId={object.id} />
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
           <div className={`space-y-3 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
             {properties

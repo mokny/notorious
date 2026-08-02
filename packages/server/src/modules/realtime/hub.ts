@@ -1,5 +1,5 @@
 import type { WebSocket } from "@fastify/websocket";
-import type { RealtimeEvent } from "@notorious/shared";
+import type { PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
 
 // Value is the socket's object-id filter: null for a real member or a
 // whole-workspace share (sees every event in the room), a specific object id
@@ -22,14 +22,29 @@ export function joinRoom(workspaceId: string, socket: WebSocket, objectIdFilter:
   });
 }
 
-/** Broadcasts a change event to every client currently viewing this workspace, honoring each socket's object-id filter (see `joinRoom`). */
-export function broadcast(event: RealtimeEvent): void {
-  const room = roomsByWorkspace.get(event.workspaceId);
+/** Sends `payload` to every socket in `workspaceId`'s room, honoring each socket's object-id filter (see `joinRoom`) against `objectIdFilter`. Shared by `broadcast`/`broadcastPresence` - the only difference between a `RealtimeEvent` and a `PresenceSnapshotMessage` broadcast is which field carries the object id. */
+function sendToRoom(workspaceId: string, objectIdFilter: string | null | undefined, payload: unknown): void {
+  const room = roomsByWorkspace.get(workspaceId);
   if (!room) return;
 
-  const payload = JSON.stringify(event);
+  const message = JSON.stringify(payload);
   for (const [socket, filter] of room) {
-    if (filter !== null && event.objectId !== filter) continue;
-    if (socket.readyState === socket.OPEN) socket.send(payload);
+    if (filter !== null && objectIdFilter !== filter) continue;
+    if (socket.readyState === socket.OPEN) socket.send(message);
   }
+}
+
+/** Broadcasts a change event to every client currently viewing this workspace, honoring each socket's object-id filter (see `joinRoom`). */
+export function broadcast(event: RealtimeEvent): void {
+  sendToRoom(event.workspaceId, event.objectId, event);
+}
+
+/**
+ * Broadcasts the current viewer list for one object - see
+ * `modules/presence/`. Reuses the same room/object-filter machinery as
+ * `broadcast`, so a single-object share's socket only ever learns about
+ * presence on *its own* object, exactly like every other event type.
+ */
+export function broadcastPresence(message: PresenceSnapshotMessage): void {
+  sendToRoom(message.workspaceId, message.objectId, message);
 }

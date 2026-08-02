@@ -55,6 +55,7 @@ import type {
   SaveAiConfigInput,
   AiChatMessage,
   RenderedBlocksResponse,
+  PresenceViewer,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
 
@@ -278,6 +279,16 @@ export const systemApi = {
   version: () => apiRequest<{ version: string }>("/api/v1/version"),
   registrationStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/registration-status"),
   twoFactorRequired: () => apiRequest<{ required: boolean }>("/api/v1/system/2fa-required"),
+};
+
+export const presenceApi = {
+  list: (objectId: string) => apiRequest<{ viewers: PresenceViewer[] }>(`/api/v1/objects/${objectId}/presence`),
+  /** Join/keep-alive/rename in one - see hooks/usePresence.ts. `visitorId`/`displayName` only matter for an anonymous viewer (omitted for a logged-in member, whose identity/name come from their session). `tabId` identifies this specific hook instance, not the browser tab - see presenceHeartbeatSchema's own doc comment for why that's deliberate. */
+  heartbeat: (objectId: string, input: { visitorId?: string; displayName?: string; tabId: string }) =>
+    apiRequest<{ viewers: PresenceViewer[] }>(`/api/v1/objects/${objectId}/presence`, { method: "POST", body: input }),
+  /** `keepalive: true` so this still fires from an unmount during navigation/tab-close (see lib/api/client.ts's own doc comment on that option). */
+  leave: (objectId: string, tabId: string, visitorId?: string) =>
+    apiRequest<void>(`/api/v1/objects/${objectId}/presence`, { method: "DELETE", query: { visitorId, tabId }, keepalive: true }),
 };
 
 export const shareLinkApi = {

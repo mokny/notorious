@@ -240,3 +240,39 @@ export interface RealtimeEvent {
   clientId?: string;
   at: ISODateString;
 }
+
+/**
+ * One person currently viewing an object - see `modules/presence/` on the
+ * server. `viewerId` is `member:<userId>` for a real workspace member or
+ * `anon:<visitorId>` for an anonymous share visitor (see
+ * `lib/visitorIdentity.ts` on the frontend for where `visitorId` comes
+ * from) - stable per identity, usable as both a React list key and for
+ * "is this viewer me" checks. `displayName` is fully computed server-side,
+ * including any " 2"/" 3" collision suffix (see `modules/presence/naming.ts`)
+ * - the client never composes or parses it itself.
+ */
+export interface PresenceViewer {
+  viewerId: string;
+  displayName: string;
+  isAnonymous: boolean;
+  /** Real members only - anonymous viewers get a fixed, distinct avatar style instead (see PresencePanel.tsx). */
+  avatarColor?: string;
+  /** Precomputed by the server so the client never has to parse/strip the "Anonymous " prefix itself just to get an avatar initial. */
+  avatarLetter: string;
+}
+
+/**
+ * The complete current viewer list for one object, broadcast over the same
+ * per-workspace WebSocket connection `RealtimeEvent`s use (see
+ * `useRealtime.ts`) - distinguished from those by `type: "presence"`, a
+ * field plain `RealtimeEvent`s never have. Deliberately a full snapshot,
+ * not a join/leave delta: a missed message is silently superseded by the
+ * next one, so the client never has to reconcile partial updates into a
+ * running total.
+ */
+export interface PresenceSnapshotMessage {
+  type: "presence";
+  workspaceId: string;
+  objectId: string;
+  viewers: PresenceViewer[];
+}

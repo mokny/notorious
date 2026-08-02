@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { RealtimeEvent } from "@notorious/shared";
+import type { PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
 import { clientId as myClientId } from "./clientId.js";
 
 const RECONNECT_BASE_DELAY_MS = 1000;
@@ -116,7 +116,26 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
       };
 
       socket.onmessage = (event) => {
-        const payload = JSON.parse(event.data) as RealtimeEvent;
+        const payload = JSON.parse(event.data) as RealtimeEvent | PresenceSnapshotMessage;
+        // Presence snapshots (see modules/presence/ server-side) share this
+        // same per-workspace socket but aren't a `RealtimeEvent` - a DB-row-
+        // change notification doesn't fit "here's the current viewer list"
+        // (see PresenceSnapshotMessage's own doc comment) - distinguished by
+        // a `type` field plain RealtimeEvents never have - `"type" in
+        // payload` alone is a sufficient, exact discriminant (no need to
+        // also compare its value) since `RealtimeEvent` has no `type`
+        // property at all, and it's also what TypeScript needs to narrow
+        // the union cleanly (a `payload.type === "presence"` comparison
+        // doesn't narrow on its own when one arm of the union lacks the
+        // property being compared).
+        if ("type" in payload) {
+          // usePresence.ts owns the actual viewer list via its own query -
+          // this just tells it (and anyone else looking at the same object)
+          // to go refetch, same "WS event -> invalidate -> refetch" idiom
+          // every other entity here already uses.
+          queryClient.invalidateQueries({ queryKey: ["presence", payload.objectId] });
+          return;
+        }
         handleMessage(payload, workspaceId!, queryClient);
       };
 

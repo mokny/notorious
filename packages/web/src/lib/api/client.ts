@@ -20,6 +20,8 @@ interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined>;
+  /** Lets the request survive page teardown (navigation/tab close) - the browser guarantees a `keepalive: true` fetch is still sent even after the initiating page has gone away, unlike a plain `fetch`. Used by presenceApi's "leave" call on unmount (see hooks/usePresence.ts), so a viewer disappears from others' lists promptly instead of waiting out the server's sweep interval. */
+  keepalive?: boolean;
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
@@ -41,6 +43,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       ? { "Content-Type": "application/json", "X-Client-Id": clientId, ...shareHeaders() }
       : { "X-Client-Id": clientId, ...shareHeaders() },
     body: options.body ? JSON.stringify(options.body) : undefined,
+    keepalive: options.keepalive,
   });
 
   if (response.status === 204) return undefined as T;

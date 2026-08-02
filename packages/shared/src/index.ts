@@ -3,6 +3,7 @@ export * from "./constants/propertyTypes.js";
 export * from "./constants/blockTypes.js";
 export * from "./constants/viewTypes.js";
 export * from "./constants/roles.js";
+export * from "./constants/animalNames.js";
 
 export * from "./types/entities.js";
 export * from "./types/blockContent.js";
@@ -21,3 +22,4 @@ export * from "./schemas/shareLink.js";
 export * from "./schemas/webhook.js";
 export * from "./schemas/ai.js";
 export * from "./schemas/template.js";
+export * from "./schemas/presence.js";
