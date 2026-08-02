@@ -122,7 +122,15 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
       </div>
 
       {expanded && hasSubObjects && (
-        <div className="ml-4 space-y-0.5 border-l border-border pl-2">
+        // `ml-7 pl-3` (not the much smaller indent this used to have) lines
+        // the guide rail up with the parent row's own chevron button, and
+        // pushes each sub-object's icon out roughly under where the
+        // *parent's* icon sits - at the old, narrower indent, a sub-object's
+        // icon actually landed to the *left* of the parent's own icon (the
+        // parent row is itself pushed right by its drag handle + chevron
+        // buttons before the icon), so an expanded list read more like a
+        // second flat group than something nested one level down.
+        <div className="ml-7 space-y-0.5 border-l border-border pl-3">
           {orderedSubObjectIds.map((subObjectId) => (
             <SubObjectRow key={subObjectId} workspaceId={workspaceId} objectId={subObjectId} />
           ))}
