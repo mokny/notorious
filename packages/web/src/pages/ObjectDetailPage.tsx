@@ -304,16 +304,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               globals.css's `body` rule), so it blends in seamlessly rather
               than needing full-bleed negative margins to avoid a visible
               seam at this column's edges while scrolled content passes
-              underneath it. */}
-          {/* z-50, not some smaller value just above the scrolled-under blocks
-              below it (which don't set a z-index at all, so z-10 would already
-              cover that) - `sticky` here creates its own stacking context, which
-              caps every z-index inside it (including ObjectSlugButton's popover,
-              itself z-50) at whatever this div's own z-index is, regardless of
-              the child's own value. Needs to clear WorkspaceLayout's mobile
-              sidebar (z-40, `fixed` while open) or that popover renders behind
-              it no matter how high its own z-index goes. */}
-          <div className={`sticky top-0 z-50 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}>
+              underneath it. z-10 is just enough to sit above the scrolled-
+              under blocks below it (which don't set a z-index at all) -
+              deliberately still *below* WorkspaceLayout.tsx's mobile sidebar
+              (z-40), so this row (and its icons) stays hidden behind an open
+              sidebar like the rest of the page's content, instead of
+              floating over it. ObjectSlugButton's own popover needs to
+              render above that sidebar despite that - it portals itself
+              into `document.body` to get there instead of this row needing
+              a z-index that would also drag its plain, non-popover icons
+              (lock, pin, share, ...) along with it. */}
+          <div className={`sticky top-0 z-10 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}>
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
                 else gets a plain, non-interactive indicator. */}
