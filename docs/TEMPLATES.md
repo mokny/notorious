@@ -27,8 +27,8 @@ numbers, `-` and `_`, and must be unique (per object for blocks, per workspace f
 | | |
 | --- | --- |
 | `object` | The current object: `object.title`, `object.slug`, `object.type_key`, `object.archived`, `object.locked`, and `object.properties.<key>` for every property value (Formula/Rollup included, already computed) |
-| `blocks.<id>` | Another block in the *same* object, by its id - `.text` (its rendered text), plus for checklists `.items` (`[{text, checked}]`), `.checked_count`, `.total_count`, and for tables `.columns`/`.rows` |
-| `objects.<id>` | Another object *in this workspace*, by its id - same shape as `object` above, but its own blocks are exposed as raw (unrendered) text, not re-evaluated - see "How rendering works" below |
+| `blocks.<id>` | Another block in the *same* object, by its id - above **or below** the block doing the referencing - `.text` (its rendered text), plus for checklists `.items` (`[{text, checked}]`), `.checked_count`, `.total_count`, and for tables `.columns`/`.rows` |
+| `objects.<id>` | Another object *in this workspace*, by its id - same shape as `object` above, plus `objects.<id>.blocks.<blockId>` (same shape as `blocks.<id>` above) for one of *its* blocks. That object's blocks are exposed as raw (unrendered) text, not re-evaluated - see "How rendering works" below |
 
 A `{% set %}` in one block is visible in every block *below* it in the same object (document
 order) - so the table-total example above works whether it's typed as a single block or (as shown
@@ -36,6 +36,10 @@ in the Examples section) spread across the table and a paragraph below it. `{% s
 `{% for %}` loop also reaches back and updates a same-named variable declared before the loop
 (instead of Jinja's usual behavior of requiring a `namespace()` object for this) - that's what lets
 `total = total + ...` actually accumulate across iterations.
+
+`blocks.<id>` itself isn't limited to "above" the way `{% set %}` is - a summary near the top of an
+object can read `blocks.prices.rows` even if the `prices` table is further down the document (see
+"How rendering works" below for how).
 
 ## Filters
 
@@ -81,6 +85,18 @@ from a task that belongs to it)
 Part of {{ objects.website_relaunch.title }} (owner: {{ objects.website_relaunch.properties.owner | default("unassigned") }})
 ```
 
+**Pulling in a block from another object** (that same Project object has its own table block with
+id `budget`)
+```
+Project budget: {{ objects.website_relaunch.blocks.budget.rows | length }} line items
+```
+
+**A summary reading a table that's further down the same document** (the `prices` table block is
+typed in *below* this paragraph, not above it)
+```
+This page totals {% set total = 0 %}{% for row in blocks.prices.rows %}{% set total = total + (row[1] | int) %}{% endfor %}{{ total }} $ - see the table below for the breakdown.
+```
+
 **Filters, chained**
 ```
 {{ object.title | trim | upper }}
@@ -95,11 +111,18 @@ Part of {{ objects.website_relaunch.title }} (owner: {{ objects.website_relaunch
 
 ## How rendering works
 
-Every one of an object's blocks is rendered together, in one pass, top to bottom - that's how
-`{% set %}` in an earlier block reaches a later one, and how `blocks.<id>` always sees an earlier
-block's *final* rendered text. A referenced *other* object (`objects.<id>`) is **not** itself
-recursively template-rendered - you get its already-computed properties and raw block text, not a
-second layer of template evaluation - which keeps a template in object A referencing object B
+Every one of an object's blocks is rendered together, in two top-to-bottom passes. The first pass
+computes every block's value without worrying about ordering - it exists purely to find out what
+every block *will* render to, including ones further down the document. The second pass is the
+real one: it starts with the first pass's results already available (so `blocks.<id>` can resolve
+a block below the one referencing it), then re-derives each block's value in proper document
+order, overwriting the first pass's rough answer with the correct one as it goes - so a block
+referencing an *earlier* one (the original, common case, including `{% set %}`) still always sees
+that earlier block's true final output, not the first pass's approximation.
+
+A referenced *other* object (`objects.<id>`) is **not** itself recursively template-rendered - you
+get its already-computed properties and raw block text (including its own `blocks.<id>` blocks),
+not a second layer of template evaluation - which keeps a template in object A referencing object B
 (which references A back) from becoming an infinite loop.
 
 ## Security

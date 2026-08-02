@@ -56,7 +56,14 @@ function getTemplatableFields(block: Block): FieldSource[] {
   }
 }
 
-/** A plain, read-only view of one block for `blocks.<slug>` - built from *rendered* (already template-evaluated) field text, not raw source, so a later block referencing an earlier one sees its final output. */
+/** A field->text map straight from a block's stored content, no template evaluation - what `buildBlockView` uses for a *cross-object* `objects.<slug>.blocks.<slug>` reference (see resolveObjectViewBySlug), since a referenced object's own blocks are deliberately never template-rendered (avoids A->B->A cycles - see this module's own security/architecture notes). */
+function rawFieldsOf(block: Block): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const { field, text } of getTemplatableFields(block)) map[field] = text;
+  return map;
+}
+
+/** A plain, read-only view of one block for `blocks.<slug>` - built from *rendered* (already template-evaluated) field text for a block in the object currently being rendered, or raw (unevaluated) field text for a cross-referenced object's block (see `rawFieldsOf` above) - either way, a later block referencing an earlier one (or a `blocks.<slug>` under `objects.<slug>`) sees a complete, already-resolved view rather than having to know which case it's in. */
 function buildBlockView(block: Block, renderedFields: Record<string, string>): Record<string, unknown> {
   const base = { id: block.id, slug: block.slug, type: block.type };
   switch (block.type) {
@@ -195,7 +202,22 @@ async function resolveObjectViewBySlug(workspaceId: string, slug: string, identi
   await assertCanViewObject(identity, row.id);
   const record = await objectService.getObject(row.id);
   const typeKey = await getObjectTypeKey(record.objectTypeId);
-  return buildObjectView(record, typeKey);
+  const view = buildObjectView(record, typeKey);
+
+  // `objects.<slug>.blocks.<blockSlug>` - same shape/fields as this object's
+  // own top-level `blocks.<slug>` (see buildBlockView), just built from raw
+  // field text instead of rendered output, since this other object's own
+  // blocks are never template-evaluated here (see buildBlockView's doc
+  // comment for why). Document order doesn't matter for this map - each
+  // entry only reads this block's own raw content, not anything threaded
+  // through a shared scope the way same-object blocks are.
+  const blocksMap: Record<string, unknown> = {};
+  for (const block of await blockService.listBlocks(row.id)) {
+    if (block.slug) blocksMap[block.slug] = buildBlockView(block, rawFieldsOf(block));
+  }
+  view.blocks = blocksMap;
+
+  return view;
 }
 
 interface ParsedField extends FieldSource {
@@ -208,14 +230,82 @@ function errorMessage(err: unknown): string {
 }
 
 /**
- * Renders every templatable field across one object's blocks in one pass:
- * a single shared `Scope` (so a `{% set %}` in an earlier block is still
- * visible in a later one - the whole point of doing this as one pass instead
- * of once per block) and a single shared `RenderBudget` (so many small
- * templates spread across many blocks can't add up to unbounded work just by
- * being in more blocks). Only fields that actually contained template syntax
- * are included in the returned map - callers substitute those over the raw
- * `content` for display, leaving everything else untouched.
+ * Runs one top-to-bottom evaluation pass over every block, incrementally
+ * growing `blocksMap` as it goes (see `renderObjectBlocks` below for why
+ * this runs twice). `showErrors` controls whether a field that fails to
+ * evaluate produces a "⚠ ..." message in the returned map (the real,
+ * user-facing pass) or silently falls back to its raw source (the first,
+ * internal-only pass - its `blocksMap` output still matters, but nobody
+ * ever sees *its* `rendered` map, so surfacing an error from it would just
+ * be noise, and any genuine error still gets reported once the real pass
+ * hits the same field).
+ */
+function runRenderPass(
+  orderedBlocks: Block[],
+  parsedByBlock: Map<string, ParsedField[]>,
+  scope: Scope,
+  blocksMap: Record<string, unknown>,
+  budget: RenderBudget,
+  showErrors: boolean,
+): Record<string, Record<string, string>> {
+  const rendered: Record<string, Record<string, string>> = {};
+
+  for (const block of orderedBlocks) {
+    const parsedFields = parsedByBlock.get(block.id) ?? [];
+    const renderedFields: Record<string, string> = {};
+    let anyTemplated = false;
+
+    for (const { field, text, nodes, error } of parsedFields) {
+      if (error) {
+        renderedFields[field] = showErrors ? `⚠ ${error}` : text;
+        anyTemplated = true;
+        continue;
+      }
+      if (!nodes) {
+        renderedFields[field] = text;
+        continue;
+      }
+      anyTemplated = true;
+      try {
+        const out: string[] = [];
+        execNodes(nodes, scope, budget, out);
+        renderedFields[field] = out.join("");
+      } catch (err) {
+        renderedFields[field] = showErrors ? `⚠ ${errorMessage(err)}` : text;
+      }
+    }
+
+    if (anyTemplated) rendered[block.id] = renderedFields;
+    if (block.slug) blocksMap[block.slug] = buildBlockView(block, renderedFields);
+  }
+
+  return rendered;
+}
+
+/**
+ * Renders every templatable field across one object's blocks, in two full
+ * top-to-bottom passes sharing one `RenderBudget` (so many small templates
+ * spread across many blocks - or across two passes now - still can't add up
+ * to unbounded work). A single pass can only ever resolve a `blocks.<slug>`
+ * reference to a block *already* evaluated (i.e. further up the document) -
+ * that's normally fine for `{% set %}` ("definitions from further up are
+ * addressable further down" was the original requirement), but it means a
+ * summary block near the top could never read a table further down.
+ *
+ * Pass 1 is a quick, error-swallowing run whose only purpose is populating a
+ * *complete* `blocksMap` (every block, both above and below any given
+ * point). Pass 2 is the real one: seeded with pass 1's map so a forward
+ * reference resolves from the very first block, then each block's entry is
+ * overwritten with its actual value (correctly `{% set %}`-scoped by pass
+ * 2's own fresh, incrementally-built scope) as this pass reaches it - so a
+ * *backward* reference (the original, common case) still sees each block's
+ * true final output, not pass 1's rougher approximation. A fresh `Scope`
+ * per pass, so `{% set %}` writes (e.g. a running total inside a `{% for
+ * %}`) don't get applied twice.
+ *
+ * Only fields that actually contained template syntax are included in the
+ * returned map - callers substitute those over the raw `content` for
+ * display, leaving everything else untouched.
  */
 export async function renderObjectBlocks(objectId: string, identity: ActingIdentity): Promise<Record<string, Record<string, string>>> {
   const object = await objectService.getObject(objectId);
@@ -238,49 +328,26 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   }
 
   const typeKey = await getObjectTypeKey(object.objectTypeId);
-  const rootScope = new Scope();
-  rootScope.set("object", buildObjectView(object, typeKey));
+  const objectView = buildObjectView(object, typeKey);
 
   const objectsMap: Record<string, unknown> = {};
   for (const slug of referencedSlugs) {
     objectsMap[slug] = await resolveObjectViewBySlug(object.workspaceId, slug, identity).catch(() => null);
   }
-  rootScope.set("objects", objectsMap);
-
-  const blocksMap: Record<string, unknown> = {};
-  rootScope.set("blocks", blocksMap);
 
   const budget = new RenderBudget();
-  const rendered: Record<string, Record<string, string>> = {};
 
-  for (const block of orderedBlocks) {
-    const parsedFields = parsedByBlock.get(block.id) ?? [];
-    const renderedFields: Record<string, string> = {};
-    let anyTemplated = false;
+  const seedBlocksMap: Record<string, unknown> = {};
+  const seedScope = new Scope();
+  seedScope.set("object", objectView);
+  seedScope.set("objects", objectsMap);
+  seedScope.set("blocks", seedBlocksMap);
+  runRenderPass(orderedBlocks, parsedByBlock, seedScope, seedBlocksMap, budget, false);
 
-    for (const { field, text, nodes, error } of parsedFields) {
-      if (error) {
-        renderedFields[field] = `⚠ ${error}`;
-        anyTemplated = true;
-        continue;
-      }
-      if (!nodes) {
-        renderedFields[field] = text;
-        continue;
-      }
-      anyTemplated = true;
-      try {
-        const out: string[] = [];
-        execNodes(nodes, rootScope, budget, out);
-        renderedFields[field] = out.join("");
-      } catch (err) {
-        renderedFields[field] = `⚠ ${errorMessage(err)}`;
-      }
-    }
-
-    if (anyTemplated) rendered[block.id] = renderedFields;
-    if (block.slug) blocksMap[block.slug] = buildBlockView(block, renderedFields);
-  }
-
-  return rendered;
+  const blocksMap: Record<string, unknown> = { ...seedBlocksMap };
+  const rootScope = new Scope();
+  rootScope.set("object", objectView);
+  rootScope.set("objects", objectsMap);
+  rootScope.set("blocks", blocksMap);
+  return runRenderPass(orderedBlocks, parsedByBlock, rootScope, blocksMap, budget, true);
 }
