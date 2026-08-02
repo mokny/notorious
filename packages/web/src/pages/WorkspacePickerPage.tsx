@@ -37,6 +37,7 @@ export function WorkspacePickerPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
+      <img src="/logo.png" alt="" className="mb-6 h-16 w-16 rounded-2xl" />
       <h1 className="text-2xl font-semibold">Hi {user?.name?.split(" ")[0]}, choose a workspace</h1>
       <p className="mt-1 text-sm text-ink-muted">Workspaces keep your objects, views and collaborators separate.</p>
 
