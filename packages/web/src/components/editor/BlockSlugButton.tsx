@@ -54,7 +54,7 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
         <div
           ref={popoverRef}
           style={clampStyle}
-          className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg"
+          className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Block id</p>

@@ -1,6 +1,8 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 const BASE_FONT_SIZE = 16;
+/** Below this, two consecutive measurements are treated as "the same" - guards against an infinite (if tiny) sub-pixel oscillation settling exactly on 0, which floating-point rounding can't always guarantee. */
+const STABLE_EPSILON = 0.5;
 
 interface UseFitTextOptions {
   text: string;
@@ -11,6 +13,21 @@ interface UseFitTextOptions {
   uppercase: boolean;
   minFontSize?: number;
   maxFontSize?: number;
+  /**
+   * Extra width to subtract from the container's own width before fitting -
+   * for a sibling sharing the same row that isn't itself part of what's
+   * being measured (see CoverImage.tsx's icon, sized off this hook's own
+   * `fontSize` output). Read fresh at each recompute rather than being a
+   * dependency of the effect below: if that sibling's width fed back into a
+   * *dependency*, growing it would trigger a new fontSize, which resizes the
+   * sibling again, which triggers another recompute - an infinite resize
+   * loop (this is exactly what caused the title to flicker/jitter once the
+   * object's icon started scaling off this same fontSize). Reading it fresh
+   * only when the *observed* container itself actually resizes breaks that
+   * loop, since resizing a plain sibling doesn't affect the container's own
+   * border-box the way it's used here (see CoverImage.tsx's `rowRef`).
+   */
+  reservedWidth?: () => number;
 }
 
 /**
@@ -41,6 +58,7 @@ export function useFitText({
   uppercase,
   minFontSize = 20,
   maxFontSize = 140,
+  reservedWidth,
 }: UseFitTextOptions): {
   fontSize: number;
   measureRef: RefObject<HTMLSpanElement>;
@@ -50,17 +68,19 @@ export function useFitText({
   const containerRef = useCallback((node: HTMLElement | null) => setContainer(node), []);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [fontSize, setFontSize] = useState(minFontSize);
+  const reservedWidthRef = useRef(reservedWidth);
+  reservedWidthRef.current = reservedWidth;
 
   useLayoutEffect(() => {
     const measure = measureRef.current;
     if (!container || !measure) return;
 
     function recompute(): void {
-      const containerWidth = container!.clientWidth;
+      const containerWidth = container!.clientWidth - (reservedWidthRef.current?.() ?? 0);
       const measuredWidth = measure!.getBoundingClientRect().width;
       if (containerWidth <= 0 || measuredWidth <= 0) return;
       const next = Math.min(maxFontSize, Math.max(minFontSize, (containerWidth / measuredWidth) * BASE_FONT_SIZE));
-      setFontSize(next);
+      setFontSize((prev) => (Math.abs(next - prev) < STABLE_EPSILON ? prev : next));
     }
 
     recompute();

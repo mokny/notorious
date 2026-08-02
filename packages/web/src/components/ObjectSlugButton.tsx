@@ -42,7 +42,7 @@ export function ObjectSlugButton({ objectId, slug }: { objectId: string; slug: s
         <Icon name="braces" className="h-4 w-4" />
       </button>
       {open && (
-        <div ref={popoverRef} style={clampStyle} className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg">
+        <div ref={popoverRef} style={clampStyle} className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Object id</p>
           <input
             value={value}

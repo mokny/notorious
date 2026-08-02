@@ -51,12 +51,18 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
   );
 
   const displayTitle = title || "Untitled";
-  const { fontSize, measureRef, containerRef: overlayRef } = useFitText({
+  const iconRef = useRef<HTMLDivElement>(null);
+  const { fontSize, measureRef, containerRef: rowRef } = useFitText({
     text: displayTitle,
     fontFamily: style.fontFamily,
     bold: style.bold,
     italic: style.italic,
     uppercase: style.uppercase,
+    // The icon sits beside the title in the same row (see `rowRef` below,
+    // attached to that whole row rather than just the title's own flex-1
+    // slot) - its current width plus the `gap-2` between them (0.5rem/8px)
+    // is what's *not* actually available to the title text.
+    reservedWidth: () => (iconRef.current?.getBoundingClientRect().width ?? 0) + 8,
   });
 
   async function applyCover(value: string | null) {
@@ -106,15 +112,23 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
       <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
-        <div className="pointer-events-auto mx-auto flex max-w-full items-center justify-center gap-2">
+        <div ref={rowRef} className="pointer-events-auto mx-auto flex max-w-full items-center justify-center gap-2">
           {/* Sized to match the title's own (auto-fit) font size, so it
               scales with it instead of looking tiny next to a huge title or
-              oversized next to a small one - useFitText below already
-              accounts for its width by measuring `overlayRef`'s *own*
-              width, which this flex row only leaves it once this has taken
-              its share. */}
-          <div className="shrink-0">{icon(fontSize)}</div>
-          <div ref={overlayRef} className="min-w-0 flex-1">
+              oversized next to a small one. `rowRef` above (not this div)
+              is what useFitText observes for resizes, with this icon's own
+              width subtracted separately (see `reservedWidth`) - observing
+              *this* row's flex-1 sibling directly would mean growing the
+              icon (a side effect of the very fontSize it's fed) shrinks
+              what's measured here, computing a smaller fontSize, shrinking
+              the icon, growing what's measured, computing a larger
+              fontSize again... measuring the whole (icon-size-independent)
+              row instead breaks that loop, which is what made the title
+              flicker/jitter vertically before this. */}
+          <div ref={iconRef} className="shrink-0">
+            {icon(fontSize)}
+          </div>
+          <div className="min-w-0 flex-1">
             {/* Unconstrained, invisible twin of the title text - its natural
                 width at a fixed baseline size is what useFitText scales
                 against to make the real title span exactly this container. */}
