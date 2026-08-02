@@ -42,9 +42,30 @@ export function useOverlayPosition(anchorRef: RefObject<HTMLElement | null>): Ov
     recompute();
     window.addEventListener("resize", recompute);
     document.addEventListener("scroll", recompute, true);
+    // Catches layout shifts a React re-render never sees - an image finishing
+    // its network load, a web font swapping in and changing text metrics, a
+    // browser-chrome-only reflow, or anything else that isn't a resize, a
+    // scroll, or a React state change. These are most likely on a cold first
+    // load, before anything's cached, which is exactly when this element
+    // would otherwise stay stuck at the *pre-shift* position it first
+    // measured and never correct itself until something else happened to
+    // force a re-render (a click, opening the popover, ...). Rather than
+    // chase down and individually listen for every possible cause (a losing
+    // game - tried a `load` listener plus `document.fonts.ready` here first,
+    // neither was actually the cause for this app), just re-measure on every
+    // animation frame for a short window after mount - cheap for one small
+    // element, and correct regardless of what actually shifted it.
+    let rafId: number;
+    const settleBy = performance.now() + 1000;
+    function pollWhileSettling(): void {
+      recompute();
+      if (performance.now() < settleBy) rafId = requestAnimationFrame(pollWhileSettling);
+    }
+    rafId = requestAnimationFrame(pollWhileSettling);
     return () => {
       window.removeEventListener("resize", recompute);
       document.removeEventListener("scroll", recompute, true);
+      cancelAnimationFrame(rafId);
     };
   });
 

@@ -293,8 +293,16 @@ export function WhiteboardBlock({
 
   return (
     <div
+      // z-[60], not the app's usual z-50 popover/modal tier: fullscreen is
+      // meant to cover *everything* unconditionally, but at z-50 it tied
+      // with (among other things) ObjectSlugButton.tsx's portaled `{}`
+      // button and BlockSlugButton.tsx's own - a tied z-index falls back to
+      // DOM order, and both of those buttons happened to land later in the
+      // DOM than this div, so they rendered on top of a "fullscreen" canvas
+      // instead of being covered by it. Needs to outrank the entire z-50
+      // tier outright rather than share it.
       className={`flex flex-col overflow-hidden ${
-        isFullscreen ? "fixed inset-0 z-50 bg-surface" : "h-[600px] w-full rounded-lg border border-border"
+        isFullscreen ? "fixed inset-0 z-[60] bg-surface" : "h-[600px] w-full rounded-lg border border-border"
       }`}
     >
       {/* A row of its own above the canvas, not an overlay on top of it -
