@@ -119,3 +119,32 @@ input[type="checkbox"] {
 .locked-content [data-lock-hide] {
   display: none;
 }
+
+/* Touch-only devices (phones/tablets - no mouse/trackpad) can never satisfy
+   `hover:`/`group-hover:` at all once `tailwind.config.js`'s
+   `hoverOnlyWhenSupported` future flag is on (see that flag's own comment -
+   it's what makes plain `hover:` links/nav take one tap instead of two on
+   touch). That's exactly right for those, but a bad default for the app's
+   *hover-reveal edit affordances* (the same `opacity-0 ...
+   group-hover(/name)?:opacity-100` convention the lock rule above matches -
+   a block's drag handle, delete button, id button, a checklist item's own
+   controls, "Add block", ...): with no hover to ever reveal them, they'd
+   stay permanently invisible while still fully clickable underneath
+   (`pointer-events` isn't affected by opacity) - a row of controls you can
+   blindly tap without ever seeing, which is exactly the "editing icons and
+   add/edit links aren't visible but you can still click them" bug this
+   fixes. Force them visible unconditionally instead, on any device that
+   can't hover at all - there's no tap-to-reveal affordance to preserve
+   here the way `PinnedNavItem.tsx`'s own `useHasHover`/`useTouchReveal`
+   deliberately keeps for sidebar rows (and this rule doesn't fight that:
+   it only emits the `group-hover:opacity-100` class string at all when
+   `hasHover` is true, so on a non-hover device its className never matches
+   this selector in the first place). Higher specificity than this rule
+   lets the lock rule above still correctly win when both apply (a locked
+   object opened on a touch device) - the control should stay hidden then
+   regardless of hover support. */
+@media (hover: none) {
+  [class*="group-hover"][class*="opacity-100"] {
+    opacity: 1 !important;
+  }
+}
