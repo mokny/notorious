@@ -4,6 +4,7 @@ build/
 *.log
 .env
 .env.local
+CLAUDE.md
 
 # runtime data (owner backups them up separately, see docs/DEPLOYMENT.md)
 data/*.db
