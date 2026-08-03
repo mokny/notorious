@@ -5,6 +5,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } f
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { workspaceApi, authApi, aiApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
+import { useConfirm } from "../context/ConfirmContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
@@ -21,6 +22,7 @@ export function WorkspaceLayout() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user, refetch } = useAuth();
   const { theme, toggle } = useTheme();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -66,6 +68,12 @@ export function WorkspaceLayout() {
   }, [location.pathname]);
 
   async function handleLogout() {
+    const confirmed = await confirm({
+      title: "Log out?",
+      description: "You'll be signed out of this device.",
+      confirmLabel: "Log out",
+    });
+    if (!confirmed) return;
     await authApi.logout();
     // Without this, `user` in AuthContext stays the stale cached value from
     // before logout - LoginPage immediately bounces back to "/" if it still
