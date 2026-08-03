@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { objectApi, schemaApi } from "../lib/api/resources.js";
 import { useObjectMutations } from "../hooks/useObjectMutations.js";
 import { RelationPicker } from "./properties/RelationPicker.js";
@@ -78,10 +79,8 @@ export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObject
             </button>
             {menuOpen && (
               <div className="absolute right-0 z-20 mt-1 max-h-64 w-48 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
-                {objectTypes
-                  ?.slice()
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((type) => (
+                {objectTypes &&
+                  sortObjectTypesForDisplay(objectTypes).map((type) => (
                     <button
                       key={type.id}
                       onClick={() => {

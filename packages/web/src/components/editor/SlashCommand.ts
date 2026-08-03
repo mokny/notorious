@@ -1,7 +1,7 @@
 import { Extension } from "@tiptap/core";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
-import type { BlockType, ObjectType } from "@notorious/shared";
+import { sortObjectTypesForDisplay, type BlockType, type ObjectType } from "@notorious/shared";
 
 export interface SlashCommandItem {
   type: BlockType;
@@ -48,9 +48,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
  * three steps in to do the same thing.
  */
 export function buildSlashCommandItems(objectTypes: ObjectType[]): SlashCommandItem[] {
-  const perType: SlashCommandItem[] = objectTypes
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
+  const perType: SlashCommandItem[] = sortObjectTypesForDisplay(objectTypes)
     .map((objectType) => ({
       type: "sub_object",
       label: objectType.name,

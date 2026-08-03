@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi } from "../../lib/api/resources.js";
 import { Icon } from "../ui/Icon.js";
 import { navLinkClass } from "./navLinkClass.js";
@@ -37,10 +38,8 @@ export function ObjectTypeMenu({ workspaceId }: { workspaceId: string }) {
 
       {open && (
         <div className="absolute left-0 z-20 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
-          {objectTypes
-            ?.slice()
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((type) => (
+          {objectTypes &&
+            sortObjectTypesForDisplay(objectTypes).map((type) => (
               <NavLink
                 key={type.id}
                 to={`/w/${workspaceId}/types/${type.key}`}
