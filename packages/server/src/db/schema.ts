@@ -413,6 +413,7 @@ export const instanceSettings = sqliteTable("instance_settings", {
   id: integer("id").primaryKey(),
   registrationEnabled: integer("registration_enabled", { mode: "boolean" }).notNull().default(false),
   require2faEnabled: integer("require_2fa_enabled", { mode: "boolean" }).notNull().default(false),
+  allowTemplateHttpRequests: integer("allow_template_http_requests", { mode: "boolean" }).notNull().default(false),
 });
 
 export const pushSubscriptions = sqliteTable("push_subscriptions", {

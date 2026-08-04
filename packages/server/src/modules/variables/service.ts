@@ -211,10 +211,11 @@ async function resolveOne(
 
       try {
         const out: string[] = [];
-        // Variable templates don't resolve objects.where(...) queries (no object-permission
-        // context to check candidates against here) - an empty queryResults map makes any such
-        // call in a Variable's template evaluate to an empty list rather than throwing.
-        const ctx: EvalContext = { budget: new RenderBudget(), queryResults: new Map() };
+        // Variable templates don't resolve objects.where(...) queries or http.*(...) calls (no
+        // object-permission/instance-settings context to check candidates against here) - empty
+        // result maps make any such call in a Variable's template evaluate to an empty
+        // list/null rather than throwing.
+        const ctx: EvalContext = { budget: new RenderBudget(), queryResults: new Map(), httpResults: new Map() };
         execNodes(nodes, scope, ctx, out);
         rendered = out.join("");
       } catch (err) {

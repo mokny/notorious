@@ -9,7 +9,20 @@ export type Expr =
   | { kind: "binary"; op: string; left: Expr; right: Expr }
   | { kind: "logical"; op: "and" | "or"; left: Expr; right: Expr }
   | { kind: "filter"; target: Expr; name: string; args: Expr[] }
-  | { kind: "objectsQuery"; filters: ObjectsQueryFilter[] };
+  | { kind: "objectsQuery"; filters: ObjectsQueryFilter[] }
+  | { kind: "httpRequest"; method: HttpMethod; url: string; headers: [string, string][]; body: string | null };
+
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD";
+
+/** `http.<method>(...)` argument names the grammar recognizes as the `http` namespace's fixed call forms - see `parsePostfix`'s comment on why this hard-coded-shape approach (mirroring `objects.where(...)`) rather than a general "call this value" node. */
+const HTTP_METHODS = new Set<string>(["get", "post", "put", "patch", "delete", "head"]);
+const HTTP_METHODS_WITH_BODY = new Set<HttpMethod>(["POST", "PUT", "PATCH"]);
+
+/** Canonical key for one `http.*(...)` call, used both to dedupe identical calls across a render pass (see collectTemplateReferences in renderer.ts) and to look its precomputed result back up from `evalExpr`'s `httpRequest` case - same role `canonicalObjectsQueryKey` plays for `objects.where(...)`. Header order doesn't affect the request, so it's sorted like that function sorts its filters. */
+export function canonicalHttpRequestKey(method: HttpMethod, url: string, headers: [string, string][], body: string | null): string {
+  const headerPart = [...headers].map(([name, value]) => `${name.toLowerCase()}:${value}`).sort().join("&");
+  return `${method} ${url}\n${headerPart}\n${body ?? ""}`;
+}
 
 /** One `name="value"` pair inside `objects.where(...)` - always a literal string, both name and value, so the whole set of possible queries a given render pass will run can be known statically (see collectTemplateReferences in renderer.ts) without evaluating any expressions. */
 export interface ObjectsQueryFilter {
@@ -232,6 +245,8 @@ class ExprParser {
         // member access is a syntax error, not a real function call.
         if (nameTok.value === "where" && target.kind === "identifier" && target.name === "objects" && this.atPunct("(")) {
           target = this.parseObjectsWhereCall();
+        } else if (target.kind === "identifier" && target.name === "http" && HTTP_METHODS.has(nameTok.value) && this.atPunct("(")) {
+          target = this.parseHttpCall(nameTok.value.toUpperCase() as HttpMethod);
         } else {
           target = { kind: "member", target, property: { kind: "literal", value: nameTok.value }, computed: false };
         }
@@ -269,6 +284,58 @@ class ExprParser {
       throw new TemplateSyntaxError(`objects.where(...) values must be string literals - got a non-string value for "${nameTok.value}"`);
     }
     return { name: nameTok.value, value: valueTok.value };
+  }
+  /**
+   * Parses `http.<method>(url)`, `http.<method>(url, headers)` (GET/HEAD/DELETE) or
+   * `http.<method>(url, body)`, `http.<method>(url, body, headers)` (POST/PUT/PATCH) -
+   * the `(` has already been peeked, not consumed. Every argument is a string literal
+   * (`headers` a literal `[["Name", "value"], ...]` list) for the same reason
+   * `objects.where(...)`'s filter values are: the whole set of requests a render pass
+   * will make has to be knowable statically, before any expression is evaluated (see
+   * collectTemplateReferences in renderer.ts) - this can't yet support a computed URL
+   * like `http.get(object.properties.api_url)`.
+   */
+  private parseHttpCall(method: HttpMethod): Expr {
+    this.pos++; // consume "("
+    const url = this.parseHttpStringArg("url");
+    let body: string | null = null;
+    if (HTTP_METHODS_WITH_BODY.has(method)) {
+      this.expectPunct(",");
+      body = this.parseHttpStringArg("body");
+    }
+    let headers: [string, string][] = [];
+    if (this.atPunct(",")) {
+      this.pos++;
+      headers = this.parseHttpHeaders();
+    }
+    this.expectPunct(")");
+    return { kind: "httpRequest", method, url, headers, body };
+  }
+  private parseHttpStringArg(what: string): string {
+    const t = this.next();
+    if (t.type !== "str") throw new TemplateSyntaxError(`http.*(...) ${what} must be a string literal, e.g. "https://example.com"`);
+    return t.value;
+  }
+  private parseHttpHeaders(): [string, string][] {
+    this.expectPunct("[");
+    const headers: [string, string][] = [];
+    if (!this.atPunct("]")) {
+      headers.push(this.parseHttpHeaderPair());
+      while (this.atPunct(",")) {
+        this.pos++;
+        headers.push(this.parseHttpHeaderPair());
+      }
+    }
+    this.expectPunct("]");
+    return headers;
+  }
+  private parseHttpHeaderPair(): [string, string] {
+    this.expectPunct("[");
+    const name = this.parseHttpStringArg("a header name");
+    this.expectPunct(",");
+    const value = this.parseHttpStringArg("a header value");
+    this.expectPunct("]");
+    return [name, value];
   }
   private parsePrimary(): Expr {
     const t = this.next();

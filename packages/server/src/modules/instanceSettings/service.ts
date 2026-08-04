@@ -36,3 +36,20 @@ export async function setRequire2faEnabled(enabled: boolean): Promise<void> {
     .set({ require2faEnabled: enabled })
     .where(eq(instanceSettings.id, SETTINGS_ROW_ID));
 }
+
+/** See scripts/setAllowTemplateHttp.ts and modules/templates/http.ts - gates the `http.*(...)` template builtin, off by default. */
+export async function getAllowTemplateHttpRequests(): Promise<boolean> {
+  const rows = await db
+    .select({ allowTemplateHttpRequests: instanceSettings.allowTemplateHttpRequests })
+    .from(instanceSettings)
+    .where(eq(instanceSettings.id, SETTINGS_ROW_ID))
+    .limit(1);
+  return rows[0]?.allowTemplateHttpRequests ?? false;
+}
+
+export async function setAllowTemplateHttpRequests(enabled: boolean): Promise<void> {
+  await db
+    .update(instanceSettings)
+    .set({ allowTemplateHttpRequests: enabled })
+    .where(eq(instanceSettings.id, SETTINGS_ROW_ID));
+}

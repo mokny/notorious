@@ -183,6 +183,33 @@ Task, each one's own `hours` property)
 {{ total_hours }} hours logged on open tasks
 ```
 
+## Outbound HTTP requests
+
+`http.get(url)`, `http.post(url, body)`, `http.put(url, body)`, `http.patch(url, body)`,
+`http.delete(url)`, `http.head(url)` fetch a URL from the server and give you back an object with
+`.status`, `.ok`, `.body` (response text), and `.headers.<name>` (lowercase header names). Every
+method except `get`/`delete`/`head` takes a `body` string as its second argument; all of them
+optionally take a trailing headers argument, a literal list of `[name, value]` pairs:
+
+```
+{{ http.get("https://api.example.com/status", [["Authorization", "Bearer xyz"]]).body }}
+{% set res = http.post("https://api.example.com/echo", "{\"hello\":true}", [["Content-Type", "application/json"]]) %}
+Status: {{ res.status }}
+```
+
+- **Off by default.** An instance admin has to explicitly turn this on:
+  `npm run enable-template-http` (or `npm run --workspace=packages/server set-allow-template-http --
+  --status` to check, `--disable` to turn back off - see `docs/DEPLOYMENT.md`). While off, every
+  `http.*(...)` call evaluates to a runtime error, same as any other template error.
+- **Every argument must be a string literal** - `url`, `body`, and every header name/value. Just
+  like `objects.where(...)`'s filter values, this is what lets the whole set of requests a render
+  will make be known before any expression is evaluated (see "How rendering works" below), so a
+  computed URL like `http.get(object.properties.api_url)` isn't currently supported.
+- **Capped at 8 distinct calls per render** - identical calls (same method/URL/headers/body,
+  regardless of how many times or where they appear across the object's blocks) only run once and
+  share their result, the same deduping `objects.where(...)` gets.
+- See Security below for what's actually guarded against once this is turned on.
+
 ## How rendering works
 
 Every one of an object's blocks is rendered together, in two top-to-bottom passes. The first pass
@@ -203,20 +230,34 @@ not a second layer of template evaluation - which keeps a template in object A r
 
 Templates run entirely server-side, through a small hand-written interpreter built specifically
 for this - not a general-purpose scripting language and not `eval`. There's no way to call an
-arbitrary function, reach `constructor`/`__proto__`, or touch the filesystem/network/process -
-those aren't missing safety checks, the language the parser accepts simply has no such thing as
-"call this value as a function" at all; only a fixed table of filters (the list above) and the one
-fixed `objects.where(...)` query shape can ever be invoked, and neither exposes a live function
-reference to the template itself. A render is capped by both a step budget and a wall-clock
-deadline, and any single `{% for %}` loop is capped at 1000 iterations. Every object a template
-reads - the current one, a cross-referenced `objects.<id>`, or a candidate row from
-`objects.where(...)` - is checked against the actual permissions of whoever is viewing the page (a
-real workspace member's role, or exactly what an anonymous share link grants) - a template can
-never surface data its viewer couldn't already see through the normal UI. `objects.where(...)` adds
-two more caps on top of that, independent of each other: a hard 200-row result limit, and one render
-budget step charged per candidate row it checks (whether or not that row ends up matching or being
-visible to the viewer) - so a query over a huge workspace can't buy unbounded work just by looking
-at a lot of rows before filtering them down.
+arbitrary function or reach `constructor`/`__proto__` - those aren't missing safety checks, the
+language the parser accepts simply has no such thing as "call this value as a function" at all;
+only a fixed table of filters (the list above) and two fixed call shapes, `objects.where(...)` and
+`http.*(...)`, can ever be invoked, and neither exposes a live function reference to the template
+itself. A render is capped by both a step budget and a wall-clock deadline, and any single
+`{% for %}` loop is capped at 1000 iterations. Every object a template reads - the current one, a
+cross-referenced `objects.<id>`, or a candidate row from `objects.where(...)` - is checked against
+the actual permissions of whoever is viewing the page (a real workspace member's role, or exactly
+what an anonymous share link grants) - a template can never surface data its viewer couldn't
+already see through the normal UI. `objects.where(...)` adds two more caps on top of that,
+independent of each other: a hard 200-row result limit, and one render budget step charged per
+candidate row it checks (whether or not that row ends up matching or being visible to the viewer) -
+so a query over a huge workspace can't buy unbounded work just by looking at a lot of rows before
+filtering them down.
+
+`http.*(...)` (see "Outbound HTTP requests" above) is the one deliberate exception to "no
+filesystem/network/process access," off by default and opt-in per instance for exactly that reason.
+Turning it on lets any workspace member who can edit a template field make the *server* issue an
+outbound request every time *anyone* views that page - including an anonymous share-link visitor,
+with no per-viewer confirmation - which is a real SSRF vector: someone with template-edit access
+could otherwise use it to probe the server's own internal network or cloud metadata endpoint. Each
+call is guarded by: http/https only, the target hostname's DNS-resolved address checked against
+private/loopback/link-local/metadata IP ranges (re-checked on *every* redirect hop, not just the
+first), an 8-second timeout, and a 1MB response cap - on top of the 8-distinct-calls-per-render cap
+mentioned above. This isn't a complete defense (DNS-rebinding between the resolve check and the
+actual connection isn't pinned) - treat it as appropriate for a self-hosted instance among trusted
+workspace members, not as safe to expose to untrusted or public-signup workspaces without further
+hardening.
 
 Output is inserted as plain text into the same Markdown pipeline every block already uses (which
 never interprets raw HTML) - rendering a template introduces no new risk beyond what any user

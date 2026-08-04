@@ -1,6 +1,16 @@
 import { and, eq } from "drizzle-orm";
 import type { Block, ObjectRecord, TableDoc, ViewFilter, ObjectsQueryFilter } from "@notorious/shared";
-import { tableCellField, tableDocToTextGrid, hasTemplateSyntax, TemplateSyntaxError, parseTemplate, type TemplateNode, type Expr, canonicalObjectsQueryKey } from "@notorious/shared";
+import {
+  tableCellField,
+  tableDocToTextGrid,
+  hasTemplateSyntax,
+  TemplateSyntaxError,
+  parseTemplate,
+  type TemplateNode,
+  type Expr,
+  canonicalObjectsQueryKey,
+  canonicalHttpRequestKey,
+} from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { objects, objectTypes } from "../../db/schema.js";
 import { forbidden } from "../../lib/httpError.js";
@@ -9,11 +19,16 @@ import { assertShareCanAccessObject, type ResolvedShare } from "../shareLinks/se
 import * as objectService from "../objects/service.js";
 import * as blockService from "../blocks/service.js";
 import { listProperties } from "../schema/service.js";
-import { execNodes, Scope, RenderBudget, TemplateRuntimeError, type EvalContext, type QueryResult } from "./interpreter.js";
+import { execNodes, Scope, RenderBudget, TemplateRuntimeError, type EvalContext, type QueryResult, type HttpCallResult } from "./interpreter.js";
 import { buildVariablesMap } from "../variables/service.js";
+import { performHttpCall, type HttpCallDescriptor } from "./http.js";
+import { getAllowTemplateHttpRequests } from "../instanceSettings/service.js";
 
 /** Every result `objects.where(...)` returns is capped here - a hard ceiling on how many objects one query call can pull into a render, independent of the render's overall step budget (see `resolveObjectsWhere`). */
 const OBJECTS_WHERE_RESULT_LIMIT = 200;
+
+/** A hard ceiling on how many *distinct* `http.*(...)` calls one render pass will actually perform - independent of the response-size/timeout caps `performHttpCall` (http.ts) already applies to each individual call, this bounds the total number of outbound requests one page render can trigger (a template can't be used to fan out into a mini port-scanner via many `http.get(...)` calls across its blocks). Calls beyond this cap resolve to an error, same as a disabled instance setting - see `renderObjectBlocks`. */
+const MAX_HTTP_CALLS_PER_RENDER = 8;
 
 /**
  * Whoever is actually viewing the page this render is for - a real member
@@ -132,13 +147,19 @@ function flattenInDocumentOrder(allBlocks: Block[]): Block[] {
  * Walks a parsed template's AST for statically-known `objects.<slug>` references
  * (`objects[someVar]` - a computed/dynamic key - can't be resolved this way and
  * simply reads as undefined at render time, not a security gap, just an
- * unsupported dynamic case) and `objects.where(...)` query calls (always
- * statically resolvable, since their filters are literal strings by
- * construction - see `ObjectsQueryFilter` in parser.ts). Collected once across
- * every block before any evaluation starts, so all cross-object reads and
- * queries for this render pass can be permission-checked and fetched up front.
+ * unsupported dynamic case), `objects.where(...)` query calls, and `http.*(...)`
+ * calls (both always statically resolvable, since their arguments are literals
+ * by construction - see `ObjectsQueryFilter`/the `httpRequest` Expr shape in
+ * parser.ts). Collected once across every block before any evaluation starts,
+ * so all cross-object reads, queries, and outbound requests for this render
+ * pass can be permission-checked/fetched up front.
  */
-function collectTemplateReferences(nodes: TemplateNode[], slugs: Set<string>, queries: Map<string, ObjectsQueryFilter[]>): void {
+function collectTemplateReferences(
+  nodes: TemplateNode[],
+  slugs: Set<string>,
+  queries: Map<string, ObjectsQueryFilter[]>,
+  httpCalls: Map<string, HttpCallDescriptor>,
+): void {
   function visitExpr(expr: Expr): void {
     if (expr.kind === "member") {
       if (!expr.computed && expr.target.kind === "identifier" && expr.target.name === "objects" && expr.property.kind === "literal" && typeof expr.property.value === "string") {
@@ -148,6 +169,13 @@ function collectTemplateReferences(nodes: TemplateNode[], slugs: Set<string>, qu
       visitExpr(expr.property);
     } else if (expr.kind === "objectsQuery") {
       queries.set(canonicalObjectsQueryKey(expr.filters), expr.filters);
+    } else if (expr.kind === "httpRequest") {
+      httpCalls.set(canonicalHttpRequestKey(expr.method, expr.url, expr.headers, expr.body), {
+        method: expr.method,
+        url: expr.url,
+        headers: expr.headers,
+        body: expr.body,
+      });
     } else if (expr.kind === "unary") {
       visitExpr(expr.argument);
     } else if (expr.kind === "binary" || expr.kind === "logical") {
@@ -403,12 +431,13 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   const parsedByBlock = new Map<string, ParsedField[]>();
   const referencedSlugs = new Set<string>();
   const referencedQueries = new Map<string, ObjectsQueryFilter[]>();
+  const referencedHttpCalls = new Map<string, HttpCallDescriptor>();
   for (const block of orderedBlocks) {
     const parsedFields = getTemplatableFields(block).map((source): ParsedField => {
       if (!hasTemplateSyntax(source.text)) return { ...source, nodes: null, error: null };
       try {
         const nodes = parseTemplate(source.text);
-        collectTemplateReferences(nodes, referencedSlugs, referencedQueries);
+        collectTemplateReferences(nodes, referencedSlugs, referencedQueries, referencedHttpCalls);
         return { ...source, nodes, error: null };
       } catch (err) {
         return { ...source, nodes: null, error: errorMessage(err) };
@@ -439,7 +468,32 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   }
   const variablesMap = await buildVariablesMap(object.workspaceId);
 
-  const ctx: EvalContext = { budget, queryResults };
+  const httpResults = new Map<string, HttpCallResult>();
+  if (referencedHttpCalls.size > 0) {
+    // Checked once per render, not per call - a template with several
+    // `http.*(...)` calls doesn't need several round trips to the settings
+    // table just to find out they're all going to be refused the same way.
+    const httpEnabled = await getAllowTemplateHttpRequests();
+    let performed = 0;
+    for (const [key, call] of referencedHttpCalls) {
+      if (!httpEnabled) {
+        httpResults.set(key, { ok: false, error: "Outbound HTTP requests are disabled for templates on this instance" });
+        continue;
+      }
+      if (performed >= MAX_HTTP_CALLS_PER_RENDER) {
+        httpResults.set(key, { ok: false, error: `Too many distinct http.*(...) calls in one render (max ${MAX_HTTP_CALLS_PER_RENDER})` });
+        continue;
+      }
+      performed++;
+      try {
+        httpResults.set(key, { ok: true, value: await performHttpCall(call) });
+      } catch (err) {
+        httpResults.set(key, { ok: false, error: errorMessage(err) });
+      }
+    }
+  }
+
+  const ctx: EvalContext = { budget, queryResults, httpResults };
 
   const seedBlocksMap: Record<string, unknown> = {};
   const seedScope = new Scope();

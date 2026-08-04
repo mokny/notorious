@@ -68,6 +68,15 @@ reversed with `npm run disable-2fa-requirement`. Since there's no email-based ac
 Notorious, each user gets 8 one-time backup codes when they set up 2FA - make sure that's communicated
 if you turn the requirement on for a team.
 
+Templates can make the server issue outbound HTTP requests (`http.get(...)`, `http.post(...)`, etc.
+- see [TEMPLATES.md](TEMPLATES.md#outbound-http-requests)), off by default since it's a real SSRF
+vector: a template author's `http.*(...)` call runs every time *anyone* views that page, including
+anonymous share-link visitors. Enable with `npm run enable-template-http`, reverse with
+`npm run disable-template-http` - same "database setting, takes effect immediately" pattern as
+registration/2FA above. Only turn this on for instances where every workspace member with
+template-edit access is trusted; see TEMPLATES.md's Security section for exactly what's guarded
+against even when enabled.
+
 AI features (Agent Chat, MCP server) need no instance-wide setup - each user brings their own AI
 provider API key, configured from **Settings -> AI**, encrypted at rest the same way TOTP secrets
 are. There's nothing to enable/disable here; a user simply hasn't configured one until they choose

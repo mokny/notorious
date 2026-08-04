@@ -1,5 +1,5 @@
 import type { Expr, TemplateNode } from "@notorious/shared";
-import { canonicalObjectsQueryKey } from "@notorious/shared";
+import { canonicalObjectsQueryKey, canonicalHttpRequestKey } from "@notorious/shared";
 import { FILTERS, stringify } from "./filters.js";
 import { TemplateRuntimeError } from "./errors.js";
 
@@ -117,10 +117,14 @@ function toNumber(value: unknown): number {
 /** One `objects.where(...)` call's outcome, precomputed once per render pass before any block is evaluated (see renderer.ts's `resolveObjectsWhere`) - `evalExpr`'s `objectsQuery` case only ever does a synchronous map lookup, never touches the DB itself. */
 export type QueryResult = { ok: true; items: unknown[] } | { ok: false; error: string };
 
-/** Threaded through every recursive `evalExpr`/`execNodes` call alongside `scope` - the render budget (see `RenderBudget` above) plus every `objects.where(...)` call's precomputed result, keyed by `canonicalObjectsQueryKey`. */
+/** One `http.*(...)` call's outcome, precomputed once per render pass the same way `QueryResult` is - see renderer.ts's use of `performHttpCall` (modules/templates/http.ts). `evalExpr`'s `httpRequest` case never itself performs network I/O. */
+export type HttpCallResult = { ok: true; value: unknown } | { ok: false; error: string };
+
+/** Threaded through every recursive `evalExpr`/`execNodes` call alongside `scope` - the render budget (see `RenderBudget` above), every `objects.where(...)` call's precomputed result (keyed by `canonicalObjectsQueryKey`), and every `http.*(...)` call's precomputed result (keyed by `canonicalHttpRequestKey`). */
 export interface EvalContext {
   budget: RenderBudget;
   queryResults: Map<string, QueryResult>;
+  httpResults: Map<string, HttpCallResult>;
 }
 
 export function evalExpr(node: Expr, scope: Scope, ctx: EvalContext): unknown {
@@ -160,6 +164,12 @@ export function evalExpr(node: Expr, scope: Scope, ctx: EvalContext): unknown {
       if (!result) return [];
       if (!result.ok) throw new TemplateRuntimeError(result.error);
       return result.items;
+    }
+    case "httpRequest": {
+      const result = ctx.httpResults.get(canonicalHttpRequestKey(node.method, node.url, node.headers, node.body));
+      if (!result) return null;
+      if (!result.ok) throw new TemplateRuntimeError(result.error);
+      return result.value;
     }
   }
 }

@@ -23,6 +23,17 @@ const NAMESPACE_ITEMS: SuggestionItem[] = [
   { label: "blocks", insertText: "blocks", detail: "This object's own blocks, by slug" },
   { label: "objects", insertText: "objects", detail: "Cross-object reference: objects.<slug>" },
   { label: "variables", insertText: "variables", detail: "Workspace Variables, by name" },
+  { label: "http", insertText: "http", detail: "Outbound HTTP request: http.get(url), http.post(url, body), …" },
+];
+
+/** `http.<method>(...)` - see parser.ts's HTTP_METHODS and modules/templates/http.ts on the server. Every argument is a string literal (headers a literal `[["Name", "value"], ...]` list), so there's nothing to search live here - just the fixed method names. */
+const HTTP_METHOD_ITEMS: SuggestionItem[] = [
+  { label: "get", insertText: 'get("https://")', detail: "http.get(url) / http.get(url, headers)" },
+  { label: "post", insertText: 'post("https://", "")', detail: "http.post(url, body) / http.post(url, body, headers)" },
+  { label: "put", insertText: 'put("https://", "")', detail: "http.put(url, body) / http.put(url, body, headers)" },
+  { label: "patch", insertText: 'patch("https://", "")', detail: "http.patch(url, body) / http.patch(url, body, headers)" },
+  { label: "delete", insertText: 'delete("https://")', detail: "http.delete(url) / http.delete(url, headers)" },
+  { label: "head", insertText: 'head("https://")', detail: "http.head(url) / http.head(url, headers)" },
 ];
 
 /** Present on every `object`/`objects.<slug>` view (see buildObjectView in modules/templates/renderer.ts). `object.blocks` doesn't exist (blocks are a separate top-level `blocks.<slug>` scope), but a cross-object `objects.<slug>.blocks`/`objects.where(...).blocks` does. */
@@ -145,6 +156,9 @@ function buildSuggestion(
           if (!workspaceIdRef.current) return [];
           const matches = await variableMatches(workspaceIdRef.current, schemaRef.current, query);
           return matches.map((obj) => ({ label: obj.title, insertText: obj.title, detail: "Variable" }));
+        }
+        if (ctx.path === "http") {
+          return HTTP_METHOD_ITEMS.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
         }
         return propertyItems(ctx.path, schemaRef.current).filter((item) => item.label.toLowerCase().includes(query.toLowerCase())).slice(0, 15);
       }
