@@ -4,9 +4,8 @@ import { objects, objectTypes } from "../../db/schema.js";
 import { badRequest } from "../../lib/httpError.js";
 import { resolveValuesForObjects } from "../objects/valueResolver.js";
 import { listProperties } from "../schema/service.js";
-import { hasTemplateSyntax, TemplateSyntaxError } from "../templates/lexer.js";
-import { parseTemplate, type TemplateNode, type Expr } from "../templates/parser.js";
-import { execNodes, Scope, RenderBudget, TemplateRuntimeError } from "../templates/interpreter.js";
+import { hasTemplateSyntax, TemplateSyntaxError, parseTemplate, type TemplateNode, type Expr } from "@notorious/shared";
+import { execNodes, Scope, RenderBudget, TemplateRuntimeError, type EvalContext } from "../templates/interpreter.js";
 
 export interface VariableValueResult {
   value: unknown;
@@ -212,7 +211,11 @@ async function resolveOne(
 
       try {
         const out: string[] = [];
-        execNodes(nodes, scope, new RenderBudget(), out);
+        // Variable templates don't resolve objects.where(...) queries (no object-permission
+        // context to check candidates against here) - an empty queryResults map makes any such
+        // call in a Variable's template evaluate to an empty list rather than throwing.
+        const ctx: EvalContext = { budget: new RenderBudget(), queryResults: new Map() };
+        execNodes(nodes, scope, ctx, out);
         rendered = out.join("");
       } catch (err) {
         const result: VariableValueResult = { value: null, error: errorMessage(err) };

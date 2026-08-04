@@ -4,8 +4,10 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
-import type { BlockType, ObjectType } from "@notorious/shared";
+import type { BlockType, ObjectType, TemplateAutocompleteSchemaResponse } from "@notorious/shared";
 import { SlashCommand } from "./SlashCommand.js";
+import { TemplateHighlight } from "./TemplateHighlight.js";
+import { TemplateSuggestion } from "./TemplateSuggestion.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 
 interface UseMarkdownEditorOptions {
@@ -17,6 +19,10 @@ interface UseMarkdownEditorOptions {
   onSlashSelect?: (type: BlockType, extraContent?: Record<string, unknown>) => void;
   /** For the slash menu's per-object-type "create a new X" entries - see SlashCommand.ts. */
   objectTypes?: ObjectType[];
+  /** Adds TemplateHighlight/TemplateSuggestion - see RichTextEditor.tsx's `templateAware` prop. */
+  templateAware?: boolean;
+  workspaceId?: string;
+  templateSchema?: TemplateAutocompleteSchemaResponse;
   /** Fired when this editor loses focus - see TemplatableMarkdown.tsx, which uses it to switch a templated field back to its rendered display. */
   onBlur?: () => void;
   /** Fired when this editor gains focus - see TemplatableMarkdown.tsx, which uses it to mark a templated field as actively being edited (so it can't involuntarily flip to its rendered display mid-typing if a save+refetch lands while still focused). */
@@ -69,6 +75,10 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   // param), not just when it's configured below - object types can still be
   // loading (or change) after this editor instance is created.
   const objectTypesRef = useRef<ObjectType[]>(options.objectTypes ?? []);
+  // Same call-time-read pattern as objectTypesRef above, for
+  // TemplateSuggestion.ts (see its own doc comment).
+  const workspaceIdRef = useRef(options.workspaceId ?? "");
+  const templateSchemaRef = useRef(options.templateSchema);
 
   onChangeRef.current = options.onChange;
   onEnterRef.current = options.onEnter;
@@ -77,8 +87,11 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   onBlurRef.current = options.onBlur;
   onFocusRef.current = options.onFocus;
   objectTypesRef.current = options.objectTypes ?? [];
+  workspaceIdRef.current = options.workspaceId ?? "";
+  templateSchemaRef.current = options.templateSchema;
 
   const hasSlashCommand = Boolean(options.onSlashSelect);
+  const templateAware = Boolean(options.templateAware);
 
   const extensions = useMemo(
     () => [
@@ -102,8 +115,9 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
             }),
           ]
         : []),
+      ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, schemaRef: templateSchemaRef })] : []),
     ],
-    [options.placeholder, hasSlashCommand],
+    [options.placeholder, hasSlashCommand, templateAware],
   );
 
   const editorProps = useMemo(

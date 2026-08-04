@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
-import type { Block, ObjectRecord, TableDoc } from "@notorious/shared";
-import { tableCellField, tableDocToTextGrid } from "@notorious/shared";
+import type { Block, ObjectRecord, TableDoc, ViewFilter, ObjectsQueryFilter } from "@notorious/shared";
+import { tableCellField, tableDocToTextGrid, hasTemplateSyntax, TemplateSyntaxError, parseTemplate, type TemplateNode, type Expr, canonicalObjectsQueryKey } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { objects, objectTypes } from "../../db/schema.js";
 import { forbidden } from "../../lib/httpError.js";
@@ -8,10 +8,12 @@ import { requireWorkspaceRole } from "../workspaces/access.js";
 import { assertShareCanAccessObject, type ResolvedShare } from "../shareLinks/service.js";
 import * as objectService from "../objects/service.js";
 import * as blockService from "../blocks/service.js";
-import { hasTemplateSyntax, TemplateSyntaxError } from "./lexer.js";
-import { parseTemplate, type TemplateNode, type Expr } from "./parser.js";
-import { execNodes, Scope, RenderBudget, TemplateRuntimeError } from "./interpreter.js";
+import { listProperties } from "../schema/service.js";
+import { execNodes, Scope, RenderBudget, TemplateRuntimeError, type EvalContext, type QueryResult } from "./interpreter.js";
 import { buildVariablesMap } from "../variables/service.js";
+
+/** Every result `objects.where(...)` returns is capped here - a hard ceiling on how many objects one query call can pull into a render, independent of the render's overall step budget (see `resolveObjectsWhere`). */
+const OBJECTS_WHERE_RESULT_LIMIT = 200;
 
 /**
  * Whoever is actually viewing the page this render is for - a real member
@@ -126,8 +128,17 @@ function flattenInDocumentOrder(allBlocks: Block[]): Block[] {
   return result;
 }
 
-/** Walks a parsed template's AST for statically-known `objects.<slug>` references (`objects[someVar]` - a computed/dynamic key - can't be resolved this way and simply reads as undefined at render time, not a security gap, just an unsupported dynamic case). Collected once across every block before any evaluation starts, so all cross-object reads for this render pass can be permission-checked and fetched up front. */
-function collectObjectSlugReferences(nodes: TemplateNode[], slugs: Set<string>): void {
+/**
+ * Walks a parsed template's AST for statically-known `objects.<slug>` references
+ * (`objects[someVar]` - a computed/dynamic key - can't be resolved this way and
+ * simply reads as undefined at render time, not a security gap, just an
+ * unsupported dynamic case) and `objects.where(...)` query calls (always
+ * statically resolvable, since their filters are literal strings by
+ * construction - see `ObjectsQueryFilter` in parser.ts). Collected once across
+ * every block before any evaluation starts, so all cross-object reads and
+ * queries for this render pass can be permission-checked and fetched up front.
+ */
+function collectTemplateReferences(nodes: TemplateNode[], slugs: Set<string>, queries: Map<string, ObjectsQueryFilter[]>): void {
   function visitExpr(expr: Expr): void {
     if (expr.kind === "member") {
       if (!expr.computed && expr.target.kind === "identifier" && expr.target.name === "objects" && expr.property.kind === "literal" && typeof expr.property.value === "string") {
@@ -135,6 +146,8 @@ function collectObjectSlugReferences(nodes: TemplateNode[], slugs: Set<string>):
       }
       visitExpr(expr.target);
       visitExpr(expr.property);
+    } else if (expr.kind === "objectsQuery") {
+      queries.set(canonicalObjectsQueryKey(expr.filters), expr.filters);
     } else if (expr.kind === "unary") {
       visitExpr(expr.argument);
     } else if (expr.kind === "binary" || expr.kind === "logical") {
@@ -185,6 +198,15 @@ async function getObjectTypeKey(objectTypeId: string): Promise<string> {
   return rows[0]?.key ?? "";
 }
 
+async function getObjectTypeIdByKey(workspaceId: string, key: string): Promise<string | null> {
+  const rows = await db
+    .select({ id: objectTypes.id })
+    .from(objectTypes)
+    .where(and(eq(objectTypes.workspaceId, workspaceId), eq(objectTypes.key, key)))
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
 function buildObjectView(record: ObjectRecord, typeKey: string): Record<string, unknown> {
   return {
     id: record.id,
@@ -226,6 +248,67 @@ async function resolveObjectViewBySlug(workspaceId: string, slug: string, identi
   return view;
 }
 
+/**
+ * Resolves one `objects.where(type="...", ...)` call - the `type` filter is
+ * required (it's how the query knows which object type's properties the
+ * other filters, and the result rows themselves, are shaped by) and every
+ * other filter must name a real property on that type, matched by equality
+ * against `queryObjects`'s existing in-process filter engine (see
+ * objects/query.ts). Every candidate row is still permission-checked
+ * individually via `assertCanViewObject` and silently dropped (not surfaced
+ * as an error - same as a dangling `objects.<slug>` reference) if the viewer
+ * can't see it, exactly like `resolveObjectViewBySlug` above. Each checked
+ * candidate costs one step of the render's shared `RenderBudget`, on top of
+ * the hard `OBJECTS_WHERE_RESULT_LIMIT` already applied by `queryObjects` -
+ * two independent caps on how much one query call can cost. Results are
+ * built the same "flat, raw blocks" way as a cross-object `objects.<slug>`
+ * reference (see buildBlockView's doc comment) - never re-parsed as
+ * templates - so a where() result can't reintroduce the A->B->A render
+ * cycles that mechanism was designed to rule out.
+ */
+async function resolveObjectsWhere(workspaceId: string, filters: ObjectsQueryFilter[], identity: ActingIdentity, budget: RenderBudget): Promise<unknown[]> {
+  const typeFilter = filters.find((f) => f.name === "type");
+  if (!typeFilter) throw new TemplateRuntimeError('objects.where(...) requires a "type" filter, e.g. objects.where(type="task")');
+
+  const objectTypeId = await getObjectTypeIdByKey(workspaceId, typeFilter.value);
+  if (!objectTypeId) return [];
+
+  const props = await listProperties(objectTypeId);
+  const propByKey = new Map(props.map((p) => [p.key, p]));
+  const viewFilters: ViewFilter[] = [];
+  for (const filter of filters) {
+    if (filter.name === "type") continue;
+    const prop = propByKey.get(filter.name);
+    if (!prop) throw new TemplateRuntimeError(`objects.where(...): unknown property "${filter.name}" on type "${typeFilter.value}"`);
+    viewFilters.push({ propertyId: prop.id, operator: "equals", value: filter.value });
+  }
+
+  const { items } = await objectService.queryObjects(workspaceId, {
+    objectTypeId,
+    archived: false,
+    filters: viewFilters,
+    limit: OBJECTS_WHERE_RESULT_LIMIT,
+  });
+
+  const results: unknown[] = [];
+  for (const record of items) {
+    budget.tick();
+    try {
+      await assertCanViewObject(identity, record.id);
+    } catch {
+      continue;
+    }
+    const view = buildObjectView(record, typeFilter.value);
+    const blocksMap: Record<string, unknown> = {};
+    for (const block of await blockService.listBlocks(record.id)) {
+      if (block.slug) blocksMap[block.slug] = buildBlockView(block, rawFieldsOf(block));
+    }
+    view.blocks = blocksMap;
+    results.push(view);
+  }
+  return results;
+}
+
 interface ParsedField extends FieldSource {
   nodes: TemplateNode[] | null;
   error: string | null;
@@ -251,7 +334,7 @@ function runRenderPass(
   parsedByBlock: Map<string, ParsedField[]>,
   scope: Scope,
   blocksMap: Record<string, unknown>,
-  budget: RenderBudget,
+  ctx: EvalContext,
   showErrors: boolean,
 ): Record<string, Record<string, string>> {
   const rendered: Record<string, Record<string, string>> = {};
@@ -274,7 +357,7 @@ function runRenderPass(
       anyTemplated = true;
       try {
         const out: string[] = [];
-        execNodes(nodes, scope, budget, out);
+        execNodes(nodes, scope, ctx, out);
         renderedFields[field] = out.join("");
       } catch (err) {
         renderedFields[field] = showErrors ? `⚠ ${errorMessage(err)}` : text;
@@ -319,12 +402,13 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
 
   const parsedByBlock = new Map<string, ParsedField[]>();
   const referencedSlugs = new Set<string>();
+  const referencedQueries = new Map<string, ObjectsQueryFilter[]>();
   for (const block of orderedBlocks) {
     const parsedFields = getTemplatableFields(block).map((source): ParsedField => {
       if (!hasTemplateSyntax(source.text)) return { ...source, nodes: null, error: null };
       try {
         const nodes = parseTemplate(source.text);
-        collectObjectSlugReferences(nodes, referencedSlugs);
+        collectTemplateReferences(nodes, referencedSlugs, referencedQueries);
         return { ...source, nodes, error: null };
       } catch (err) {
         return { ...source, nodes: null, error: errorMessage(err) };
@@ -336,13 +420,26 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   const typeKey = await getObjectTypeKey(object.objectTypeId);
   const objectView = buildObjectView(object, typeKey);
 
+  // Created before resolving objects.where(...) calls below, so the cost of
+  // checking each candidate row's permissions is charged against the same
+  // shared budget the render passes use - not a separate, unbounded cost.
+  const budget = new RenderBudget();
+
   const objectsMap: Record<string, unknown> = {};
   for (const slug of referencedSlugs) {
     objectsMap[slug] = await resolveObjectViewBySlug(object.workspaceId, slug, identity).catch(() => null);
   }
+  const queryResults = new Map<string, QueryResult>();
+  for (const [key, filters] of referencedQueries) {
+    try {
+      queryResults.set(key, { ok: true, items: await resolveObjectsWhere(object.workspaceId, filters, identity, budget) });
+    } catch (err) {
+      queryResults.set(key, { ok: false, error: errorMessage(err) });
+    }
+  }
   const variablesMap = await buildVariablesMap(object.workspaceId);
 
-  const budget = new RenderBudget();
+  const ctx: EvalContext = { budget, queryResults };
 
   const seedBlocksMap: Record<string, unknown> = {};
   const seedScope = new Scope();
@@ -350,7 +447,7 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   seedScope.set("objects", objectsMap);
   seedScope.set("variables", variablesMap);
   seedScope.set("blocks", seedBlocksMap);
-  runRenderPass(orderedBlocks, parsedByBlock, seedScope, seedBlocksMap, budget, false);
+  runRenderPass(orderedBlocks, parsedByBlock, seedScope, seedBlocksMap, ctx, false);
 
   const blocksMap: Record<string, unknown> = { ...seedBlocksMap };
   const rootScope = new Scope();
@@ -358,5 +455,5 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   rootScope.set("objects", objectsMap);
   rootScope.set("variables", variablesMap);
   rootScope.set("blocks", blocksMap);
-  return runRenderPass(orderedBlocks, parsedByBlock, rootScope, blocksMap, budget, true);
+  return runRenderPass(orderedBlocks, parsedByBlock, rootScope, blocksMap, ctx, true);
 }

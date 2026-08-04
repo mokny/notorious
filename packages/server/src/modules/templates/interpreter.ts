@@ -1,4 +1,5 @@
-import type { Expr, TemplateNode } from "./parser.js";
+import type { Expr, TemplateNode } from "@notorious/shared";
+import { canonicalObjectsQueryKey } from "@notorious/shared";
 import { FILTERS, stringify } from "./filters.js";
 
 export class TemplateRuntimeError extends Error {}
@@ -112,37 +113,52 @@ function toNumber(value: unknown): number {
   return n;
 }
 
-export function evalExpr(node: Expr, scope: Scope, budget: RenderBudget): unknown {
-  budget.tick();
+/** One `objects.where(...)` call's outcome, precomputed once per render pass before any block is evaluated (see renderer.ts's `resolveObjectsWhere`) - `evalExpr`'s `objectsQuery` case only ever does a synchronous map lookup, never touches the DB itself. */
+export type QueryResult = { ok: true; items: unknown[] } | { ok: false; error: string };
+
+/** Threaded through every recursive `evalExpr`/`execNodes` call alongside `scope` - the render budget (see `RenderBudget` above) plus every `objects.where(...)` call's precomputed result, keyed by `canonicalObjectsQueryKey`. */
+export interface EvalContext {
+  budget: RenderBudget;
+  queryResults: Map<string, QueryResult>;
+}
+
+export function evalExpr(node: Expr, scope: Scope, ctx: EvalContext): unknown {
+  ctx.budget.tick();
   switch (node.kind) {
     case "literal":
       return node.value;
     case "list":
-      return node.items.map((item) => evalExpr(item, scope, budget));
+      return node.items.map((item) => evalExpr(item, scope, ctx));
     case "identifier":
       return scope.get(node.name);
     case "member": {
-      const target = evalExpr(node.target, scope, budget);
-      const key = node.computed ? stringify(evalExpr(node.property, scope, budget)) : (node.property as { value: string }).value;
+      const target = evalExpr(node.target, scope, ctx);
+      const key = node.computed ? stringify(evalExpr(node.property, scope, ctx)) : (node.property as { value: string }).value;
       return safeGet(target, key);
     }
     case "unary": {
-      const value = evalExpr(node.argument, scope, budget);
+      const value = evalExpr(node.argument, scope, ctx);
       return node.op === "not" ? !isTruthy(value) : -toNumber(value);
     }
     case "logical": {
-      const left = evalExpr(node.left, scope, budget);
-      if (node.op === "and") return isTruthy(left) ? evalExpr(node.right, scope, budget) : left;
-      return isTruthy(left) ? left : evalExpr(node.right, scope, budget);
+      const left = evalExpr(node.left, scope, ctx);
+      if (node.op === "and") return isTruthy(left) ? evalExpr(node.right, scope, ctx) : left;
+      return isTruthy(left) ? left : evalExpr(node.right, scope, ctx);
     }
     case "binary":
-      return evalBinary(node.op, evalExpr(node.left, scope, budget), evalExpr(node.right, scope, budget));
+      return evalBinary(node.op, evalExpr(node.left, scope, ctx), evalExpr(node.right, scope, ctx));
     case "filter": {
-      const target = evalExpr(node.target, scope, budget);
+      const target = evalExpr(node.target, scope, ctx);
       const fn = FILTERS[node.name];
       if (!fn) throw new TemplateRuntimeError(`Unknown filter "${node.name}"`);
-      const args = node.args.map((arg) => evalExpr(arg, scope, budget));
+      const args = node.args.map((arg) => evalExpr(arg, scope, ctx));
       return fn(target, ...args);
+    }
+    case "objectsQuery": {
+      const result = ctx.queryResults.get(canonicalObjectsQueryKey(node.filters));
+      if (!result) return [];
+      if (!result.ok) throw new TemplateRuntimeError(result.error);
+      return result.items;
     }
   }
 }
@@ -182,26 +198,26 @@ function evalBinary(op: string, left: unknown, right: unknown): unknown {
   }
 }
 
-export function execNodes(nodes: TemplateNode[], scope: Scope, budget: RenderBudget, out: string[]): void {
+export function execNodes(nodes: TemplateNode[], scope: Scope, ctx: EvalContext, out: string[]): void {
   for (const node of nodes) {
-    budget.tick();
+    ctx.budget.tick();
     switch (node.kind) {
       case "text":
         out.push(node.value);
         break;
       case "output":
-        out.push(stringify(evalExpr(node.expr, scope, budget)));
+        out.push(stringify(evalExpr(node.expr, scope, ctx)));
         break;
       case "set":
-        scope.set(node.name, evalExpr(node.expr, scope, budget));
+        scope.set(node.name, evalExpr(node.expr, scope, ctx));
         break;
       case "if": {
-        const branch = node.branches.find((b) => b.cond === null || isTruthy(evalExpr(b.cond, scope, budget)));
-        if (branch) execNodes(branch.body, scope.child(), budget, out);
+        const branch = node.branches.find((b) => b.cond === null || isTruthy(evalExpr(b.cond, scope, ctx)));
+        if (branch) execNodes(branch.body, scope.child(), ctx, out);
         break;
       }
       case "for": {
-        const iterable = evalExpr(node.iterable, scope, budget);
+        const iterable = evalExpr(node.iterable, scope, ctx);
         if (!Array.isArray(iterable)) throw new TemplateRuntimeError('"for" loop target is not a list');
         if (iterable.length > MAX_LOOP_ITERATIONS) {
           throw new TemplateRuntimeError(`"for" loop exceeded ${MAX_LOOP_ITERATIONS} iterations`);
@@ -209,7 +225,7 @@ export function execNodes(nodes: TemplateNode[], scope: Scope, budget: RenderBud
         for (const item of iterable) {
           const loopScope = scope.child();
           loopScope.set(node.varName, item);
-          execNodes(node.body, loopScope, budget, out);
+          execNodes(node.body, loopScope, ctx, out);
         }
         break;
       }

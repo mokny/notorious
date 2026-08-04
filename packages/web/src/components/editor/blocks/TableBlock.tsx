@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Table from "@tiptap/extension-table";
@@ -6,16 +6,20 @@ import TableRow from "@tiptap/extension-table-row";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import TextAlign from "@tiptap/extension-text-align";
-import type { TableContent, TableDoc } from "@notorious/shared";
+import type { TableContent, TableDoc, TemplateAutocompleteSchemaResponse } from "@notorious/shared";
 import { buildRenderedTableDoc, createEmptyTableDoc } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
+import { useTemplateAutocompleteSchema } from "../../../hooks/useTemplateAutocompleteSchema.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
+import { TemplateHighlight } from "../TemplateHighlight.js";
+import { TemplateSuggestion } from "../TemplateSuggestion.js";
 import { Icon } from "../../ui/Icon.js";
 import { TableCell, TableHeader } from "./tableExtensions.js";
 import { TableFormatToolbar } from "./TableFormatToolbar.js";
 import { TableGridControls } from "./TableGridControls.js";
 
-function buildExtensions() {
+/** `templateAware` mirrors RichTextEditor.tsx's prop of the same name - only ever true for the live-editable table (see EditableTable below), never the read-only/rendered variant, which shows already-evaluated cell text, not template source. */
+function buildExtensions(templateAware: boolean, workspaceIdRef?: { current: string }, schemaRef?: { current: TemplateAutocompleteSchemaResponse | undefined }) {
   return [
     StarterKit.configure({
       heading: false,
@@ -35,6 +39,7 @@ function buildExtensions() {
     TableRow,
     TableHeader,
     TableCell,
+    ...(templateAware && workspaceIdRef && schemaRef ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, schemaRef })] : []),
   ];
 }
 
@@ -54,7 +59,14 @@ function EditableTable({
   onFocus: () => void;
   onBlur: () => void;
 }) {
-  const extensions = useMemo(buildExtensions, []);
+  const { workspaceId } = useBlockEditor();
+  const { data: templateSchema } = useTemplateAutocompleteSchema(workspaceId);
+  const workspaceIdRef = useRef(workspaceId);
+  workspaceIdRef.current = workspaceId;
+  const schemaRef = useRef(templateSchema);
+  schemaRef.current = templateSchema;
+
+  const extensions = useMemo(() => buildExtensions(true, workspaceIdRef, schemaRef), []);
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
 
@@ -84,7 +96,7 @@ function EditableTable({
 
 /** Read-only rendering of a doc (e.g. the templated/rendered variant while unfocused, or any table when the object/share is read-only) - no toolbar, no grid controls, click-to-edit handled by the parent. */
 function ReadOnlyTable({ doc }: { doc: TableDoc }) {
-  const extensions = useMemo(buildExtensions, []);
+  const extensions = useMemo(() => buildExtensions(false), []);
   const editor = useEditor({ extensions, content: doc as unknown as Record<string, unknown>, editable: false });
   return <EditorContent editor={editor} className="notorious-table-editor overflow-x-auto rounded-lg border border-border p-1" />;
 }

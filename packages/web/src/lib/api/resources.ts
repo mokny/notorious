@@ -55,6 +55,7 @@ import type {
   SaveAiConfigInput,
   AiChatMessage,
   RenderedBlocksResponse,
+  TemplateAutocompleteSchemaResponse,
   PresenceViewer,
   ShareIntakeFields,
   ShareCommitInput,
@@ -196,6 +197,12 @@ export const blockApi = {
   rendered: (objectId: string) => apiRequest<RenderedBlocksResponse>(`/api/v1/objects/${objectId}/blocks/rendered`),
 };
 
+export const templateApi = {
+  /** Object types + their properties, bundled for TemplateSuggestion.ts's `.`-triggered property autocomplete - see modules/templates/routes.ts. */
+  autocompleteSchema: (workspaceId: string) =>
+    apiRequest<TemplateAutocompleteSchemaResponse>(`/api/v1/workspaces/${workspaceId}/templates/autocomplete-schema`),
+};
+
 export const viewApi = {
   list: (workspaceId: string, objectTypeId?: string) =>
     apiRequest<View[]>(`/api/v1/workspaces/${workspaceId}/views`, { query: { objectTypeId } }),
@@ -210,7 +217,7 @@ export const viewApi = {
 export const searchApi = {
   search: (
     workspaceId: string,
-    query: { q?: string; objectTypeId?: string; fuzzy?: boolean; relatedToObjectId?: string; tagPropertyId?: string; tagValue?: string },
+    query: { q?: string; objectTypeId?: string; fuzzy?: boolean; relatedToObjectId?: string; tagPropertyId?: string; tagValue?: string; limit?: number },
   ) => apiRequest<ObjectRecord[]>(`/api/v1/workspaces/${workspaceId}/search`, { query }),
   savedSearches: (workspaceId: string) => apiRequest<SavedSearch[]>(`/api/v1/workspaces/${workspaceId}/saved-searches`),
   createSavedSearch: (workspaceId: string, input: CreateSavedSearchInput) =>

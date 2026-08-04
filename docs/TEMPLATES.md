@@ -15,6 +15,17 @@ switch back to.
 **Total: {{ total }}**
 ```
 
+## Editor support
+
+Every field that can contain template code gets syntax highlighting (keywords, strings, numbers,
+filter names, and delimiters colored distinctly) plus autocomplete while you type: `{{` suggests
+`object`, `blocks`, `objects`, `variables` and known `Variable` names; a `.` after `object`/
+`objects.<id>`/`objects.where(...)` suggests that shape's fields; a `|` suggests filter names. A
+template that fails to parse gets a wavy red underline the moment you type it, with the real error
+message on hover - the same parser the server uses to render, so there's no "looked fine while
+typing, broke on save" gap. (Checklist items are the one exception for now - still plain text, no
+highlighting/autocomplete there yet, though `{{ }}`/`{% %}` inside one still renders correctly.)
+
 ## Block and object ids
 
 Every block and object gets a short, auto-generated id at creation (e.g. `paragraph-a1b2c3d4`,
@@ -29,6 +40,7 @@ numbers, `-` and `_`, and must be unique (per object for blocks, per workspace f
 | `object` | The current object: `object.title`, `object.slug`, `object.type_key`, `object.archived`, `object.locked`, and `object.properties.<key>` for every property value (Formula/Rollup included, already computed) |
 | `blocks.<id>` | Another block in the *same* object, by its id - above **or below** the block doing the referencing - `.text` (its rendered text), plus for checklists `.items` (`[{text, checked}]`), `.checked_count`, `.total_count`, and for tables `.columns`/`.rows` |
 | `objects.<id>` | Another object *in this workspace*, by its id - same shape as `object` above, plus `objects.<id>.blocks.<blockId>` (same shape as `blocks.<id>` above) for one of *its* blocks. That object's blocks are exposed as raw (unrendered) text, not re-evaluated - see "How rendering works" below |
+| `objects.where(type="...", ...)` | Every object of a given type in this workspace, optionally narrowed by property values - see "Querying every object of a type" below |
 | `variables.<Name>` | The computed value of a `Variable` object named `<Name>` (see [SCRIPTING.md](SCRIPTING.md#variable-objects)) - already coerced to its declared value type, or `null` if it failed to resolve |
 
 A `{% set %}` in one block is visible in every block *below* it in the same object (document
@@ -41,6 +53,39 @@ in the Examples section) spread across the table and a paragraph below it. `{% s
 `blocks.<id>` itself isn't limited to "above" the way `{% set %}` is - a summary near the top of an
 object can read `blocks.prices.rows` even if the `prices` table is further down the document (see
 "How rendering works" below for how).
+
+## Querying every object of a type
+
+`objects.<id>` is great when you already know exactly which object you want, but sometimes you want
+"every Task with status open," not one specific object. `objects.where(...)` does that:
+
+```
+{% for task in objects.where(type="task", status="open") %}- {{ task.title }}
+{% endfor %}
+```
+
+- `type="..."` is required - it's how the query knows which object type (and therefore which
+  properties) it's even looking at. Everything else is optional and matches by exact equality
+  (`status="open"` only matches an `open` status exactly - no `contains`/`>`/`<` yet).
+- The property names on the right (`status`, in the example) are the property's *key*, the same
+  short identifier used everywhere else in a template (`object.properties.<key>`), not its display
+  name.
+- Each matching object comes back in the same shape as an `objects.<id>` reference: `.title`,
+  `.slug`, `.properties.<key>`, `.blocks.<blockId>`, etc. - built the same "raw, not re-evaluated"
+  way, so a `where(...)` result can't reintroduce the reference cycles the `objects.<id>` design
+  already rules out (see "How rendering works" below).
+- Results are capped at 200 objects, and every object the query even *looks at* (to check whether
+  you're allowed to see it, whether or not it ends up matching) counts against the same render
+  budget as everything else in the template (see Security below) - a `where(...)` call over a huge
+  workspace can't blow past that budget just by touching a lot of rows.
+- Exactly like `objects.<id>`, every candidate object is checked against *your* actual permissions
+  before it's included - one you can't see is silently skipped, not shown as an error.
+
+```
+{% set total = 0 %}
+{% for expense in objects.where(type="expense", category="hosting") %}{% set total = total + (expense.properties.amount | int) %}{% endfor %}
+Hosting spend so far: {{ total }} $
+```
 
 ## Filters
 
@@ -110,6 +155,27 @@ This page totals {% set total = 0 %}{% for row in blocks.prices.rows %}{% set to
 {# TODO: once the "priority" property exists, sort this list by it instead #}
 ```
 
+**Counting every object of a type, no loop needed** (the `length` filter works on the list
+`objects.where(...)` returns, just like it works on any other list)
+```
+{{ objects.where(type="task", status="open") | length }} open tasks right now
+```
+
+**A open-tasks list on a Project object, filtered by a relation-style property** (assumes Task
+objects have a `project` property holding the owning project's id)
+```
+{% for task in objects.where(type="task", project=object.id, status="open") %}- [ ] {{ task.title }}
+{% endfor %}
+```
+
+**Combining a workspace-wide query with a per-block loop** (total hours logged across every open
+Task, each one's own `hours` property)
+```
+{% set total_hours = 0 %}
+{% for task in objects.where(type="task", status="open") %}{% set total_hours = total_hours + (task.properties.hours | default(0) | int) %}{% endfor %}
+{{ total_hours }} hours logged on open tasks
+```
+
 ## How rendering works
 
 Every one of an object's blocks is rendered together, in two top-to-bottom passes. The first pass
@@ -132,12 +198,18 @@ Templates run entirely server-side, through a small hand-written interpreter bui
 for this - not a general-purpose scripting language and not `eval`. There's no way to call an
 arbitrary function, reach `constructor`/`__proto__`, or touch the filesystem/network/process -
 those aren't missing safety checks, the language the parser accepts simply has no such thing as
-"call this value as a function" at all; only a fixed table of filters (the list above) can ever be
-invoked, by name. A render is capped by both a step budget and a wall-clock deadline, and any
-single `{% for %}` loop is capped at 1000 iterations. Every object a template reads - the current
-one or a cross-referenced `objects.<id>` - is checked against the actual permissions of whoever is
-viewing the page (a real workspace member's role, or exactly what an anonymous share link grants) -
-a template can never surface data its viewer couldn't already see through the normal UI.
+"call this value as a function" at all; only a fixed table of filters (the list above) and the one
+fixed `objects.where(...)` query shape can ever be invoked, and neither exposes a live function
+reference to the template itself. A render is capped by both a step budget and a wall-clock
+deadline, and any single `{% for %}` loop is capped at 1000 iterations. Every object a template
+reads - the current one, a cross-referenced `objects.<id>`, or a candidate row from
+`objects.where(...)` - is checked against the actual permissions of whoever is viewing the page (a
+real workspace member's role, or exactly what an anonymous share link grants) - a template can
+never surface data its viewer couldn't already see through the normal UI. `objects.where(...)` adds
+two more caps on top of that, independent of each other: a hard 200-row result limit, and one render
+budget step charged per candidate row it checks (whether or not that row ends up matching or being
+visible to the viewer) - so a query over a huge workspace can't buy unbounded work just by looking
+at a lot of rows before filtering them down.
 
 Output is inserted as plain text into the same Markdown pipeline every block already uses (which
 never interprets raw HTML) - rendering a template introduces no new risk beyond what any user

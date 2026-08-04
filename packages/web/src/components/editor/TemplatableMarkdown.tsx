@@ -80,6 +80,7 @@ export function TemplatableMarkdown({
       onBackspaceEmpty={onBackspaceEmpty}
       onSlashSelect={onSlashSelect}
       objectTypes={objectTypes}
+      templateAware
       autoFocus={autoFocus || clickedToEditRef.current}
       onAutoFocused={() => {
         clickedToEditRef.current = false;

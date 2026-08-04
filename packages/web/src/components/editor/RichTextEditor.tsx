@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { EditorContent } from "@tiptap/react";
 import type { BlockType, ObjectType } from "@notorious/shared";
 import { useMarkdownEditor } from "./useMarkdownEditor.js";
+import { useBlockEditor } from "./BlockEditorContext.js";
+import { useTemplateAutocompleteSchema } from "../../hooks/useTemplateAutocompleteSchema.js";
 
 interface RichTextEditorProps {
   markdown: string;
@@ -22,6 +24,14 @@ interface RichTextEditorProps {
   onBlur?: () => void;
   /** See useMarkdownEditor.ts. */
   onFocus?: () => void;
+  /**
+   * Only set by TemplatableMarkdown.tsx's "edit" instance - adds
+   * TemplateHighlight/TemplateSuggestion (see those files) so `{{ }}`/`{% %}`
+   * syntax gets highlighted, inline error-checked, and autocompleted. Never
+   * set on the "rendered" instance (that one shows already-evaluated text,
+   * not template source).
+   */
+  templateAware?: boolean;
 }
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -47,7 +57,14 @@ export function RichTextEditor({
   editable,
   onBlur,
   onFocus,
+  templateAware,
 }: RichTextEditorProps) {
+  // Workspace context is only available inside a BlockEditor tree - fine
+  // here since `templateAware` is only ever set from within one (see
+  // TemplatableMarkdown.tsx). `useTemplateAutocompleteSchema` is always
+  // called (rules-of-hooks) but its query is harmless/idle-ish when unused.
+  const { workspaceId } = useBlockEditor();
+  const { data: templateSchema } = useTemplateAutocompleteSchema(workspaceId);
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isSavingRef = useRef(false);
   const pendingValueRef = useRef<string | null>(null);
@@ -81,6 +98,9 @@ export function RichTextEditor({
     onSlashSelect,
     objectTypes,
     editable,
+    templateAware,
+    workspaceId,
+    templateSchema,
     // Save right away instead of waiting out the rest of the debounce below -
     // once focus has left, there's no more typing to coalesce, and a
     // templated field (see TemplatableMarkdown.tsx) is about to show its

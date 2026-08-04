@@ -8,7 +8,22 @@ export type Expr =
   | { kind: "unary"; op: "-" | "not"; argument: Expr }
   | { kind: "binary"; op: string; left: Expr; right: Expr }
   | { kind: "logical"; op: "and" | "or"; left: Expr; right: Expr }
-  | { kind: "filter"; target: Expr; name: string; args: Expr[] };
+  | { kind: "filter"; target: Expr; name: string; args: Expr[] }
+  | { kind: "objectsQuery"; filters: ObjectsQueryFilter[] };
+
+/** One `name="value"` pair inside `objects.where(...)` - always a literal string, both name and value, so the whole set of possible queries a given render pass will run can be known statically (see collectTemplateReferences in renderer.ts) without evaluating any expressions. */
+export interface ObjectsQueryFilter {
+  name: string;
+  value: string;
+}
+
+/** Canonical, order-independent key for one `objects.where(...)` call's filter set - used to dedupe identical calls (so each distinct query runs once per render pass) and to look its precomputed result back up from `evalExpr`'s `objectsQuery` case. */
+export function canonicalObjectsQueryKey(filters: ObjectsQueryFilter[]): string {
+  return filters
+    .map((f) => `${f.name}=${f.value}`)
+    .sort()
+    .join("&");
+}
 
 export type TemplateNode =
   | { kind: "text"; value: string }
@@ -211,7 +226,15 @@ class ExprParser {
         this.pos++;
         const nameTok = this.next();
         if (nameTok.type !== "ident") throw new TemplateSyntaxError("Expected a property name after .");
-        target = { kind: "member", target, property: { kind: "literal", value: nameTok.value }, computed: false };
+        // `objects.where(...)` is the one hard-coded call form the grammar allows - a fixed-shape
+        // query descriptor, not a general "call this arbitrary value" node (see interpreter.ts's
+        // safeGet doc comment on why that distinction matters for security). Any other `(` after a
+        // member access is a syntax error, not a real function call.
+        if (nameTok.value === "where" && target.kind === "identifier" && target.name === "objects" && this.atPunct("(")) {
+          target = this.parseObjectsWhereCall();
+        } else {
+          target = { kind: "member", target, property: { kind: "literal", value: nameTok.value }, computed: false };
+        }
       } else if (this.atPunct("[")) {
         this.pos++;
         const prop = this.parseOr();
@@ -222,6 +245,30 @@ class ExprParser {
       }
     }
     return target;
+  }
+  /** Parses the `(name="value", ...)` arg list of `objects.where(...)` - the `(` has already been peeked, not consumed. */
+  private parseObjectsWhereCall(): Expr {
+    this.pos++; // consume "("
+    const filters: ObjectsQueryFilter[] = [];
+    if (!this.atPunct(")")) {
+      filters.push(this.parseObjectsWhereFilterArg());
+      while (this.atPunct(",")) {
+        this.pos++;
+        filters.push(this.parseObjectsWhereFilterArg());
+      }
+    }
+    this.expectPunct(")");
+    return { kind: "objectsQuery", filters };
+  }
+  private parseObjectsWhereFilterArg(): ObjectsQueryFilter {
+    const nameTok = this.next();
+    if (nameTok.type !== "ident") throw new TemplateSyntaxError('Expected a property name in objects.where(...), e.g. status="open"');
+    this.expectPunct("=");
+    const valueTok = this.next();
+    if (valueTok.type !== "str") {
+      throw new TemplateSyntaxError(`objects.where(...) values must be string literals - got a non-string value for "${nameTok.value}"`);
+    }
+    return { name: nameTok.value, value: valueTok.value };
   }
   private parsePrimary(): Expr {
     const t = this.next();

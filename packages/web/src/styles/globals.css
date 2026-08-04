@@ -71,6 +71,40 @@ body {
   }
 }
 
+/* Template syntax coloring - see TemplateHighlight.ts. `.tpl-delim` covers
+   the `{{`/`}}`/`{%`/`%}`/`{#`/`#}` markers themselves; the rest color one
+   sub-token class each inside an expr/stmt region. `.tpl-error` (a parse
+   failure - see parseTemplate in @notorious/shared) stacks a wavy red
+   underline on top of whatever token coloring is already there. */
+.tpl-delim {
+  @apply text-accent/70 font-medium;
+}
+.tpl-keyword {
+  @apply text-accent font-medium;
+}
+.tpl-identifier {
+  color: rgb(var(--ink));
+}
+.tpl-string {
+  @apply text-emerald-600 dark:text-emerald-400;
+}
+.tpl-number {
+  @apply text-amber-600 dark:text-amber-400;
+}
+.tpl-filter {
+  @apply text-fuchsia-600 dark:text-fuchsia-400;
+}
+.tpl-operator {
+  @apply text-ink-muted;
+}
+.tpl-comment {
+  @apply text-ink-muted italic;
+}
+.tpl-error {
+  text-decoration: underline wavy rgb(220 38 38 / 0.8);
+  text-decoration-skip-ink: none;
+}
+
 /* A native checkbox's default size (or the app's own previous h-4/w-4) is a
    fiddly target to tap accurately with a finger - sized here once, app-wide
    (checklist items, property values, settings toggles, ...) rather than in
