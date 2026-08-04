@@ -331,3 +331,16 @@ export interface BackupFilesChangedMessage {
   workspaceId: string;
   destinationId: string;
 }
+
+/**
+ * Sent to every member of a workspace after a backup run (manual "Jetzt
+ * sichern" or the scheduler) finishes, once the schedule's and each
+ * destination's `lastRunAt`/`lastRunStatus`/`nextRunAt` have been persisted -
+ * lets any open Settings page refresh those without a manual reload,
+ * regardless of which tab (or the scheduler, with no tab at all) triggered
+ * the run.
+ */
+export interface BackupScheduleChangedMessage {
+  type: "backupScheduleChanged";
+  workspaceId: string;
+}

@@ -41,7 +41,7 @@ import { generateBackupKey, encryptBackup, decryptBackup, isEncryptedBackup } fr
 import { createDestinationClient, type BackupDestinationClient, type ResolvedDestinationConfig } from "./destinations/index.js";
 import { computeNextRunAt, currentWeekMonday } from "./scheduling.js";
 import { notifyUser } from "../push/service.js";
-import { broadcastBackupFilesChanged, sendToClient } from "../realtime/hub.js";
+import { broadcastBackupFilesChanged, broadcastBackupScheduleChanged, sendToClient } from "../realtime/hub.js";
 
 const BACKUP_FORMAT_VERSION = 1;
 
@@ -671,6 +671,7 @@ export async function runBackupNow(workspaceId: string): Promise<void> {
     })
     .where(eq(backupSchedules.workspaceId, workspaceId));
   if (scheduleRow) await advanceSchedule(scheduleRow);
+  broadcastBackupScheduleChanged({ type: "backupScheduleChanged", workspaceId });
 
   if (anyFailure) {
     const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);

@@ -1,6 +1,12 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { BackupFilesChangedMessage, BackupProgressMessage, PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
+import type {
+  BackupFilesChangedMessage,
+  BackupProgressMessage,
+  BackupScheduleChangedMessage,
+  PresenceSnapshotMessage,
+  RealtimeEvent,
+} from "@notorious/shared";
 import { clientId as myClientId } from "./clientId.js";
 import { emitBackupProgress } from "./backupProgress.js";
 
@@ -117,7 +123,12 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
       };
 
       socket.onmessage = (event) => {
-        const payload = JSON.parse(event.data) as RealtimeEvent | PresenceSnapshotMessage | BackupProgressMessage | BackupFilesChangedMessage;
+        const payload = JSON.parse(event.data) as
+          | RealtimeEvent
+          | PresenceSnapshotMessage
+          | BackupProgressMessage
+          | BackupFilesChangedMessage
+          | BackupScheduleChangedMessage;
         // Presence snapshots and backup-progress updates (see modules/
         // presence/ and modules/backup/ server-side) share this same per-
         // workspace socket but aren't a `RealtimeEvent` - distinguished by a
@@ -135,6 +146,11 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           }
           if (payload.type === "backupFilesChanged") {
             queryClient.invalidateQueries({ queryKey: ["backupDestinationFiles", workspaceId, payload.destinationId] });
+            return;
+          }
+          if (payload.type === "backupScheduleChanged") {
+            queryClient.invalidateQueries({ queryKey: ["backupSchedule", workspaceId] });
+            queryClient.invalidateQueries({ queryKey: ["backupDestinations", workspaceId] });
             return;
           }
           // usePresence.ts owns the actual viewer list via its own query -

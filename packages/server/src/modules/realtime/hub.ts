@@ -1,5 +1,11 @@
 import type { WebSocket } from "@fastify/websocket";
-import type { BackupFilesChangedMessage, BackupProgressMessage, PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
+import type {
+  BackupFilesChangedMessage,
+  BackupProgressMessage,
+  BackupScheduleChangedMessage,
+  PresenceSnapshotMessage,
+  RealtimeEvent,
+} from "@notorious/shared";
 
 interface RoomEntry {
   objectIdFilter: string | null;
@@ -57,6 +63,11 @@ export function broadcastPresence(message: PresenceSnapshotMessage): void {
 
 /** Broadcasts to every member viewing this workspace that a destination's backup file list changed - see `BackupFilesChangedMessage`'s doc comment. No object-id filter applies, so single-object shares (which never see the Backup settings section anyway) simply won't act on it. */
 export function broadcastBackupFilesChanged(message: BackupFilesChangedMessage): void {
+  sendToRoom(message.workspaceId, undefined, message);
+}
+
+/** Broadcasts to every member viewing this workspace that a backup run finished - see `BackupScheduleChangedMessage`'s doc comment. */
+export function broadcastBackupScheduleChanged(message: BackupScheduleChangedMessage): void {
   sendToRoom(message.workspaceId, undefined, message);
 }
 
