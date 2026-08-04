@@ -7,8 +7,13 @@ import { isIOS } from "../lib/platform.js";
  * `/api/v1/share-target/intake-multipart` (Bearer-token auth, since a Shortcut has no session
  * cookie - see ApiKeysSettings.tsx for generating one) and then opens Safari on the result to
  * finish filing it, same as the Android share-sheet flow. Only shown on iOS: the shortcut is
- * useless anywhere else, and unsigned .shortcut files require enabling "Allow Untrusted
- * Shortcuts" first, which is confusing to surface to non-iOS users.
+ * useless anywhere else.
+ *
+ * `public/notorious.shortcut` must stay signed (`shortcuts sign -m anyone -i ... -o ...`) - iOS
+ * flatly refuses to import an unsigned .shortcut file (no "allow untrusted" override exists for
+ * this path, unlike Shortcuts automations). The `shortcuts` CLI only exists on macOS, so any edit
+ * to the shortcut's actions needs a manual re-sign on a Mac before it's committed; there's no way
+ * to do this from the Linux prod build.
  */
 export function IosShortcutSettings() {
   if (!isIOS()) return null;
@@ -27,10 +32,7 @@ export function IosShortcutSettings() {
         Download iOS Shortcut
       </a>
       <ol className="list-decimal space-y-1 pl-5 text-xs text-ink-muted">
-        <li>
-          Open the downloaded file to import it into the Shortcuts app. If iOS refuses to run it, enable "Allow
-          Untrusted Shortcuts" in Settings → Shortcuts first.
-        </li>
+        <li>Open the downloaded file to import it into the Shortcuts app.</li>
         <li>
           Create an API key above under "API keys", then edit the shortcut's first action: replace
           <code className="mx-1 rounded bg-surface px-1">your-notorious-domain.example</code> with{" "}
