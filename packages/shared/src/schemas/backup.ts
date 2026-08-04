@@ -76,6 +76,8 @@ export interface BackupDestination {
 export const backupScheduleSchema = z.object({
   weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
   time: timeSchema,
+  /** IANA name (e.g. "Europe/Berlin") - `time` is this zone's local wall clock, not UTC. The web client sends `Intl.DateTimeFormat().resolvedOptions().timeZone`. */
+  timezone: z.string().min(1),
   intervalWeeks: z.number().int().min(1).max(52).default(1),
   enabled: z.boolean().default(true),
 });
@@ -85,6 +87,7 @@ export interface BackupSchedule {
   workspaceId: string;
   weekdays: number[];
   time: string;
+  timezone: string;
   intervalWeeks: number;
   enabled: boolean;
   nextRunAt: string | null;

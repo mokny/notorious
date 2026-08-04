@@ -11,6 +11,8 @@ import { TextField } from "./ui/TextField.js";
 import { Icon } from "./ui/Icon.js";
 import { ProgressPopup } from "./ui/ProgressPopup.js";
 
+const BROWSER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 function formatFileSize(bytes: number | null): string | null {
   if (bytes === null) return null;
   if (bytes < 1024) return `${bytes} B`;
@@ -284,7 +286,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
   function handleSaveSchedule(event: FormEvent) {
     event.preventDefault();
     if (weekdays.length === 0) return;
-    saveScheduleMutation.mutate({ weekdays, time, intervalWeeks, enabled: scheduleEnabled });
+    saveScheduleMutation.mutate({ weekdays, time, timezone: BROWSER_TIMEZONE, intervalWeeks, enabled: scheduleEnabled });
   }
 
   function handleCreateDestination(event: FormEvent) {
@@ -353,6 +355,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 }}
                 className="rounded-lg border border-border bg-surface px-2 py-1 text-xs"
               />
+              <span className="text-[11px] text-ink-muted">({BROWSER_TIMEZONE})</span>
             </label>
             <label className="flex items-center gap-1.5 text-xs text-ink-muted">
               Every
@@ -386,6 +389,12 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
           </Button>
         </form>
         <div className="mt-2 space-y-0.5 text-xs text-ink-muted">
+          {schedule && !scheduleDirty && schedule.timezone !== BROWSER_TIMEZONE && (
+            <p className="text-amber-500">
+              This schedule's time was set in {schedule.timezone}, not your current timezone ({BROWSER_TIMEZONE}) - save
+              again to switch it to your local time.
+            </p>
+          )}
           {schedule?.nextRunAt && schedule.enabled && <p>Next run: {new Date(schedule.nextRunAt).toLocaleString()}</p>}
           {schedule?.lastRunAt && (
             <p className={schedule.lastRunStatus === "failure" ? "text-red-500" : "text-emerald-500"}>

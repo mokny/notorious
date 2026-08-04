@@ -1,0 +1,1 @@
+ALTER TABLE backup_schedules ADD COLUMN timezone TEXT NOT NULL DEFAULT 'UTC';

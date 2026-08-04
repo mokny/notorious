@@ -488,6 +488,8 @@ export const backupSchedules = sqliteTable("backup_schedules", {
   // JSON array of 0 (Sunday) - 6 (Saturday).
   weekdays: text("weekdays").notNull(),
   time: text("time").notNull(),
+  // IANA name (e.g. "Europe/Berlin") the user's browser was in when `time` was set - `time` is that zone's local wall clock, not UTC.
+  timezone: text("timezone").notNull().default("UTC"),
   intervalWeeks: integer("interval_weeks").notNull().default(1),
   anchorWeekStart: text("anchor_week_start").notNull(),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),

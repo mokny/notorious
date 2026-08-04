@@ -563,6 +563,7 @@ function toPublicSchedule(row: typeof backupSchedules.$inferSelect): BackupSched
     workspaceId: row.workspaceId,
     weekdays: JSON.parse(row.weekdays) as number[],
     time: row.time,
+    timezone: row.timezone,
     intervalWeeks: row.intervalWeeks,
     enabled: row.enabled,
     nextRunAt: row.nextRunAt,
@@ -579,11 +580,12 @@ export async function getSchedule(workspaceId: string): Promise<BackupSchedule |
 
 export async function upsertSchedule(workspaceId: string, input: BackupScheduleInput): Promise<BackupSchedule> {
   const now = nowIso();
-  const anchorWeekStart = currentWeekMonday();
+  const anchorWeekStart = currentWeekMonday(input.timezone);
   const nextRunAt = input.enabled
     ? computeNextRunAt({
         weekdays: input.weekdays,
         time: input.time,
+        timezone: input.timezone,
         intervalWeeks: input.intervalWeeks,
         anchorWeekStart,
         after: new Date(),
@@ -593,6 +595,7 @@ export async function upsertSchedule(workspaceId: string, input: BackupScheduleI
   const values = {
     weekdays: JSON.stringify(input.weekdays),
     time: input.time,
+    timezone: input.timezone,
     intervalWeeks: input.intervalWeeks,
     anchorWeekStart,
     enabled: input.enabled,
@@ -615,6 +618,7 @@ export async function advanceSchedule(row: typeof backupSchedules.$inferSelect):
   const nextRunAt = computeNextRunAt({
     weekdays: JSON.parse(row.weekdays) as number[],
     time: row.time,
+    timezone: row.timezone,
     intervalWeeks: row.intervalWeeks,
     anchorWeekStart: row.anchorWeekStart,
     after: new Date(),
