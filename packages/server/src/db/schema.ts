@@ -442,6 +442,63 @@ export const aiConfigs = sqliteTable("ai_configs", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// One row per workspace, created lazily on first access - holds the AES-256
+// key used to encrypt that workspace's backups. `encryptedKey` is the raw
+// key wrapped with lib/crypto.ts (server master secret), decrypted only to
+// show it in Settings or to encrypt/decrypt an actual backup ZIP.
+export const workspaceBackupKeys = sqliteTable("workspace_backup_keys", {
+  workspaceId: text("workspace_id")
+    .primaryKey()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  encryptedKey: text("encrypted_key").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const backupDestinations = sqliteTable("backup_destinations", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  type: text("type").notNull().$type<"local" | "sftp" | "ftp" | "samba">(),
+  name: text("name").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  retentionCount: integer("retention_count").notNull().default(7),
+  // Type-specific non-secret fields (host, port, username, remotePath, ...) as JSON.
+  config: text("config").notNull().default("{}"),
+  // The destination's password/credential, individually encrypted with lib/crypto.ts - null for 'local'.
+  encryptedCredential: text("encrypted_credential"),
+  // SFTP trust-on-first-use fingerprint of the server's host key, set after the first successful connection.
+  hostKeyFingerprint: text("host_key_fingerprint"),
+  lastRunAt: text("last_run_at"),
+  lastRunStatus: text("last_run_status").$type<"success" | "failure" | null>(),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// One row per workspace (id = workspaceId) describing its recurring backup
+// job - see modules/backup/scheduler.ts. `anchorWeekStart` is the Monday
+// (ISO date) the schedule was last saved on; `intervalWeeks` counts active
+// weeks from that anchor, so "every 2 weeks" always lands on predictable weeks
+// regardless of when the schedule was created or edited.
+export const backupSchedules = sqliteTable("backup_schedules", {
+  workspaceId: text("workspace_id")
+    .primaryKey()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  // JSON array of 0 (Sunday) - 6 (Saturday).
+  weekdays: text("weekdays").notNull(),
+  time: text("time").notNull(),
+  intervalWeeks: integer("interval_weeks").notNull().default(1),
+  anchorWeekStart: text("anchor_week_start").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  nextRunAt: text("next_run_at"),
+  lastRunAt: text("last_run_at"),
+  lastRunStatus: text("last_run_status").$type<"success" | "failure" | null>(),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const aiChatMessages = sqliteTable("ai_chat_messages", {
   id: text("id").primaryKey(),
   userId: text("user_id")

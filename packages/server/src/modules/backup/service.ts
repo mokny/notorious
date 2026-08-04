@@ -4,8 +4,15 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import archiver from "archiver";
 import unzipper from "unzipper";
-import { eq } from "drizzle-orm";
-import type { Workspace } from "@notorious/shared";
+import { and, eq } from "drizzle-orm";
+import type {
+  Workspace,
+  BackupDestination,
+  CreateBackupDestinationInput,
+  UpdateBackupDestinationInput,
+  BackupSchedule,
+  BackupScheduleInput,
+} from "@notorious/shared";
 import { db } from "../../db/client.js";
 import {
   workspaces,
@@ -19,10 +26,19 @@ import {
   views,
   savedSearches,
   files,
+  workspaceBackupKeys,
+  backupDestinations,
+  backupSchedules,
 } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { absoluteStoragePath } from "../files/service.js";
 import { reindexObjectBody } from "../search/indexer.js";
+import { encrypt, decrypt } from "../../lib/crypto.js";
+import { badRequest, notFound } from "../../lib/httpError.js";
+import { generateBackupKey, encryptBackup, decryptBackup, isEncryptedBackup } from "./keyCrypto.js";
+import { createDestinationClient, type BackupDestinationClient, type ResolvedDestinationConfig } from "./destinations/index.js";
+import { computeNextRunAt, currentWeekMonday } from "./scheduling.js";
+import { notifyUser } from "../push/service.js";
 
 const BACKUP_FORMAT_VERSION = 1;
 
@@ -95,8 +111,13 @@ export async function exportWorkspace(workspaceId: string): Promise<Buffer> {
  * generated and remapped so the import is safe to run against any instance,
  * including the one the backup was taken from.
  */
-export async function importWorkspace(ownerId: string, zipBuffer: Buffer): Promise<Workspace> {
-  const directory = await unzipper.Open.buffer(zipBuffer);
+export async function importWorkspace(ownerId: string, zipBuffer: Buffer, backupKey?: string): Promise<Workspace> {
+  let buffer = zipBuffer;
+  if (isEncryptedBackup(zipBuffer)) {
+    if (!backupKey) throw badRequest("This backup is encrypted - the backup code is required to import it");
+    buffer = decryptBackup(zipBuffer, backupKey);
+  }
+  const directory = await unzipper.Open.buffer(buffer);
   const manifestEntry = directory.files.find((entry) => entry.path === "manifest.json");
   if (!manifestEntry) throw new Error("Not a valid Notorious backup: manifest.json is missing");
 
@@ -240,5 +261,313 @@ function remapPropertyConfig(
     return JSON.stringify(config);
   } catch {
     return configJson;
+  }
+}
+
+// --- Encryption key -------------------------------------------------------
+
+/** Returns the workspace's AES-256 backup key (hex), creating one on first access. */
+export async function getOrCreateWorkspaceKey(workspaceId: string): Promise<string> {
+  const [row] = await db.select().from(workspaceBackupKeys).where(eq(workspaceBackupKeys.workspaceId, workspaceId)).limit(1);
+  if (row) return decrypt(row.encryptedKey);
+
+  const key = generateBackupKey();
+  await db
+    .insert(workspaceBackupKeys)
+    .values({ workspaceId, encryptedKey: encrypt(key), createdAt: nowIso() })
+    .onConflictDoNothing();
+  const [inserted] = await db.select().from(workspaceBackupKeys).where(eq(workspaceBackupKeys.workspaceId, workspaceId)).limit(1);
+  return decrypt(inserted!.encryptedKey);
+}
+
+/** Replaces the workspace's backup key. Backups already made with the old key become permanently undecryptable - the caller (route) is responsible for surfacing that warning. */
+export async function regenerateWorkspaceKey(workspaceId: string): Promise<string> {
+  const key = generateBackupKey();
+  const encryptedKey = encrypt(key);
+  await db
+    .insert(workspaceBackupKeys)
+    .values({ workspaceId, encryptedKey, createdAt: nowIso() })
+    .onConflictDoUpdate({ target: workspaceBackupKeys.workspaceId, set: { encryptedKey } });
+  return key;
+}
+
+/** Exports and encrypts a workspace with its backup key - what both the "Download backup" button and scheduled runs produce. */
+export async function exportWorkspaceEncrypted(workspaceId: string): Promise<Buffer> {
+  const key = await getOrCreateWorkspaceKey(workspaceId);
+  const raw = await exportWorkspace(workspaceId);
+  return encryptBackup(raw, key);
+}
+
+// --- Destinations -----------------------------------------------------------
+
+function toPublicDestination(row: typeof backupDestinations.$inferSelect): BackupDestination {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    type: row.type,
+    name: row.name,
+    enabled: row.enabled,
+    retentionCount: row.retentionCount,
+    config: JSON.parse(row.config) as Record<string, unknown>,
+    hasCredentials: row.encryptedCredential != null,
+    hostKeyFingerprint: row.hostKeyFingerprint,
+    lastRunAt: row.lastRunAt,
+    lastRunStatus: row.lastRunStatus,
+    lastError: row.lastError,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function resolveDestinationConfig(row: typeof backupDestinations.$inferSelect): ResolvedDestinationConfig {
+  const config = JSON.parse(row.config) as Record<string, string | number | boolean | undefined>;
+  const password = row.encryptedCredential ? decrypt(row.encryptedCredential) : "";
+
+  switch (row.type) {
+    case "local":
+      return { type: "local" };
+    case "sftp":
+      return {
+        type: "sftp",
+        host: String(config.host ?? ""),
+        port: Number(config.port ?? 22),
+        username: String(config.username ?? ""),
+        remotePath: String(config.remotePath ?? "/"),
+        password,
+        expectedHostKeyFingerprint: row.hostKeyFingerprint,
+      };
+    case "ftp":
+      return {
+        type: "ftp",
+        host: String(config.host ?? ""),
+        port: Number(config.port ?? 21),
+        username: String(config.username ?? ""),
+        remotePath: String(config.remotePath ?? "/"),
+        secure: Boolean(config.secure ?? true),
+        password,
+      };
+    case "samba":
+      return {
+        type: "samba",
+        host: String(config.host ?? ""),
+        share: String(config.share ?? ""),
+        remotePath: String(config.remotePath ?? "/"),
+        username: String(config.username ?? ""),
+        domain: config.domain !== undefined ? String(config.domain) : undefined,
+        password,
+      };
+  }
+}
+
+export async function listDestinations(workspaceId: string): Promise<BackupDestination[]> {
+  const rows = await db.select().from(backupDestinations).where(eq(backupDestinations.workspaceId, workspaceId));
+  return rows.map(toPublicDestination);
+}
+
+export async function createDestination(workspaceId: string, input: CreateBackupDestinationInput): Promise<BackupDestination> {
+  const id = newId();
+  const now = nowIso();
+  const { password, ...configRest } = input.config as Record<string, unknown> & { password?: string };
+
+  await db.insert(backupDestinations).values({
+    id,
+    workspaceId,
+    type: input.type,
+    name: input.name,
+    enabled: input.enabled,
+    retentionCount: input.retentionCount,
+    config: JSON.stringify(configRest),
+    encryptedCredential: password ? encrypt(password) : null,
+    hostKeyFingerprint: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const [row] = await db.select().from(backupDestinations).where(eq(backupDestinations.id, id)).limit(1);
+  return toPublicDestination(row!);
+}
+
+export async function updateDestination(
+  workspaceId: string,
+  id: string,
+  input: UpdateBackupDestinationInput,
+): Promise<BackupDestination> {
+  const [existing] = await db
+    .select()
+    .from(backupDestinations)
+    .where(and(eq(backupDestinations.id, id), eq(backupDestinations.workspaceId, workspaceId)))
+    .limit(1);
+  if (!existing) throw notFound("Backup destination not found");
+
+  const updates: Partial<typeof backupDestinations.$inferInsert> = { updatedAt: nowIso() };
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.enabled !== undefined) updates.enabled = input.enabled;
+  if (input.retentionCount !== undefined) updates.retentionCount = input.retentionCount;
+  if (input.config !== undefined) {
+    const { password, ...configRest } = input.config as Record<string, unknown> & { password?: string };
+    updates.config = JSON.stringify(configRest);
+    if (password) updates.encryptedCredential = encrypt(password);
+  }
+
+  await db.update(backupDestinations).set(updates).where(eq(backupDestinations.id, id));
+  const [row] = await db.select().from(backupDestinations).where(eq(backupDestinations.id, id)).limit(1);
+  return toPublicDestination(row!);
+}
+
+export async function deleteDestination(workspaceId: string, id: string): Promise<void> {
+  await db.delete(backupDestinations).where(and(eq(backupDestinations.id, id), eq(backupDestinations.workspaceId, workspaceId)));
+}
+
+async function getDestinationRow(workspaceId: string, id: string): Promise<typeof backupDestinations.$inferSelect> {
+  const [row] = await db
+    .select()
+    .from(backupDestinations)
+    .where(and(eq(backupDestinations.id, id), eq(backupDestinations.workspaceId, workspaceId)))
+    .limit(1);
+  if (!row) throw notFound("Backup destination not found");
+  return row;
+}
+
+async function recordHostKeyFingerprint(row: typeof backupDestinations.$inferSelect, client: BackupDestinationClient): Promise<void> {
+  if (row.type !== "sftp" || row.hostKeyFingerprint || !client.getHostKeyFingerprint) return;
+  const fingerprint = client.getHostKeyFingerprint();
+  if (fingerprint) await db.update(backupDestinations).set({ hostKeyFingerprint: fingerprint }).where(eq(backupDestinations.id, row.id));
+}
+
+export async function testDestination(workspaceId: string, id: string): Promise<void> {
+  const row = await getDestinationRow(workspaceId, id);
+  const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
+  await client.test();
+  await recordHostKeyFingerprint(row, client);
+}
+
+async function applyRetention(client: BackupDestinationClient, retentionCount: number): Promise<void> {
+  const filenames = (await client.list()).sort();
+  const excess = filenames.length - retentionCount;
+  for (let i = 0; i < excess; i++) {
+    await client.remove(filenames[i]!);
+  }
+}
+
+// --- Schedule ---------------------------------------------------------------
+
+function toPublicSchedule(row: typeof backupSchedules.$inferSelect): BackupSchedule {
+  return {
+    workspaceId: row.workspaceId,
+    weekdays: JSON.parse(row.weekdays) as number[],
+    time: row.time,
+    intervalWeeks: row.intervalWeeks,
+    enabled: row.enabled,
+    nextRunAt: row.nextRunAt,
+    lastRunAt: row.lastRunAt,
+    lastRunStatus: row.lastRunStatus,
+    lastError: row.lastError,
+  };
+}
+
+export async function getSchedule(workspaceId: string): Promise<BackupSchedule | null> {
+  const [row] = await db.select().from(backupSchedules).where(eq(backupSchedules.workspaceId, workspaceId)).limit(1);
+  return row ? toPublicSchedule(row) : null;
+}
+
+export async function upsertSchedule(workspaceId: string, input: BackupScheduleInput): Promise<BackupSchedule> {
+  const now = nowIso();
+  const anchorWeekStart = currentWeekMonday();
+  const nextRunAt = input.enabled
+    ? computeNextRunAt({
+        weekdays: input.weekdays,
+        time: input.time,
+        intervalWeeks: input.intervalWeeks,
+        anchorWeekStart,
+        after: new Date(),
+      }).toISOString()
+    : null;
+
+  const values = {
+    weekdays: JSON.stringify(input.weekdays),
+    time: input.time,
+    intervalWeeks: input.intervalWeeks,
+    anchorWeekStart,
+    enabled: input.enabled,
+    nextRunAt,
+    updatedAt: now,
+  };
+
+  await db
+    .insert(backupSchedules)
+    .values({ workspaceId, ...values, createdAt: now })
+    .onConflictDoUpdate({ target: backupSchedules.workspaceId, set: values });
+
+  const [row] = await db.select().from(backupSchedules).where(eq(backupSchedules.workspaceId, workspaceId)).limit(1);
+  return toPublicSchedule(row!);
+}
+
+/** Recomputes and persists `nextRunAt` for a schedule after it has just run, using its own row as the fresh `after` reference. */
+export async function advanceSchedule(row: typeof backupSchedules.$inferSelect): Promise<void> {
+  if (!row.enabled) return;
+  const nextRunAt = computeNextRunAt({
+    weekdays: JSON.parse(row.weekdays) as number[],
+    time: row.time,
+    intervalWeeks: row.intervalWeeks,
+    anchorWeekStart: row.anchorWeekStart,
+    after: new Date(),
+  }).toISOString();
+  await db.update(backupSchedules).set({ nextRunAt }).where(eq(backupSchedules.workspaceId, row.workspaceId));
+}
+
+// --- Running a backup ---------------------------------------------------------
+
+/** Encrypts a fresh export and pushes it to every enabled destination, applying each destination's retention policy. Used by both the "Jetzt sichern" button and the scheduler. */
+export async function runBackupNow(workspaceId: string): Promise<void> {
+  const destinationRows = await db
+    .select()
+    .from(backupDestinations)
+    .where(and(eq(backupDestinations.workspaceId, workspaceId), eq(backupDestinations.enabled, true)));
+  if (destinationRows.length === 0) throw badRequest("No enabled backup destinations are configured");
+
+  const encrypted = await exportWorkspaceEncrypted(workspaceId);
+  const filename = `backup-${nowIso().replace(/[:.]/g, "-")}.zip`;
+
+  let anyFailure = false;
+  for (const row of destinationRows) {
+    try {
+      const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
+      await client.upload(filename, encrypted);
+      await recordHostKeyFingerprint(row, client);
+      await applyRetention(client, row.retentionCount);
+      await db
+        .update(backupDestinations)
+        .set({ lastRunAt: nowIso(), lastRunStatus: "success", lastError: null })
+        .where(eq(backupDestinations.id, row.id));
+    } catch (error: unknown) {
+      anyFailure = true;
+      const message = error instanceof Error ? error.message : String(error);
+      await db
+        .update(backupDestinations)
+        .set({ lastRunAt: nowIso(), lastRunStatus: "failure", lastError: message })
+        .where(eq(backupDestinations.id, row.id));
+    }
+  }
+
+  const [scheduleRow] = await db.select().from(backupSchedules).where(eq(backupSchedules.workspaceId, workspaceId)).limit(1);
+  await db
+    .update(backupSchedules)
+    .set({
+      lastRunAt: nowIso(),
+      lastRunStatus: anyFailure ? "failure" : "success",
+      lastError: anyFailure ? "One or more destinations failed - see the destination list for details" : null,
+    })
+    .where(eq(backupSchedules.workspaceId, workspaceId));
+  if (scheduleRow) await advanceSchedule(scheduleRow);
+
+  if (anyFailure) {
+    const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
+    if (workspace) {
+      await notifyUser(workspace.ownerId, {
+        title: "Backup failed",
+        body: `A backup for "${workspace.name}" failed for one or more destinations.`,
+        url: `/w/${workspaceId}/settings`,
+      });
+    }
   }
 }

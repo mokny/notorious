@@ -17,7 +17,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined>;
   /** Lets the request survive page teardown (navigation/tab close) - the browser guarantees a `keepalive: true` fetch is still sent even after the initiating page has gone away, unlike a plain `fetch`. Used by presenceApi's "leave" call on unmount (see hooks/usePresence.ts), so a viewer disappears from others' lists promptly instead of waiting out the server's sweep interval. */

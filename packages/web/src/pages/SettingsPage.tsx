@@ -18,6 +18,7 @@ import { ShareDialog } from "../components/ShareDialog.js";
 import { ActiveShareLinksList } from "../components/ActiveShareLinksList.js";
 import { WebhooksSettings } from "../components/WebhooksSettings.js";
 import { AiSettings } from "../components/AiSettings.js";
+import { BackupSettings } from "../components/BackupSettings.js";
 
 const ROLES = ["viewer", "commenter", "editor"] as const;
 
@@ -58,9 +59,24 @@ export function SettingsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] }),
   });
 
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [importKey, setImportKey] = useState("");
+  const [importNeedsKey, setImportNeedsKey] = useState(false);
+
   const importMutation = useMutation({
-    mutationFn: (file: File) => backupApi.import(file),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspaces"] }),
+    mutationFn: (input: { file: File; key?: string }) => backupApi.import(input.file, input.key),
+    onSuccess: () => {
+      setPendingImportFile(null);
+      setImportKey("");
+      setImportNeedsKey(false);
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+    onError: (err, input) => {
+      if (err instanceof ApiError && err.statusCode === 400 && /backup code is required/i.test(err.message)) {
+        setPendingImportFile(input.file);
+        setImportNeedsKey(true);
+      }
+    },
   });
 
   const setIconMutation = useMutation({
@@ -269,7 +285,8 @@ export function SettingsPage() {
         <section>
           <h2 className="text-lg font-semibold">Backup</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            Download a complete ZIP backup of this workspace, or restore one as a brand-new workspace.
+            Every backup is encrypted with this workspace's code below. Download one manually, restore one as a
+            brand-new workspace, or set up automatic scheduled backups to one or more destinations.
           </p>
           <div className="mt-4 flex gap-2">
             <Button variant="secondary" onClick={() => window.open(backupApi.exportUrl(workspaceId!), "_blank")}>
@@ -285,11 +302,35 @@ export function SettingsPage() {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) importMutation.mutate(file);
+                if (file) importMutation.mutate({ file });
               }}
             />
           </div>
+          {importNeedsKey && pendingImportFile && (
+            <div className="mt-2 flex items-center gap-2">
+              <TextField
+                placeholder="Backup code"
+                value={importKey}
+                onChange={(e) => setImportKey(e.target.value)}
+                className="max-w-xs"
+              />
+              <Button
+                variant="secondary"
+                onClick={() => importMutation.mutate({ file: pendingImportFile, key: importKey })}
+                disabled={!importKey || importMutation.isPending}
+              >
+                Restore
+              </Button>
+            </div>
+          )}
+          {importMutation.isError && !importNeedsKey && (
+            <p className="mt-2 text-sm text-red-500">
+              {importMutation.error instanceof ApiError ? importMutation.error.message : "Could not restore this backup"}
+            </p>
+          )}
           {importMutation.isSuccess && <p className="mt-2 text-sm text-green-600">Restored as a new workspace - check the workspace picker.</p>}
+
+          <BackupSettings workspaceId={workspaceId!} />
         </section>
       )}
 

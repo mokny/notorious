@@ -59,6 +59,12 @@ import type {
   ShareIntakeFields,
   ShareCommitInput,
   ShareInboxItem,
+  BackupDestination,
+  CreateBackupDestinationInput,
+  UpdateBackupDestinationInput,
+  BackupSchedule,
+  BackupScheduleInput,
+  WorkspaceBackupKey,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
 
@@ -239,11 +245,30 @@ export const pushApi = {
 
 export const backupApi = {
   exportUrl: (workspaceId: string) => `/api/v1/workspaces/${workspaceId}/backup`,
-  import: (file: File) => {
+  import: (file: File, key?: string) => {
     const formData = new FormData();
     formData.append("file", file);
+    if (key) formData.append("key", key);
     return apiUpload<Workspace>("/api/v1/workspaces/import", formData);
   },
+  getKey: (workspaceId: string) => apiRequest<WorkspaceBackupKey>(`/api/v1/workspaces/${workspaceId}/backup/key`),
+  regenerateKey: (workspaceId: string) =>
+    apiRequest<WorkspaceBackupKey>(`/api/v1/workspaces/${workspaceId}/backup/key/regenerate`, { method: "POST" }),
+  listDestinations: (workspaceId: string) =>
+    apiRequest<BackupDestination[]>(`/api/v1/workspaces/${workspaceId}/backup/destinations`),
+  createDestination: (workspaceId: string, input: CreateBackupDestinationInput) =>
+    apiRequest<BackupDestination>(`/api/v1/workspaces/${workspaceId}/backup/destinations`, { method: "POST", body: input }),
+  updateDestination: (workspaceId: string, id: string, input: UpdateBackupDestinationInput) =>
+    apiRequest<BackupDestination>(`/api/v1/workspaces/${workspaceId}/backup/destinations/${id}`, { method: "PATCH", body: input }),
+  deleteDestination: (workspaceId: string, id: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/backup/destinations/${id}`, { method: "DELETE" }),
+  testDestination: (workspaceId: string, id: string) =>
+    apiRequest<{ ok: boolean }>(`/api/v1/workspaces/${workspaceId}/backup/destinations/${id}/test`, { method: "POST" }),
+  getSchedule: (workspaceId: string) => apiRequest<BackupSchedule | null>(`/api/v1/workspaces/${workspaceId}/backup/schedule`),
+  saveSchedule: (workspaceId: string, input: BackupScheduleInput) =>
+    apiRequest<BackupSchedule>(`/api/v1/workspaces/${workspaceId}/backup/schedule`, { method: "PUT", body: input }),
+  runNow: (workspaceId: string) =>
+    apiRequest<BackupDestination[]>(`/api/v1/workspaces/${workspaceId}/backup/run-now`, { method: "POST" }),
 };
 
 export const apiKeyApi = {
