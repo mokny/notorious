@@ -69,6 +69,24 @@ export function tableDocToTextGrid(doc: TableDoc | undefined | null): string[][]
  * granularity since one TipTap table is a single shared document rather
  * than independently editable per-cell fields.
  */
+function firstParagraph(cell: TableDocNode): TableDocNode | undefined {
+  return cell.content?.find((n) => n.type === "paragraph");
+}
+
+function firstTextMarks(cell: TableDocNode): TableDocMark[] | undefined {
+  let found: TableDocMark[] | undefined;
+  const walk = (node: TableDocNode): void => {
+    if (found) return;
+    if (node.type === "text" && node.marks?.length) {
+      found = node.marks;
+      return;
+    }
+    node.content?.forEach(walk);
+  };
+  walk(cell);
+  return found;
+}
+
 export function buildRenderedTableDoc(doc: TableDoc, renderedFields: Record<string, string>): TableDoc {
   const table = findTable(doc);
   if (!table?.content) return doc;
@@ -79,7 +97,18 @@ export function buildRenderedTableDoc(doc: TableDoc, renderedFields: Record<stri
       content: (row.content ?? []).map((cell, colIndex) => {
         const text = renderedFields[tableCellField(rowIndex, colIndex)];
         if (text === undefined) return cell;
-        return { ...cell, content: [{ type: "paragraph", content: text ? [{ type: "text", text }] : [] }] };
+        const paragraphAttrs = firstParagraph(cell)?.attrs;
+        const marks = firstTextMarks(cell);
+        return {
+          ...cell,
+          content: [
+            {
+              type: "paragraph",
+              ...(paragraphAttrs ? { attrs: paragraphAttrs } : {}),
+              content: text ? [{ type: "text", text, ...(marks ? { marks } : {}) }] : [],
+            },
+          ],
+        };
       }),
     })),
   };
