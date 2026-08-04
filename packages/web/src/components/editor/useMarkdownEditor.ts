@@ -5,9 +5,10 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import type { BlockType, ObjectType, TemplateAutocompleteSchemaResponse } from "@notorious/shared";
-import { SlashCommand } from "./SlashCommand.js";
+import type { EditorView } from "@tiptap/pm/view";
+import { SlashCommand, slashCommandPluginKey } from "./SlashCommand.js";
 import { TemplateHighlight } from "./TemplateHighlight.js";
-import { TemplateSuggestion } from "./TemplateSuggestion.js";
+import { TemplateSuggestion, templateSuggestionPluginKey } from "./TemplateSuggestion.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 
 interface UseMarkdownEditorOptions {
@@ -122,7 +123,17 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
 
   const editorProps = useMemo(
     () => ({
-      handleKeyDown: (_view: unknown, event: KeyboardEvent) => {
+      // `handleKeyDown` here is a *view-level* editorProp, which ProseMirror
+      // always consults before any plugin's own `handleKeyDown` (see
+      // EditorView.someProp: direct props win over `state.plugins`) -
+      // without this check, Enter would always create a new block instead of
+      // ever reaching SlashCommand/TemplateSuggestion's own Enter-accepts-
+      // the-highlighted-item handling while one of those popups is open.
+      handleKeyDown: (view: EditorView, event: KeyboardEvent) => {
+        const suggestionOpen = [slashCommandPluginKey, templateSuggestionPluginKey].some(
+          (key) => (key.getState(view.state) as { active?: boolean } | undefined)?.active,
+        );
+        if (suggestionOpen) return false;
         if (event.key === "Enter" && !event.shiftKey) {
           onEnterRef.current?.();
           return true;

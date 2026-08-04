@@ -167,6 +167,9 @@ function buildSuggestion(
   };
 }
 
+/** Exported so useMarkdownEditor.ts's own `handleKeyDown` (a view-level editorProp, which ProseMirror always consults *before* any plugin's `handleKeyDown` - see EditorView.someProp) can check whether this popup is currently open and step aside for Enter/Escape/arrow keys instead of always winning. */
+export const slashCommandPluginKey = new PluginKey("slashCommand");
+
 export const SlashCommand = Extension.create<SlashCommandExtensionOptions>({
   name: "slashCommand",
 
@@ -178,7 +181,7 @@ export const SlashCommand = Extension.create<SlashCommandExtensionOptions>({
     return [
       Suggestion({
         editor: this.editor,
-        pluginKey: new PluginKey("slashCommand"),
+        pluginKey: slashCommandPluginKey,
         ...buildSuggestion(this.options.onSelect, this.options.objectTypesRef),
       }),
     ];

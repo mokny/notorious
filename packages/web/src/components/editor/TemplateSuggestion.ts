@@ -165,6 +165,22 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
           });
           container.appendChild(row);
         });
+        // Keep the highlighted row in view while navigating with the arrow
+        // keys - `.slash-menu` is capped at `max-h-80` with its own scroll,
+        // so without this the selection can move past what's visible and
+        // look like arrow keys stop working after the first few rows.
+        container.querySelector(".slash-item-active")?.scrollIntoView({ block: "nearest" });
+      }
+
+      // The popup's reference position is a *virtual* element
+      // (`getReferenceClientRect`, not a real DOM node it's anchored to), so
+      // Popper can't discover which scroll containers affect it on its own
+      // and won't reposition when e.g. the page/block list around the editor
+      // scrolls. `capture: true` on `window` catches scroll events from any
+      // nested scrollable ancestor - native `scroll` doesn't bubble, but
+      // capture-phase listeners still see it on the way down.
+      function handleScroll() {
+        popup?.popperInstance?.update();
       }
 
       return {
@@ -186,6 +202,7 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
             trigger: "manual",
             placement: "bottom-start",
           });
+          window.addEventListener("scroll", handleScroll, true);
         },
         onUpdate: (props) => {
           currentItems = props.items;
@@ -222,12 +239,16 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
           return false;
         },
         onExit: () => {
+          window.removeEventListener("scroll", handleScroll, true);
           popup?.destroy();
         },
       };
     },
   };
 }
+
+/** Exported so useMarkdownEditor.ts's own `handleKeyDown` (a view-level editorProp, which ProseMirror always consults *before* any plugin's `handleKeyDown` - see EditorView.someProp) can check whether this popup is currently open and step aside for Enter/Escape/arrow keys instead of always winning. */
+export const templateSuggestionPluginKey = new PluginKey("templateSuggestion");
 
 export const TemplateSuggestion = Extension.create<TemplateSuggestionExtensionOptions>({
   name: "templateSuggestion",
@@ -240,7 +261,7 @@ export const TemplateSuggestion = Extension.create<TemplateSuggestionExtensionOp
     return [
       Suggestion({
         editor: this.editor,
-        pluginKey: new PluginKey("templateSuggestion"),
+        pluginKey: templateSuggestionPluginKey,
         ...buildSuggestion(this.options.workspaceIdRef, this.options.schemaRef),
       }),
     ];
