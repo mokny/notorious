@@ -89,9 +89,16 @@ Hosting spend so far: {{ total }} $
 
 ## Filters
 
-`{{ value | filter }}` or `{{ value | filter(arg) }}`: `upper`, `lower`, `trim`, `capitalize`,
-`length`, `default(fallback)`, `round(digits)`, `abs`, `int`, `float`, `string`, `first`, `last`,
-`join(sep)`, `sort`, `reverse`, `truncate(n)`.
+`{{ value | filter }}` or `{{ value | filter(arg) }}`: `upper`, `lower`, `trim`, `ltrim`, `rtrim`,
+`capitalize`, `title`, `length`, `wordcount`, `default(fallback)`, `round(digits)`, `abs`, `int`,
+`float`, `string`, `first`, `last`, `join(sep)`, `sort`, `reverse`, `truncate(n)`,
+`replace(search, replacement)`, `split(sep)` (splits on whitespace if `sep` is omitted),
+`slice(start, end)`, `contains(needle)`, `startswith(prefix)`, `endswith(suffix)`,
+`padstart(n, char)`, `padend(n, char)`, `repeat(n)`, `regex(pattern, flags)`,
+`regexreplace(pattern, replacement, flags)`, `regexextract(pattern, flags)` (first capture group,
+or the full match if the pattern has none). `regex`/`regexreplace`/`regexextract` cap both the
+pattern and the input length and reject the classic catastrophic-backtracking shapes (e.g.
+`(a+)+`) - a template can't hang the renderer with a hostile pattern.
 
 ## Examples
 

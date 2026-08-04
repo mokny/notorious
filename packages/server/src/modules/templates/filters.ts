@@ -6,19 +6,61 @@
  * the *only* way a template can invoke any code at all - keep it short and
  * side-effect-free.
  */
+import { TemplateRuntimeError } from "./errors.js";
+
+/** Hard ceiling on any regex filter's *pattern* length - keeps the static nested-quantifier scan in `compileSafeRegex` below cheap and rules out sheer pattern-size abuse on its own. */
+const MAX_REGEX_PATTERN_LENGTH = 200;
+/** Hard ceiling on the *value* a regex filter runs against. Doesn't make catastrophic backtracking impossible (a short adversarial pattern can still blow up on a short string), but bounds the everyday case and is cheap to check up front. */
+const MAX_REGEX_INPUT_LENGTH = 5000;
+/** Best-effort rejection of the classic catastrophic-backtracking shapes - a quantified group that itself contains a quantifier, e.g. `(a+)+`, `(a*)*`, `(a+){2,}`. Not a real static analysis (nothing here parses balanced/nested parens beyond one level), just enough to stop the well-known patterns from ever compiling; combined with the length caps above, keeps the common case bounded. Regex filters still ultimately run as one blocking, non-interruptible call - see this module's own top-of-file comment on why the filter table is kept small and side-effect-free. */
+const CATASTROPHIC_QUANTIFIER_RE = /\([^()]*[+*][^()]*\)[+*]|\([^()]*[+*][^()]*\)\{\d*,/;
+
+function sanitizeRegexFlags(flags: unknown): string {
+  if (flags === undefined) return "";
+  // Only the flags that can't change *how long* a match takes (no `g`
+  // built in here - callers that need global replacement add it themselves).
+  return [...new Set(stringify(flags).split(""))].filter((c) => "imsu".includes(c)).join("");
+}
+
+function compileSafeRegex(pattern: unknown, flags: string): RegExp {
+  const source = stringify(pattern);
+  if (source.length > MAX_REGEX_PATTERN_LENGTH) throw new TemplateRuntimeError("Regex pattern is too long");
+  if (CATASTROPHIC_QUANTIFIER_RE.test(source)) {
+    throw new TemplateRuntimeError(`Regex pattern "${source}" was rejected (nested quantifiers can hang the renderer)`);
+  }
+  try {
+    return new RegExp(source, flags);
+  } catch {
+    throw new TemplateRuntimeError(`Invalid regex pattern "${source}"`);
+  }
+}
+
+function regexInput(v: unknown): string {
+  const s = stringify(v);
+  if (s.length > MAX_REGEX_INPUT_LENGTH) throw new TemplateRuntimeError("Value is too long for a regex filter");
+  return s;
+}
+
 export const FILTERS: Record<string, (value: unknown, ...args: unknown[]) => unknown> = {
   upper: (v) => stringify(v).toUpperCase(),
   lower: (v) => stringify(v).toLowerCase(),
   trim: (v) => stringify(v).trim(),
+  ltrim: (v) => stringify(v).replace(/^\s+/, ""),
+  rtrim: (v) => stringify(v).replace(/\s+$/, ""),
   capitalize: (v) => {
     const s = stringify(v);
     return s.charAt(0).toUpperCase() + s.slice(1);
   },
+  title: (v) => stringify(v).replace(/\S+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()),
   length: (v) => {
     if (typeof v === "string") return v.length;
     if (Array.isArray(v)) return v.length;
     if (v && typeof v === "object") return Object.keys(v).length;
     return 0;
+  },
+  wordcount: (v) => {
+    const s = stringify(v).trim();
+    return s ? s.split(/\s+/).length : 0;
   },
   default: (v, fallback) => (v === undefined || v === null || v === "" ? fallback : v),
   round: (v, digits) => {
@@ -38,6 +80,40 @@ export const FILTERS: Record<string, (value: unknown, ...args: unknown[]) => unk
     const s = stringify(v);
     const limit = Number(n) || 50;
     return s.length > limit ? `${s.slice(0, limit)}…` : s;
+  },
+  // Plain substring replace - no regex involved, so none of the safety caps
+  // above apply. This is the common case; reach for `regexreplace` only when
+  // an actual pattern is needed.
+  replace: (v, search, replacement) => stringify(v).split(stringify(search)).join(stringify(replacement)),
+  split: (v, sep) => (sep === undefined ? stringify(v).trim().split(/\s+/) : stringify(v).split(stringify(sep))),
+  slice: (v, start, end) => {
+    const s = Number(start) || 0;
+    const e = end === undefined ? undefined : Number(end);
+    return Array.isArray(v) ? v.slice(s, e) : stringify(v).slice(s, e);
+  },
+  contains: (v, needle) => (Array.isArray(v) ? v.some((item) => stringify(item) === stringify(needle)) : stringify(v).includes(stringify(needle))),
+  startswith: (v, prefix) => stringify(v).startsWith(stringify(prefix)),
+  endswith: (v, suffix) => stringify(v).endsWith(stringify(suffix)),
+  padstart: (v, length, char) => stringify(v).padStart(Number(length) || 0, char === undefined ? " " : stringify(char)),
+  padend: (v, length, char) => stringify(v).padEnd(Number(length) || 0, char === undefined ? " " : stringify(char)),
+  repeat: (v, n) => {
+    const s = stringify(v);
+    const count = Math.max(0, Math.trunc(Number(n)) || 0);
+    if (s.length * count > MAX_REGEX_INPUT_LENGTH * 4) throw new TemplateRuntimeError("repeat() result is too large");
+    return s.repeat(count);
+  },
+  // `regex`/`regexreplace`/`regexextract` share the pattern/input safety
+  // caps above - see their comments for what is (and isn't) actually
+  // guarded against.
+  regex: (v, pattern, flags) => compileSafeRegex(pattern, sanitizeRegexFlags(flags)).test(regexInput(v)),
+  regexreplace: (v, pattern, replacement, flags) => {
+    const finalFlags = `g${sanitizeRegexFlags(flags)}`;
+    return regexInput(v).replace(compileSafeRegex(pattern, finalFlags), stringify(replacement));
+  },
+  regexextract: (v, pattern, flags) => {
+    const match = compileSafeRegex(pattern, sanitizeRegexFlags(flags)).exec(regexInput(v));
+    if (!match) return "";
+    return match.length > 1 ? (match[1] ?? "") : match[0];
   },
 };
 

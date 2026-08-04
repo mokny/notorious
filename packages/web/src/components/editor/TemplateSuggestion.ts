@@ -98,6 +98,13 @@ async function blockSlugItems(objectId: string, query: string): Promise<Suggesti
     .slice(0, 15);
 }
 
+/** Shared by both `variables.<name>` completion below (property mode, after the dot is already typed) and the bare-namespace shortcut search further down (typing a variable's name directly, without the `variables.` prefix first) - see `Variable` objects in SCRIPTING.md. Not gated on a non-empty query, unlike that shortcut: once `variables.` itself has been typed, browsing the full list makes sense the same way `objects.`/`blocks.` do. */
+async function variableMatches(workspaceId: string, schema: TemplateAutocompleteSchemaResponse | undefined, query: string) {
+  const variableTypeId = schema?.objectTypes.find((t) => t.key === "variable")?.id;
+  if (!variableTypeId) return [];
+  return searchApi.search(workspaceId, { q: query, objectTypeId: variableTypeId, limit: 10 }).catch(() => []);
+}
+
 /** Extension options: a ref to the current workspace id (for the variable-name/`objects.<slug>` search), a ref to the current object id (for the `blocks.<slug>` search, scoped to just this object - see blockSlugItems), and a ref to the bundled object-type/property schema (see useTemplateAutocompleteSchema.ts) - all read at call time, like SlashCommand.ts's `objectTypesRef`, since any of them can still be loading when this extension is first configured. */
 export interface TemplateSuggestionExtensionOptions {
   workspaceIdRef: { current: string };
@@ -134,15 +141,20 @@ function buildSuggestion(
         if (ctx.path === "blocks") {
           return objectIdRef.current ? blockSlugItems(objectIdRef.current, query) : [];
         }
+        if (ctx.path === "variables") {
+          if (!workspaceIdRef.current) return [];
+          const matches = await variableMatches(workspaceIdRef.current, schemaRef.current, query);
+          return matches.map((obj) => ({ label: obj.title, insertText: obj.title, detail: "Variable" }));
+        }
         return propertyItems(ctx.path, schemaRef.current).filter((item) => item.label.toLowerCase().includes(query.toLowerCase())).slice(0, 15);
       }
-      // namespace mode - the four fixed identifiers, plus a live search for
-      // matching Variable objects (only once at least one character has been
-      // typed, same as every other search-as-you-type in this app).
+      // namespace mode - the four fixed identifiers, plus a shortcut live
+      // search for matching Variable objects by name directly (only once at
+      // least one character has been typed, unlike the `variables.` property
+      // branch above - firing this on every bare `{{` would be noisy).
       const staticItems = NAMESPACE_ITEMS.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
-      const variableTypeId = schemaRef.current?.objectTypes.find((t) => t.key === "variable")?.id;
-      if (!query || !variableTypeId || !workspaceIdRef.current) return staticItems;
-      const matches = await searchApi.search(workspaceIdRef.current, { q: query, objectTypeId: variableTypeId, limit: 10 }).catch(() => []);
+      if (!query || !workspaceIdRef.current) return staticItems;
+      const matches = await variableMatches(workspaceIdRef.current, schemaRef.current, query);
       const variableItems = matches.map((obj) => ({ label: obj.title, insertText: `variables.${obj.title}`, detail: "Variable" }));
       return [...staticItems, ...variableItems];
     },

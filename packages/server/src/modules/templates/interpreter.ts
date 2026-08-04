@@ -1,8 +1,9 @@
 import type { Expr, TemplateNode } from "@notorious/shared";
 import { canonicalObjectsQueryKey } from "@notorious/shared";
 import { FILTERS, stringify } from "./filters.js";
+import { TemplateRuntimeError } from "./errors.js";
 
-export class TemplateRuntimeError extends Error {}
+export { TemplateRuntimeError };
 
 const DANGEROUS_KEYS = new Set(["constructor", "__proto__", "prototype"]);
 const MAX_LOOP_ITERATIONS = 1000;
