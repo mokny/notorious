@@ -170,6 +170,24 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
     }
   }
 
+  const deleteFileMutation = useMutation({
+    mutationFn: ({ destinationId, filename }: { destinationId: string; filename: string }) =>
+      backupApi.deleteDestinationFile(workspaceId, destinationId, filename),
+    onSuccess: (_data, { destinationId }) =>
+      queryClient.invalidateQueries({ queryKey: ["backupDestinationFiles", workspaceId, destinationId] }),
+  });
+
+  async function handleDeleteFile(destinationId: string, filename: string) {
+    const confirmed = await confirm({
+      title: "Delete this backup file?",
+      description: "This permanently removes it from the destination. This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
+    deleteFileMutation.mutate({ destinationId, filename });
+  }
+
   const destinationsQuery = useQuery({
     queryKey: ["backupDestinations", workspaceId],
     queryFn: () => backupApi.listDestinations(workspaceId),
@@ -478,6 +496,13 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                           className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
                         >
                           <Icon name="history" className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteFile(destination.id, file.filename)}
+                          title="Delete this backup file"
+                          className="rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
+                        >
+                          <Icon name="trash" className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>

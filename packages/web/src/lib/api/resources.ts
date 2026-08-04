@@ -307,6 +307,11 @@ export const backupApi = {
     );
     return { jobId, promise };
   },
+  deleteDestinationFile: (workspaceId: string, destinationId: string, filename: string) =>
+    apiRequest<void>(
+      `/api/v1/workspaces/${workspaceId}/backup/destinations/${destinationId}/files/${encodeURIComponent(filename)}`,
+      { method: "DELETE" },
+    ),
 };
 
 export const apiKeyApi = {

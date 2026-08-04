@@ -474,6 +474,12 @@ export async function listDestinationBackups(workspaceId: string, destinationId:
   return files.sort((a, b) => (b.modifiedAt ?? "").localeCompare(a.modifiedAt ?? ""));
 }
 
+export async function deleteDestinationBackup(workspaceId: string, destinationId: string, filename: string): Promise<void> {
+  const row = await getDestinationRow(workspaceId, destinationId);
+  const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
+  await client.remove(filename);
+}
+
 /** Downloads one file from a destination, reporting progress to `clientId` under `jobId` (see emitProgress). Used by the destination file browser's "Download" button - the caller streams the returned buffer back to the browser. */
 export async function downloadDestinationBackup(
   workspaceId: string,

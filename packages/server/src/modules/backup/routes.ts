@@ -129,6 +129,14 @@ export async function registerBackupRoutes(app: FastifyInstance): Promise<void> 
     return backupService.restoreDestinationBackup(workspaceId, id, filename, user.id, clientId, jobId);
   });
 
+  app.delete("/api/v1/workspaces/:workspaceId/backup/destinations/:id/files/:filename", async (request, reply) => {
+    const user = requireUser(request);
+    const { workspaceId, id, filename } = request.params as { workspaceId: string; id: string; filename: string };
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    await backupService.deleteDestinationBackup(workspaceId, id, filename);
+    reply.code(204);
+  });
+
   app.get("/api/v1/workspaces/:workspaceId/backup/schedule", async (request) => {
     const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
