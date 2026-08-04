@@ -22,6 +22,10 @@ export async function registerBackupRoutes(app: FastifyInstance): Promise<void> 
     const zip = await backupService.exportWorkspaceEncrypted(workspaceId);
     reply.header("Content-Type", "application/zip");
     reply.header("Content-Disposition", `attachment; filename="workspace-${workspaceId}.zip"`);
+    // Known up front (the export is fully buffered in memory already) - lets
+    // the browser-side fetch+ReadableStream download compute real progress
+    // instead of an indeterminate spinner (see backupApi.downloadExport).
+    reply.header("Content-Length", String(zip.length));
     return reply.send(zip);
   });
 
@@ -90,6 +94,39 @@ export async function registerBackupRoutes(app: FastifyInstance): Promise<void> 
     await requireWorkspaceRole(workspaceId, user.id, "owner");
     await backupService.testDestination(workspaceId, id);
     return { ok: true };
+  });
+
+  app.get("/api/v1/workspaces/:workspaceId/backup/destinations/:id/files", async (request) => {
+    const user = requireUser(request);
+    const { workspaceId, id } = request.params as { workspaceId: string; id: string };
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    return backupService.listDestinationBackups(workspaceId, id);
+  });
+
+  app.get("/api/v1/workspaces/:workspaceId/backup/destinations/:id/files/:filename/download", async (request, reply) => {
+    const user = requireUser(request);
+    const { workspaceId, id, filename } = request.params as { workspaceId: string; id: string; filename: string };
+    const { jobId } = request.query as { jobId?: string };
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const clientId = request.headers["x-client-id"];
+    if (!jobId || typeof clientId !== "string") throw badRequest("jobId and X-Client-Id are required");
+
+    const buffer = await backupService.downloadDestinationBackup(workspaceId, id, filename, clientId, jobId);
+    reply.header("Content-Type", "application/zip");
+    reply.header("Content-Disposition", `attachment; filename="${filename}"`);
+    reply.header("Content-Length", String(buffer.length));
+    return reply.send(buffer);
+  });
+
+  app.post("/api/v1/workspaces/:workspaceId/backup/destinations/:id/files/:filename/restore", async (request) => {
+    const user = requireUser(request);
+    const { workspaceId, id, filename } = request.params as { workspaceId: string; id: string; filename: string };
+    const { jobId } = request.query as { jobId?: string };
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const clientId = request.headers["x-client-id"];
+    if (!jobId || typeof clientId !== "string") throw badRequest("jobId and X-Client-Id are required");
+
+    return backupService.restoreDestinationBackup(workspaceId, id, filename, user.id, clientId, jobId);
   });
 
   app.get("/api/v1/workspaces/:workspaceId/backup/schedule", async (request) => {

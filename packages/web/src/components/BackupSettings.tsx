@@ -2,10 +2,27 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BACKUP_DESTINATION_TYPES, type BackupDestinationType, type BackupScheduleInput } from "@notorious/shared";
 import { backupApi } from "../lib/api/resources.js";
+import { ApiError } from "../lib/api/client.js";
 import { useConfirm } from "../context/ConfirmContext.js";
+import { downloadBlob } from "../lib/downloadBlob.js";
+import { useBackupTransfer } from "../hooks/useBackupTransfer.js";
 import { Button } from "./ui/Button.js";
 import { TextField } from "./ui/TextField.js";
 import { Icon } from "./ui/Icon.js";
+import { ProgressPopup } from "./ui/ProgressPopup.js";
+
+function formatFileSize(bytes: number | null): string | null {
+  if (bytes === null) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
 
 const WEEKDAY_LABELS: { value: number; label: string }[] = [
   { value: 1, label: "Mon" },
@@ -97,6 +114,61 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
   const [intervalWeeks, setIntervalWeeks] = useState(1);
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleDirty, setScheduleDirty] = useState(false);
+
+  const [expandedDestinationId, setExpandedDestinationId] = useState<string | null>(null);
+  const [lastDownload, setLastDownload] = useState<{ destinationId: string; filename: string } | null>(null);
+  const [lastRestore, setLastRestore] = useState<{ destinationId: string; filename: string } | null>(null);
+  const downloadTransfer = useBackupTransfer();
+  const restoreTransfer = useBackupTransfer();
+
+  const filesQuery = useQuery({
+    queryKey: ["backupDestinationFiles", workspaceId, expandedDestinationId],
+    queryFn: () => backupApi.listDestinationFiles(workspaceId, expandedDestinationId!),
+    enabled: expandedDestinationId !== null,
+  });
+
+  async function handleDownloadFile(destinationId: string, filename: string) {
+    setLastDownload({ destinationId, filename });
+    const controller = new AbortController();
+    const { jobId, promise } = backupApi.downloadDestinationFile(
+      workspaceId,
+      destinationId,
+      filename,
+      (info) => downloadTransfer.update({ phase: "transferring", percent: info.percent }),
+      controller.signal,
+    );
+    downloadTransfer.begin(jobId, () => controller.abort());
+    try {
+      const blob = await promise;
+      downloadBlob(blob, filename);
+      downloadTransfer.finish("Backup downloaded.");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      downloadTransfer.fail(err instanceof ApiError ? err.message : "Download failed");
+    }
+  }
+
+  async function handleRestoreFile(destinationId: string, filename: string) {
+    const confirmed = await confirm({
+      title: "Restore this backup as a new workspace?",
+      description: "This creates a brand-new workspace from this backup file - your current workspace is never changed or overwritten.",
+      confirmLabel: "Restore",
+    });
+    if (!confirmed) return;
+
+    setLastRestore({ destinationId, filename });
+    const controller = new AbortController();
+    const { jobId, promise } = backupApi.restoreDestinationFile(workspaceId, destinationId, filename, controller.signal);
+    restoreTransfer.begin(jobId, () => controller.abort());
+    try {
+      await promise;
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      restoreTransfer.finish("Restored as a new workspace - check the workspace picker.");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      restoreTransfer.fail(err instanceof ApiError ? err.message : "Could not restore this backup");
+    }
+  }
 
   const destinationsQuery = useQuery({
     queryKey: ["backupDestinations", workspaceId],
@@ -342,6 +414,13 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
+                    onClick={() => setExpandedDestinationId((current) => (current === destination.id ? null : destination.id))}
+                    title="Backup files at this destination"
+                    className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
+                  >
+                    <Icon name={expandedDestinationId === destination.id ? "chevron-down" : "chevron-right"} className="h-3.5 w-3.5" />
+                  </button>
+                  <button
                     onClick={() => testDestinationMutation.mutate(destination.id)}
                     disabled={testDestinationMutation.isPending}
                     title="Test connection"
@@ -370,6 +449,40 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 <p className={`mt-1 text-xs ${testResult.ok ? "text-emerald-500" : "text-red-500"}`}>
                   {testResult.ok ? "Connection OK." : (testResult.error ?? "Test failed.")}
                 </p>
+              )}
+              {expandedDestinationId === destination.id && (
+                <div className="mt-2 space-y-1 border-t border-border pt-2">
+                  {filesQuery.isLoading && <p className="text-xs text-ink-muted">Loading backup files...</p>}
+                  {filesQuery.isError && <p className="text-xs text-red-500">Could not load backup files.</p>}
+                  {filesQuery.data?.length === 0 && <p className="text-xs text-ink-muted">No backup files at this destination yet.</p>}
+                  {filesQuery.data?.map((file) => (
+                    <div key={file.filename} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate">{file.filename}</p>
+                        <p className="text-[11px] text-ink-muted">
+                          {file.modifiedAt && new Date(file.modifiedAt).toLocaleString()}
+                          {formatFileSize(file.size) ? ` - ${formatFileSize(file.size)}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          onClick={() => void handleDownloadFile(destination.id, file.filename)}
+                          title="Download"
+                          className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
+                        >
+                          <Icon name="download" className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => void handleRestoreFile(destination.id, file.filename)}
+                          title="Restore as a new workspace"
+                          className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
+                        >
+                          <Icon name="history" className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ))}
@@ -493,6 +606,23 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
           </Button>
         )}
       </div>
+
+      <ProgressPopup
+        open={downloadTransfer.open}
+        title="Downloading backup"
+        state={downloadTransfer.state}
+        onCancel={downloadTransfer.cancel}
+        onClose={downloadTransfer.close}
+        onRetry={lastDownload ? () => void handleDownloadFile(lastDownload.destinationId, lastDownload.filename) : undefined}
+      />
+      <ProgressPopup
+        open={restoreTransfer.open}
+        title="Restoring backup"
+        state={restoreTransfer.state}
+        onCancel={restoreTransfer.cancel}
+        onClose={restoreTransfer.close}
+        onRetry={lastRestore ? () => void handleRestoreFile(lastRestore.destinationId, lastRestore.filename) : undefined}
+      />
     </div>
   );
 }

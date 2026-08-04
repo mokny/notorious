@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
+import type { BackupProgressMessage, PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
 import { clientId as myClientId } from "./clientId.js";
+import { emitBackupProgress } from "./backupProgress.js";
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15_000;
@@ -94,7 +95,7 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
 
     function connect(): void {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const query = new URLSearchParams({ workspaceId: workspaceId! });
+      const query = new URLSearchParams({ workspaceId: workspaceId!, clientId: myClientId });
       if (shareToken) query.set("shareToken", shareToken);
       socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query.toString()}`);
 
@@ -116,12 +117,11 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
       };
 
       socket.onmessage = (event) => {
-        const payload = JSON.parse(event.data) as RealtimeEvent | PresenceSnapshotMessage;
-        // Presence snapshots (see modules/presence/ server-side) share this
-        // same per-workspace socket but aren't a `RealtimeEvent` - a DB-row-
-        // change notification doesn't fit "here's the current viewer list"
-        // (see PresenceSnapshotMessage's own doc comment) - distinguished by
-        // a `type` field plain RealtimeEvents never have - `"type" in
+        const payload = JSON.parse(event.data) as RealtimeEvent | PresenceSnapshotMessage | BackupProgressMessage;
+        // Presence snapshots and backup-progress updates (see modules/
+        // presence/ and modules/backup/ server-side) share this same per-
+        // workspace socket but aren't a `RealtimeEvent` - distinguished by a
+        // `type` field plain RealtimeEvents never have - `"type" in
         // payload` alone is a sufficient, exact discriminant (no need to
         // also compare its value) since `RealtimeEvent` has no `type`
         // property at all, and it's also what TypeScript needs to narrow
@@ -129,6 +129,10 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
         // doesn't narrow on its own when one arm of the union lacks the
         // property being compared).
         if ("type" in payload) {
+          if (payload.type === "backupProgress") {
+            emitBackupProgress(payload);
+            return;
+          }
           // usePresence.ts owns the actual viewer list via its own query -
           // this just tells it (and anyone else looking at the same object)
           // to go refetch, same "WS event -> invalidate -> refetch" idiom

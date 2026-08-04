@@ -60,13 +60,15 @@ import type {
   ShareCommitInput,
   ShareInboxItem,
   BackupDestination,
+  BackupDestinationFile,
   CreateBackupDestinationInput,
   UpdateBackupDestinationInput,
   BackupSchedule,
   BackupScheduleInput,
   WorkspaceBackupKey,
 } from "@notorious/shared";
-import { apiRequest, apiUpload } from "./client.js";
+import { apiRequest, apiUpload, apiDownload, apiUploadWithProgress } from "./client.js";
+import { randomId } from "../randomId.js";
 
 /** Returned by login when the account has 2FA enabled - a real session is only created once `twoFactorApi.verify` succeeds. */
 export interface Pending2fa {
@@ -245,11 +247,21 @@ export const pushApi = {
 
 export const backupApi = {
   exportUrl: (workspaceId: string) => `/api/v1/workspaces/${workspaceId}/backup`,
+  /** Downloads the live export with byte progress (see apiDownload) - what the Settings page's "Download backup" button uses instead of a plain `window.open`. */
+  downloadExport: (workspaceId: string, onProgress?: (info: { bytes: number; percent?: number }) => void, signal?: AbortSignal) =>
+    apiDownload(`/api/v1/workspaces/${workspaceId}/backup`, { onProgress, signal }),
   import: (file: File, key?: string) => {
     const formData = new FormData();
     formData.append("file", file);
     if (key) formData.append("key", key);
     return apiUpload<Workspace>("/api/v1/workspaces/import", formData);
+  },
+  /** Same as `import`, but with upload progress and cancellation - see ui/ProgressPopup.tsx. */
+  importWithProgress: (file: File, key: string | undefined, onProgress?: (info: { bytes: number; percent?: number }) => void) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (key) formData.append("key", key);
+    return apiUploadWithProgress<Workspace>("/api/v1/workspaces/import", formData, onProgress);
   },
   getKey: (workspaceId: string) => apiRequest<WorkspaceBackupKey>(`/api/v1/workspaces/${workspaceId}/backup/key`),
   regenerateKey: (workspaceId: string) =>
@@ -269,6 +281,32 @@ export const backupApi = {
     apiRequest<BackupSchedule>(`/api/v1/workspaces/${workspaceId}/backup/schedule`, { method: "PUT", body: input }),
   runNow: (workspaceId: string) =>
     apiRequest<BackupDestination[]>(`/api/v1/workspaces/${workspaceId}/backup/run-now`, { method: "POST" }),
+  listDestinationFiles: (workspaceId: string, destinationId: string) =>
+    apiRequest<BackupDestinationFile[]>(`/api/v1/workspaces/${workspaceId}/backup/destinations/${destinationId}/files`),
+  /** Returns a fresh `jobId` alongside the download promise - pass the id straight to `useBackupProgress` to watch the server-side (destination -> server) leg over WS, while `onProgress` here tracks the second (server -> browser) leg via Content-Length. */
+  downloadDestinationFile: (
+    workspaceId: string,
+    destinationId: string,
+    filename: string,
+    onProgress?: (info: { bytes: number; percent?: number }) => void,
+    signal?: AbortSignal,
+  ) => {
+    const jobId = randomId();
+    const promise = apiDownload(
+      `/api/v1/workspaces/${workspaceId}/backup/destinations/${destinationId}/files/${encodeURIComponent(filename)}/download`,
+      { query: { jobId }, onProgress, signal },
+    );
+    return { jobId, promise };
+  },
+  /** Restores a destination's backup file as a new workspace - same `jobId`-for-`useBackupProgress` pattern as `downloadDestinationFile`. The backup code is applied automatically server-side, never asked of the user (see restoreDestinationBackup's doc comment). */
+  restoreDestinationFile: (workspaceId: string, destinationId: string, filename: string, signal?: AbortSignal) => {
+    const jobId = randomId();
+    const promise = apiRequest<Workspace>(
+      `/api/v1/workspaces/${workspaceId}/backup/destinations/${destinationId}/files/${encodeURIComponent(filename)}/restore`,
+      { method: "POST", query: { jobId }, signal },
+    );
+    return { jobId, promise };
+  },
 };
 
 export const apiKeyApi = {

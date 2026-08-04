@@ -19,6 +19,9 @@ import { ActiveShareLinksList } from "../components/ActiveShareLinksList.js";
 import { WebhooksSettings } from "../components/WebhooksSettings.js";
 import { AiSettings } from "../components/AiSettings.js";
 import { BackupSettings } from "../components/BackupSettings.js";
+import { ProgressPopup } from "../components/ui/ProgressPopup.js";
+import { useBackupTransfer } from "../hooks/useBackupTransfer.js";
+import { downloadBlob } from "../lib/downloadBlob.js";
 
 const ROLES = ["viewer", "commenter", "editor"] as const;
 
@@ -62,22 +65,57 @@ export function SettingsPage() {
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [importKey, setImportKey] = useState("");
   const [importNeedsKey, setImportNeedsKey] = useState(false);
+  const [lastImportAttempt, setLastImportAttempt] = useState<{ file: File; key?: string } | null>(null);
 
-  const importMutation = useMutation({
-    mutationFn: (input: { file: File; key?: string }) => backupApi.import(input.file, input.key),
-    onSuccess: () => {
+  const downloadTransfer = useBackupTransfer();
+  const restoreTransfer = useBackupTransfer();
+
+  async function handleDownloadBackup() {
+    const controller = new AbortController();
+    downloadTransfer.begin(null, () => controller.abort());
+    downloadTransfer.update({ phase: "transferring" });
+    try {
+      const blob = await backupApi.downloadExport(
+        workspaceId!,
+        (info) => downloadTransfer.update({ phase: "transferring", percent: info.percent }),
+        controller.signal,
+      );
+      downloadBlob(blob, `workspace-${workspaceId}.zip`);
+      downloadTransfer.finish("Backup downloaded.");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      downloadTransfer.fail(err instanceof ApiError ? err.message : "Download failed");
+    }
+  }
+
+  async function runImport(file: File, key?: string) {
+    setLastImportAttempt({ file, key });
+    const { promise, abort } = backupApi.importWithProgress(file, key, (info) =>
+      restoreTransfer.update({ phase: "transferring", percent: info.percent }),
+    );
+    restoreTransfer.begin(null, abort);
+    restoreTransfer.update({ phase: "transferring" });
+    try {
+      await promise;
       setPendingImportFile(null);
       setImportKey("");
       setImportNeedsKey(false);
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-    },
-    onError: (err, input) => {
-      if (err instanceof ApiError && err.statusCode === 400 && /backup code is required/i.test(err.message)) {
-        setPendingImportFile(input.file);
-        setImportNeedsKey(true);
+      restoreTransfer.finish("Restored as a new workspace - check the workspace picker.");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        restoreTransfer.close();
+        return;
       }
-    },
-  });
+      if (err instanceof ApiError && err.statusCode === 400 && /backup code is required/i.test(err.message)) {
+        restoreTransfer.close();
+        setPendingImportFile(file);
+        setImportNeedsKey(true);
+        return;
+      }
+      restoreTransfer.fail(err instanceof ApiError ? err.message : "Could not restore this backup");
+    }
+  }
 
   const setIconMutation = useMutation({
     mutationFn: (icon: string) => workspaceApi.update(workspaceId!, { icon }),
@@ -289,7 +327,7 @@ export function SettingsPage() {
             brand-new workspace, or set up automatic scheduled backups to one or more destinations.
           </p>
           <div className="mt-4 flex gap-2">
-            <Button variant="secondary" onClick={() => window.open(backupApi.exportUrl(workspaceId!), "_blank")}>
+            <Button variant="secondary" onClick={handleDownloadBackup}>
               Download backup
             </Button>
             <Button variant="secondary" onClick={() => importInputRef.current?.click()}>
@@ -302,7 +340,8 @@ export function SettingsPage() {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) importMutation.mutate({ file });
+                e.target.value = "";
+                if (file) void runImport(file);
               }}
             />
           </div>
@@ -314,21 +353,28 @@ export function SettingsPage() {
                 onChange={(e) => setImportKey(e.target.value)}
                 className="max-w-xs"
               />
-              <Button
-                variant="secondary"
-                onClick={() => importMutation.mutate({ file: pendingImportFile, key: importKey })}
-                disabled={!importKey || importMutation.isPending}
-              >
+              <Button variant="secondary" onClick={() => void runImport(pendingImportFile, importKey)} disabled={!importKey}>
                 Restore
               </Button>
             </div>
           )}
-          {importMutation.isError && !importNeedsKey && (
-            <p className="mt-2 text-sm text-red-500">
-              {importMutation.error instanceof ApiError ? importMutation.error.message : "Could not restore this backup"}
-            </p>
-          )}
-          {importMutation.isSuccess && <p className="mt-2 text-sm text-green-600">Restored as a new workspace - check the workspace picker.</p>}
+
+          <ProgressPopup
+            open={downloadTransfer.open}
+            title="Downloading backup"
+            state={downloadTransfer.state}
+            onCancel={downloadTransfer.cancel}
+            onClose={downloadTransfer.close}
+            onRetry={() => void handleDownloadBackup()}
+          />
+          <ProgressPopup
+            open={restoreTransfer.open}
+            title="Restoring backup"
+            state={restoreTransfer.state}
+            onCancel={restoreTransfer.cancel}
+            onClose={restoreTransfer.close}
+            onRetry={lastImportAttempt ? () => void runImport(lastImportAttempt.file, lastImportAttempt.key) : undefined}
+          />
 
           <BackupSettings workspaceId={workspaceId!} />
         </section>

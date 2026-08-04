@@ -17,4 +17,4 @@ export function createDestinationClient(workspaceId: string, config: ResolvedDes
   }
 }
 
-export type { BackupDestinationClient, ResolvedDestinationConfig } from "./types.js";
+export type { BackupDestinationClient, ResolvedDestinationConfig, TransferProgress } from "./types.js";

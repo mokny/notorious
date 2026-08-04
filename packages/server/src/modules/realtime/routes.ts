@@ -14,7 +14,7 @@ import { getMemberRole } from "../workspaces/access.js";
  */
 export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void> {
   app.get("/ws", { websocket: true }, async (socket, request) => {
-    const { workspaceId } = request.query as { workspaceId?: string };
+    const { workspaceId, clientId } = request.query as { workspaceId?: string; clientId?: string };
     if (!workspaceId) {
       socket.close(4001, "Unauthorized");
       return;
@@ -27,7 +27,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
         socket.close(4003, "Forbidden");
         return;
       }
-      joinRoom(workspaceId, socket);
+      joinRoom(workspaceId, socket, null, clientId);
       return;
     }
 
@@ -40,7 +40,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
       // A single-object share only ever gets events for that object (see
       // `broadcast` in ./hub.ts) - it must not learn that other objects in
       // the workspace exist or changed, same boundary the REST API enforces.
-      joinRoom(workspaceId, socket, share.objectId);
+      joinRoom(workspaceId, socket, share.objectId, clientId);
       return;
     }
 

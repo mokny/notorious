@@ -1,5 +1,5 @@
 import path from "node:path";
-import { Readable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 import { Client, FileType } from "basic-ftp";
 import type { BackupDestinationClient, FtpDestinationConfig } from "./types.js";
 
@@ -53,6 +53,57 @@ export function createFtpDestinationClient(config: FtpDestinationConfig): Backup
       } catch (err) {
         throw new Error(`FTP list failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
+        client.close();
+      }
+    },
+    async listDetailed() {
+      const client = await connect();
+      try {
+        const entries = await client.list(config.remotePath);
+        return entries
+          .filter((entry) => entry.type === FileType.File)
+          .map((entry) => ({
+            filename: entry.name,
+            size: entry.size,
+            modifiedAt: entry.modifiedAt ? entry.modifiedAt.toISOString() : null,
+          }));
+      } catch (err) {
+        throw new Error(`FTP list failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        client.close();
+      }
+    },
+    async download(filename, onProgress) {
+      const client = await connect();
+      try {
+        const remotePath = path.posix.join(config.remotePath, filename);
+        let totalSize: number | null = null;
+        try {
+          totalSize = await client.size(remotePath);
+        } catch {
+          totalSize = null;
+        }
+
+        const chunks: Buffer[] = [];
+        const collector = new Writable({
+          write(chunk: Buffer, _encoding, callback) {
+            chunks.push(chunk);
+            callback();
+          },
+        });
+
+        if (onProgress) {
+          client.trackProgress((info) => {
+            onProgress({ bytes: info.bytes, percent: totalSize ? Math.min(100, (info.bytes / totalSize) * 100) : undefined });
+          });
+        }
+
+        await client.downloadTo(collector, remotePath);
+        return Buffer.concat(chunks);
+      } catch (err) {
+        throw new Error(`FTP download failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        client.trackProgress(undefined);
         client.close();
       }
     },

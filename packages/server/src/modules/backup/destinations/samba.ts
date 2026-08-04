@@ -10,8 +10,9 @@ interface SMB2Client {
   exists(path: string): Promise<boolean>;
   mkdir(path: string): Promise<void>;
   writeFile(path: string, data: string | Buffer): Promise<void>;
+  readFile(path: string): Promise<Buffer>;
   unlink(path: string): Promise<void>;
-  readdir(path: string, options: { stats: true }): Promise<{ name: string; isDirectory(): boolean }[]>;
+  readdir(path: string, options: { stats: true }): Promise<{ name: string; isDirectory(): boolean; mtime: Date }[]>;
   disconnect(): void;
 }
 const SMB2 = SMB2Ctor as unknown as new (options: { share: string; domain: string; username: string; password: string }) => SMB2Client;
@@ -73,6 +74,35 @@ export function createSambaDestinationClient(config: SambaDestinationConfig): Ba
         return entries.filter((entry) => !entry.isDirectory()).map((entry) => entry.name);
       } catch (err) {
         throw new Error(`SMB list failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        smb2.disconnect();
+      }
+    },
+    async listDetailed() {
+      const smb2 = connect();
+      try {
+        const entries = await smb2.readdir(config.remotePath, { stats: true });
+        // @marsaud/smb2's stat surface has no file-size field (see this
+        // file's SMB2Client interface) - size stays null here, unlike
+        // FTP/SFTP, so the file browser shows a date but no size for Samba.
+        return entries
+          .filter((entry) => !entry.isDirectory())
+          .map((entry) => ({ filename: entry.name, size: null, modifiedAt: entry.mtime.toISOString() }));
+      } catch (err) {
+        throw new Error(`SMB list failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        smb2.disconnect();
+      }
+    },
+    // No progress callback: @marsaud/smb2's readFile has no chunk-level hook
+    // (see this file's top comment and BackupDestinationClient.download's
+    // doc comment) - the caller shows an indeterminate spinner instead.
+    async download(filename) {
+      const smb2 = connect();
+      try {
+        return await smb2.readFile(joinRemote(config.remotePath, filename));
+      } catch (err) {
+        throw new Error(`SMB download failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         smb2.disconnect();
       }

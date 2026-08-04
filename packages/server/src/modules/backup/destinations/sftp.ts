@@ -2,6 +2,15 @@ import path from "node:path";
 import Client from "ssh2-sftp-client";
 import type { BackupDestinationClient, SftpDestinationConfig } from "./types.js";
 
+// ssh2-sftp-client's public types don't expose the raw SFTPWrapper it wraps
+// internally (`this.sftp`, set after `connect()`), but its own `get()`
+// implementation reads from it directly (src/index.js) - `createReadStream`
+// is the only way to observe transfer progress via `data` events, since the
+// high-level `get()`/`put()` don't accept a progress callback.
+interface RawSftpHandle {
+  sftp: { createReadStream(remotePath: string): NodeJS.ReadableStream };
+}
+
 /** Opens a fresh SFTP connection per call (never held open between operations) and enforces trust-on-first-use host key pinning. */
 export function createSftpDestinationClient(config: SftpDestinationConfig): BackupDestinationClient {
   let lastFingerprint: string | null = null;
@@ -62,6 +71,54 @@ export function createSftpDestinationClient(config: SftpDestinationConfig): Back
         return entries.filter((entry) => entry.type !== "d").map((entry) => entry.name);
       } catch (err) {
         throw new Error(`SFTP list failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        await sftp.end();
+      }
+    },
+    async listDetailed() {
+      const sftp = await connect();
+      try {
+        const entries = await sftp.list(config.remotePath);
+        return entries
+          .filter((entry) => entry.type !== "d")
+          .map((entry) => ({
+            filename: entry.name,
+            size: entry.size,
+            modifiedAt: new Date(entry.modifyTime).toISOString(),
+          }));
+      } catch (err) {
+        throw new Error(`SFTP list failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        await sftp.end();
+      }
+    },
+    async download(filename, onProgress) {
+      const sftp = await connect();
+      try {
+        const remotePath = path.posix.join(config.remotePath, filename);
+        let totalSize: number | null = null;
+        try {
+          const stat = await sftp.stat(remotePath);
+          totalSize = stat.size;
+        } catch {
+          totalSize = null;
+        }
+
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        const stream = (sftp as unknown as RawSftpHandle).sftp.createReadStream(remotePath);
+        await new Promise<void>((resolve, reject) => {
+          stream.on("data", (chunk: Buffer) => {
+            chunks.push(chunk);
+            bytes += chunk.length;
+            onProgress?.({ bytes, percent: totalSize ? Math.min(100, (bytes / totalSize) * 100) : undefined });
+          });
+          stream.on("end", resolve);
+          stream.on("error", reject);
+        });
+        return Buffer.concat(chunks);
+      } catch (err) {
+        throw new Error(`SFTP download failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         await sftp.end();
       }

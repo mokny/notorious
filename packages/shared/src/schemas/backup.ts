@@ -96,3 +96,10 @@ export interface BackupSchedule {
 export interface WorkspaceBackupKey {
   key: string;
 }
+
+/** One backup file currently stored at a destination - see modules/backup/destinations/*.ts's `listDetailed()`. `size`/`modifiedAt` are null where the destination type can't report them cheaply (e.g. Samba, see BackupProgressMessage's doc comment on why progress is best-effort there too). */
+export interface BackupDestinationFile {
+  filename: string;
+  size: number | null;
+  modifiedAt: string | null;
+}

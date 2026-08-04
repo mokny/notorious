@@ -279,6 +279,31 @@ export interface PresenceViewer {
 }
 
 /**
+ * Progress for one backup transfer (local download/upload, or a remote
+ * destination's download/restore) - shares the same per-workspace socket as
+ * `RealtimeEvent`/`PresenceSnapshotMessage`, distinguished by `type:
+ * "backupProgress"`. Unlike those two, this is sent to exactly one client
+ * (see `sendToClient` in modules/realtime/hub.ts) - a backup transfer is a
+ * private action by the user who triggered it, not something other
+ * workspace members should see. `jobId` is generated client-side and echoed
+ * back so a client can ignore stray messages for a job it isn't (or is no
+ * longer) tracking.
+ *
+ * `percent` is omitted whenever the transfer can't report byte-level
+ * progress - notably Samba destinations, whose client library exposes no
+ * progress callback or cheap pre-fetch size - in which case the UI shows an
+ * indeterminate spinner instead of a bar.
+ */
+export interface BackupProgressMessage {
+  type: "backupProgress";
+  jobId: string;
+  phase: "connecting" | "transferring" | "encrypting" | "decrypting" | "importing" | "done" | "error";
+  percent?: number;
+  message?: string;
+  error?: string;
+}
+
+/**
  * The complete current viewer list for one object, broadcast over the same
  * per-workspace WebSocket connection `RealtimeEvent`s use (see
  * `useRealtime.ts`) - distinguished from those by `type: "presence"`, a

@@ -8,10 +8,12 @@ import { and, eq } from "drizzle-orm";
 import type {
   Workspace,
   BackupDestination,
+  BackupDestinationFile,
   CreateBackupDestinationInput,
   UpdateBackupDestinationInput,
   BackupSchedule,
   BackupScheduleInput,
+  BackupProgressMessage,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import {
@@ -39,6 +41,7 @@ import { generateBackupKey, encryptBackup, decryptBackup, isEncryptedBackup } fr
 import { createDestinationClient, type BackupDestinationClient, type ResolvedDestinationConfig } from "./destinations/index.js";
 import { computeNextRunAt, currentWeekMonday } from "./scheduling.js";
 import { notifyUser } from "../push/service.js";
+import { sendToClient } from "../realtime/hub.js";
 
 const BACKUP_FORMAT_VERSION = 1;
 
@@ -446,6 +449,89 @@ async function applyRetention(client: BackupDestinationClient, retentionCount: n
   const excess = filenames.length - retentionCount;
   for (let i = 0; i < excess; i++) {
     await client.remove(filenames[i]!);
+  }
+}
+
+/** Sends one progress update for `jobId` to the client that started it, if still connected - see BackupProgressMessage's doc comment on why this is targeted, not broadcast. */
+function emitProgress(
+  workspaceId: string,
+  clientId: string,
+  jobId: string,
+  phase: BackupProgressMessage["phase"],
+  extra?: { percent?: number; message?: string; error?: string },
+): void {
+  sendToClient(workspaceId, clientId, { type: "backupProgress", jobId, phase, ...extra });
+}
+
+export async function listDestinationBackups(workspaceId: string, destinationId: string): Promise<BackupDestinationFile[]> {
+  const row = await getDestinationRow(workspaceId, destinationId);
+  const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
+  const files = await client.listDetailed();
+  return files.sort((a, b) => (b.modifiedAt ?? "").localeCompare(a.modifiedAt ?? ""));
+}
+
+/** Downloads one file from a destination, reporting progress to `clientId` under `jobId` (see emitProgress). Used by the destination file browser's "Download" button - the caller streams the returned buffer back to the browser. */
+export async function downloadDestinationBackup(
+  workspaceId: string,
+  destinationId: string,
+  filename: string,
+  clientId: string,
+  jobId: string,
+): Promise<Buffer> {
+  const row = await getDestinationRow(workspaceId, destinationId);
+  const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
+
+  emitProgress(workspaceId, clientId, jobId, "connecting");
+  try {
+    const buffer = await client.download(filename, (progress) => {
+      emitProgress(workspaceId, clientId, jobId, "transferring", { percent: progress.percent });
+    });
+    emitProgress(workspaceId, clientId, jobId, "done");
+    return buffer;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    emitProgress(workspaceId, clientId, jobId, "error", { error: message });
+    throw error;
+  }
+}
+
+/**
+ * Restores one backup file from a destination as a brand-new workspace,
+ * mirroring `importWorkspace` but sourcing the ZIP from the destination
+ * instead of an uploaded file - and, unlike a manually uploaded ZIP, the
+ * backup code is never asked of the user: a destination's backups always
+ * belong to *this* workspace, whose key the server already has (see
+ * getOrCreateWorkspaceKey).
+ */
+export async function restoreDestinationBackup(
+  workspaceId: string,
+  destinationId: string,
+  filename: string,
+  ownerId: string,
+  clientId: string,
+  jobId: string,
+): Promise<Workspace> {
+  const row = await getDestinationRow(workspaceId, destinationId);
+  const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
+
+  emitProgress(workspaceId, clientId, jobId, "connecting");
+  try {
+    const buffer = await client.download(filename, (progress) => {
+      emitProgress(workspaceId, clientId, jobId, "transferring", { percent: progress.percent });
+    });
+
+    emitProgress(workspaceId, clientId, jobId, "decrypting");
+    const key = await getOrCreateWorkspaceKey(workspaceId);
+
+    emitProgress(workspaceId, clientId, jobId, "importing");
+    const workspace = await importWorkspace(ownerId, buffer, key);
+
+    emitProgress(workspaceId, clientId, jobId, "done");
+    return workspace;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    emitProgress(workspaceId, clientId, jobId, "error", { error: message });
+    throw error;
   }
 }
 

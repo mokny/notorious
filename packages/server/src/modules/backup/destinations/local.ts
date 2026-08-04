@@ -22,6 +22,21 @@ export function createLocalDestinationClient(workspaceId: string, _config: Local
       await fsp.mkdir(dir, { recursive: true });
       return fsp.readdir(dir);
     },
+    async listDetailed() {
+      await fsp.mkdir(dir, { recursive: true });
+      const filenames = await fsp.readdir(dir);
+      return Promise.all(
+        filenames.map(async (filename) => {
+          const stat = await fsp.stat(path.join(dir, filename));
+          return { filename, size: stat.size, modifiedAt: stat.mtime.toISOString() };
+        }),
+      );
+    },
+    async download(filename, onProgress) {
+      const buffer = await fsp.readFile(path.join(dir, filename));
+      onProgress?.({ bytes: buffer.length, percent: 100 });
+      return buffer;
+    },
     async remove(filename) {
       await fsp.unlink(path.join(dir, filename));
     },
