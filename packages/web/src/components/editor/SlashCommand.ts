@@ -48,7 +48,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
  * three steps in to do the same thing.
  */
 export function buildSlashCommandItems(objectTypes: ObjectType[]): SlashCommandItem[] {
-  const perType: SlashCommandItem[] = sortObjectTypesForDisplay(objectTypes)
+  const perType: SlashCommandItem[] = sortObjectTypesForDisplay(objectTypes.filter((t) => t.blockInsertable))
     .map((objectType) => ({
       type: "sub_object",
       label: objectType.name,

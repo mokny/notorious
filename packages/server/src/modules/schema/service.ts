@@ -8,6 +8,7 @@ import type {
   PropertyConfig,
   PropertyType,
 } from "@notorious/shared";
+import { isSystemTypeBlockInsertable } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { objectTypes, properties } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -39,7 +40,7 @@ function toProperty(row: typeof properties.$inferSelect): Property {
 }
 
 export async function listObjectTypes(workspaceId: string): Promise<ObjectType[]> {
-  return db
+  const rows = await db
     .select({
       id: objectTypes.id,
       workspaceId: objectTypes.workspaceId,
@@ -50,6 +51,7 @@ export async function listObjectTypes(workspaceId: string): Promise<ObjectType[]
     })
     .from(objectTypes)
     .where(eq(objectTypes.workspaceId, workspaceId));
+  return rows.map((row) => ({ ...row, blockInsertable: row.isSystem ? isSystemTypeBlockInsertable(row.key) : true }));
 }
 
 export async function createObjectType(
@@ -75,7 +77,7 @@ export async function createObjectType(
   });
   await createSubObjectsProperty(workspaceId, id);
 
-  return { id, workspaceId, key: input.key, name: input.name, icon: input.icon, isSystem: false };
+  return { id, workspaceId, key: input.key, name: input.name, icon: input.icon, isSystem: false, blockInsertable: true };
 }
 
 export async function deleteObjectType(workspaceId: string, objectTypeId: string): Promise<void> {

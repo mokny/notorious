@@ -69,6 +69,8 @@ export interface ObjectType {
   name: string;
   icon: string;
   isSystem: boolean;
+  /** See `SystemObjectTypeDefinition.blockInsertable` - derived, not stored. */
+  blockInsertable: boolean;
 }
 
 export interface Property {

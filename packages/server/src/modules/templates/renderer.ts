@@ -11,6 +11,7 @@ import * as blockService from "../blocks/service.js";
 import { hasTemplateSyntax, TemplateSyntaxError } from "./lexer.js";
 import { parseTemplate, type TemplateNode, type Expr } from "./parser.js";
 import { execNodes, Scope, RenderBudget, TemplateRuntimeError } from "./interpreter.js";
+import { buildVariablesMap } from "../variables/service.js";
 
 /**
  * Whoever is actually viewing the page this render is for - a real member
@@ -339,6 +340,7 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   for (const slug of referencedSlugs) {
     objectsMap[slug] = await resolveObjectViewBySlug(object.workspaceId, slug, identity).catch(() => null);
   }
+  const variablesMap = await buildVariablesMap(object.workspaceId);
 
   const budget = new RenderBudget();
 
@@ -346,6 +348,7 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   const seedScope = new Scope();
   seedScope.set("object", objectView);
   seedScope.set("objects", objectsMap);
+  seedScope.set("variables", variablesMap);
   seedScope.set("blocks", seedBlocksMap);
   runRenderPass(orderedBlocks, parsedByBlock, seedScope, seedBlocksMap, budget, false);
 
@@ -353,6 +356,7 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   const rootScope = new Scope();
   rootScope.set("object", objectView);
   rootScope.set("objects", objectsMap);
+  rootScope.set("variables", variablesMap);
   rootScope.set("blocks", blocksMap);
   return runRenderPass(orderedBlocks, parsedByBlock, rootScope, blocksMap, budget, true);
 }

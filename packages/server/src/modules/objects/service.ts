@@ -20,6 +20,7 @@ import { applyFilters, compareForSort, MAX_SCAN } from "./query.js";
 import { reindexObjectBody, removeFromIndex } from "../search/indexer.js";
 import { listFilesForObject, deleteFile } from "../files/service.js";
 import { positionBetween } from "../../lib/position.js";
+import { assertVariableNameAvailable, isVariableObjectType, getVariableValue } from "../variables/service.js";
 
 function toRecord(row: typeof objects.$inferSelect, values: Record<string, unknown>): ObjectRecord {
   return {
@@ -113,6 +114,10 @@ export async function createObject(
   userId: string,
   input: CreateObjectInput,
 ): Promise<ObjectRecord> {
+  if (await isVariableObjectType(input.objectTypeId)) {
+    await assertVariableNameAvailable(workspaceId, input.title);
+  }
+
   const id = newId();
   const now = nowIso();
   const slug = await generateUniqueObjectSlug(workspaceId, input.title);
@@ -158,6 +163,13 @@ async function seedWhiteboardBlockIfNeeded(objectId: string, objectTypeId: strin
   });
 }
 
+/** Narrows an arbitrary computed value (a Variable's `list`/`json` value type can be any JSON shape) down to `PropertyValue` - non-primitive, non-string-array shapes are stringified so `ObjectRecord.values` stays honestly typed for every consumer. */
+function toPropertyValue(value: unknown): ObjectRecord["values"][string] {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) return value;
+  return JSON.stringify(value);
+}
+
 export async function getObjectWorkspaceId(objectId: string): Promise<string> {
   const rows = await db
     .select({ workspaceId: objects.workspaceId })
@@ -176,7 +188,19 @@ export async function getObject(objectId: string): Promise<ObjectRecord> {
 
   const props = await listProperties(row.objectTypeId);
   const values = await resolveValuesForObjects([objectId], props);
-  return toRecord(row, values.get(objectId) ?? {});
+  const resolved = values.get(objectId) ?? {};
+
+  // A Variable's actual value is never stored - it's computed from its
+  // `template` property (see modules/variables/service.ts). Surfaced here as
+  // two synthetic keys (rather than a change to the generic property/value
+  // system) so the object detail page can show it like any other value.
+  if (await isVariableObjectType(row.objectTypeId)) {
+    const { value, error } = await getVariableValue(objectId);
+    resolved.computedValue = toPropertyValue(value);
+    resolved.computedValueError = error;
+  }
+
+  return toRecord(row, resolved);
 }
 
 export async function updateObject(
@@ -186,6 +210,10 @@ export async function updateObject(
   const existing = await db.select().from(objects).where(eq(objects.id, objectId)).limit(1);
   const row = existing[0];
   if (!row) throw notFound("Object not found");
+
+  if (input.title !== undefined && (await isVariableObjectType(row.objectTypeId))) {
+    await assertVariableNameAvailable(row.workspaceId, input.title, objectId);
+  }
 
   const patch: Partial<typeof objects.$inferInsert> = { updatedAt: nowIso() };
   if (input.title !== undefined) patch.title = input.title;

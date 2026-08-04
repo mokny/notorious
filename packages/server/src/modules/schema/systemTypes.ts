@@ -159,12 +159,33 @@ function defaultPropertiesFor(
       ];
     case "file":
       return [{ key: "attachment", name: "Attachment", type: "file", config: { type: "file" } }];
+    case "variable":
+      return [
+        {
+          key: "valueType",
+          name: "Value Type",
+          type: "select",
+          config: {
+            type: "select",
+            options: [
+              option("Int", "#3b82f6"),
+              option("Float", "#8b5cf6"),
+              option("String", "#22c55e"),
+              option("Bool", "#f59e0b"),
+              option("Date", "#ec4899"),
+              option("List", "#06b6d4"),
+              option("JSON", "#64748b"),
+            ],
+          },
+        },
+        { key: "template", name: "Template", type: "text", config: { type: "text" } },
+      ];
     default:
       return [];
   }
 }
 
-/** Creates the 10 built-in object types (and their default properties) for a new workspace. */
+/** Creates the built-in object types (and their default properties) for a new workspace. */
 export async function seedSystemObjectTypes(workspaceId: string): Promise<void> {
   const createdAt = nowIso();
   const typeIdByKey: Record<string, string> = {};
@@ -204,6 +225,8 @@ export async function seedSystemObjectTypes(workspaceId: string): Promise<void> 
   }
 
   for (const type of SYSTEM_OBJECT_TYPES) {
+    // Variable is a leaf coding-only value, never a container for sub-objects.
+    if (type.key === "variable") continue;
     await createSubObjectsProperty(workspaceId, typeIdByKey[type.key]!);
   }
 }

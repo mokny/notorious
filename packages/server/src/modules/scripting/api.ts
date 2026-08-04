@@ -5,6 +5,8 @@ import type { ScriptObjectSnapshot, StagedWrites } from "./types.js";
 
 export interface BindObjectApiParams {
   snapshot: ScriptObjectSnapshot;
+  /** Every Variable object in the workspace, keyed by name - see modules/variables/service.ts's `buildVariablesMap`. Exposed as its own top-level `variables` global, not nested under `object`. */
+  variables: Record<string, unknown>;
   staged: StagedWrites;
   logLines: string[];
   isAutomated: boolean;
@@ -42,10 +44,12 @@ function validatePropertyValue(value: unknown): ScriptPropertyValue {
  *   never touch the DB. service.ts applies them after a successful run.
  */
 export function bindObjectApi(context: QuickJSContext, params: BindObjectApiParams): void {
-  const { snapshot, staged, logLines, isAutomated } = params;
+  const { snapshot, variables, staged, logLines, isAutomated } = params;
 
   const jsonLiteral = JSON.stringify(JSON.stringify(snapshot));
   runBootstrap(context, `globalThis.__snapshot = JSON.parse(${jsonLiteral});`);
+  const variablesLiteral = JSON.stringify(JSON.stringify(variables));
+  runBootstrap(context, `globalThis.variables = JSON.parse(${variablesLiteral});`);
 
   bindFunction(context, "__setProperty", (keyHandle, valueHandle) => {
     const key = context.getString(keyHandle);

@@ -440,6 +440,23 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                   <PropertyCell workspaceId={workspaceId} object={object} property={property} />
                 </div>
               ))}
+
+            {objectType?.key === "variable" && (
+              <div>
+                <label className="mb-1 block text-xs text-ink-muted">Computed Value</label>
+                {object.values.computedValueError ? (
+                  <p className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
+                    ⚠ {String(object.values.computedValueError)}
+                  </p>
+                ) : (
+                  <code className="block break-all rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink">
+                    {object.values.computedValue === null || object.values.computedValue === undefined
+                      ? "—"
+                      : String(object.values.computedValue)}
+                  </code>
+                )}
+              </div>
+            )}
           </div>
 
           {selectedBlockId && <BlockHistoryPanel objectId={object.id} blockId={selectedBlockId} />}

@@ -12,6 +12,7 @@ import { clearPause } from "./automation.js";
 import { executeScript, SCRIPT_LIMITS } from "./engine.js";
 import { bindObjectApi } from "./api.js";
 import { createEmptyStagedWrites, type ScriptObjectSnapshot, type ScriptRelatedObjectSnapshot } from "./types.js";
+import { buildVariablesMap } from "../variables/service.js";
 
 const MAX_RELATED_OBJECTS_TOTAL = 200;
 
@@ -97,11 +98,12 @@ export async function runScript(objectId: string, options: RunScriptOptions): Pr
 
   const startedAt = Date.now();
   const snapshot = await buildSnapshot(objectId);
+  const variables = await buildVariablesMap(object.workspaceId);
   const staged = createEmptyStagedWrites();
   const logLines: string[] = [];
 
   const outcome = executeScript(object.scriptSource, (context) =>
-    bindObjectApi(context, { snapshot, staged, logLines, isAutomated: options.isAutomated }),
+    bindObjectApi(context, { snapshot, variables, staged, logLines, isAutomated: options.isAutomated }),
   );
   const durationMs = Date.now() - startedAt;
   const ranAt = nowIso();

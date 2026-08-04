@@ -36,6 +36,7 @@ mid-script, and relation lookups are one level deep, resolved at the start of th
 | `object.log(...args)` | Appends to the run's log, shown in the result panel |
 | `object.now()` | Current time as an ISO timestamp - use this instead of `new Date()`, which has no real timezone data inside the sandbox |
 | `object.automation.isAutomated` | `true` when this run was triggered by the automation, `false` for a manual Run click |
+| `variables.<Name>` | The computed value of the workspace's `Variable` object named `<Name>` - read-only, coerced to its declared value type (int/float/string/bool/date/list/json). See "Variable objects" below |
 
 Writes are **staged, not applied immediately** - `setProperty`/`setBlockContent`/`appendBlock` only
 take effect if the script finishes without throwing. A script that errors or times out changes
@@ -112,6 +113,22 @@ const table = object.blocks.find((b) => b.type === "table");
 const lines = table.content.rows.map((row) => `  ${row[1]} : ${Number(row[0]) || 0}`);
 object.appendBlock("mermaid", { code: `pie title Breakdown\n${lines.join("\n")}` });
 ```
+
+## Variable objects
+
+`Variable` is a system object type meant purely for scripting/templates - it can't be inserted as a
+block in the editor (no "Existing Object" entry for it), but any object of any type can still link to
+one via a Relation property. A Variable has two properties:
+
+- **Value Type** - `int`, `float`, `string`, `bool`, `date`, `list`, or `json`.
+- **Template** - an expression in the same format used for [block templates](TEMPLATES.md)
+  (`{{ }}`/`{% %}`). Plain text with no template syntax is used as-is.
+
+The rendered template output is coerced to the declared Value Type on every read; a value that
+doesn't fit (e.g. Value Type `int` but the template renders `"abc"`) resolves to `null` with the
+error shown on the Variable's own object page. A Variable's title is its lookup name and must be
+unique per workspace. A Variable's own template can reference other Variables via `variables.<Name>`
+too - a circular reference (A references B, B references A) resolves to an error instead of hanging.
 
 ## Security model
 

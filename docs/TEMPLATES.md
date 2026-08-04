@@ -29,6 +29,7 @@ numbers, `-` and `_`, and must be unique (per object for blocks, per workspace f
 | `object` | The current object: `object.title`, `object.slug`, `object.type_key`, `object.archived`, `object.locked`, and `object.properties.<key>` for every property value (Formula/Rollup included, already computed) |
 | `blocks.<id>` | Another block in the *same* object, by its id - above **or below** the block doing the referencing - `.text` (its rendered text), plus for checklists `.items` (`[{text, checked}]`), `.checked_count`, `.total_count`, and for tables `.columns`/`.rows` |
 | `objects.<id>` | Another object *in this workspace*, by its id - same shape as `object` above, plus `objects.<id>.blocks.<blockId>` (same shape as `blocks.<id>` above) for one of *its* blocks. That object's blocks are exposed as raw (unrendered) text, not re-evaluated - see "How rendering works" below |
+| `variables.<Name>` | The computed value of a `Variable` object named `<Name>` (see [SCRIPTING.md](SCRIPTING.md#variable-objects)) - already coerced to its declared value type, or `null` if it failed to resolve |
 
 A `{% set %}` in one block is visible in every block *below* it in the same object (document
 order) - so the table-total example above works whether it's typed as a single block or (as shown

@@ -15,6 +15,7 @@ export const SYSTEM_OBJECT_TYPE_KEYS = [
   "database",
   "collection",
   "whiteboard",
+  "variable",
 ] as const;
 
 export type SystemObjectTypeKey = (typeof SYSTEM_OBJECT_TYPE_KEYS)[number];
@@ -23,21 +24,38 @@ export interface SystemObjectTypeDefinition {
   key: SystemObjectTypeKey;
   name: string;
   icon: string;
+  /**
+   * Whether this type can be inserted as a `sub_object` block (the
+   * slash-command "Existing Object" entry) inside another object's content.
+   * `false` only for `variable` - it's a coding-only value definition, not
+   * something meant to be embedded in a document. Everything else about a
+   * variable object (standalone creation, relations, list/table views)
+   * behaves like any other system type. Custom (workspace-defined) types
+   * have no such flag and are always block-insertable.
+   */
+  blockInsertable: boolean;
 }
 
 export const SYSTEM_OBJECT_TYPES: readonly SystemObjectTypeDefinition[] = [
-  { key: "note", name: "Note", icon: "file-text" },
-  { key: "project", name: "Project", icon: "folder-kanban" },
-  { key: "task", name: "Task", icon: "check-square" },
-  { key: "person", name: "Person", icon: "user" },
-  { key: "book", name: "Book", icon: "book" },
-  { key: "meeting", name: "Meeting", icon: "calendar" },
-  { key: "company", name: "Company", icon: "building" },
-  { key: "file", name: "File", icon: "paperclip" },
-  { key: "database", name: "Database", icon: "table" },
-  { key: "collection", name: "Collection", icon: "layers" },
-  { key: "whiteboard", name: "Whiteboard", icon: "whiteboard" },
+  { key: "note", name: "Note", icon: "file-text", blockInsertable: true },
+  { key: "project", name: "Project", icon: "folder-kanban", blockInsertable: true },
+  { key: "task", name: "Task", icon: "check-square", blockInsertable: true },
+  { key: "person", name: "Person", icon: "user", blockInsertable: true },
+  { key: "book", name: "Book", icon: "book", blockInsertable: true },
+  { key: "meeting", name: "Meeting", icon: "calendar", blockInsertable: true },
+  { key: "company", name: "Company", icon: "building", blockInsertable: true },
+  { key: "file", name: "File", icon: "paperclip", blockInsertable: true },
+  { key: "database", name: "Database", icon: "table", blockInsertable: true },
+  { key: "collection", name: "Collection", icon: "layers", blockInsertable: true },
+  { key: "whiteboard", name: "Whiteboard", icon: "whiteboard", blockInsertable: true },
+  { key: "variable", name: "Variable", icon: "braces", blockInsertable: false },
 ];
+
+/** Looks up whether a *system* type key is block-insertable; custom (non-system) types always are. */
+export function isSystemTypeBlockInsertable(key: string): boolean {
+  const definition = SYSTEM_OBJECT_TYPES.find((type) => type.key === key);
+  return definition ? definition.blockInsertable : true;
+}
 
 /**
  * Display order for object-type pickers (browse-objects menu, sub-object
