@@ -74,7 +74,7 @@ export function TableGridControls({ editor, container }: { editor: Editor; conta
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0">
+    <div className="pointer-events-none absolute inset-0" onMouseDown={(e) => e.preventDefault()}>
       {geometry.colBoundaries.map((x, i) => (
         <button
           key={`col-${i}`}

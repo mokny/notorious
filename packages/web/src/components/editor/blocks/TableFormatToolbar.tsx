@@ -64,7 +64,10 @@ function ColorSwatchPicker({ icon, title, onPick }: { icon: string; title: strin
  */
 export function TableFormatToolbar({ editor }: { editor: Editor }) {
   return (
-    <div className="mb-1 flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface-raised p-1">
+    <div
+      className="mb-1 flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface-raised p-1"
+      onMouseDown={(e) => e.preventDefault()}
+    >
       <button type="button" className={`${BUTTON} ${activeClass(editor.isActive("bold"))}`} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
         <Icon name="bold" className="h-3.5 w-3.5" />
       </button>

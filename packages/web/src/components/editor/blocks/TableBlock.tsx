@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Table from "@tiptap/extension-table";
@@ -10,6 +10,7 @@ import type { TableContent, TableDoc } from "@notorious/shared";
 import { buildRenderedTableDoc, createEmptyTableDoc } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
+import { Icon } from "../../ui/Icon.js";
 import { TableCell, TableHeader } from "./tableExtensions.js";
 import { TableFormatToolbar } from "./TableFormatToolbar.js";
 import { TableGridControls } from "./TableGridControls.js";
@@ -102,28 +103,50 @@ export function TableBlock({
   const renderedFields = renderedBlocks?.[blockId];
   const hasTemplatedCells = Boolean(renderedFields && Object.keys(renderedFields).length > 0);
   const [editing, setEditing] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const showRendered = hasTemplatedCells && (readOnly || !editing);
 
+  let table: ReactNode;
   if (showRendered) {
     const renderedDoc = buildRenderedTableDoc(doc, renderedFields ?? {});
-    return (
+    table = (
       <div className={readOnly ? undefined : "cursor-text"} onClick={() => !readOnly && setEditing(true)}>
         <ReadOnlyTable key="rendered" doc={renderedDoc} />
       </div>
     );
+  } else if (readOnly) {
+    table = <ReadOnlyTable key="readonly" doc={doc} />;
+  } else {
+    table = (
+      <EditableTable
+        key="edit"
+        doc={doc}
+        editable
+        onChange={(nextDoc) => save({ ...content, doc: nextDoc })}
+        onFlush={flushSave}
+        onFocus={() => setEditing(true)}
+        onBlur={() => setEditing(false)}
+      />
+    );
   }
 
-  if (readOnly) return <ReadOnlyTable key="readonly" doc={doc} />;
-
   return (
-    <EditableTable
-      key="edit"
-      doc={doc}
-      editable
-      onChange={(nextDoc) => save({ ...content, doc: nextDoc })}
-      onFlush={flushSave}
-      onFocus={() => setEditing(true)}
-      onBlur={() => setEditing(false)}
-    />
+    <div
+      className={`group relative ${isFullscreen ? "fixed inset-0 z-[60] overflow-auto bg-surface p-4" : ""}`}
+    >
+      <button
+        type="button"
+        onClick={() => setIsFullscreen((v) => !v)}
+        title={isFullscreen ? "Exit fullscreen" : "Fill the browser window"}
+        // A view preference, not shared content - stays usable even while the
+        // object is locked or viewed by an anonymous share visitor (see
+        // readOnlyContent.ts / globals.css's `.locked-content` rule).
+        data-view-toggle
+        className="absolute right-1 top-1 z-10 rounded p-1.5 text-ink-muted opacity-0 transition-opacity hover:bg-surface-raised hover:text-ink group-hover:opacity-100"
+      >
+        <Icon name={isFullscreen ? "minimize" : "maximize"} className="h-3.5 w-3.5" />
+      </button>
+      {table}
+    </div>
   );
 }
