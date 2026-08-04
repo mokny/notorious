@@ -1,5 +1,6 @@
 import { Extension } from "@tiptap/core";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
+import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { TemplateAutocompleteSchemaResponse } from "@notorious/shared";
@@ -216,6 +217,7 @@ export const TemplateSuggestion = Extension.create<TemplateSuggestionExtensionOp
     return [
       Suggestion({
         editor: this.editor,
+        pluginKey: new PluginKey("templateSuggestion"),
         ...buildSuggestion(this.options.workspaceIdRef, this.options.schemaRef),
       }),
     ];

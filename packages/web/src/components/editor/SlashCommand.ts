@@ -1,5 +1,6 @@
 import { Extension } from "@tiptap/core";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
+import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
 import { sortObjectTypesForDisplay, type BlockType, type ObjectType } from "@notorious/shared";
 
@@ -177,6 +178,7 @@ export const SlashCommand = Extension.create<SlashCommandExtensionOptions>({
     return [
       Suggestion({
         editor: this.editor,
+        pluginKey: new PluginKey("slashCommand"),
         ...buildSuggestion(this.options.onSelect, this.options.objectTypesRef),
       }),
     ];
