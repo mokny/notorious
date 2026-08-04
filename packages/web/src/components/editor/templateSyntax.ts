@@ -91,6 +91,38 @@ export function regionAt(regions: TemplateRegion[], pos: number): TemplateRegion
   return regions.find((r) => pos > r.innerStart && pos <= r.innerEnd);
 }
 
+/**
+ * Companion to `regionAt`, for the region (if any) still being typed at
+ * `pos` whose closer doesn't exist yet - unlike `findTemplateRegions`, which
+ * deliberately drops unterminated openers (see its own comment), autocomplete
+ * has to work *before* the closing `}}`/`%}`/`#}` is typed, which is the
+ * common case while actively writing an expression. Only ever consulted as a
+ * fallback after `regionAt` finds nothing, so an already-closed region
+ * earlier in the text (with a later, unrelated `{{` still open) doesn't get
+ * shadowed by this. `pos` may equal the opener's `innerStart` (nothing typed
+ * inside yet), unlike `regionAt`'s strict `>`.
+ */
+export function findOpenRegionAt(text: string, pos: number): TemplateRegion | undefined {
+  let best: TemplateRegion | undefined;
+  for (const opener of OPENERS) {
+    const openIndex = text.lastIndexOf(opener.open, pos - opener.open.length);
+    if (openIndex === -1) continue;
+    const innerStart = openIndex + opener.open.length;
+    const closeIndex = text.indexOf(opener.close, innerStart);
+    // Already closed before `pos` - whatever's at `pos` isn't inside this opener.
+    if (closeIndex !== -1 && closeIndex < pos) continue;
+    const candidate: TemplateRegion = {
+      start: openIndex,
+      end: closeIndex === -1 ? text.length : closeIndex + opener.close.length,
+      innerStart,
+      innerEnd: closeIndex === -1 ? text.length : closeIndex,
+      kind: opener.kind,
+    };
+    if (!best || candidate.start > best.start) best = candidate;
+  }
+  return best;
+}
+
 export type ExprTokenClass = "keyword" | "identifier" | "string" | "number" | "filter" | "operator";
 
 export interface ExprToken {

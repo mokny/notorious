@@ -5,7 +5,7 @@ import tippy, { type Instance as TippyInstance } from "tippy.js";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { TemplateAutocompleteSchemaResponse } from "@notorious/shared";
 import { searchApi } from "../../lib/api/resources.js";
-import { findTemplateRegions, regionAt, flattenDocText, TEMPLATE_FILTERS } from "./templateSyntax.js";
+import { findTemplateRegions, regionAt, findOpenRegionAt, flattenDocText, TEMPLATE_FILTERS } from "./templateSyntax.js";
 
 interface SuggestionItem {
   label: string;
@@ -46,7 +46,7 @@ const NAMESPACE_RE = /(?:^|[^a-zA-Z0-9_.])([a-zA-Z0-9_]*)$/;
 function detectTriggerContext(doc: ProseMirrorNode, pos: number): TriggerContext | null {
   const { text, toStringIndex } = flattenDocText(doc);
   const stringIndex = toStringIndex(pos);
-  const region = regionAt(findTemplateRegions(text), stringIndex);
+  const region = regionAt(findTemplateRegions(text), stringIndex) ?? findOpenRegionAt(text, stringIndex);
   if (!region) return null;
 
   const before = text.slice(region.innerStart, stringIndex);
