@@ -4,7 +4,7 @@ import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireAccess, resolveActor } from "../workspaces/access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import { authenticateApiKey } from "../apiKeys/service.js";
-import { unauthorized } from "../../lib/httpError.js";
+import { unauthorized, badRequest } from "../../lib/httpError.js";
 import * as shareTargetService from "./service.js";
 import type { IncomingSharedFile } from "./service.js";
 
@@ -98,6 +98,16 @@ export async function registerShareTargetRoutes(app: FastifyInstance): Promise<v
             mimeType: request.headers["content-type"] || "application/octet-stream",
             buffer,
           });
+        }
+
+        // Surfaced straight back into the Shortcuts app's own error alert (it shows the failed
+        // request's response body), since there's no other way to see what actually arrived here
+        // without shell access to the prod server's logs.
+        if (files.length === 0 && !url && !text) {
+          throw badRequest(
+            `No file body received (content-length: ${request.headers["content-length"] ?? "none"}, ` +
+              `content-type: ${request.headers["content-type"] ?? "none"}, buffer bytes: ${buffer?.length ?? 0})`,
+          );
         }
 
         const parsedFields = shareIntakeFieldsSchema.parse({ title, text, url });
