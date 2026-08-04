@@ -59,6 +59,16 @@ import {
   ZoomIn,
   ZoomOut,
   Scan,
+  Bold,
+  Italic,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Combine,
+  SplitSquareHorizontal,
+  PaintBucket,
+  Rows,
+  Columns,
   type LucideIcon,
 } from "lucide-react";
 
@@ -121,6 +131,16 @@ const ICONS: Record<string, LucideIcon> = {
   "zoom-in": ZoomIn,
   "zoom-out": ZoomOut,
   scan: Scan,
+  bold: Bold,
+  italic: Italic,
+  "align-left": AlignLeft,
+  "align-center": AlignCenter,
+  "align-right": AlignRight,
+  merge: Combine,
+  split: SplitSquareHorizontal,
+  "paint-bucket": PaintBucket,
+  "insert-row": Rows,
+  "insert-column": Columns,
 };
 
 function isImageUrl(value: string): boolean {

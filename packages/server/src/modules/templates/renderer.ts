@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
-import type { Block, ObjectRecord } from "@notorious/shared";
+import type { Block, ObjectRecord, TableDoc } from "@notorious/shared";
+import { tableCellField, tableDocToTextGrid } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { objects, objectTypes } from "../../db/schema.js";
 import { forbidden } from "../../lib/httpError.js";
@@ -44,12 +45,8 @@ function getTemplatableFields(block: Block): FieldSource[] {
       return items.map((item, i) => ({ field: `items.${i}`, text: typeof item.markdown === "string" ? item.markdown : "" }));
     }
     case "table": {
-      const fields: FieldSource[] = [];
-      const columns = Array.isArray(content.columns) ? (content.columns as unknown[]) : [];
-      columns.forEach((col, i) => fields.push({ field: `columns.${i}`, text: typeof col === "string" ? col : "" }));
-      const rows = Array.isArray(content.rows) ? (content.rows as unknown[][]) : [];
-      rows.forEach((row, r) => row.forEach((cell, c) => fields.push({ field: `rows.${r}.${c}`, text: typeof cell === "string" ? cell : "" })));
-      return fields;
+      const grid = tableDocToTextGrid(content.doc as TableDoc | undefined);
+      return grid.flatMap((row, r) => row.map((cell, c) => ({ field: tableCellField(r, c), text: cell ?? "" })));
     }
     default:
       return [];
@@ -86,11 +83,19 @@ function buildBlockView(block: Block, renderedFields: Record<string, string>): R
       };
     }
     case "table": {
-      const content = block.content as { columns?: unknown[]; rows?: unknown[][] };
-      const columnCount = content.columns?.length ?? 0;
-      const rowCount = content.rows?.length ?? 0;
-      const columns = Array.from({ length: columnCount }, (_, i) => renderedFields[`columns.${i}`] ?? "");
-      const rows = Array.from({ length: rowCount }, (_, r) => Array.from({ length: columnCount }, (_, c) => renderedFields[`rows.${r}.${c}`] ?? ""));
+      const content = block.content as { doc?: TableDoc };
+      // Dimensions come from the live doc (renderedFields only has entries
+      // for cells whose source actually contained template syntax) - `.rows`
+      // for templates keeps excluding the header row, matching the
+      // pre-rewrite `{ columns, rows }` shape templates were written against
+      // (see docs/TEMPLATES.md).
+      const shape = tableDocToTextGrid(content.doc);
+      const columnCount = shape[0]?.length ?? 0;
+      const rowCount = Math.max(shape.length - 1, 0);
+      const columns = Array.from({ length: columnCount }, (_, i) => renderedFields[tableCellField(0, i)] ?? shape[0]?.[i] ?? "");
+      const rows = Array.from({ length: rowCount }, (_, r) =>
+        Array.from({ length: columnCount }, (_, c) => renderedFields[tableCellField(r + 1, c)] ?? shape[r + 1]?.[c] ?? ""),
+      );
       return { ...base, text: "", columns, rows };
     }
     default:

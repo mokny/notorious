@@ -1,71 +1,89 @@
-import { useRef } from "react";
-import type { TableContent } from "@notorious/shared";
+import { useMemo, useState } from "react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TextStyle from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import TextAlign from "@tiptap/extension-text-align";
+import type { TableContent, TableDoc } from "@notorious/shared";
+import { buildRenderedTableDoc, createEmptyTableDoc } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
-import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
-import { useTemplatableField } from "../useTemplatableField.js";
+import { TableCell, TableHeader } from "./tableExtensions.js";
+import { TableFormatToolbar } from "./TableFormatToolbar.js";
+import { TableGridControls } from "./TableGridControls.js";
 
-/** One column header or cell - see ChecklistBlock.tsx's identical rendered/editing split for why this isn't just an `<input>`. */
-function TableCellInput({
-  blockId,
-  field,
-  value,
+function buildExtensions() {
+  return [
+    StarterKit.configure({
+      heading: false,
+      bulletList: false,
+      orderedList: false,
+      listItem: false,
+      blockquote: false,
+      codeBlock: false,
+      horizontalRule: false,
+    }),
+    TextStyle,
+    Color,
+    TextAlign.configure({ types: ["paragraph"] }),
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
+  ];
+}
+
+/** One TipTap editor instance over the whole table doc (see blockContent.ts's TableContent) - editable live view, debounced-saved like every other block. */
+function EditableTable({
+  doc,
+  editable,
   onChange,
   onFlush,
-  readOnly,
-  className,
+  onFocus,
+  onBlur,
 }: {
-  blockId: string;
-  field: string;
-  value: string;
-  onChange: (value: string) => void;
-  /** Saves a pending edit right away on blur instead of waiting out the rest of useDebouncedSave's window - see RichTextEditor.tsx's identical onBlur flush. */
+  doc: TableDoc;
+  editable: boolean;
+  onChange: (doc: TableDoc) => void;
   onFlush: () => void;
-  readOnly: boolean;
-  className: string;
+  onFocus: () => void;
+  onBlur: () => void;
 }) {
-  const { rendered, showRendered, startEditing, stopEditing } = useTemplatableField(blockId, field);
-  const focusOnEditRef = useRef(false);
+  const extensions = useMemo(buildExtensions, []);
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
 
-  if (showRendered) {
-    return (
-      <div
-        onClick={() => {
-          focusOnEditRef.current = true;
-          startEditing();
-        }}
-        className={`${className} ${readOnly ? "" : "cursor-text"}`}
-      >
-        {rendered || " "}
-      </div>
-    );
-  }
+  const tiptapEditor = useEditor({
+    extensions,
+    content: doc as unknown as Record<string, unknown>,
+    editable,
+    onUpdate: ({ editor: updated }) => onChange(updated.getJSON() as TableDoc),
+    onFocus: () => onFocus(),
+    onBlur: () => {
+      onFlush();
+      onBlur();
+    },
+    onCreate: ({ editor: created }) => setEditor(created),
+  });
 
   return (
-    <input
-      ref={(el) => {
-        if (el && focusOnEditRef.current) {
-          el.focus();
-          focusOnEditRef.current = false;
-        }
-      }}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      // Same reasoning as ChecklistBlock.tsx's identical onFocus - without
-      // it, a cell that's never been opened via clicking a rendered value
-      // (e.g. one freshly typed into for the first time) could have its
-      // rendered value arrive mid-typing and yank focus out from under the
-      // cursor.
-      onFocus={startEditing}
-      onBlur={() => {
-        onFlush();
-        stopEditing();
-      }}
-      readOnly={readOnly}
-      autoComplete="off"
-      className={className}
-    />
+    <div className="group relative overflow-x-auto rounded-lg border border-border p-1 pl-4 pt-4">
+      {editor && !editor.isDestroyed && editable && <TableFormatToolbar editor={editor} />}
+      <div ref={setContainerEl} className="relative">
+        <EditorContent editor={tiptapEditor} className="notorious-table-editor" />
+        {editor && !editor.isDestroyed && editable && containerEl && <TableGridControls editor={editor} container={containerEl} />}
+      </div>
+    </div>
   );
+}
+
+/** Read-only rendering of a doc (e.g. the templated/rendered variant while unfocused, or any table when the object/share is read-only) - no toolbar, no grid controls, click-to-edit handled by the parent. */
+function ReadOnlyTable({ doc }: { doc: TableDoc }) {
+  const extensions = useMemo(buildExtensions, []);
+  const editor = useEditor({ extensions, content: doc as unknown as Record<string, unknown>, editable: false });
+  return <EditorContent editor={editor} className="notorious-table-editor overflow-x-auto rounded-lg border border-border p-1" />;
 }
 
 export function TableBlock({
@@ -77,87 +95,35 @@ export function TableBlock({
   content: TableContent;
   onSave: (c: TableContent) => Promise<void>;
 }) {
-  const { readOnly } = useBlockEditor();
+  const { readOnly, renderedBlocks } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
-  const columns = content.columns?.length ? content.columns : ["Column 1", "Column 2"];
-  const rows = content.rows ?? [];
+  const doc = content?.doc ?? createEmptyTableDoc();
 
-  function setColumn(index: number, value: string) {
-    save({ ...content, columns: columns.map((c, i) => (i === index ? value : c)), rows });
+  const renderedFields = renderedBlocks?.[blockId];
+  const hasTemplatedCells = Boolean(renderedFields && Object.keys(renderedFields).length > 0);
+  const [editing, setEditing] = useState(false);
+  const showRendered = hasTemplatedCells && (readOnly || !editing);
+
+  if (showRendered) {
+    const renderedDoc = buildRenderedTableDoc(doc, renderedFields ?? {});
+    return (
+      <div className={readOnly ? undefined : "cursor-text"} onClick={() => !readOnly && setEditing(true)}>
+        <ReadOnlyTable key="rendered" doc={renderedDoc} />
+      </div>
+    );
   }
 
-  function setCell(rowIndex: number, colIndex: number, value: string) {
-    // `.map()` over a row can only ever touch indices the row already has -
-    // rows shorter than the column count (e.g. a freshly created table's
-    // default `[]` row) would silently drop edits to any cell past their
-    // current length. Pad to the full column count first so every cell index
-    // always exists to write into.
-    const nextRows = rows.map((row, r) => {
-      if (r !== rowIndex) return row;
-      const paddedRow = columns.map((_, c) => row[c] ?? "");
-      paddedRow[colIndex] = value;
-      return paddedRow;
-    });
-    save({ ...content, columns, rows: nextRows });
-  }
-
-  function addColumn() {
-    save({ ...content, columns: [...columns, `Column ${columns.length + 1}`], rows: rows.map((row) => [...row, ""]) });
-  }
-
-  function addRow() {
-    save({ ...content, columns, rows: [...rows, columns.map(() => "")] });
-  }
+  if (readOnly) return <ReadOnlyTable key="readonly" doc={doc} />;
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            {columns.map((column, index) => (
-              <th key={index} className="border-b border-border bg-surface-raised p-1.5 text-left">
-                <TableCellInput
-                  blockId={blockId}
-                  field={`columns.${index}`}
-                  value={column}
-                  onChange={(value) => setColumn(index, value)}
-                  onFlush={flushSave}
-                  readOnly={readOnly}
-                  className="w-full border-none bg-transparent font-medium outline-none"
-                />
-              </th>
-            ))}
-            <th className="w-8 border-b border-border bg-surface-raised">
-              <button onClick={addColumn} className="p-1 text-ink-muted hover:text-accent">
-                <Icon name="plus" className="h-3.5 w-3.5" />
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {columns.map((_, colIndex) => (
-                <td key={colIndex} className="border-b border-border p-1.5">
-                  <TableCellInput
-                    blockId={blockId}
-                    field={`rows.${rowIndex}.${colIndex}`}
-                    value={row[colIndex] ?? ""}
-                    onChange={(value) => setCell(rowIndex, colIndex, value)}
-                    onFlush={flushSave}
-                    readOnly={readOnly}
-                    className="w-full border-none bg-transparent outline-none"
-                  />
-                </td>
-              ))}
-              <td className="border-b border-border" />
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <button onClick={addRow} className="flex w-full items-center gap-1 p-1.5 text-xs text-ink-muted hover:text-accent">
-        <Icon name="plus" className="h-3 w-3" /> Add row
-      </button>
-    </div>
+    <EditableTable
+      key="edit"
+      doc={doc}
+      editable
+      onChange={(nextDoc) => save({ ...content, doc: nextDoc })}
+      onFlush={flushSave}
+      onFocus={() => setEditing(true)}
+      onBlur={() => setEditing(false)}
+    />
   );
 }

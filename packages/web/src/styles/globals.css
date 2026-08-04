@@ -148,3 +148,40 @@ input[type="checkbox"] {
     opacity: 1 !important;
   }
 }
+
+/* TipTap table block (TableBlock.tsx) - the app's other block types render a
+   single inline paragraph, so this is the only place ProseMirror's own
+   table/tableRow/tableCell/tableHeader node CSS is needed. Cell background
+   color is applied inline per cell (see tableExtensions.ts), not here. */
+.notorious-table-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+.notorious-table-editor td,
+.notorious-table-editor th {
+  border: 1px solid rgb(var(--border));
+  padding: 0.375rem 0.5rem;
+  vertical-align: top;
+  position: relative;
+}
+.notorious-table-editor th {
+  background: rgb(var(--surface-raised));
+  font-weight: 600;
+  text-align: left;
+}
+.notorious-table-editor td > p,
+.notorious-table-editor th > p {
+  margin: 0;
+}
+/* ProseMirror's own selection overlay for a multi-cell drag-select (the
+   selection mergeCells/deleteRow/... act on) - without this the browser's
+   native text selection is the only visible feedback, which doesn't cover
+   an empty cell. */
+.notorious-table-editor .selectedCell:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--accent) / 0.15);
+  pointer-events: none;
+}

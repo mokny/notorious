@@ -4,7 +4,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, ty
 import { arrayMove } from "@dnd-kit/sortable";
 import { generateKeyBetween } from "fractional-indexing";
 import type { Block, BlockType } from "@notorious/shared";
-import { blockContentForFile } from "@notorious/shared";
+import { blockContentForFile, createEmptyTableDoc } from "@notorious/shared";
 import { blockApi, fileApi, schemaApi } from "../../lib/api/resources.js";
 import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
@@ -303,7 +303,7 @@ export function BlockEditor({
       case "checklist":
         return { items: [] };
       case "table":
-        return { columns: ["Column 1", "Column 2"], rows: [["", ""]] };
+        return { doc: createEmptyTableDoc() };
       case "code":
         return { code: "", language: "text" };
       case "callout":

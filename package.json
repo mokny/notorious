@@ -1,7 +1,7 @@
 {
   "name": "notorious",
   "private": true,
-  "version": "0.0.115",
+  "version": "0.0.116",
   "type": "module",
   "description": "Self-hosted, multi-user notes and knowledge base application",
   "workspaces": [
@@ -24,6 +24,7 @@
     "disable-registration": "npm run set-registration:prod --workspace=packages/server -- --disable",
     "enable-2fa-requirement": "npm run set-require-2fa:prod --workspace=packages/server -- --enable",
     "disable-2fa-requirement": "npm run set-require-2fa:prod --workspace=packages/server -- --disable",
+    "migrate-table-blocks": "npm run migrate-table-blocks:prod --workspace=packages/server",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",

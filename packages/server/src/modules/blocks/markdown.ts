@@ -4,7 +4,8 @@ import remarkGfm from "remark-gfm";
 import remarkStringify from "remark-stringify";
 import { toString as mdastToString } from "mdast-util-to-string";
 import type { Root, RootContent, TableRow } from "mdast";
-import type { Block } from "@notorious/shared";
+import type { Block, TableDoc } from "@notorious/shared";
+import { gridToTableDoc, tableDocToTextGrid } from "@notorious/shared";
 import type { BlockTreeNode } from "./service.js";
 
 const inlineProcessor = unified().use(remarkStringify);
@@ -71,7 +72,7 @@ function nodeToBlocks(node: RootContent): BlockTreeNode[] {
       const [header, ...body] = node.children as TableRow[];
       const columns = (header?.children ?? []).map((cell) => mdastToString(cell));
       const rows = body.map((row) => row.children.map((cell) => mdastToString(cell)));
-      return [{ type: "table", content: { columns, rows } }];
+      return [{ type: "table", content: { doc: gridToTableDoc(columns, rows) } }];
     }
 
     default:
@@ -122,8 +123,8 @@ function renderBlock(block: Block, byParent: Map<string | null, Block[]>): strin
       return items.map((item) => `- [${item.checked ? "x" : " "}] ${item.markdown}`).join("\n");
     }
     case "table": {
-      const columns = (content.columns as string[]) ?? [];
-      const rows = (content.rows as string[][]) ?? [];
+      const grid = tableDocToTextGrid(content.doc as TableDoc | undefined);
+      const [columns = [], ...rows] = grid;
       const header = `| ${columns.join(" | ")} |`;
       const divider = `| ${columns.map(() => "---").join(" | ")} |`;
       const body = rows.map((row) => `| ${row.join(" | ")} |`).join("\n");

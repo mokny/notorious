@@ -4,9 +4,11 @@ export * from "./constants/blockTypes.js";
 export * from "./constants/viewTypes.js";
 export * from "./constants/roles.js";
 export * from "./constants/animalNames.js";
+export * from "./constants/tableColors.js";
 
 export * from "./types/entities.js";
 export * from "./types/blockContent.js";
+export * from "./utils/tableDoc.js";
 
 export * from "./schemas/auth.js";
 export * from "./schemas/workspace.js";

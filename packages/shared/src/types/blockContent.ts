@@ -1,3 +1,5 @@
+import type { TableDoc } from "../utils/tableDoc.js";
+
 /**
  * Per-block-type content payloads stored in `blocks.content` (as JSON) and
  * consumed directly by the block editor UI. Rich text fields are stored as
@@ -36,9 +38,16 @@ export interface ChecklistItem {
 export interface ChecklistContent {
   items: ChecklistItem[];
 }
+/**
+ * Unlike other rich-text block content, a table's content is a TipTap/
+ * ProseMirror JSON document (see utils/tableDoc.ts) rather than a Markdown
+ * string - cell background color, alignment, and merged cells (colspan/
+ * rowspan) have no Markdown representation. Tables saved before this shape
+ * (`{ columns: string[], rows: string[][] }`) are migrated by
+ * `scripts/migrateTableBlocks.ts`.
+ */
 export interface TableContent {
-  columns: string[];
-  rows: string[][];
+  doc: TableDoc;
 }
 export interface CodeContent {
   code: string;

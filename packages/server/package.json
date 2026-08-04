@@ -18,6 +18,8 @@
     "set-registration:prod": "node dist/scripts/setRegistration.js",
     "set-require-2fa": "tsx src/scripts/setRequire2fa.ts",
     "set-require-2fa:prod": "node dist/scripts/setRequire2fa.js",
+    "migrate-table-blocks": "tsx src/scripts/migrateTableBlocks.ts",
+    "migrate-table-blocks:prod": "node dist/scripts/migrateTableBlocks.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test src/**/*.test.ts"
   },
