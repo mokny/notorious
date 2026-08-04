@@ -29,7 +29,9 @@ function buildExtensions() {
     TextStyle,
     Color,
     TextAlign.configure({ types: ["paragraph"] }),
-    Table.configure({ resizable: false }),
+    // cellMinWidth must match the `min-width` fallback for unresized columns
+    // in globals.css's `.notorious-table-editor td/th` rule.
+    Table.configure({ resizable: true, cellMinWidth: 60 }),
     TableRow,
     TableHeader,
     TableCell,
