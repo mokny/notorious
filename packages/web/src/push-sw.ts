@@ -46,7 +46,16 @@ precacheAndRoute(self.__WB_MANIFEST.filter((entry) => !urlOf(entry).endsWith(".h
 // unreachable within 3s) - the same "prefer freshness over a stale cache"
 // policy this service worker already applies to object/API data (see
 // vite.config.ts's own comment on that), now applied to the app shell too.
-registerRoute(new NavigationRoute(new NetworkFirst({ cacheName: "pages", networkTimeoutSeconds: 3 })));
+//
+// denylist excludes downloadable static files from this catch-all: iOS Safari treats a `download`
+// anchor click as a normal top-level navigation rather than a same-page fetch, so without this the
+// browser navigates to e.g. /notorious.shortcut and NavigationRoute hands back the cached app shell
+// (index.html) instead of the actual file - a silent "download" of the wrong content.
+registerRoute(
+  new NavigationRoute(new NetworkFirst({ cacheName: "pages", networkTimeoutSeconds: 3 }), {
+    denylist: [/\.shortcut$/],
+  }),
+);
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
