@@ -156,7 +156,12 @@ input[type="checkbox"] {
 .notorious-table-editor table {
   border-collapse: collapse;
   width: 100%;
-  table-layout: fixed;
+  /* auto, not fixed: fixed forces every column into the container's width
+     regardless of content, squishing/wrapping text instead of growing past
+     it - auto lets the table grow past 100% when a column's content demands
+     more room, so the .overflow-x-auto wrapper (TableBlock.tsx) scrolls
+     instead. */
+  table-layout: auto;
 }
 .notorious-table-editor td,
 .notorious-table-editor th {
