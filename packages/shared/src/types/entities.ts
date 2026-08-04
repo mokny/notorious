@@ -318,3 +318,16 @@ export interface PresenceSnapshotMessage {
   objectId: string;
   viewers: PresenceViewer[];
 }
+
+/**
+ * Sent to every member of a workspace whenever the set of backup files at one
+ * destination changes - a scheduled or manual backup run uploading a new
+ * file, or a user deleting one - so any open Settings page can refresh its
+ * file list without a manual reload. Distinguished from `RealtimeEvent` by
+ * `type`, same pattern as `BackupProgressMessage`/`PresenceSnapshotMessage`.
+ */
+export interface BackupFilesChangedMessage {
+  type: "backupFilesChanged";
+  workspaceId: string;
+  destinationId: string;
+}

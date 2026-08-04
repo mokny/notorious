@@ -41,7 +41,7 @@ import { generateBackupKey, encryptBackup, decryptBackup, isEncryptedBackup } fr
 import { createDestinationClient, type BackupDestinationClient, type ResolvedDestinationConfig } from "./destinations/index.js";
 import { computeNextRunAt, currentWeekMonday } from "./scheduling.js";
 import { notifyUser } from "../push/service.js";
-import { sendToClient } from "../realtime/hub.js";
+import { broadcastBackupFilesChanged, sendToClient } from "../realtime/hub.js";
 
 const BACKUP_FORMAT_VERSION = 1;
 
@@ -488,6 +488,7 @@ export async function deleteDestinationBackup(workspaceId: string, destinationId
   const row = await getDestinationRow(workspaceId, destinationId);
   const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
   await client.remove(filename);
+  broadcastBackupFilesChanged({ type: "backupFilesChanged", workspaceId, destinationId });
 }
 
 /** Downloads one file from a destination, reporting progress to `clientId` under `jobId` (see emitProgress). Used by the destination file browser's "Download" button - the caller streams the returned buffer back to the browser. */
@@ -645,6 +646,7 @@ export async function runBackupNow(workspaceId: string): Promise<void> {
         .update(backupDestinations)
         .set({ lastRunAt: nowIso(), lastRunStatus: "success", lastError: null })
         .where(eq(backupDestinations.id, row.id));
+      broadcastBackupFilesChanged({ type: "backupFilesChanged", workspaceId, destinationId: row.id });
     } catch (error: unknown) {
       anyFailure = true;
       const message = error instanceof Error ? error.message : String(error);

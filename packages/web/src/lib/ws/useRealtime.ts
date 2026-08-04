@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { BackupProgressMessage, PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
+import type { BackupFilesChangedMessage, BackupProgressMessage, PresenceSnapshotMessage, RealtimeEvent } from "@notorious/shared";
 import { clientId as myClientId } from "./clientId.js";
 import { emitBackupProgress } from "./backupProgress.js";
 
@@ -117,7 +117,7 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
       };
 
       socket.onmessage = (event) => {
-        const payload = JSON.parse(event.data) as RealtimeEvent | PresenceSnapshotMessage | BackupProgressMessage;
+        const payload = JSON.parse(event.data) as RealtimeEvent | PresenceSnapshotMessage | BackupProgressMessage | BackupFilesChangedMessage;
         // Presence snapshots and backup-progress updates (see modules/
         // presence/ and modules/backup/ server-side) share this same per-
         // workspace socket but aren't a `RealtimeEvent` - distinguished by a
@@ -131,6 +131,10 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
         if ("type" in payload) {
           if (payload.type === "backupProgress") {
             emitBackupProgress(payload);
+            return;
+          }
+          if (payload.type === "backupFilesChanged") {
+            queryClient.invalidateQueries({ queryKey: ["backupDestinationFiles", workspaceId, payload.destinationId] });
             return;
           }
           // usePresence.ts owns the actual viewer list via its own query -
