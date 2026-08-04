@@ -467,11 +467,21 @@ function emitProgress(
   sendToClient(workspaceId, clientId, { type: "backupProgress", jobId, phase, ...extra });
 }
 
+// Matches the filename generated in `runBackupNow` below (`backup-<timestamp>.zip`).
+// Applied regardless of what a destination's `listDetailed()` returns, since
+// directory-vs-file detection is unreliable across some SFTP/FTP/Samba server
+// implementations - filtering by the actual backup filename shape is the only
+// way to guarantee non-backup entries (folders or anything else at that path)
+// never show up in the backup list.
+const BACKUP_FILENAME_PATTERN = /^backup-.*\.zip$/i;
+
 export async function listDestinationBackups(workspaceId: string, destinationId: string): Promise<BackupDestinationFile[]> {
   const row = await getDestinationRow(workspaceId, destinationId);
   const client = createDestinationClient(workspaceId, resolveDestinationConfig(row));
   const files = await client.listDetailed();
-  return files.sort((a, b) => (b.modifiedAt ?? "").localeCompare(a.modifiedAt ?? ""));
+  return files
+    .filter((file) => BACKUP_FILENAME_PATTERN.test(file.filename))
+    .sort((a, b) => (b.modifiedAt ?? "").localeCompare(a.modifiedAt ?? ""));
 }
 
 export async function deleteDestinationBackup(workspaceId: string, destinationId: string, filename: string): Promise<void> {
