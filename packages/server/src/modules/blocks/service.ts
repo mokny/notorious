@@ -27,13 +27,13 @@ function toBlock(row: typeof blocks.$inferSelect): Block {
 
 /** Derives a default slug from the block type, unique within the object - see db/schema.ts's `blocks.slug`. Collision (two blocks of the same type created in the same instant) is checked once; a random suffix makes a second one astronomically unlikely. */
 async function generateUniqueBlockSlug(objectId: string, type: string): Promise<string> {
-  const base = type.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const base = type.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
   const existing = await db
     .select({ id: blocks.id })
     .from(blocks)
     .where(and(eq(blocks.objectId, objectId), eq(blocks.slug, base)))
     .limit(1);
-  return existing[0] ? `${base}-${randomSlugSuffix()}` : base;
+  return existing[0] ? `${base}_${randomSlugSuffix()}` : base;
 }
 
 async function assertBlockSlugAvailable(objectId: string, slug: string, excludeBlockId: string): Promise<void> {

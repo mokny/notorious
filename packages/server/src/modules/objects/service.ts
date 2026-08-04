@@ -62,7 +62,7 @@ async function generateUniqueObjectSlug(workspaceId: string, title: string): Pro
     .from(objects)
     .where(and(eq(objects.workspaceId, workspaceId), eq(objects.slug, base)))
     .limit(1);
-  return existing[0] ? `${base}-${randomSlugSuffix()}` : base;
+  return existing[0] ? `${base}_${randomSlugSuffix()}` : base;
 }
 
 async function assertObjectSlugAvailable(workspaceId: string, slug: string, excludeObjectId: string): Promise<void> {

@@ -28,10 +28,12 @@ highlighting/autocomplete there yet, though `{{ }}`/`{% %}` inside one still ren
 
 ## Block and object ids
 
-Every block and object gets a short, auto-generated id at creation (e.g. `paragraph-a1b2c3d4`,
+Every block and object gets a short, auto-generated id at creation (e.g. `paragraph_a1b2c3d4`,
 or slugified from an object's title) - click the `{}` icon next to a block (in its hover toolbar)
 or next to an object's title to rename it to something memorable. Ids only use lowercase letters,
-numbers, `-` and `_`, and must be unique (per object for blocks, per workspace for objects).
+numbers and `_`, and must be unique (per object for blocks, per workspace for objects). No hyphens:
+`-` is the subtraction operator in template expressions, so `objects.my-task` would silently parse
+as `objects.my - task` instead of addressing a single id - use `objects.my_task` instead.
 
 ## Available variables
 

@@ -109,7 +109,15 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
         codeBlock: false,
         horizontalRule: false,
       }),
-      Link.configure({ openOnClick: false }),
+      // `autolink`/`linkOnPaste` (both on by default) turn a bare URL you
+      // type or paste into a Link mark - great for normal prose, but a URL
+      // inside a templateAware field's `{{ }}`/`{% %}` source is a string
+      // literal, not prose, and auto-linking it corrupts the saved markdown:
+      // prosemirror-markdown serializes a plain-URL link as `<url>` (see
+      // `isPlainURL` in prosemirror-markdown), silently rewriting the
+      // template's own source text on every keystroke. Disabled here so a
+      // pasted/typed URL inside template code stays exactly what was typed.
+      Link.configure(templateAware ? { openOnClick: false, autolink: false, linkOnPaste: false } : { openOnClick: false }),
       Placeholder.configure({ placeholder: options.placeholder ?? "Type '/' for commands…" }),
       Markdown.configure({ html: false, transformPastedText: true }),
       ...(hasSlashCommand

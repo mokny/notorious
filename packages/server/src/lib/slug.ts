@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
 
-/** Lowercases and strips anything outside `[a-z0-9-]`, matching `slugSchema` in @notorious/shared - used to derive a default slug from a title, not to validate a user-provided one (the zod schema already does that). */
+/** Lowercases and strips anything outside `[a-z0-9_]`, matching `slugSchema` in @notorious/shared - used to derive a default slug from a title, not to validate a user-provided one (the zod schema already does that). No hyphens - see slugSchema's doc comment for why. */
 export function slugify(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
     .slice(0, 40);
 }
 
