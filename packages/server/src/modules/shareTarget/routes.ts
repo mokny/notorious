@@ -3,6 +3,8 @@ import { shareIntakeFieldsSchema, shareCommitSchema } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireAccess, resolveActor } from "../workspaces/access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
+import { authenticateApiKey } from "../apiKeys/service.js";
+import { unauthorized } from "../../lib/httpError.js";
 import * as shareTargetService from "./service.js";
 import type { IncomingSharedFile } from "./service.js";
 
@@ -57,6 +59,54 @@ export async function registerShareTargetRoutes(app: FastifyInstance): Promise<v
 
     reply.code(201);
     return result;
+  });
+
+  // Used by the iOS Shortcut workaround for the *file* case specifically: Shortcuts' own "Get
+  // Contents of URL" action can send a shared file as a raw POST body (WFHTTPBodyType "File"),
+  // but reliably building a multipart/form-data body by hand in the shortcut's plist (as
+  // /intake-multipart above expects) turned out to not be a viable path - it crashed the
+  // Shortcuts app on import. Fastify has no parser for arbitrary content-types by default (a
+  // shared photo/PDF could be anything), so this route gets its own encapsulated context with a
+  // catch-all raw-buffer parser, scoped so it can't affect any other route's body parsing.
+  // Auth is a `?apiKey=` query param rather than the usual Authorization header, since a plain
+  // literal query string is the lowest-risk plist structure to hand-author - see
+  // IosShortcutSettings.tsx for why that trade-off (a key in the URL, and therefore in any proxy
+  // access log) was accepted here specifically.
+  await app.register(async (raw) => {
+    raw.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+
+    raw.post(
+      "/api/v1/share-target/intake-raw",
+      { bodyLimit: 50 * 1024 * 1024 },
+      async (request, reply) => {
+        const { apiKey, filename, title, text, url } = request.query as {
+          apiKey?: string;
+          filename?: string;
+          title?: string;
+          text?: string;
+          url?: string;
+        };
+        if (!apiKey) throw unauthorized();
+        const user = await authenticateApiKey(apiKey);
+        if (!user) throw unauthorized();
+
+        const buffer = request.body as Buffer;
+        const files: IncomingSharedFile[] = [];
+        if (buffer.length > 0) {
+          files.push({
+            filename: filename || "shared-file",
+            mimeType: request.headers["content-type"] || "application/octet-stream",
+            buffer,
+          });
+        }
+
+        const parsedFields = shareIntakeFieldsSchema.parse({ title, text, url });
+        const result = await shareTargetService.createInboxItemFromShare(user.id, parsedFields, files);
+
+        reply.code(201);
+        return result;
+      },
+    );
   });
 
   // Used by the bookmarklet path: a plain client-side JSON POST once ShareTargetPage.tsx has
