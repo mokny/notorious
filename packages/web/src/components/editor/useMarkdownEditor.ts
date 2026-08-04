@@ -23,6 +23,8 @@ interface UseMarkdownEditorOptions {
   /** Adds TemplateHighlight/TemplateSuggestion - see RichTextEditor.tsx's `templateAware` prop. */
   templateAware?: boolean;
   workspaceId?: string;
+  /** The object this field's blocks belong to - for `blocks.<slug>` autocomplete (see TemplateSuggestion.ts), scoped to just this object's own blocks like the renderer itself scopes `blocks.<slug>` (see modules/templates/renderer.ts). */
+  objectId?: string;
   templateSchema?: TemplateAutocompleteSchemaResponse;
   /** Fired when this editor loses focus - see TemplatableMarkdown.tsx, which uses it to switch a templated field back to its rendered display. */
   onBlur?: () => void;
@@ -79,6 +81,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   // Same call-time-read pattern as objectTypesRef above, for
   // TemplateSuggestion.ts (see its own doc comment).
   const workspaceIdRef = useRef(options.workspaceId ?? "");
+  const objectIdRef = useRef(options.objectId ?? "");
   const templateSchemaRef = useRef(options.templateSchema);
 
   onChangeRef.current = options.onChange;
@@ -89,6 +92,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   onFocusRef.current = options.onFocus;
   objectTypesRef.current = options.objectTypes ?? [];
   workspaceIdRef.current = options.workspaceId ?? "";
+  objectIdRef.current = options.objectId ?? "";
   templateSchemaRef.current = options.templateSchema;
 
   const hasSlashCommand = Boolean(options.onSlashSelect);
@@ -116,7 +120,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
             }),
           ]
         : []),
-      ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, schemaRef: templateSchemaRef })] : []),
+      ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, objectIdRef, schemaRef: templateSchemaRef })] : []),
     ],
     [options.placeholder, hasSlashCommand, templateAware],
   );

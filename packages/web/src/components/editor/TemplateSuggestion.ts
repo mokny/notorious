@@ -4,7 +4,7 @@ import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { TemplateAutocompleteSchemaResponse } from "@notorious/shared";
-import { searchApi } from "../../lib/api/resources.js";
+import { searchApi, blockApi } from "../../lib/api/resources.js";
 import { findTemplateRegions, regionAt, findOpenRegionAt, flattenDocText, TEMPLATE_FILTERS } from "./templateSyntax.js";
 
 interface SuggestionItem {
@@ -88,13 +88,28 @@ async function objectSlugItems(workspaceId: string, query: string): Promise<Sugg
   return matches.filter((obj) => obj.slug).map((obj) => ({ label: obj.slug!, insertText: obj.slug!, detail: obj.title }));
 }
 
-/** Extension options: a ref to the current workspace id (for the variable-name search) and a ref to the bundled object-type/property schema (see useTemplateAutocompleteSchema.ts) - both read at call time, like SlashCommand.ts's `objectTypesRef`, since either can still be loading when this extension is first configured. */
+/** `blocks.<slug>` completion, scoped to just the *current* object's own blocks - matches how the renderer itself resolves `blocks.<slug>` (see modules/templates/renderer.ts's `runRenderPass`, which only ever populates `blocksMap` from the object being rendered, not any other object's blocks). There's no server-side search for this (blocks aren't indexed like objects are), so it lists this object's blocks and filters by slug substring client-side - the same list is at most a few dozen rows for any real object. */
+async function blockSlugItems(objectId: string, query: string): Promise<SuggestionItem[]> {
+  const blocks = await blockApi.list(objectId).catch(() => []);
+  const q = query.toLowerCase();
+  return blocks
+    .filter((block) => block.slug && block.slug.toLowerCase().includes(q))
+    .map((block) => ({ label: block.slug!, insertText: block.slug!, detail: block.type }))
+    .slice(0, 15);
+}
+
+/** Extension options: a ref to the current workspace id (for the variable-name/`objects.<slug>` search), a ref to the current object id (for the `blocks.<slug>` search, scoped to just this object - see blockSlugItems), and a ref to the bundled object-type/property schema (see useTemplateAutocompleteSchema.ts) - all read at call time, like SlashCommand.ts's `objectTypesRef`, since any of them can still be loading when this extension is first configured. */
 export interface TemplateSuggestionExtensionOptions {
   workspaceIdRef: { current: string };
+  objectIdRef: { current: string };
   schemaRef: { current: TemplateAutocompleteSchemaResponse | undefined };
 }
 
-function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { current: TemplateAutocompleteSchemaResponse | undefined }): Omit<SuggestionOptions<SuggestionItem>, "editor"> {
+function buildSuggestion(
+  workspaceIdRef: { current: string },
+  objectIdRef: { current: string },
+  schemaRef: { current: TemplateAutocompleteSchemaResponse | undefined },
+): Omit<SuggestionOptions<SuggestionItem>, "editor"> {
   return {
     // `char`/`allowedPrefixes` etc. are irrelevant here - `findSuggestionMatch`
     // below is fully custom (needs to look inside `{{ }}`/`{% %}` regions,
@@ -115,6 +130,9 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
       if (ctx.mode === "property") {
         if (ctx.path === "objects") {
           return workspaceIdRef.current ? objectSlugItems(workspaceIdRef.current, query) : [];
+        }
+        if (ctx.path === "blocks") {
+          return objectIdRef.current ? blockSlugItems(objectIdRef.current, query) : [];
         }
         return propertyItems(ctx.path, schemaRef.current).filter((item) => item.label.toLowerCase().includes(query.toLowerCase())).slice(0, 15);
       }
@@ -254,7 +272,7 @@ export const TemplateSuggestion = Extension.create<TemplateSuggestionExtensionOp
   name: "templateSuggestion",
 
   addOptions() {
-    return { workspaceIdRef: { current: "" }, schemaRef: { current: undefined } };
+    return { workspaceIdRef: { current: "" }, objectIdRef: { current: "" }, schemaRef: { current: undefined } };
   },
 
   addProseMirrorPlugins() {
@@ -262,7 +280,7 @@ export const TemplateSuggestion = Extension.create<TemplateSuggestionExtensionOp
       Suggestion({
         editor: this.editor,
         pluginKey: templateSuggestionPluginKey,
-        ...buildSuggestion(this.options.workspaceIdRef, this.options.schemaRef),
+        ...buildSuggestion(this.options.workspaceIdRef, this.options.objectIdRef, this.options.schemaRef),
       }),
     ];
   },

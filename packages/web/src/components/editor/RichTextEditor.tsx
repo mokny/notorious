@@ -63,7 +63,7 @@ export function RichTextEditor({
   // here since `templateAware` is only ever set from within one (see
   // TemplatableMarkdown.tsx). `useTemplateAutocompleteSchema` is always
   // called (rules-of-hooks) but its query is harmless/idle-ish when unused.
-  const { workspaceId } = useBlockEditor();
+  const { workspaceId, objectId } = useBlockEditor();
   const { data: templateSchema } = useTemplateAutocompleteSchema(workspaceId);
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isSavingRef = useRef(false);
@@ -100,6 +100,7 @@ export function RichTextEditor({
     editable,
     templateAware,
     workspaceId,
+    objectId,
     templateSchema,
     // Save right away instead of waiting out the rest of the debounce below -
     // once focus has left, there's no more typing to coalesce, and a
