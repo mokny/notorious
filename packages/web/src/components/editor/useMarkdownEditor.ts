@@ -11,6 +11,23 @@ import { TemplateHighlight } from "./TemplateHighlight.js";
 import { TemplateSuggestion, templateSuggestionPluginKey } from "./TemplateSuggestion.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 
+/**
+ * `Link`'s `autolink`/`linkOnPaste` options (disabled below for templateAware
+ * fields) only gate two of its three link-creation mechanisms - its
+ * `addPasteRules()` markPasteRule runs unconditionally on every paste
+ * regardless of either option (see @tiptap/extension-link's source), so a
+ * pasted URL inside `{{ }}`/`{% %}` source still silently got wrapped in a
+ * Link mark without this override. That mark then round-trips through
+ * markdown as `<url>` (prosemirror-markdown's plain-autolink serialization),
+ * corrupting the template source on save - confirmed by inspecting a
+ * corrupted block directly in the dev DB.
+ */
+const TemplateAwareLink = Link.extend({
+  addPasteRules() {
+    return [];
+  },
+});
+
 interface UseMarkdownEditorOptions {
   markdown: string;
   placeholder?: string;
@@ -116,8 +133,12 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       // prosemirror-markdown serializes a plain-URL link as `<url>` (see
       // `isPlainURL` in prosemirror-markdown), silently rewriting the
       // template's own source text on every keystroke. Disabled here so a
-      // pasted/typed URL inside template code stays exactly what was typed.
-      Link.configure(templateAware ? { openOnClick: false, autolink: false, linkOnPaste: false } : { openOnClick: false }),
+      // pasted/typed URL inside template code stays exactly what was typed -
+      // `TemplateAwareLink` additionally overrides `addPasteRules` (see its
+      // own comment above), which these two options alone don't cover.
+      templateAware
+        ? TemplateAwareLink.configure({ openOnClick: false, autolink: false, linkOnPaste: false })
+        : Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: options.placeholder ?? "Type '/' for commands…" }),
       Markdown.configure({ html: false, transformPastedText: true }),
       ...(hasSlashCommand
