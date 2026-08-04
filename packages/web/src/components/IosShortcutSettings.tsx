@@ -14,6 +14,13 @@ import { isIOS } from "../lib/platform.js";
  * this path, unlike Shortcuts automations). The `shortcuts` CLI only exists on macOS, so any edit
  * to the shortcut's actions needs a manual re-sign on a Mac before it's committed; there's no way
  * to do this from the Linux prod build.
+ *
+ * The shortcut's actions were originally hand-authored as a plist (no way to script Apple's own
+ * Shortcuts editor from here), which took several rounds to get right - the first action's file
+ * body needs *both* a `WFInput` and a `WFRequestVariable` parameter set to the same
+ * ExtensionInput attachment, or Shortcuts silently sends an empty body with no error. The current
+ * file was derived from a real working export (device-repaired, then re-extracted structurally)
+ * rather than guessed, so this should import working end-to-end without manual fixups.
  */
 export function IosShortcutSettings() {
   if (!isIOS()) return null;
@@ -34,13 +41,13 @@ export function IosShortcutSettings() {
       <ol className="list-decimal space-y-1 pl-5 text-xs text-ink-muted">
         <li>Open the downloaded file to import it into the Shortcuts app.</li>
         <li>
-          Create an API key above under "API keys", then edit the shortcut's first action: replace
+          Create an API key above under "API keys", then edit the shortcut's first action ("Get Contents of URL")
+          and replace, inside its URL field, both{" "}
           <code className="mx-1 rounded bg-surface px-1">your-notorious-domain.example</code> with{" "}
-          <code className="mx-1 rounded bg-surface px-1">{window.location.origin.replace(/^https?:\/\//, "")}</code>
-          and <code className="mx-1 rounded bg-surface px-1">PASTE_YOUR_API_KEY_HERE</code> with that key (in both
-          the URL field and the Authorization header).
+          <code className="mx-1 rounded bg-surface px-1">{window.location.origin.replace(/^https?:\/\//, "")}</code>{" "}
+          and <code className="mx-1 rounded bg-surface px-1">PASTE_YOUR_API_KEY_HERE</code> with that key.
         </li>
-        <li>Also update the domain in the last action's URL field the same way.</li>
+        <li>Also update the domain in the last action's URL field ("Open URLs") the same way.</li>
         <li>Now "Notorious" appears in the share sheet for photos, files, and links from any app.</li>
       </ol>
     </div>
