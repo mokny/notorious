@@ -33,6 +33,32 @@ export async function registerShareTargetRoutes(app: FastifyInstance): Promise<v
     return reply.redirect(`/share-target?inboxId=${id}`, 303);
   });
 
+  // Used by the iOS Shortcut workaround (see IosShortcutSettings.tsx): iOS has no Web Share
+  // Target API, so a user-installed Shortcut POSTs here directly with `Authorization: Bearer
+  // <api key>` (requireUser accepts either the session cookie or an API key, see session.ts) and
+  // gets JSON back instead of a redirect, since the Shortcut isn't a browser navigation.
+  app.post("/api/v1/share-target/intake-multipart", async (request, reply) => {
+    const user = requireUser(request);
+
+    const fields: { url?: string; title?: string; text?: string } = {};
+    const files: IncomingSharedFile[] = [];
+
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        const buffer = await part.toBuffer();
+        if (buffer.length > 0) files.push({ filename: part.filename, mimeType: part.mimetype, buffer });
+      } else if (part.fieldname === "url" || part.fieldname === "title" || part.fieldname === "text") {
+        fields[part.fieldname] = String(part.value);
+      }
+    }
+
+    const parsedFields = shareIntakeFieldsSchema.parse(fields);
+    const result = await shareTargetService.createInboxItemFromShare(user.id, parsedFields, files);
+
+    reply.code(201);
+    return result;
+  });
+
   // Used by the bookmarklet path: a plain client-side JSON POST once ShareTargetPage.tsx has
   // read `url`/`title`/`text` off its own query string, made after the page has already loaded
   // authenticated (RequireAuth already guards this route client-side).

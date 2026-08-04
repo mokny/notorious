@@ -12,6 +12,7 @@ import { ApiError } from "../lib/api/client.js";
 import { NotificationSettings } from "../components/NotificationSettings.js";
 import { ApiKeysSettings } from "../components/ApiKeysSettings.js";
 import { BookmarkletSettings } from "../components/BookmarkletSettings.js";
+import { IosShortcutSettings } from "../components/IosShortcutSettings.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 import { ActiveShareLinksList } from "../components/ActiveShareLinksList.js";
@@ -157,6 +158,7 @@ export function SettingsPage() {
           (once installed as an app on Android) or from a desktop browser bookmarklet.
         </p>
         <BookmarkletSettings />
+        <IosShortcutSettings />
       </section>
 
       <section>
