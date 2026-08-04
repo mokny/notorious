@@ -108,9 +108,9 @@ export function SettingsPage() {
         return;
       }
       if (err instanceof ApiError && err.statusCode === 400 && /backup code is required/i.test(err.message)) {
-        restoreTransfer.close();
         setPendingImportFile(file);
         setImportNeedsKey(true);
+        restoreTransfer.fail("This backup is encrypted - enter the backup code below to restore it.");
         return;
       }
       restoreTransfer.fail(err instanceof ApiError ? err.message : "Could not restore this backup");

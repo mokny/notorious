@@ -118,7 +118,11 @@ export async function importWorkspace(ownerId: string, zipBuffer: Buffer, backup
   let buffer = zipBuffer;
   if (isEncryptedBackup(zipBuffer)) {
     if (!backupKey) throw badRequest("This backup is encrypted - the backup code is required to import it");
-    buffer = decryptBackup(zipBuffer, backupKey);
+    try {
+      buffer = decryptBackup(zipBuffer, backupKey);
+    } catch {
+      throw badRequest("Wrong backup code - could not decrypt this backup");
+    }
   }
   const directory = await unzipper.Open.buffer(buffer);
   const manifestEntry = directory.files.find((entry) => entry.path === "manifest.json");
