@@ -1,5 +1,5 @@
 import { Extension } from "@tiptap/core";
-import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
+import Suggestion, { type SuggestionOptions, type SuggestionProps } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
@@ -82,6 +82,12 @@ function propertyItems(path: string, schema: TemplateAutocompleteSchemaResponse 
   return [];
 }
 
+/** Live search for `objects.<slug>` completion - the slug segment itself isn't part of any static schema (it names a specific object in the workspace, not a type/property), so unlike `propertyItems` above this has to hit the same search endpoint the `variables.` namespace lookup in `buildSuggestion` uses. An object without a slug can't be referenced this way (see `resolveObjectViewBySlug` on the server) and is filtered out. */
+async function objectSlugItems(workspaceId: string, query: string): Promise<SuggestionItem[]> {
+  const matches = await searchApi.search(workspaceId, { q: query, limit: 10 }).catch(() => []);
+  return matches.filter((obj) => obj.slug).map((obj) => ({ label: obj.slug!, insertText: obj.slug!, detail: obj.title }));
+}
+
 /** Extension options: a ref to the current workspace id (for the variable-name search) and a ref to the bundled object-type/property schema (see useTemplateAutocompleteSchema.ts) - both read at call time, like SlashCommand.ts's `objectTypesRef`, since either can still be loading when this extension is first configured. */
 export interface TemplateSuggestionExtensionOptions {
   workspaceIdRef: { current: string };
@@ -107,6 +113,9 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
           .map((f) => ({ label: f.name, insertText: f.name, detail: f.detail }));
       }
       if (ctx.mode === "property") {
+        if (ctx.path === "objects") {
+          return workspaceIdRef.current ? objectSlugItems(workspaceIdRef.current, query) : [];
+        }
         return propertyItems(ctx.path, schemaRef.current).filter((item) => item.label.toLowerCase().includes(query.toLowerCase())).slice(0, 15);
       }
       // namespace mode - the four fixed identifiers, plus a live search for
@@ -123,6 +132,20 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
       editor.chain().focus().insertContentAt(range, props.insertText).run();
     },
     render: () => {
+      // `props.clientRect` reads a decoration node the Suggestion plugin
+      // draws around `range` - for a zero-length range (namespace mode with
+      // nothing typed yet, e.g. right after `{{`) there's no character to
+      // wrap, so no DOM node exists and `clientRect` comes back null. Falling
+      // back to `new DOMRect()` in that case would anchor the popup to the
+      // page's top-left corner instead of the cursor, so fall back to the
+      // cursor's own screen coordinates instead.
+      function referenceRect(props: SuggestionProps<SuggestionItem>): DOMRect {
+        const decorationRect = props.clientRect?.();
+        if (decorationRect) return decorationRect;
+        const coords = props.editor.view.coordsAtPos(props.range.to);
+        return new DOMRect(coords.left, coords.top, 0, coords.bottom - coords.top);
+      }
+
       let popup: TippyInstance | undefined;
       let container: HTMLDivElement;
       let selectedIndex = 0;
@@ -155,7 +178,7 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
           if (currentItems.length === 0) return;
 
           popup = tippy(document.body, {
-            getReferenceClientRect: () => props.clientRect?.() ?? new DOMRect(),
+            getReferenceClientRect: () => referenceRect(props),
             appendTo: () => document.body,
             content: container,
             showOnCreate: true,
@@ -172,7 +195,7 @@ function buildSuggestion(workspaceIdRef: { current: string }, schemaRef: { curre
             popup?.hide();
           } else if (popup) {
             popup.show();
-            popup.setProps({ getReferenceClientRect: () => props.clientRect?.() ?? new DOMRect() });
+            popup.setProps({ getReferenceClientRect: () => referenceRect(props) });
           }
         },
         onKeyDown: (props) => {
