@@ -7,8 +7,32 @@ import type { BackupDestinationClient, SftpDestinationConfig } from "./types.js"
 // implementation reads from it directly (src/index.js) - `createReadStream`
 // is the only way to observe transfer progress via `data` events, since the
 // high-level `get()`/`put()` don't accept a progress callback.
+//
+// `list()`'s own `type` field is derived from `longname.slice(0, 1)`
+// (src/index.js) - a plain `ls -l`-style string that some SFTP server
+// implementations format non-standardly or omit, which silently
+// misclassifies directories as files. Raw `readdir()` attrs expose a real
+// `isDirectory()` (backed by the numeric SFTP file mode, see ssh2's
+// `Stats.isDirectory()`), so directory listing below bypasses the wrapper
+// and reads straight from the raw SFTPWrapper for reliable file/dir typing.
+interface RawSftpEntry {
+  filename: string;
+  attrs: { isDirectory(): boolean; size: number; mtime: number };
+}
 interface RawSftpHandle {
-  sftp: { createReadStream(remotePath: string): NodeJS.ReadableStream };
+  sftp: {
+    createReadStream(remotePath: string): NodeJS.ReadableStream;
+    readdir(remotePath: string, cb: (err: Error | null, list: RawSftpEntry[]) => void): void;
+  };
+}
+
+function rawReaddirFiles(sftp: Client, remotePath: string): Promise<RawSftpEntry[]> {
+  return new Promise((resolve, reject) => {
+    (sftp as unknown as RawSftpHandle).sftp.readdir(remotePath, (err, list) => {
+      if (err) reject(err);
+      else resolve(list.filter((entry) => !entry.attrs.isDirectory()));
+    });
+  });
 }
 
 /** Opens a fresh SFTP connection per call (never held open between operations) and enforces trust-on-first-use host key pinning. */
@@ -67,8 +91,8 @@ export function createSftpDestinationClient(config: SftpDestinationConfig): Back
     async list() {
       const sftp = await connect();
       try {
-        const entries = await sftp.list(config.remotePath);
-        return entries.filter((entry) => entry.type !== "d").map((entry) => entry.name);
+        const entries = await rawReaddirFiles(sftp, config.remotePath);
+        return entries.map((entry) => entry.filename);
       } catch (err) {
         throw new Error(`SFTP list failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
@@ -78,14 +102,12 @@ export function createSftpDestinationClient(config: SftpDestinationConfig): Back
     async listDetailed() {
       const sftp = await connect();
       try {
-        const entries = await sftp.list(config.remotePath);
-        return entries
-          .filter((entry) => entry.type !== "d")
-          .map((entry) => ({
-            filename: entry.name,
-            size: entry.size,
-            modifiedAt: new Date(entry.modifyTime).toISOString(),
-          }));
+        const entries = await rawReaddirFiles(sftp, config.remotePath);
+        return entries.map((entry) => ({
+          filename: entry.filename,
+          size: entry.attrs.size,
+          modifiedAt: new Date(entry.attrs.mtime * 1000).toISOString(),
+        }));
       } catch (err) {
         throw new Error(`SFTP list failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
