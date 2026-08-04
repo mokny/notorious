@@ -20,15 +20,17 @@ export function createLocalDestinationClient(workspaceId: string, _config: Local
     },
     async list() {
       await fsp.mkdir(dir, { recursive: true });
-      return fsp.readdir(dir);
+      const entries = await fsp.readdir(dir, { withFileTypes: true });
+      return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
     },
     async listDetailed() {
       await fsp.mkdir(dir, { recursive: true });
-      const filenames = await fsp.readdir(dir);
+      const entries = await fsp.readdir(dir, { withFileTypes: true });
+      const files = entries.filter((entry) => entry.isFile());
       return Promise.all(
-        filenames.map(async (filename) => {
-          const stat = await fsp.stat(path.join(dir, filename));
-          return { filename, size: stat.size, modifiedAt: stat.mtime.toISOString() };
+        files.map(async (entry) => {
+          const stat = await fsp.stat(path.join(dir, entry.name));
+          return { filename: entry.name, size: stat.size, modifiedAt: stat.mtime.toISOString() };
         }),
       );
     },
