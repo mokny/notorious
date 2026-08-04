@@ -132,7 +132,7 @@ export function TableBlock({
 
   return (
     <div
-      className={`group relative ${isFullscreen ? "fixed inset-0 z-[60] overflow-auto bg-surface p-4" : ""}`}
+      className={`group ${isFullscreen ? "fixed inset-0 z-[60] overflow-auto bg-surface p-4" : "relative"}`}
     >
       <button
         type="button"
