@@ -4,6 +4,7 @@ import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, ty
 import { arrayMove } from "@dnd-kit/sortable";
 import { generateKeyBetween } from "fractional-indexing";
 import type { Block, BlockType } from "@notorious/shared";
+import { blockContentForFile } from "@notorious/shared";
 import { blockApi, fileApi, schemaApi } from "../../lib/api/resources.js";
 import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
@@ -51,14 +52,6 @@ function computeOptimisticMove(all: Block[], blockId: string, parentBlockId: str
   const beforeBlock = siblings[afterIndex + 1] ?? null;
   const position = generateKeyBetween(afterBlock?.position ?? null, beforeBlock?.position ?? null);
   return all.map((b) => (b.id === blockId ? { ...b, parentBlockId, position } : b));
-}
-
-/** Picks a sensible block type/content for a dropped file, based on its MIME type. */
-function blockForDroppedFile(file: File, url: string, fileId: string): { type: BlockType; content: Record<string, unknown> } {
-  if (file.type.startsWith("image/")) return { type: "image", content: { url, caption: file.name, fileId } };
-  if (file.type.startsWith("video/")) return { type: "video", content: { url, caption: file.name, fileId } };
-  if (file.type.startsWith("audio/") || file.type === "application/pdf") return { type: "embed", content: { url } };
-  return { type: "paragraph", content: { markdown: `[${file.name}](${url})` } };
 }
 
 interface BlockEditorProps {
@@ -385,7 +378,7 @@ export function BlockEditor({
       let afterBlockId = tree[tree.length - 1]?.id ?? null;
       for (const file of files) {
         const asset = await fileApi.upload(workspaceId, file, objectId);
-        const { type, content } = blockForDroppedFile(file, fileApi.downloadUrl(asset.id), asset.id);
+        const { type, content } = blockContentForFile(file.type, file.name, fileApi.downloadUrl(asset.id), asset.id);
         const created = await createMutation.mutateAsync({ parentBlockId: null, afterBlockId, type, content });
         afterBlockId = created.id;
       }

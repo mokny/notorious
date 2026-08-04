@@ -22,6 +22,7 @@ export const env = {
   isProduction: process.env.NODE_ENV === "production",
   databasePath: resolveFromServerRoot(process.env.DATABASE_PATH ?? "../../data/notorious.db"),
   filesDir: resolveFromServerRoot(process.env.FILES_DIR ?? "../../data/files"),
+  shareInboxDir: resolveFromServerRoot(process.env.SHARE_INBOX_DIR ?? "../../data/share-inbox"),
   sessionSecret: process.env.SESSION_SECRET ?? "dev-only-insecure-secret-change-me",
   // Deliberately NOT tied to isProduction: the "Secure" cookie attribute makes
   // browsers silently refuse to store/send the cookie over a plain HTTP

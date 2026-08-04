@@ -114,3 +114,22 @@ export interface WhiteboardContent {
   /** Presentation mode - while true, only the workspace owner can draw/edit; everyone else gets a live, view-only canvas (still pans/zooms, still sees updates in real time). Toggled by WhiteboardBlock.tsx, persisted like any other content field so it's in sync for every viewer. */
   presenting?: boolean;
 }
+
+/**
+ * Picks a sensible block type/content for a file, based on its MIME type -
+ * shared between the web drop handler (BlockEditor.tsx) and the server's
+ * share-target commit flow (modules/shareTarget/service.ts), which both need
+ * the exact same mapping but only one of them has a DOM `File` object to
+ * work with, hence the plain-value signature instead of `(file: File, ...)`.
+ */
+export function blockContentForFile(
+  mimeType: string,
+  filename: string,
+  url: string,
+  fileId: string,
+): { type: "image" | "video" | "embed" | "paragraph"; content: Record<string, unknown> } {
+  if (mimeType.startsWith("image/")) return { type: "image", content: { url, caption: filename, fileId } };
+  if (mimeType.startsWith("video/")) return { type: "video", content: { url, caption: filename, fileId } };
+  if (mimeType.startsWith("audio/") || mimeType === "application/pdf") return { type: "embed", content: { url } };
+  return { type: "paragraph", content: { markdown: `[${filename}](${url})` } };
+}

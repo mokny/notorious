@@ -7,6 +7,7 @@ import { usePullToRefresh } from "./hooks/usePullToRefresh.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { SetupTwoFactorPage } from "./pages/SetupTwoFactorPage.js";
+import { ShareTargetPage } from "./pages/ShareTargetPage.js";
 import { WorkspacePickerPage } from "./pages/WorkspacePickerPage.js";
 import { WorkspaceLayout } from "./pages/WorkspaceLayout.js";
 import { WorkspaceHome } from "./pages/WorkspaceHome.js";
@@ -52,6 +53,14 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/setup-2fa" element={<SetupTwoFactorPage />} />
+      <Route
+        path="/share-target"
+        element={
+          <RequireAuth>
+            <ShareTargetPage />
+          </RequireAuth>
+        }
+      />
       <Route path="/share/:token" element={<SharePage />}>
         <Route index element={<SharedIndexRoute />} />
         <Route path="objects/:objectId" element={<SharedObjectRoute />} />

@@ -23,3 +23,4 @@ export * from "./schemas/webhook.js";
 export * from "./schemas/ai.js";
 export * from "./schemas/template.js";
 export * from "./schemas/presence.js";
+export * from "./schemas/shareTarget.js";

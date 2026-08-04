@@ -56,6 +56,9 @@ import type {
   AiChatMessage,
   RenderedBlocksResponse,
   PresenceViewer,
+  ShareIntakeFields,
+  ShareCommitInput,
+  ShareInboxItem,
 } from "@notorious/shared";
 import { apiRequest, apiUpload } from "./client.js";
 
@@ -273,6 +276,14 @@ export const aiApi = {
 
 export const linkPreviewApi = {
   fetch: (url: string) => apiRequest<{ title: string | null; icon: string | null }>("/api/v1/link-preview", { query: { url } }),
+};
+
+export const shareTargetApi = {
+  intakeJson: (input: ShareIntakeFields) =>
+    apiRequest<{ id: string }>("/api/v1/share-target/intake-json", { method: "POST", body: input }),
+  inbox: (id: string) => apiRequest<ShareInboxItem>(`/api/v1/share-target/inbox/${id}`),
+  commit: (input: ShareCommitInput) =>
+    apiRequest<ObjectRecord>("/api/v1/share-target/commit", { method: "POST", body: input }),
 };
 
 export const systemApi = {

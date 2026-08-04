@@ -1,11 +1,13 @@
 import { buildApp } from "./app.js";
 import { env } from "./env.js";
 import { startReminderScheduler } from "./modules/push/scheduler.js";
+import { startShareInboxCleanup } from "./modules/shareTarget/cleanup.js";
 import { initScriptEngine } from "./modules/scripting/engine.js";
 
 const app = await buildApp();
 
 startReminderScheduler();
+startShareInboxCleanup();
 await initScriptEngine();
 
 app

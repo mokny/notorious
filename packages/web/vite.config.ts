@@ -21,6 +21,28 @@ export default defineConfig({
           { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
           { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
+        // Lets Android's native share sheet target the installed PWA (images,
+        // videos, documents, links, plain text). POST/multipart is required
+        // because file sharing isn't possible with a GET-based share target.
+        // The "files" part name ("files") must match what
+        // modules/shareTarget/routes.ts's intake route looks for when
+        // distinguishing file parts from the url/title/text text fields.
+        share_target: {
+          action: "/api/v1/share-target/intake",
+          method: "POST",
+          enctype: "multipart/form-data",
+          params: {
+            title: "title",
+            text: "text",
+            url: "url",
+            files: [
+              {
+                name: "files",
+                accept: ["image/*", "video/*", "audio/*", "application/pdf", "text/*", "*/*"],
+              },
+            ],
+          },
+        },
       },
       injectManifest: {
         swSrc: "src/push-sw.ts",

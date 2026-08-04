@@ -191,6 +191,23 @@ export interface FileAsset {
   createdAt: ISODateString;
 }
 
+/**
+ * A pending share (from the Android Web Share Target or the desktop
+ * bookmarklet) held in a per-user temp inbox until the share-target chooser
+ * page commits it into a real workspace - see modules/shareTarget/. Not yet
+ * associated with any workspace, since that's chosen in the chooser UI.
+ */
+export interface ShareInboxItem {
+  id: string;
+  kind: "url" | "text" | "files";
+  url: string | null;
+  title: string | null;
+  text: string | null;
+  files: { id: string; filename: string; mimeType: string; size: number }[];
+  expiresAt: ISODateString;
+  createdAt: ISODateString;
+}
+
 export interface SavedSearch {
   id: string;
   workspaceId: string;

@@ -11,6 +11,7 @@ import { IconPicker } from "../components/IconPicker.js";
 import { ApiError } from "../lib/api/client.js";
 import { NotificationSettings } from "../components/NotificationSettings.js";
 import { ApiKeysSettings } from "../components/ApiKeysSettings.js";
+import { BookmarkletSettings } from "../components/BookmarkletSettings.js";
 import { AccountSettings } from "../components/AccountSettings.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 import { ActiveShareLinksList } from "../components/ActiveShareLinksList.js";
@@ -147,6 +148,15 @@ export function SettingsPage() {
           workspaces. Send them as <code>Authorization: Bearer &lt;key&gt;</code>.
         </p>
         <ApiKeysSettings />
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold">Share to Notorious</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Share images, videos, documents, and links into Notorious directly from your phone's share sheet
+          (once installed as an app on Android) or from a desktop browser bookmarklet.
+        </p>
+        <BookmarkletSettings />
       </section>
 
       <section>

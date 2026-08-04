@@ -224,6 +224,31 @@ export const files = sqliteTable("files", {
   createdAt: text("created_at").notNull(),
 });
 
+export const shareInboxItems = sqliteTable("share_inbox_items", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), // 'url' | 'text' | 'files'
+  url: text("url"),
+  title: text("title"),
+  sharedText: text("shared_text"),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const shareInboxFiles = sqliteTable("share_inbox_files", {
+  id: text("id").primaryKey(),
+  inboxItemId: text("inbox_item_id")
+    .notNull()
+    .references(() => shareInboxItems.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  storagePath: text("storage_path").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const views = sqliteTable("views", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id")
