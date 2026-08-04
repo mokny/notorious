@@ -20,6 +20,7 @@ import { WebhooksSettings } from "../components/WebhooksSettings.js";
 import { AiSettings } from "../components/AiSettings.js";
 import { BackupSettings } from "../components/BackupSettings.js";
 import { ProgressPopup } from "../components/ui/ProgressPopup.js";
+import { Modal } from "../components/ui/Modal.js";
 import { useBackupTransfer } from "../hooks/useBackupTransfer.js";
 import { downloadBlob } from "../lib/downloadBlob.js";
 
@@ -108,13 +109,19 @@ export function SettingsPage() {
         return;
       }
       if (err instanceof ApiError && err.statusCode === 400 && /backup code is required/i.test(err.message)) {
+        restoreTransfer.close();
         setPendingImportFile(file);
         setImportNeedsKey(true);
-        restoreTransfer.fail("This backup is encrypted - enter the backup code below to restore it.");
         return;
       }
       restoreTransfer.fail(err instanceof ApiError ? err.message : "Could not restore this backup");
     }
+  }
+
+  function handleImportKeySubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!pendingImportFile || !importKey) return;
+    void runImport(pendingImportFile, importKey);
   }
 
   const setIconMutation = useMutation({
@@ -345,19 +352,31 @@ export function SettingsPage() {
               }}
             />
           </div>
-          {importNeedsKey && pendingImportFile && (
-            <div className="mt-2 flex items-center gap-2">
+          <Modal
+            open={importNeedsKey && pendingImportFile !== null}
+            onOpenChange={(open) => {
+              if (!open) {
+                setImportNeedsKey(false);
+                setPendingImportFile(null);
+                setImportKey("");
+              }
+            }}
+            title="Enter backup code"
+            description="This backup is encrypted. Enter the workspace's backup code to restore it."
+          >
+            <form onSubmit={handleImportKeySubmit} className="flex items-center gap-2">
               <TextField
+                autoFocus
                 placeholder="Backup code"
                 value={importKey}
                 onChange={(e) => setImportKey(e.target.value)}
-                className="max-w-xs"
+                className="flex-1"
               />
-              <Button variant="secondary" onClick={() => void runImport(pendingImportFile, importKey)} disabled={!importKey}>
+              <Button type="submit" variant="primary" disabled={!importKey}>
                 Restore
               </Button>
-            </div>
-          )}
+            </form>
+          </Modal>
 
           <ProgressPopup
             open={downloadTransfer.open}
