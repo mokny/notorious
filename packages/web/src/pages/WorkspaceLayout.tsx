@@ -10,6 +10,7 @@ import { useTheme } from "../context/ThemeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
+import { useBreakpoint, useIsLandscape } from "../hooks/useBreakpoint.js";
 import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
 import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
@@ -17,6 +18,7 @@ import { InstallAppHint } from "../components/nav/InstallAppHint.js";
 import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
+import { BottomTabBar } from "../components/nav/BottomTabBar.js";
 
 export function WorkspaceLayout() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -27,6 +29,14 @@ export function WorkspaceLayout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const shareToken = getShareToken();
+  const breakpoint = useBreakpoint();
+  const isLandscape = useIsLandscape();
+  // Sidebar stays permanently visible (no drawer) on desktop, and on the
+  // tablet tier only in landscape - tablet portrait doesn't have room for
+  // sidebar + list + detail together, so it falls back to the phone-style
+  // drawer there (see ObjectTypePage/SearchPage for the split-view panes
+  // this pairs with).
+  const sidebarPersistent = breakpoint === "desktop" || (breakpoint === "tablet" && isLandscape);
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
@@ -85,14 +95,19 @@ export function WorkspaceLayout() {
   }
 
   return (
-    <div className="flex h-screen">
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setSidebarOpen(false)} />
+    // `h-dvh`, not `h-screen` (`100vh`) - iOS/Android shrink the *dynamic*
+    // viewport when the on-screen keyboard opens, but leave the plain
+    // layout viewport (what `100vh` measures) unchanged. With `h-screen`
+    // the bottom tab bar and sidebar footer would get pushed down behind
+    // the keyboard instead of reflowing above it.
+    <div className="flex h-dvh">
+      {sidebarOpen && !sidebarPersistent && (
+        <div className="fixed inset-0 z-30 bg-black/30" onClick={() => setSidebarOpen(false)} />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface-raised transition-transform duration-200 ease-in-out md:relative md:z-0 md:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface-raised transition-transform duration-200 ease-in-out ${
+          sidebarPersistent ? "relative z-0 translate-x-0" : sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {shareToken ? (
@@ -188,22 +203,31 @@ export function WorkspaceLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border p-2 md:hidden">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
-            title="Open menu"
-          >
-            <Icon name="menu" className="h-5 w-5" />
-          </button>
-          <span className="truncate text-sm font-medium">{workspace?.name}</span>
-        </div>
+        {!sidebarPersistent && (
+          <div className="flex items-center gap-2 border-b border-border p-2">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
+              title="Open menu"
+            >
+              <Icon name="menu" className="h-5 w-5" />
+            </button>
+            <span className="truncate text-sm font-medium">{workspace?.name}</span>
+          </div>
+        )}
         {/* Only for a real member - an anonymous share visitor has no
             account to "install their copy" of the app for. */}
         {!shareToken && <InstallAppHint />}
         <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
+        {breakpoint === "phone" && (
+          <BottomTabBar
+            workspaceId={workspaceId!}
+            dashboardObjectId={workspace?.dashboardObjectId ?? undefined}
+            onOpenMenu={() => setSidebarOpen(true)}
+          />
+        )}
       </div>
     </div>
   );

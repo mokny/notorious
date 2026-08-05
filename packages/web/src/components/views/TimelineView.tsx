@@ -7,11 +7,13 @@ interface TimelineViewProps {
   items: ObjectRecord[];
   properties: Property[];
   datePropertyId: string | null | undefined;
+  onOpenObject?: (objectId: string) => void;
 }
 
 /** A simple single-point timeline: each object is placed on a date axis by its date property. */
-export function TimelineView({ workspaceId, items, properties, datePropertyId }: TimelineViewProps) {
+export function TimelineView({ workspaceId, items, properties, datePropertyId, onOpenObject }: TimelineViewProps) {
   const navigate = useNavigate();
+  const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const dateProperty = properties.find((p) => p.id === datePropertyId) ?? properties.find((p) => p.config.type === "date" || p.config.type === "datetime");
 
   const dated = useMemo(() => {
@@ -40,7 +42,7 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId }:
           <button
             key={item.id}
             title={item.title}
-            onClick={() => navigate(`/w/${workspaceId}/objects/${item.id}`)}
+            onClick={() => openObject(item.id)}
             style={{ left: `${((new Date(date).getTime() - min) / span) * 100}%` }}
             className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-surface hover:scale-125"
           />
@@ -50,7 +52,7 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId }:
         {dated.map(({ item, date }) => (
           <button
             key={item.id}
-            onClick={() => navigate(`/w/${workspaceId}/objects/${item.id}`)}
+            onClick={() => openObject(item.id)}
             className="flex w-full items-center justify-between px-1 py-2 text-left text-sm hover:bg-surface-raised"
           >
             <span className="truncate">{item.title}</span>

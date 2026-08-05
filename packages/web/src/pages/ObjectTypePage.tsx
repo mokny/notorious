@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { schemaApi, viewApi, objectApi } from "../lib/api/resources.js";
 import { ViewRenderer } from "../components/views/ViewRenderer.js";
@@ -7,6 +7,8 @@ import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useNavigate } from "react-router-dom";
 import { isSharedSession } from "../lib/api/shareMode.js";
+import { useBreakpoint } from "../hooks/useBreakpoint.js";
+import { ObjectDetailPage } from "./ObjectDetailPage.js";
 
 const VIEW_TYPES = [
   { type: "table", label: "Table", icon: "rows" },
@@ -22,6 +24,25 @@ export function ObjectTypePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const breakpoint = useBreakpoint();
+  // Split view (list + detail pane) is a tablet-only affordance - phone has
+  // no room for it, desktop already has a persistent sidebar and full-width
+  // detail navigation that works fine as-is.
+  const splitActive = breakpoint === "tablet";
+  const openObjectId = splitActive ? searchParams.get("open") : null;
+
+  function openObject(objectId: string) {
+    if (splitActive) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("open", objectId);
+        return next;
+      });
+    } else {
+      navigate(`/w/${workspaceId}/objects/${objectId}`);
+    }
+  }
 
   const { data: objectTypes } = useQuery({
     queryKey: ["objectTypes", workspaceId],
@@ -57,7 +78,7 @@ export function ObjectTypePage() {
 
   const createObjectMutation = useMutation({
     mutationFn: () => objectApi.create(workspaceId!, { objectTypeId: objectType!.id, title: "Untitled", values: {} }),
-    onSuccess: (object) => navigate(`/w/${workspaceId}/objects/${object.id}`),
+    onSuccess: (object) => openObject(object.id),
   });
 
   if (!objectType) return <div className="p-8 text-sm text-ink-muted">Loading…</div>;
@@ -65,7 +86,8 @@ export function ObjectTypePage() {
   const activeView = views?.find((v) => v.id === activeViewId);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+      <div className={`flex h-full min-w-0 flex-col ${splitActive ? "w-full max-w-sm shrink-0 border-r border-border" : "flex-1"}`}>
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-2">
           <Icon name={objectType.icon} className="h-5 w-5 text-accent" />
@@ -112,11 +134,33 @@ export function ObjectTypePage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeView ? (
-          <ViewRenderer workspaceId={workspaceId!} view={activeView} />
+          <ViewRenderer workspaceId={workspaceId!} view={activeView} onOpenObject={splitActive ? openObject : undefined} />
         ) : (
           <p className="p-6 text-sm text-ink-muted">Create a view above to see your {objectType.name.toLowerCase()} objects.</p>
         )}
       </div>
+      </div>
+
+      {splitActive &&
+        (openObjectId ? (
+          <div key={openObjectId} className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+            <button
+              onClick={() =>
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.delete("open");
+                  return next;
+                })
+              }
+              className="flex items-center gap-1.5 self-start px-4 pt-3 text-xs text-ink-muted hover:text-ink"
+            >
+              <Icon name="close" className="h-3.5 w-3.5" /> Close
+            </button>
+            <ObjectDetailPage workspaceId={workspaceId} objectId={openObjectId} />
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-sm text-ink-muted">Select an object to view it here.</div>
+        ))}
     </div>
   );
 }

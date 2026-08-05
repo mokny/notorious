@@ -1,21 +1,37 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import type { ObjectRecord, Property, PropertyOption } from "@notorious/shared";
 import { useObjectMutations } from "../../hooks/useObjectMutations.js";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 
 interface BoardViewProps {
   workspaceId: string;
   items: ObjectRecord[];
   properties: Property[];
   pivotPropertyId: string | null | undefined;
+  /** Overrides the default full-navigation card click - used for the tablet split view (see ObjectTypePage/SearchPage). */
+  onOpenObject?: (objectId: string) => void;
 }
 
 const UNASSIGNED = "__unassigned__";
 
-export function BoardView({ workspaceId, items, properties, pivotPropertyId }: BoardViewProps) {
+export function BoardView({ workspaceId, items, properties, pivotPropertyId, onOpenObject }: BoardViewProps) {
   const navigate = useNavigate();
+  const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const mutations = useObjectMutations(workspaceId);
+  const breakpoint = useBreakpoint();
+  // Columns can't scroll sideways on a phone screen - they stack full-width
+  // and the user scrolls down through them instead (same reasoning as
+  // TableView's card fallback).
+  const stacked = breakpoint === "phone";
+  // Same split as the block editor's drag handles: mouse drags start on a
+  // tiny movement, touch needs a short long-press first so a plain tap
+  // doesn't get mistaken for the user scrolling the (now vertical) column.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
   const pivot = properties.find((p) => p.id === pivotPropertyId);
   const options: PropertyOption[] = useMemo(
     () => (pivot && "options" in pivot.config ? pivot.config.options : []),
@@ -44,9 +60,16 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId }: B
   }
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
-      <div className="flex h-full gap-4 overflow-x-auto p-4">
-        <BoardColumn id={UNASSIGNED} title="No status" color="#94a3b8" items={columns.get(UNASSIGNED) ?? []} workspaceId={workspaceId} navigate={navigate} />
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <div className={stacked ? "flex h-full flex-col gap-4 overflow-y-auto p-4" : "flex h-full gap-4 overflow-x-auto p-4"}>
+        <BoardColumn
+          id={UNASSIGNED}
+          title="No status"
+          color="#94a3b8"
+          items={columns.get(UNASSIGNED) ?? []}
+          onOpenObject={openObject}
+          stacked={stacked}
+        />
         {options.map((option) => (
           <BoardColumn
             key={option.id}
@@ -54,8 +77,8 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId }: B
             title={option.label}
             color={option.color}
             items={columns.get(option.id) ?? []}
-            workspaceId={workspaceId}
-            navigate={navigate}
+            onOpenObject={openObject}
+            stacked={stacked}
           />
         ))}
       </div>
@@ -68,20 +91,23 @@ function BoardColumn({
   title,
   color,
   items,
-  workspaceId,
-  navigate,
+  onOpenObject,
+  stacked,
 }: {
   id: string;
   title: string;
   color: string;
   items: ObjectRecord[];
-  workspaceId: string;
-  navigate: (path: string) => void;
+  onOpenObject: (objectId: string) => void;
+  stacked: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
-    <div ref={setNodeRef} className={`w-64 shrink-0 rounded-xl border border-border p-2 ${isOver ? "bg-accent/5" : "bg-surface-raised"}`}>
+    <div
+      ref={setNodeRef}
+      className={`rounded-xl border border-border p-2 ${stacked ? "w-full" : "w-64 shrink-0"} ${isOver ? "bg-accent/5" : "bg-surface-raised"}`}
+    >
       <div className="mb-2 flex items-center gap-2 px-1">
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
         <h3 className="text-sm font-medium">{title}</h3>
@@ -89,7 +115,7 @@ function BoardColumn({
       </div>
       <div className="space-y-2">
         {items.map((item) => (
-          <BoardCard key={item.id} item={item} onOpen={() => navigate(`/w/${workspaceId}/objects/${item.id}`)} />
+          <BoardCard key={item.id} item={item} onOpen={() => onOpenObject(item.id)} />
         ))}
       </div>
     </div>

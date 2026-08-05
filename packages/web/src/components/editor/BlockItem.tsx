@@ -52,7 +52,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
       <div className="mt-1 flex shrink-0 items-center gap-0.5">
         <button
           onClick={() => createBlockAfter(block.parentBlockId, block.id, "paragraph")}
-          className="rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/item:opacity-100"
+          className="rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/item:opacity-100 [@media(pointer:coarse)]:p-2"
           title="Add block below"
         >
           <Icon name="plus" className="h-3.5 w-3.5" />
@@ -60,7 +60,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
         <button
           {...attributes}
           {...listeners}
-          className={`cursor-grab rounded p-0.5 text-ink-muted hover:bg-surface hover:text-ink ${
+          className={`cursor-grab touch-none rounded p-0.5 text-ink-muted hover:bg-surface hover:text-ink [@media(pointer:coarse)]:p-2 ${
             isDraggingAny ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"
           }`}
           title="Drag to reorder"
@@ -95,7 +95,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
 
       <button
         onClick={() => deleteBlock(block.id)}
-        className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover/item:opacity-100"
+        className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover/item:opacity-100 [@media(pointer:coarse)]:p-2"
         title="Delete block"
       >
         <Icon name="trash" className="h-3.5 w-3.5" />

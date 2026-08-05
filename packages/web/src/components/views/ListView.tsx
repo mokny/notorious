@@ -8,10 +8,12 @@ interface ListViewProps {
   items: ObjectRecord[];
   properties: Property[];
   visiblePropertyIds: string[];
+  onOpenObject?: (objectId: string) => void;
 }
 
-export function ListView({ workspaceId, items, properties, visiblePropertyIds }: ListViewProps) {
+export function ListView({ workspaceId, items, properties, visiblePropertyIds, onOpenObject }: ListViewProps) {
   const navigate = useNavigate();
+  const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
 
   return (
@@ -19,7 +21,7 @@ export function ListView({ workspaceId, items, properties, visiblePropertyIds }:
       {items.map((object) => (
         <div key={object.id} className="flex items-center gap-3 px-2 py-2 hover:bg-surface-raised">
           <Icon name={object.icon ?? "file-text"} className="h-4 w-4 shrink-0 text-ink-muted" />
-          <button className="flex-1 truncate text-left text-sm hover:underline" onClick={() => navigate(`/w/${workspaceId}/objects/${object.id}`)}>
+          <button className="flex-1 truncate text-left text-sm hover:underline" onClick={() => openObject(object.id)}>
             {object.title || "Untitled"}
           </button>
           <div className="flex shrink-0 items-center gap-3">

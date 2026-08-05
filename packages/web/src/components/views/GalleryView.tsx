@@ -7,10 +7,12 @@ interface GalleryViewProps {
   items: ObjectRecord[];
   properties: Property[];
   visiblePropertyIds: string[];
+  onOpenObject?: (objectId: string) => void;
 }
 
-export function GalleryView({ workspaceId, items, properties, visiblePropertyIds }: GalleryViewProps) {
+export function GalleryView({ workspaceId, items, properties, visiblePropertyIds, onOpenObject }: GalleryViewProps) {
   const navigate = useNavigate();
+  const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
 
   return (
@@ -18,7 +20,7 @@ export function GalleryView({ workspaceId, items, properties, visiblePropertyIds
       {items.map((object) => (
         <button
           key={object.id}
-          onClick={() => navigate(`/w/${workspaceId}/objects/${object.id}`)}
+          onClick={() => openObject(object.id)}
           className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface-raised text-left transition hover:ring-2 hover:ring-accent/30"
         >
           {object.cover ? (

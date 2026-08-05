@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
+import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { generateKeyBetween } from "fractional-indexing";
 import type { Block, BlockType } from "@notorious/shared";
@@ -10,6 +10,7 @@ import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
 import { BlockList } from "./BlockList.js";
 import { useEditorHistory, type BlockSnapshot } from "./useEditorHistory.js";
+import { useKeepFocusedElementVisible } from "../../hooks/useKeepFocusedElementVisible.js";
 
 function isEditableElementFocused(): boolean {
   const el = document.activeElement as HTMLElement | null;
@@ -89,12 +90,21 @@ export function BlockEditor({
   // always read-only, on top of that - see `readOnly` above.
   const isEmbedded = Boolean(embedAncestorIds);
   const effectiveReadOnly = readOnly || isEmbedded;
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // Split by input type instead of one PointerSensor: mouse keeps the
+  // near-instant 4px-movement drag start, touch needs a short long-press
+  // first (mirrors iOS/Android native reorder) so a plain tap-drag on the
+  // handle doesn't get mistaken for the user trying to scroll the page.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
   const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const dragDepth = useRef(0);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+  useKeepFocusedElementVisible(editorContainerRef);
 
   const { data: blocks } = useQuery({ queryKey: ["blocks", objectId], queryFn: () => blockApi.list(objectId) });
   const tree = buildBlockTree(blocks ?? []);
@@ -445,6 +455,7 @@ export function BlockEditor({
       }}
     >
       <div
+        ref={editorContainerRef}
         className="relative"
         onDragEnter={isEmbedded ? undefined : handleDragEnter}
         onDragOver={

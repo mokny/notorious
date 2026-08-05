@@ -8,14 +8,16 @@ interface CalendarViewProps {
   items: ObjectRecord[];
   properties: Property[];
   datePropertyId: string | null | undefined;
+  onOpenObject?: (objectId: string) => void;
 }
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-export function CalendarView({ workspaceId, items, properties, datePropertyId }: CalendarViewProps) {
+export function CalendarView({ workspaceId, items, properties, datePropertyId, onOpenObject }: CalendarViewProps) {
   const navigate = useNavigate();
+  const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
   const dateProperty = properties.find((p) => p.id === datePropertyId) ?? properties.find((p) => p.config.type === "date" || p.config.type === "datetime");
 
@@ -68,7 +70,7 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId }:
                   {dayItems.slice(0, 3).map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => navigate(`/w/${workspaceId}/objects/${item.id}`)}
+                      onClick={() => openObject(item.id)}
                       className="mb-0.5 block w-full truncate rounded bg-accent/10 px-1 py-0.5 text-left text-accent"
                     >
                       {item.title}
