@@ -460,13 +460,13 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               `!share?.singleObject` gate above it - unlike backlinks/
               sub-objects (which need to browse elsewhere in the workspace),
               commenting is entirely local to this one object, so a
-              single-object share can use it too. */}
-          <CommentsPanel
-            objectId={object.id}
-            workspaceId={workspaceId}
-            commentsDisabled={object.commentsDisabled}
-            share={share}
-          />
+              single-object share can use it too.
+              Not rendered at all while `commentsDisabled` - the owner's
+              kill-switch button above hides the whole section, not just the
+              compose box, so there's nothing left down here to show. */}
+          {!object.commentsDisabled && (
+            <CommentsPanel objectId={object.id} workspaceId={workspaceId} share={share} />
+          )}
         </div>
 
         <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">

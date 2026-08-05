@@ -14,7 +14,6 @@ const MAX_LENGTH = 4000;
 interface CommentsPanelProps {
   objectId: string;
   workspaceId: string;
-  commentsDisabled: boolean;
   share?: SharedObjectContext;
 }
 
@@ -22,12 +21,16 @@ interface CommentsPanelProps {
  * Comments are deliberately independent of the object lock (see
  * `createCommentSchema`/`workspaces/access.ts`'s `allowWhenLocked`) - only
  * `commentsDisabled` (the owner's own kill-switch, toggled next to the lock
- * button in ObjectDetailPage.tsx) turns this off. Plain text only: the
+ * button in ObjectDetailPage.tsx) turns this off, which ObjectDetailPage.tsx
+ * enforces by not rendering this component at all rather than passing the
+ * flag down - a disabled object shows no comments section whatsoever, not
+ * even its already-posted comments.
+ * Plain text only: the
  * textarea below is the entire authoring surface, no formatting toolbar,
  * and `body` renders with `white-space: pre-wrap` and nothing else - line
  * breaks are the only structure a comment can carry.
  */
-export function CommentsPanel({ objectId, workspaceId, commentsDisabled, share }: CommentsPanelProps) {
+export function CommentsPanel({ objectId, workspaceId, share }: CommentsPanelProps) {
   const { user } = useAuth();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -121,9 +124,7 @@ export function CommentsPanel({ objectId, workspaceId, commentsDisabled, share }
           })}
         </ul>
 
-        {commentsDisabled ? (
-          <p className="text-sm text-ink-muted">Comments are disabled for this object.</p>
-        ) : canComment ? (
+        {canComment ? (
           <div className="space-y-2">
             <textarea
               value={draft}
