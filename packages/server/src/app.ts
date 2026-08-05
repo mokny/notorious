@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import staticFiles from "@fastify/static";
 import swagger from "@fastify/swagger";
@@ -37,6 +38,7 @@ import { registerMcpRoutes } from "./modules/mcp/routes.js";
 import { registerTemplateRoutes } from "./modules/templates/routes.js";
 import { registerPresenceRoutes } from "./modules/presence/routes.js";
 import { registerUserRoutes } from "./modules/users/routes.js";
+import { registerCommentRoutes } from "./modules/comments/routes.js";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const WEB_DIST_DIR = path.join(PACKAGE_ROOT, "packages/web/dist");
@@ -71,6 +73,17 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024 } });
   await app.register(websocket);
   await app.register(sessionPlugin);
+  // `global: false` - this only throttles routes that opt in via their own
+  // `config: { rateLimit: {...} }` (currently just comment creation, the
+  // app's one spam-prone, low-friction-to-abuse write) rather than every
+  // route in the app. Keyed by session user id when logged in, falling back
+  // to IP for anonymous share-link visitors - `request.user` isn't set yet
+  // this early in the plugin chain, so the key generator reads it lazily per
+  // request rather than at registration time.
+  await app.register(rateLimit, {
+    global: false,
+    keyGenerator: (request) => request.user?.id ?? request.ip,
+  });
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof HttpError) {
@@ -109,6 +122,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerTemplateRoutes(app);
   await registerPresenceRoutes(app);
   await registerUserRoutes(app);
+  await registerCommentRoutes(app);
 
   app.get("/api/v1/health", async () => ({ status: "ok", version: PACKAGE_VERSION }));
 

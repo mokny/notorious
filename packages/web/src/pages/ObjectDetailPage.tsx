@@ -11,6 +11,7 @@ import { SubObjectsPanel } from "../components/SubObjectsPanel.js";
 import { ScriptPanel } from "../components/ScriptPanel.js";
 import { CollapsibleSection } from "../components/ui/CollapsibleSection.js";
 import { BlockHistoryPanel } from "../components/BlockHistoryPanel.js";
+import { CommentsPanel } from "../components/CommentsPanel.js";
 import { IconPicker } from "../components/IconPicker.js";
 import { CoverImage } from "../components/CoverImage.js";
 import { ShareDialog } from "../components/ShareDialog.js";
@@ -165,6 +166,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
   const lockMutation = useMutation({
     mutationFn: (locked: boolean) => objectApi.setLocked(objectId!, { locked }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
+  });
+
+  const commentsDisabledMutation = useMutation({
+    mutationFn: (disabled: boolean) => objectApi.setCommentsDisabled(objectId!, { disabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
   });
 
@@ -349,6 +355,20 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </span>
               )
             )}
+            {/* Owner-only kill-switch for comments (independent of the lock
+                above - see CommentsPanel.tsx's own doc comment) - a non-owner
+                sees no indicator here, unlike the lock button, since a
+                disabled comment box below already makes the state obvious. */}
+            {isOwner && !share && (
+              <button
+                onClick={() => commentsDisabledMutation.mutate(!object.commentsDisabled)}
+                disabled={commentsDisabledMutation.isPending}
+                title={object.commentsDisabled ? "Enable comments on this object" : "Disable comments on this object"}
+                className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.commentsDisabled ? "text-accent" : "text-ink-muted"}`}
+              >
+                <Icon name={object.commentsDisabled ? "comment-off" : "comment"} className="h-4 w-4" />
+              </button>
+            )}
             {/* `key={object.id}` forces a full remount on every object
                 change, same reasoning as CoverImage's own `key` above -
                 without it, navigating from one object to another reuses
@@ -417,6 +437,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
               </>
             )}
+
+            {/* Deliberately outside the `!share?.singleObject` gate above -
+                unlike backlinks/sub-objects (which need to browse elsewhere
+                in the workspace), commenting is entirely local to this one
+                object, so a single-object share can use it too. */}
+            <CommentsPanel
+              objectId={object.id}
+              workspaceId={workspaceId}
+              commentsDisabled={object.commentsDisabled}
+              share={share}
+            />
 
             {/* Members-only, full stop - never shown for any kind of share,
                 not just single-object ones (see workspaces/access.ts's

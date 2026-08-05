@@ -159,6 +159,10 @@ export const objects = sqliteTable("objects", {
   // object by a stable name instead of its UUID. Null until the user (or the auto-generated
   // default at creation) sets one - see objects/service.ts's `generateSlug`.
   slug: text("slug"),
+  // Owner-only kill-switch for the comments feature (modules/comments/) -
+  // independent of lockedAt, so comments stay postable on a locked object
+  // unless this is also set.
+  commentsDisabled: integer("comments_disabled", { mode: "boolean" }).notNull().default(false),
 });
 
 export const objectValues = sqliteTable(
@@ -230,6 +234,29 @@ export const voteRecords = sqliteTable(
   },
   (table) => [unique().on(table.blockId, table.itemId, table.voterKey)],
 );
+
+// One row per comment on an object - see modules/comments/. `authorId` is
+// nullable (ON DELETE SET NULL) so a comment survives its author's account
+// being deleted; `authorName` is denormalized at write time for the same
+// reason as `blockHistory.actorName`, and doubles as the anonymous
+// share-visitor label when `authorId` is null (see workspaces/access.ts's
+// `resolveActor`). `deletedAt`/`deletedByName` implement moderation deletes
+// as a tombstone instead of a row removal - see migrations/0029_comments.sql.
+export const comments = sqliteTable("comments", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  objectId: text("object_id")
+    .notNull()
+    .references(() => objects.id, { onDelete: "cascade" }),
+  authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
+  authorName: text("author_name").notNull(),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
+  deletedByName: text("deleted_by_name"),
+});
 
 export const files = sqliteTable("files", {
   id: text("id").primaryKey(),

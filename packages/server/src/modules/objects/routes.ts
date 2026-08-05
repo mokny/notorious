@@ -5,6 +5,7 @@ import {
   listObjectsQuerySchema,
   createRelationSchema,
   setObjectLockedSchema,
+  setCommentsDisabledSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess, resolveActor } from "../workspaces/access.js";
@@ -101,6 +102,34 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       clientId: getClientId(request),
       action: "updated",
       summary: input.locked ? `${user.name} locked "${object.title}"` : `${user.name} unlocked "${object.title}"`,
+      entity: "object",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return object;
+  });
+
+  // Owner-only, and - like the lock endpoint above - deliberately NOT routed
+  // through `requireAccess`, so the owner can always reach this regardless of
+  // the object's own lock state (a locked object with comments still enabled
+  // should stay that way until the owner explicitly changes it, not become
+  // unreachable).
+  app.post("/api/v1/objects/:id/comments-disabled", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    const workspaceId = await objectService.getObjectWorkspaceId(id);
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const input = setCommentsDisabledSchema.parse(request.body);
+    const object = await objectService.setCommentsDisabled(id, input.disabled);
+
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: input.disabled ? `${user.name} disabled comments on "${object.title}"` : `${user.name} enabled comments on "${object.title}"`,
       entity: "object",
       entityId: id,
       realtimeAction: "updated",

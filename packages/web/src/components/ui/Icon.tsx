@@ -70,6 +70,8 @@ import {
   PaintBucket,
   Rows,
   Columns,
+  MessageSquare,
+  MessageSquareOff,
   type LucideIcon,
 } from "lucide-react";
 
@@ -143,6 +145,8 @@ const ICONS: Record<string, LucideIcon> = {
   "paint-bucket": PaintBucket,
   "insert-row": Rows,
   "insert-column": Columns,
+  comment: MessageSquare,
+  "comment-off": MessageSquareOff,
 };
 
 function isImageUrl(value: string): boolean {

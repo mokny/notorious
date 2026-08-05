@@ -120,6 +120,8 @@ export interface ObjectRecord {
   coverTextStyle: CoverTextStyle | null;
   /** Human-assignable, unique within this workspace - see modules/templates/ for how another object's template addresses this one by slug instead of its UUID. Null until set. */
   slug: string | null;
+  /** Owner-only kill-switch for the comments feature on this object (see modules/comments/) - independent of `lockedAt`: comments stay postable on a locked object unless this is also set. */
+  commentsDisabled: boolean;
   values: Record<string, PropertyValue>;
 }
 
@@ -244,10 +246,35 @@ export interface BlockHistoryEntry {
   createdAt: ISODateString;
 }
 
+/**
+ * A comment on an object (see modules/comments/) - plain text only (line
+ * breaks preserved, no other markup), postable even on a locked object
+ * unless the owner disabled comments (`ObjectRecord.commentsDisabled`).
+ */
+export interface Comment {
+  id: string;
+  workspaceId: string;
+  objectId: string;
+  /** Null once the author's account has been deleted (ON DELETE SET NULL) - `authorName` is denormalized at write time so the comment still displays correctly afterward. An anonymous share-link visitor's comment is attributed to the share's creator, same as any other edit they make - see workspaces/access.ts's `resolveActor`. */
+  authorId: string | null;
+  authorName: string;
+  body: string;
+  createdAt: ISODateString;
+  /**
+   * Set only when an owner/editor deleted *someone else's* comment
+   * (moderation) - the row is kept as a tombstone (see CommentsPanel.tsx)
+   * instead of being removed outright, so the thread visibly records who
+   * removed it. An author deleting their own comment removes the row
+   * instead of setting this, since there's nothing to disclose there.
+   */
+  deletedAt: ISODateString | null;
+  deletedByName: string | null;
+}
+
 /** Payload broadcast over the WebSocket connection for a given workspace room. */
 export interface RealtimeEvent {
   workspaceId: string;
-  entity: "object" | "block" | "relation" | "view" | "member" | "pin";
+  entity: "object" | "block" | "relation" | "view" | "member" | "pin" | "comment";
   action: "created" | "updated" | "deleted";
   entityId: string;
   /** The parent object id, when `entity` is "block" (omitted otherwise). */

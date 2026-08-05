@@ -50,6 +50,7 @@ function toRecord(row: typeof objects.$inferSelect, values: Record<string, unkno
       : null,
     coverTextStyle: row.coverTextStyle ? (JSON.parse(row.coverTextStyle) as CoverTextStyle) : null,
     slug: row.slug,
+    commentsDisabled: row.commentsDisabled,
     values: values as ObjectRecord["values"],
   };
 }
@@ -106,6 +107,21 @@ export async function setObjectLocked(objectId: string, userId: string | null, i
     .update(objects)
     .set({ lockedAt: isLocked ? nowIso() : null, lockedBy: isLocked ? userId : null })
     .where(eq(objects.id, objectId));
+  return getObject(objectId);
+}
+
+/** True once `objects.commentsDisabled` is set - the enforcement side of the owner-only toggle (see objects/routes.ts). Checked explicitly by modules/comments/service.ts's `createComment`, not folded into `assertObjectEditable`/`requireAccess` since it's a distinct rule from the object lock. */
+export async function isCommentsDisabled(objectId: string): Promise<boolean> {
+  const rows = await db
+    .select({ commentsDisabled: objects.commentsDisabled })
+    .from(objects)
+    .where(eq(objects.id, objectId))
+    .limit(1);
+  return Boolean(rows[0]?.commentsDisabled);
+}
+
+export async function setCommentsDisabled(objectId: string, disabled: boolean): Promise<ObjectRecord> {
+  await db.update(objects).set({ commentsDisabled: disabled }).where(eq(objects.id, objectId));
   return getObject(objectId);
 }
 

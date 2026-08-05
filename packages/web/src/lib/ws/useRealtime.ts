@@ -62,6 +62,11 @@ function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient:
   } else if (payload.entity === "relation") {
     queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
     queryClient.invalidateQueries({ queryKey: ["viewResults"] });
+  } else if (payload.entity === "comment") {
+    // A deliberate, discrete action (not a per-keystroke stream like block
+    // saves) - refetching even for the tab that made the change itself is
+    // harmless, so no clientId self-echo check, same reasoning as "pin" below.
+    queryClient.invalidateQueries({ queryKey: ["comments", payload.objectId ?? ""] });
   } else if (payload.entity === "pin") {
     // Pin/unpin/reorder is a discrete, deliberate action (not a per-
     // keystroke stream like block saves) - refetching even for the tab
@@ -121,6 +126,7 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           queryClient.invalidateQueries({ queryKey: ["blockHistory"] });
           queryClient.invalidateQueries({ queryKey: ["viewResults"] });
           queryClient.invalidateQueries({ queryKey: ["backlinks"] });
+          queryClient.invalidateQueries({ queryKey: ["comments"] });
           queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["workspaces"] });
           queryClient.invalidateQueries({ queryKey: ["pins", workspaceId] });

@@ -8,6 +8,9 @@ import type {
   ObjectRecord,
   Relation,
   Block,
+  Comment,
+  CreateCommentInput,
+  SetCommentsDisabledInput,
   View,
   SavedSearch,
   FileAsset,
@@ -163,6 +166,8 @@ export const objectApi = {
   update: (id: string, input: UpdateObjectInput) =>
     apiRequest<ObjectRecord>(`/api/v1/objects/${id}`, { method: "PATCH", body: input }),
   setLocked: (id: string, input: SetObjectLockedInput) => apiRequest<ObjectRecord>(`/api/v1/objects/${id}/lock`, { method: "POST", body: input }),
+  setCommentsDisabled: (id: string, input: SetCommentsDisabledInput) =>
+    apiRequest<ObjectRecord>(`/api/v1/objects/${id}/comments-disabled`, { method: "POST", body: input }),
   archive: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/archive`, { method: "POST" }),
   restore: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/restore`, { method: "POST" }),
   remove: (id: string) => apiRequest<void>(`/api/v1/objects/${id}`, { method: "DELETE" }),
@@ -220,6 +225,15 @@ export const blockApi = {
   history: (id: string) => apiRequest<BlockHistoryEntry[]>(`/api/v1/blocks/${id}/history`),
   /** Template-rendered text for this object's blocks - see ObjectDetailPage.tsx's Preview toggle and modules/templates/ on the server. */
   rendered: (objectId: string) => apiRequest<RenderedBlocksResponse>(`/api/v1/objects/${objectId}/blocks/rendered`),
+};
+
+export const commentApi = {
+  list: (objectId: string) => apiRequest<Comment[]>(`/api/v1/objects/${objectId}/comments`),
+  /** Works on a locked object (see createCommentSchema); 400s if the owner disabled comments (`ObjectRecord.commentsDisabled`) or the caller is rate-limited. */
+  create: (objectId: string, input: CreateCommentInput) =>
+    apiRequest<Comment>(`/api/v1/objects/${objectId}/comments`, { method: "POST", body: input }),
+  /** Deleting your own comment removes it outright; an owner/editor deleting someone else's leaves a tombstone (`deletedAt`/`deletedByName`) instead - see modules/comments/service.ts. */
+  remove: (id: string) => apiRequest<void>(`/api/v1/comments/${id}`, { method: "DELETE" }),
 };
 
 export const templateApi = {
