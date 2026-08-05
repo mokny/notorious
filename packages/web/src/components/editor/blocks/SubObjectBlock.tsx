@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { SubObjectContent } from "@notorious/shared";
-import { objectApi, schemaApi, searchApi } from "../../../lib/api/resources.js";
+import { blockApi, objectApi, schemaApi, searchApi } from "../../../lib/api/resources.js";
 import { useObjectTitle } from "../../../hooks/useObjectTitle.js";
 import { useDebouncedValue } from "../../../hooks/useDebouncedValue.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
@@ -242,14 +242,27 @@ function EmbeddedContent({
   objectId: string;
   embedAncestorIds: string[];
 }) {
-  if (embedAncestorIds.includes(objectId)) {
+  const isCircular = embedAncestorIds.includes(objectId);
+  const isTooDeep = embedAncestorIds.length >= MAX_EMBED_DEPTH;
+  // Same fetch ObjectDetailPage.tsx does for the top-level object - an
+  // embedded object is always shown read-only, so it should always show
+  // rendered {{ }} template output too, not the raw source. Called
+  // unconditionally (hooks can't follow the early returns below), but
+  // skipped whenever we're not actually going to render the BlockEditor.
+  const { data: renderedBlocks } = useQuery({
+    queryKey: ["blocksRendered", objectId],
+    queryFn: () => blockApi.rendered(objectId),
+    enabled: !isCircular && !isTooDeep,
+  });
+
+  if (isCircular) {
     return (
       <p className="rounded-lg border border-dashed border-border p-2 text-xs text-ink-muted">
         Can't embed this object's content here - it would create a circular reference.
       </p>
     );
   }
-  if (embedAncestorIds.length >= MAX_EMBED_DEPTH) {
+  if (isTooDeep) {
     return (
       <p className="rounded-lg border border-dashed border-border p-2 text-xs text-ink-muted">
         Nested too deeply to embed here - open the object directly to see its content.
@@ -266,7 +279,12 @@ function EmbeddedContent({
     // the object directly. Wide block types (whiteboards especially) made
     // this the most visible.
     <div className={`${READ_ONLY_CONTENT_CLASS} -ml-11 border-t border-border pt-2`}>
-      <BlockEditor workspaceId={workspaceId} objectId={objectId} embedAncestorIds={[...embedAncestorIds, objectId]} />
+      <BlockEditor
+        workspaceId={workspaceId}
+        objectId={objectId}
+        embedAncestorIds={[...embedAncestorIds, objectId]}
+        renderedBlocks={renderedBlocks?.rendered ?? null}
+      />
     </div>
   );
 }
