@@ -43,18 +43,18 @@ function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient:
       // BlockHistoryPanel.tsx) if it's currently open on the block someone
       // else just changed.
       queryClient.invalidateQueries({ queryKey: ["blockHistory", payload.entityId] });
-      // A changed block can be the source a template elsewhere in the same
-      // object reads from (`blocks.<slug>`) - without this, another
-      // viewer's already-rendered output would silently go stale until they
-      // reloaded, which is what someone editing live alongside them would
-      // actually notice as "the template doesn't update".
-      queryClient.invalidateQueries({ queryKey: ["blocksRendered", payload.objectId ?? ""] });
     }
-    // Unlike the rest of this branch, not gated by the self-echo check -
-    // a vote cast from this same tab already gets its own optimistic
-    // update (see VotingBlock.tsx), but this also has to cover *other*
-    // tabs/devices of the same voter, which the clientId check above would
-    // otherwise skip.
+    // `blocksRendered`/`blockVotes`, unlike `blocks`/`blockHistory` above,
+    // aren't gated by the self-echo check: neither feeds back into an
+    // actively-typed textarea (the raw editing surface those two protect),
+    // so there's no dropped-keystroke risk in refetching them for this same
+    // tab too - and for a vote cast specifically, this tab's own cast
+    // (which already gets an optimistic `blockVotes` update, see
+    // VotingBlock.tsx) still needs this to refresh any *other* block on the
+    // same page whose template reads this voting block's `blocks.<slug>`
+    // data (see modules/templates/renderer.ts's `voting` case), which the
+    // clientId check would otherwise skip for the voter's own tab.
+    queryClient.invalidateQueries({ queryKey: ["blocksRendered", payload.objectId ?? ""] });
     queryClient.invalidateQueries({ queryKey: ["blockVotes", payload.entityId] });
   } else if (payload.entity === "member") {
     queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });

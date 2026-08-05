@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { Block, ObjectRecord, TableDoc, ViewFilter, ObjectsQueryFilter } from "@notorious/shared";
+import type { Block, ObjectRecord, TableDoc, ViewFilter, ObjectsQueryFilter, VotingContent, VoteSummary } from "@notorious/shared";
 import {
   tableCellField,
   tableDocToTextGrid,
@@ -78,8 +78,25 @@ function rawFieldsOf(block: Block): Record<string, string> {
   return map;
 }
 
-/** A plain, read-only view of one block for `blocks.<slug>` - built from *rendered* (already template-evaluated) field text for a block in the object currently being rendered, or raw (unevaluated) field text for a cross-referenced object's block (see `rawFieldsOf` above) - either way, a later block referencing an earlier one (or a `blocks.<slug>` under `objects.<slug>`) sees a complete, already-resolved view rather than having to know which case it's in. */
-function buildBlockView(block: Block, renderedFields: Record<string, string>): Record<string, unknown> {
+/** Per-item vote counts/score/ratio for `blocks.<slug>.items` on a `voting` block - shared by `buildBlockView`'s same-object and cross-object callers, both of which already have a `Record<itemId, VoteSummary>` (aggregate-only - `voterKey: null`, see `getVoteSummary` - templates have no "current viewer" to attribute `myVote` to) fetched up front. */
+function buildVotingItems(content: Partial<VotingContent>, voteSummary: Record<string, VoteSummary>): Record<string, unknown>[] {
+  return (content.items ?? []).map((item) => {
+    const summary = voteSummary[item.id] ?? { up: 0, down: 0, myVote: null };
+    const total = summary.up + summary.down;
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description ?? "",
+      up: summary.up,
+      down: summary.down,
+      score: summary.up - summary.down,
+      ratio: total > 0 ? Math.round((summary.up / total) * 100) : 0,
+    };
+  });
+}
+
+/** A plain, read-only view of one block for `blocks.<slug>` - built from *rendered* (already template-evaluated) field text for a block in the object currently being rendered, or raw (unevaluated) field text for a cross-referenced object's block (see `rawFieldsOf` above) - either way, a later block referencing an earlier one (or a `blocks.<slug>` under `objects.<slug>`) sees a complete, already-resolved view rather than having to know which case it's in. `voteSummary` is only meaningful (and only ever passed) for a `voting` block - see `buildVotingItems`. */
+function buildBlockView(block: Block, renderedFields: Record<string, string>, voteSummary?: Record<string, VoteSummary>): Record<string, unknown> {
   const base = { id: block.id, slug: block.slug, type: block.type };
   switch (block.type) {
     case "paragraph":
@@ -115,6 +132,15 @@ function buildBlockView(block: Block, renderedFields: Record<string, string>): R
         Array.from({ length: columnCount }, (_, c) => renderedFields[tableCellField(r + 1, c)] ?? shape[r + 1]?.[c] ?? ""),
       );
       return { ...base, text: "", columns, rows };
+    }
+    case "voting": {
+      const items = buildVotingItems(block.content as Partial<VotingContent>, voteSummary ?? {});
+      return {
+        ...base,
+        text: items.map((item) => item.title).filter(Boolean).join(", "),
+        items,
+        total_votes: items.reduce((sum, item) => sum + (item.up as number) + (item.down as number), 0),
+      };
     }
     default:
       return { ...base, text: "" };
@@ -269,7 +295,9 @@ async function resolveObjectViewBySlug(workspaceId: string, slug: string, identi
   // through a shared scope the way same-object blocks are.
   const blocksMap: Record<string, unknown> = {};
   for (const block of await blockService.listBlocks(row.id)) {
-    if (block.slug) blocksMap[block.slug] = buildBlockView(block, rawFieldsOf(block));
+    if (!block.slug) continue;
+    const voteSummary = block.type === "voting" ? await blockService.getVoteSummary(block.id, null) : undefined;
+    blocksMap[block.slug] = buildBlockView(block, rawFieldsOf(block), voteSummary);
   }
   view.blocks = blocksMap;
 
@@ -329,7 +357,9 @@ async function resolveObjectsWhere(workspaceId: string, filters: ObjectsQueryFil
     const view = buildObjectView(record, typeFilter.value);
     const blocksMap: Record<string, unknown> = {};
     for (const block of await blockService.listBlocks(record.id)) {
-      if (block.slug) blocksMap[block.slug] = buildBlockView(block, rawFieldsOf(block));
+      if (!block.slug) continue;
+      const voteSummary = block.type === "voting" ? await blockService.getVoteSummary(block.id, null) : undefined;
+      blocksMap[block.slug] = buildBlockView(block, rawFieldsOf(block), voteSummary);
     }
     view.blocks = blocksMap;
     results.push(view);
@@ -364,6 +394,7 @@ function runRenderPass(
   blocksMap: Record<string, unknown>,
   ctx: EvalContext,
   showErrors: boolean,
+  voteSummaries: Map<string, Record<string, VoteSummary>>,
 ): Record<string, Record<string, string>> {
   const rendered: Record<string, Record<string, string>> = {};
 
@@ -393,7 +424,7 @@ function runRenderPass(
     }
 
     if (anyTemplated) rendered[block.id] = renderedFields;
-    if (block.slug) blocksMap[block.slug] = buildBlockView(block, renderedFields);
+    if (block.slug) blocksMap[block.slug] = buildBlockView(block, renderedFields, voteSummaries.get(block.id));
   }
 
   return rendered;
@@ -468,6 +499,20 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   }
   const variablesMap = await buildVariablesMap(object.workspaceId);
 
+  // Prefetched up front (parallel, one query per voting block) rather than
+  // inside `buildBlockView` itself - that function is called synchronously,
+  // twice per block (see the two `runRenderPass` calls below), and votes
+  // live in their own `vote_records` table rather than `blocks.content`
+  // (see modules/blocks/service.ts's `getVoteSummary`). `voterKey: null` -
+  // templates have no "current viewer" to attribute a `myVote` to, so this
+  // is always the aggregate-only reading.
+  const voteSummaries = new Map<string, Record<string, VoteSummary>>();
+  await Promise.all(
+    orderedBlocks
+      .filter((block) => block.type === "voting")
+      .map(async (block) => voteSummaries.set(block.id, await blockService.getVoteSummary(block.id, null))),
+  );
+
   const httpResults = new Map<string, HttpCallResult>();
   if (referencedHttpCalls.size > 0) {
     // Checked once per render, not per call - a template with several
@@ -512,7 +557,7 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   seedScope.set("blocks", seedBlocksMap);
   seedScope.set("today", todayIso);
   seedScope.set("now", nowIso);
-  runRenderPass(orderedBlocks, parsedByBlock, seedScope, seedBlocksMap, ctx, false);
+  runRenderPass(orderedBlocks, parsedByBlock, seedScope, seedBlocksMap, ctx, false, voteSummaries);
 
   const blocksMap: Record<string, unknown> = { ...seedBlocksMap };
   const rootScope = new Scope();
@@ -522,5 +567,5 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   rootScope.set("blocks", blocksMap);
   rootScope.set("today", todayIso);
   rootScope.set("now", nowIso);
-  return runRenderPass(orderedBlocks, parsedByBlock, rootScope, blocksMap, ctx, true);
+  return runRenderPass(orderedBlocks, parsedByBlock, rootScope, blocksMap, ctx, true, voteSummaries);
 }

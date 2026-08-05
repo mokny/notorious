@@ -40,7 +40,7 @@ as `objects.my - task` instead of addressing a single id - use `objects.my_task`
 | | |
 | --- | --- |
 | `object` | The current object: `object.title`, `object.slug`, `object.type_key`, `object.archived`, `object.locked`, and `object.properties.<key>` for every property value (Formula/Rollup included, already computed) |
-| `blocks.<id>` | Another block in the *same* object, by its id - above **or below** the block doing the referencing - `.text` (its rendered text), plus for checklists `.items` (`[{text, checked}]`), `.checked_count`, `.total_count`, and for tables `.columns`/`.rows` |
+| `blocks.<id>` | Another block in the *same* object, by its id - above **or below** the block doing the referencing - `.text` (its rendered text), plus for checklists `.items` (`[{text, checked}]`), `.checked_count`, `.total_count`; for tables `.columns`/`.rows`; and for voting blocks `.items` (`[{id, title, description, up, down, score, ratio}]`, `ratio` a 0-100 upvote percentage) and `.total_votes` - vote counts are always the live aggregate, never a specific viewer's own vote |
 | `objects.<id>` | Another object *in this workspace*, by its id - same shape as `object` above, plus `objects.<id>.blocks.<blockId>` (same shape as `blocks.<id>` above) for one of *its* blocks. That object's blocks are exposed as raw (unrendered) text, not re-evaluated - see "How rendering works" below |
 | `objects.where(type="...", ...)` | Every object of a given type in this workspace, optionally narrowed by property values - see "Querying every object of a type" below |
 | `variables.<Name>` | The computed value of a `Variable` object named `<Name>` (see [SCRIPTING.md](SCRIPTING.md#variable-objects)) - already coerced to its declared value type, or `null` if it failed to resolve |
@@ -127,6 +127,12 @@ Paragraph block right below it:
 ```
 {{ blocks.tasks.checked_count }} / {{ blocks.tasks.total_count }} done
 {% if blocks.tasks.checked_count == blocks.tasks.total_count %}🎉 All done!{% endif %}
+```
+
+**Voting results, written into a paragraph below it** (voting block with id `poll`)
+```
+{% for item in blocks.poll.items %}{{ item.title }}: {{ item.score }} ({{ item.ratio }}% upvoted, {{ item.up + item.down }} votes){% endfor %}
+{{ blocks.poll.total_votes }} votes total
 ```
 
 **Conditional text based on a property value**
