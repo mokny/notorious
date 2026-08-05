@@ -4,8 +4,9 @@ import type { FastifyRequest } from "fastify";
 import { badRequest } from "../../lib/httpError.js";
 import { getClientId } from "../../plugins/session.js";
 import { requireAccess, resolveActor, getMemberRole } from "../workspaces/access.js";
-import { getObjectWorkspaceId, isCommentsDisabled } from "../objects/service.js";
+import { getObjectWorkspaceId, isCommentsDisabled, getObject } from "../objects/service.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
+import { notifyCommentParticipants } from "../notifications/service.js";
 import * as commentService from "./service.js";
 
 /** True for a real member with at least editor access, or an editor(+)-role share link - the set of callers allowed to delete *someone else's* comment (own-comment deletes don't need this, see commentService.deleteComment). */
@@ -56,6 +57,17 @@ export async function registerCommentRoutes(app: FastifyInstance): Promise<void>
         entity: "comment",
         entityId: comment.id,
         realtimeAction: "created",
+      });
+
+      const object = await getObject(objectId);
+      await notifyCommentParticipants({
+        workspaceId,
+        objectId,
+        objectTitle: object.title,
+        commentId: comment.id,
+        actorId: author.actorId,
+        actorName: author.actorName,
+        body: comment.body,
       });
 
       reply.code(201);

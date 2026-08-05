@@ -18,6 +18,7 @@ import { InstallAppHint } from "../components/nav/InstallAppHint.js";
 import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
+import { NotificationBell } from "../components/nav/NotificationBell.js";
 import { BottomTabBar } from "../components/nav/BottomTabBar.js";
 
 export function WorkspaceLayout() {
@@ -190,6 +191,7 @@ export function WorkspaceLayout() {
             </div>
           )}
           <div className="flex items-center gap-1">
+            {!shareToken && workspaceId && <NotificationBell workspaceId={workspaceId} />}
             <button onClick={toggle} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Toggle theme">
               <Icon name={theme === "dark" ? "sun" : "moon"} />
             </button>

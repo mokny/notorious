@@ -150,6 +150,12 @@ export async function createObject(
     updatedAt: now,
     archivedAt: null,
     slug,
+    // Comments default to disabled - the owner opts in via the toolbar icon
+    // next to Share (see setCommentsDisabled/objects/routes.ts). Set
+    // explicitly rather than relying on the column's own SQL default, which
+    // migrations/0030_notifications.sql left at `0` for backward-compat
+    // reasons with objects created before that flip.
+    commentsDisabled: true,
   });
 
   if (Object.keys(input.values).length > 0) {

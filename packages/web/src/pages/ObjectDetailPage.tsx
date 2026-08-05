@@ -355,20 +355,6 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </span>
               )
             )}
-            {/* Owner-only kill-switch for comments (independent of the lock
-                above - see CommentsPanel.tsx's own doc comment) - a non-owner
-                sees no indicator here, unlike the lock button, since a
-                disabled comment box below already makes the state obvious. */}
-            {isOwner && !share && (
-              <button
-                onClick={() => commentsDisabledMutation.mutate(!object.commentsDisabled)}
-                disabled={commentsDisabledMutation.isPending}
-                title={object.commentsDisabled ? "Enable comments on this object" : "Disable comments on this object"}
-                className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.commentsDisabled ? "text-accent" : "text-ink-muted"}`}
-              >
-                <Icon name={object.commentsDisabled ? "comment-off" : "comment"} className="h-4 w-4" />
-              </button>
-            )}
             {/* `key={object.id}` forces a full remount on every object
                 change, same reasoning as CoverImage's own `key` above -
                 without it, navigating from one object to another reuses
@@ -393,6 +379,21 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 >
                   <Icon name="layout-dashboard" className="h-4 w-4" />
                 </button>
+                {/* Owner-only kill-switch for comments, deliberately sitting
+                    right next to Share - the two controls answer the same
+                    kind of question ("who can interact with this object,
+                    and how") - see CommentsPanel.tsx's own doc comment for
+                    why this is independent of the lock button above. */}
+                {isOwner && (
+                  <button
+                    onClick={() => commentsDisabledMutation.mutate(!object.commentsDisabled)}
+                    disabled={commentsDisabledMutation.isPending}
+                    title={object.commentsDisabled ? "Enable comments on this object" : "Disable comments on this object"}
+                    className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.commentsDisabled ? "text-ink-muted" : "text-accent"}`}
+                  >
+                    <Icon name={object.commentsDisabled ? "comment-off" : "comment"} className="h-4 w-4" />
+                  </button>
+                )}
                 <ShareDialog workspaceId={workspaceId} objectId={object.id} label="Share" />
                 <button
                   onClick={handleDelete}

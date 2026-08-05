@@ -4,6 +4,7 @@ import type {
   BackupFilesChangedMessage,
   BackupProgressMessage,
   BackupScheduleChangedMessage,
+  NotificationMessage,
   PresenceSnapshotMessage,
   RealtimeEvent,
 } from "@notorious/shared";
@@ -127,6 +128,7 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           queryClient.invalidateQueries({ queryKey: ["viewResults"] });
           queryClient.invalidateQueries({ queryKey: ["backlinks"] });
           queryClient.invalidateQueries({ queryKey: ["comments"] });
+          queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["workspaces"] });
           queryClient.invalidateQueries({ queryKey: ["pins", workspaceId] });
@@ -140,7 +142,8 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           | PresenceSnapshotMessage
           | BackupProgressMessage
           | BackupFilesChangedMessage
-          | BackupScheduleChangedMessage;
+          | BackupScheduleChangedMessage
+          | NotificationMessage;
         // Presence snapshots and backup-progress updates (see modules/
         // presence/ and modules/backup/ server-side) share this same per-
         // workspace socket but aren't a `RealtimeEvent` - distinguished by a
@@ -163,6 +166,14 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           if (payload.type === "backupScheduleChanged") {
             queryClient.invalidateQueries({ queryKey: ["backupSchedule", workspaceId] });
             queryClient.invalidateQueries({ queryKey: ["backupDestinations", workspaceId] });
+            return;
+          }
+          if (payload.type === "notification") {
+            // Already targeted server-side to just this user (see
+            // `sendToUser` in modules/realtime/hub.ts) - every socket that
+            // receives this one is meant to act on it, no self-echo or
+            // ownership check needed.
+            queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] });
             return;
           }
           // usePresence.ts owns the actual viewer list via its own query -

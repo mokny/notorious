@@ -39,6 +39,7 @@ import { registerTemplateRoutes } from "./modules/templates/routes.js";
 import { registerPresenceRoutes } from "./modules/presence/routes.js";
 import { registerUserRoutes } from "./modules/users/routes.js";
 import { registerCommentRoutes } from "./modules/comments/routes.js";
+import { registerNotificationRoutes } from "./modules/notifications/routes.js";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const WEB_DIST_DIR = path.join(PACKAGE_ROOT, "packages/web/dist");
@@ -123,6 +124,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerPresenceRoutes(app);
   await registerUserRoutes(app);
   await registerCommentRoutes(app);
+  await registerNotificationRoutes(app);
 
   app.get("/api/v1/health", async () => ({ status: "ok", version: PACKAGE_VERSION }));
 

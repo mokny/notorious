@@ -380,3 +380,32 @@ export interface BackupScheduleChangedMessage {
   type: "backupScheduleChanged";
   workspaceId: string;
 }
+
+/** One entry in a registered user's notification bell (see modules/notifications/) - currently only ever created for a new comment, hence no `type` field of its own the way `ActivityEntry.action` has (nothing else produces one yet). `body` is a truncated preview of the comment, not the full text - see modules/notifications/service.ts. */
+export interface Notification {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  objectId: string;
+  objectTitle: string;
+  commentId: string | null;
+  actorName: string;
+  body: string;
+  createdAt: ISODateString;
+  readAt: ISODateString | null;
+}
+
+/**
+ * Sent to exactly one user's connected sockets (see `sendToUser` in
+ * modules/realtime/hub.ts) whenever a `Notification` is created for them -
+ * distinguished from `RealtimeEvent` by `type`, same pattern as
+ * `BackupProgressMessage`. Deliberately per-user rather than broadcast to the
+ * whole workspace room like `PresenceSnapshotMessage`/`BackupFilesChangedMessage`
+ * - a notification's content (who commented, on what) isn't meant for every
+ * other workspace member's socket to receive, only the recipient's.
+ */
+export interface NotificationMessage {
+  type: "notification";
+  workspaceId: string;
+  notification: Notification;
+}

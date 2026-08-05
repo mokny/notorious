@@ -11,6 +11,7 @@ import type {
   Comment,
   CreateCommentInput,
   SetCommentsDisabledInput,
+  Notification,
   View,
   SavedSearch,
   FileAsset,
@@ -234,6 +235,15 @@ export const commentApi = {
     apiRequest<Comment>(`/api/v1/objects/${objectId}/comments`, { method: "POST", body: input }),
   /** Deleting your own comment removes it outright; an owner/editor deleting someone else's leaves a tombstone (`deletedAt`/`deletedByName`) instead - see modules/comments/service.ts. */
   remove: (id: string) => apiRequest<void>(`/api/v1/comments/${id}`, { method: "DELETE" }),
+};
+
+/** Members-only, full stop - see modules/notifications/routes.ts. */
+export const notificationApi = {
+  list: (workspaceId: string) => apiRequest<Notification[]>(`/api/v1/workspaces/${workspaceId}/notifications`),
+  markRead: (workspaceId: string, id: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/notifications/${id}/read`, { method: "POST" }),
+  markAllRead: (workspaceId: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/notifications/read-all`, { method: "POST" }),
 };
 
 export const templateApi = {

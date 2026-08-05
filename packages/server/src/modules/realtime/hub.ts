@@ -3,6 +3,7 @@ import type {
   BackupFilesChangedMessage,
   BackupProgressMessage,
   BackupScheduleChangedMessage,
+  NotificationMessage,
   PresenceSnapshotMessage,
   RealtimeEvent,
 } from "@notorious/shared";
@@ -11,6 +12,8 @@ interface RoomEntry {
   objectIdFilter: string | null;
   /** The browser tab's `clientId` (see lib/ws/clientId.ts on the frontend), used to target a single client - e.g. `sendToClient` for backup progress - rather than the whole room. Absent for anonymous share visitors, who never trigger a targeted send. */
   clientId?: string;
+  /** The real member's user id, absent for an anonymous share visitor - used only to target `sendToUser` (notifications), which a share visitor (no account, nothing to notify) never needs to receive. */
+  userId?: string;
 }
 
 // Value is the socket's object-id filter: null for a real member or a
@@ -20,13 +23,19 @@ interface RoomEntry {
 const roomsByWorkspace = new Map<string, Map<WebSocket, RoomEntry>>();
 
 /** Adds a socket to a workspace's broadcast room and cleans up on disconnect. */
-export function joinRoom(workspaceId: string, socket: WebSocket, objectIdFilter: string | null = null, clientId?: string): void {
+export function joinRoom(
+  workspaceId: string,
+  socket: WebSocket,
+  objectIdFilter: string | null = null,
+  clientId?: string,
+  userId?: string,
+): void {
   let room = roomsByWorkspace.get(workspaceId);
   if (!room) {
     room = new Map();
     roomsByWorkspace.set(workspaceId, room);
   }
-  room.set(socket, { objectIdFilter, clientId });
+  room.set(socket, { objectIdFilter, clientId, userId });
 
   socket.on("close", () => {
     room?.delete(socket);
@@ -85,6 +94,26 @@ export function sendToClient(workspaceId: string, clientId: string, message: Bac
   const payload = JSON.stringify(message);
   for (const [socket, entry] of room) {
     if (entry.clientId !== clientId) continue;
+    if (socket.readyState === socket.OPEN) socket.send(payload);
+  }
+}
+
+/**
+ * Sends a notification to every open socket belonging to one specific user
+ * (they may have several tabs/devices open) rather than the whole workspace
+ * room - see `NotificationMessage`'s doc comment for why this needs its own
+ * targeting instead of reusing `broadcast`. A no-op if that user has no
+ * open socket on this workspace right now; they still see it next time they
+ * fetch their notification list (see modules/notifications/service.ts) -
+ * this is purely the live-update path, not the source of truth.
+ */
+export function sendToUser(workspaceId: string, userId: string, message: NotificationMessage): void {
+  const room = roomsByWorkspace.get(workspaceId);
+  if (!room) return;
+
+  const payload = JSON.stringify(message);
+  for (const [socket, entry] of room) {
+    if (entry.userId !== userId) continue;
     if (socket.readyState === socket.OPEN) socket.send(payload);
   }
 }

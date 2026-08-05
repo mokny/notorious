@@ -161,8 +161,11 @@ export const objects = sqliteTable("objects", {
   slug: text("slug"),
   // Owner-only kill-switch for the comments feature (modules/comments/) -
   // independent of lockedAt, so comments stay postable on a locked object
-  // unless this is also set.
-  commentsDisabled: integer("comments_disabled", { mode: "boolean" }).notNull().default(false),
+  // unless this is also set. Defaults to true (disabled) - see
+  // objects/service.ts's `createObject`, which sets this explicitly rather
+  // than relying on the column's own SQL default (still `0` at the SQL
+  // level for historical reasons, see migrations/0030_notifications.sql).
+  commentsDisabled: integer("comments_disabled", { mode: "boolean" }).notNull().default(true),
 });
 
 export const objectValues = sqliteTable(
@@ -256,6 +259,30 @@ export const comments = sqliteTable("comments", {
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
   deletedByName: text("deleted_by_name"),
+});
+
+// One row per notification delivered to a registered user's bell - see
+// modules/notifications/. `commentId` cascades with its comment (see
+// migrations/0030_notifications.sql); `objectTitle`/`actorName` are
+// denormalized at write time so a notification still reads correctly even
+// after the object is renamed or the actor's account is gone.
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  objectId: text("object_id")
+    .notNull()
+    .references(() => objects.id, { onDelete: "cascade" }),
+  objectTitle: text("object_title").notNull(),
+  commentId: text("comment_id").references(() => comments.id, { onDelete: "cascade" }),
+  actorName: text("actor_name").notNull(),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+  readAt: text("read_at"),
 });
 
 export const files = sqliteTable("files", {

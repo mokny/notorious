@@ -27,7 +27,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
         socket.close(4003, "Forbidden");
         return;
       }
-      joinRoom(workspaceId, socket, null, clientId);
+      joinRoom(workspaceId, socket, null, clientId, user.id);
       return;
     }
 

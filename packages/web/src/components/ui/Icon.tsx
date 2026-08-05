@@ -72,6 +72,7 @@ import {
   Columns,
   MessageSquare,
   MessageSquareOff,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 
@@ -147,6 +148,7 @@ const ICONS: Record<string, LucideIcon> = {
   "insert-column": Columns,
   comment: MessageSquare,
   "comment-off": MessageSquareOff,
+  bell: Bell,
 };
 
 function isImageUrl(value: string): boolean {
