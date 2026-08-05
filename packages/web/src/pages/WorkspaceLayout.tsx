@@ -10,6 +10,7 @@ import { useTheme } from "../context/ThemeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
+import { useDragSelectGuard } from "../hooks/useDragSelectGuard.js";
 import { useBreakpoint, useIsLandscape } from "../hooks/useBreakpoint.js";
 import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
@@ -42,6 +43,7 @@ export function WorkspaceLayout() {
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
   const pinSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const pinDragSelectGuard = useDragSelectGuard();
 
   function handlePinDragEnd(event: DragEndEvent) {
     if (!event.over || event.active.id === event.over.id) return;
@@ -146,7 +148,15 @@ export function WorkspaceLayout() {
           {pinnedIds.length > 0 && (
             <div className="mt-3">
               <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Pinned</p>
-              <DndContext sensors={pinSensors} onDragEnd={handlePinDragEnd}>
+              <DndContext
+                sensors={pinSensors}
+                onDragStart={pinDragSelectGuard.onDragStart}
+                onDragCancel={pinDragSelectGuard.onDragCancel}
+                onDragEnd={(event) => {
+                  pinDragSelectGuard.onDragEnd();
+                  handlePinDragEnd(event);
+                }}
+              >
                 <SortableContext items={pinnedIds} strategy={verticalListSortingStrategy}>
                   <div className="space-y-0.5">
                     {pinnedIds.map((objectId) => (

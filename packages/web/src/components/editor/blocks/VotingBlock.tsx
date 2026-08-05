@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { VotingContent, VotingItem, VoteSummary } from "@notorious/shared";
 import { useAuth } from "../../../context/AuthContext.js";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
+import { useDragSelectGuard } from "../../../hooks/useDragSelectGuard.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { useKeepInViewport } from "../../../hooks/useKeepInViewport.js";
 import { blockApi, workspaceApi } from "../../../lib/api/resources.js";
@@ -15,6 +16,13 @@ import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 
 const EMPTY_SUMMARY: VoteSummary = { up: 0, down: 0, myVote: null };
+
+/** Grows a textarea to fit its (possibly wrapped, no literal newlines) content instead of clipping it - reset to "auto" first so it can shrink back down too, not just grow. Same helper as ChecklistBlock.tsx's own `resizeTextarea`. */
+function resizeTextarea(el: HTMLTextAreaElement | null): void {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
 
 /** Local <-> UTC round-trip for a `datetime-local` input, same helper as PropertyField.tsx's own `toLocalInputValue`. */
 function toLocalInputValue(iso: string): string {
@@ -180,13 +188,21 @@ function VotingItemRow({
       </div>
 
       <div className="min-w-0 flex-1 space-y-0.5 py-0.5">
-        <input
+        <textarea
+          ref={(el) => resizeTextarea(el)}
           value={item.title}
-          onChange={(e) => onChangeTitle(e.target.value)}
+          onChange={(e) => {
+            onChangeTitle(e.target.value);
+            resizeTextarea(e.target);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
           readOnly={readOnly}
           placeholder="Option"
           autoComplete="off"
-          className="w-full border-none bg-transparent text-sm font-medium outline-none"
+          rows={1}
+          className="w-full resize-none overflow-hidden border-none bg-transparent text-sm font-medium outline-none"
         />
         {(item.description || !readOnly) && (
           <input
@@ -232,6 +248,7 @@ export function VotingBlock({
   const votingEndsAt = content.votingEndsAt ?? null;
   const votingClosed = votingEndsAt !== null && new Date(votingEndsAt).getTime() <= Date.now();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const dragSelectGuard = useDragSelectGuard();
 
   // Only a real workspace owner can reach `onUpdateSettings` server-side (see
   // updateVotingSettingsSchema's minRole) - hiding the gear for everyone else
@@ -289,7 +306,15 @@ export function VotingBlock({
           />
         )}
       </div>
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        onDragStart={dragSelectGuard.onDragStart}
+        onDragCancel={dragSelectGuard.onDragCancel}
+        onDragEnd={(event) => {
+          dragSelectGuard.onDragEnd();
+          handleDragEnd(event);
+        }}
+      >
         <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
           {items.map((item, index) => (
             <VotingItemRow

@@ -4,6 +4,7 @@ import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSe
 import type { ObjectRecord, Property, PropertyOption } from "@notorious/shared";
 import { useObjectMutations } from "../../hooks/useObjectMutations.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
 
 interface BoardViewProps {
   workspaceId: string;
@@ -32,6 +33,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
   );
+  const dragSelectGuard = useDragSelectGuard();
   const pivot = properties.find((p) => p.id === pivotPropertyId);
   const options: PropertyOption[] = useMemo(
     () => (pivot && "options" in pivot.config ? pivot.config.options : []),
@@ -60,7 +62,15 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={dragSelectGuard.onDragStart}
+      onDragCancel={dragSelectGuard.onDragCancel}
+      onDragEnd={(event) => {
+        dragSelectGuard.onDragEnd();
+        handleDragEnd(event);
+      }}
+    >
       <div className={stacked ? "flex h-full flex-col gap-4 overflow-y-auto p-4" : "flex h-full gap-4 overflow-x-auto p-4"}>
         <BoardColumn
           id={UNASSIGNED}

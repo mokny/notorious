@@ -11,6 +11,7 @@ import { BlockEditorProvider } from "./BlockEditorContext.js";
 import { BlockList } from "./BlockList.js";
 import { useEditorHistory, type BlockSnapshot } from "./useEditorHistory.js";
 import { useKeepFocusedElementVisible } from "../../hooks/useKeepFocusedElementVisible.js";
+import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
 
 function isEditableElementFocused(): boolean {
   const el = document.activeElement as HTMLElement | null;
@@ -100,6 +101,7 @@ export function BlockEditor({
   );
   const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
+  const dragSelectGuard = useDragSelectGuard();
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const dragDepth = useRef(0);
@@ -358,10 +360,12 @@ export function BlockEditor({
 
   function handleDragStart(_event: DragStartEvent) {
     setIsDraggingAny(true);
+    dragSelectGuard.onDragStart();
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setIsDraggingAny(false);
+    dragSelectGuard.onDragEnd();
     if (!event.over || event.active.id === event.over.id) return;
     const blockId = String(event.active.id);
     const overId = String(event.over.id);
@@ -491,7 +495,15 @@ export function BlockEditor({
           </div>
         )}
 
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setIsDraggingAny(false)}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => {
+            setIsDraggingAny(false);
+            dragSelectGuard.onDragCancel();
+          }}
+        >
           <div className="group/editor">
             <BlockList blocks={tree} parentBlockId={null} />
           </div>

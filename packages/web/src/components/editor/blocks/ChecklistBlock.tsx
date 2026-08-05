@@ -4,6 +4,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import type { ChecklistContent, ChecklistItem } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
+import { useDragSelectGuard } from "../../../hooks/useDragSelectGuard.js";
 import { randomId } from "../../../lib/randomId.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
@@ -175,6 +176,7 @@ export function ChecklistBlock({
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const dragSelectGuard = useDragSelectGuard();
 
   useEffect(() => {
     if (pendingFocusIndex === null) return;
@@ -228,7 +230,15 @@ export function ChecklistBlock({
 
   return (
     <div className="space-y-1">
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        onDragStart={dragSelectGuard.onDragStart}
+        onDragCancel={dragSelectGuard.onDragCancel}
+        onDragEnd={(event) => {
+          dragSelectGuard.onDragEnd();
+          handleDragEnd(event);
+        }}
+      >
         <SortableContext items={items.map((item, index) => item.id ?? `unindexed-${index}`)} strategy={verticalListSortingStrategy}>
           {items.map((item, index) => (
             <ChecklistItemRow
