@@ -21,10 +21,22 @@
  * inputs, the title field, ...) has no such native read-only state, so it
  * still falls back to `pointer-events: none`.
  *
+ * The whiteboard block's own canvas gets a narrower carve-out on top of the
+ * blanket `[&_canvas]:pointer-events-none` above: WhiteboardBlock.tsx already
+ * gates *drawing* itself via Excalidraw's own `viewModeEnabled` prop (which,
+ * unlike a CSS `pointer-events: none`, still allows panning/zooming the
+ * canvas) - see its `canDraw`. A blanket `pointer-events: none` on top of
+ * that would additionally kill panning/zooming for everyone, including the
+ * owner, which `viewModeEnabled` never does on its own. WhiteboardBlock.tsx
+ * marks its canvas's wrapper with `data-pannable`, and the second selector
+ * below (more specific than the first, so it wins regardless of rule order)
+ * restores pointer events there - `viewModeEnabled` is left to do the actual
+ * fine-grained gating.
+ *
  * Shared by ObjectDetailPage.tsx (a locked object, or a read-only share) and
  * BlockEditor.tsx (an embedded sub-object's content, which is always
  * read-only regardless of the host object's own lock state - see its
  * `readOnly`/`isEmbedded`).
  */
 export const READ_ONLY_CONTENT_CLASS =
-  "locked-content [&_input:not([readonly])]:pointer-events-none [&_textarea:not([readonly])]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable=true]]:pointer-events-none [&_canvas]:pointer-events-none";
+  "locked-content [&_input:not([readonly])]:pointer-events-none [&_textarea:not([readonly])]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable=true]]:pointer-events-none [&_canvas]:pointer-events-none [&_[data-pannable]_canvas]:pointer-events-auto";

@@ -93,6 +93,15 @@ export const twoFactorApi = {
   verify: (input: VerifyTwoFactorInput) => apiRequest<User>("/api/v1/auth/2fa/verify", { method: "POST", body: input }),
 };
 
+export const usersApi = {
+  uploadAvatar: (file: Blob) => {
+    const formData = new FormData();
+    formData.append("file", file, "avatar.png");
+    return apiUpload<{ avatarUrl: string }>("/api/v1/users/me/avatar", formData);
+  },
+  deleteAvatar: () => apiRequest<void>("/api/v1/users/me/avatar", { method: "DELETE" }),
+};
+
 export const workspaceApi = {
   list: () => apiRequest<Workspace[]>("/api/v1/workspaces"),
   create: (input: CreateWorkspaceInput) => apiRequest<Workspace>("/api/v1/workspaces", { method: "POST", body: input }),

@@ -7,6 +7,7 @@ import { useTheme } from "../../../context/ThemeContext.js";
 import { useAuth } from "../../../context/AuthContext.js";
 import { workspaceApi } from "../../../lib/api/resources.js";
 import { Icon } from "../../ui/Icon.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 const SAVE_DEBOUNCE_MS = 500;
 // Matches Excalidraw's own (undocumented-as-a-prop, so mirrored here rather
@@ -65,6 +66,20 @@ export function WhiteboardBlock({
   // stopping a presentation needs to flip everyone else's view mode the
   // moment that update arrives, the same as any other synced field.
   const presenting = externalContent.presenting ?? false;
+  // `readOnly` here already folds together everything that should block
+  // drawing outside of presentation mode: the object's own lock state and
+  // (for an anonymous share visitor) a sub-`editor` share role - see
+  // ObjectDetailPage.tsx's `effectiveCanEdit`/`isLocked`, which is exactly
+  // what gets passed down as `BlockEditor`'s `readOnly` prop and ends up
+  // here via BlockEditorContext (same pattern ChecklistBlock.tsx uses for
+  // its own item text). No need to re-derive or re-thread that logic here.
+  const { readOnly } = useBlockEditor();
+  // canDraw truth table (see WhiteboardBlock's spec):
+  // - while presenting, only the owner can draw - everyone else, owner or
+  //   not, only gets to pan/zoom.
+  // - outside of presenting, anyone with edit rights can draw, unless the
+  //   object is locked or this is a read-only share visitor (`readOnly`).
+  const canDraw = presenting ? isOwner : !readOnly;
   // Purely local - which browser tab has this whiteboard enlarged is not
   // shared state, unlike `presenting`.
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -323,6 +338,12 @@ export function WhiteboardBlock({
             type="button"
             onClick={togglePresenting}
             title={presenting ? "Stop presenting - everyone can draw again" : "Start presenting - only you can draw while this is on"}
+            // Toggling presentation mode is a view/mode switch the owner
+            // should still be able to reach even while the object is locked
+            // (or this whole block is otherwise wrapped in
+            // READ_ONLY_CONTENT_CLASS) - same exemption the zoom/fullscreen
+            // buttons below already use.
+            data-view-toggle
             className={`flex items-center gap-1 rounded p-1.5 text-xs ${
               presenting ? "bg-accent/10 text-accent" : "text-ink-muted hover:bg-surface hover:text-ink"
             }`}
@@ -376,7 +397,12 @@ export function WhiteboardBlock({
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1">
+      {/* `data-pannable` opts this canvas out of READ_ONLY_CONTENT_CLASS's
+          blanket `[&_canvas]:pointer-events-none` (see readOnlyContent.ts) -
+          `viewModeEnabled` below already does the fine-grained gating
+          (blocks drawing, still allows pan/zoom), so the cruder CSS rule
+          would only take away panning on top of that for no reason. */}
+      <div className="min-h-0 flex-1" data-pannable>
         <Suspense
           fallback={<div className="flex h-full items-center justify-center text-sm text-ink-muted">Loading whiteboard…</div>}
         >
@@ -385,7 +411,7 @@ export function WhiteboardBlock({
             onChange={handleChange}
             theme={theme}
             excalidrawAPI={onExcalidrawApi}
-            viewModeEnabled={presenting && !isOwner}
+            viewModeEnabled={!canDraw}
           />
         </Suspense>
       </div>

@@ -17,6 +17,7 @@ export interface AuthenticatedUser {
   email: string;
   name: string;
   avatarColor: string;
+  avatarUrl: string | null;
 }
 
 declare module "fastify" {
@@ -59,6 +60,7 @@ export const sessionPlugin = fp(async (app: FastifyInstance) => {
           email: users.email,
           name: users.name,
           avatarColor: users.avatarColor,
+          avatarUrl: users.avatarUrl,
         })
         .from(sessions)
         .innerJoin(users, eq(sessions.userId, users.id))
@@ -67,7 +69,7 @@ export const sessionPlugin = fp(async (app: FastifyInstance) => {
 
       const row = rows[0];
       if (row) {
-        request.user = { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor };
+        request.user = { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor, avatarUrl: row.avatarUrl };
         return;
       }
     }

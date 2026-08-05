@@ -11,6 +11,8 @@ export interface User {
   email: string;
   name: string;
   avatarColor: string;
+  /** Set once the user uploads a profile picture (see modules/users/) - a servable URL/path. `avatarColor` is the fallback whenever this is null/unset. */
+  avatarUrl?: string | null;
   createdAt: ISODateString;
   /** Whether TOTP two-factor authentication is set up and confirmed for this account (see modules/twoFactor/) - never exposes the secret itself, just this flag. */
   totpEnabled: boolean;

@@ -98,6 +98,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       email: users.email,
       name: users.name,
       avatarColor: users.avatarColor,
+      avatarUrl: users.avatarUrl,
       createdAt: users.createdAt,
       totpEnabled: users.totpEnabled,
     })
@@ -115,6 +116,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       email: row.email,
       name: row.name,
       avatarColor: row.avatarColor,
+      avatarUrl: row.avatarUrl,
       createdAt: row.createdAt,
       totpEnabled: row.totpEnabled,
     },

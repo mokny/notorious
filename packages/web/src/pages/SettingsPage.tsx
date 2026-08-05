@@ -240,12 +240,16 @@ export function SettingsPage() {
           {members?.map((member) => (
             <div key={member.userId} className="flex items-center justify-between rounded-lg border border-border p-3">
               <div className="flex items-center gap-2">
-                <span
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
-                  style={{ backgroundColor: member.user.avatarColor }}
-                >
-                  {member.user.name[0]}
-                </span>
+                {member.user.avatarUrl ? (
+                  <img src={member.user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                ) : (
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
+                    style={{ backgroundColor: member.user.avatarColor }}
+                  >
+                    {member.user.name[0]}
+                  </span>
+                )}
                 <div>
                   <p className="text-sm font-medium">{member.user.name}</p>
                   <p className="text-xs text-ink-muted">{member.user.email}</p>

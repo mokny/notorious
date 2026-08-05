@@ -16,6 +16,7 @@ function toUser(row: typeof users.$inferSelect): User {
     email: row.email,
     name: row.name,
     avatarColor: row.avatarColor,
+    avatarUrl: row.avatarUrl,
     createdAt: row.createdAt,
     totpEnabled: row.totpEnabled,
   };
@@ -44,7 +45,7 @@ export async function registerUser(input: RegisterInput): Promise<User> {
   await createWorkspace(id, { name: `${input.name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, input.email);
 
-  return { id, email: input.email, name: input.name, avatarColor, createdAt, totpEnabled: false };
+  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false };
 }
 
 /**

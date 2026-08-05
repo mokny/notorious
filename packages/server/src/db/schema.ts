@@ -6,6 +6,10 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   name: text("name").notNull(),
   avatarColor: text("avatar_color").notNull().default("#6366f1"),
+  // Set once the user uploads a profile picture (see modules/users/) - a
+  // servable URL/path, not raw bytes. `avatarColor` stays the fallback
+  // used everywhere this is null/unset.
+  avatarUrl: text("avatar_url"),
   createdAt: text("created_at").notNull(),
   totpSecret: text("totp_secret"),
   totpEnabled: integer("totp_enabled", { mode: "boolean" }).notNull().default(false),

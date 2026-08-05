@@ -161,12 +161,16 @@ export function WorkspaceLayout() {
             <span className="truncate text-sm text-ink-muted">Viewing via a shared link</span>
           ) : (
             <div className="flex items-center gap-2 overflow-hidden">
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                style={{ backgroundColor: user?.avatarColor }}
-              >
-                {user?.name?.[0]}
-              </span>
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+                  style={{ backgroundColor: user?.avatarColor }}
+                >
+                  {user?.name?.[0]}
+                </span>
+              )}
               <span className="truncate text-sm">{user?.name}</span>
             </div>
           )}

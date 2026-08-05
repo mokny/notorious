@@ -74,6 +74,7 @@ export async function authenticateApiKey(token: string): Promise<AuthenticatedUs
       email: users.email,
       name: users.name,
       avatarColor: users.avatarColor,
+      avatarUrl: users.avatarUrl,
     })
     .from(apiKeys)
     .innerJoin(users, eq(apiKeys.userId, users.id))
@@ -85,5 +86,5 @@ export async function authenticateApiKey(token: string): Promise<AuthenticatedUs
 
   await db.update(apiKeys).set({ lastUsedAt: nowIso() }).where(eq(apiKeys.id, row.keyId));
 
-  return { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor };
+  return { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor, avatarUrl: row.avatarUrl };
 }
