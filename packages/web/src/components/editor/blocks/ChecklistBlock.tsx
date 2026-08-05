@@ -223,6 +223,7 @@ export function ChecklistBlock({
     const newIndex = sortableIds.indexOf(String(event.over.id));
     if (oldIndex === -1 || newIndex === -1) return;
     save({ ...content, items: arrayMove(items, oldIndex, newIndex) });
+    flushSave();
   }
 
   return (
