@@ -439,17 +439,6 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               </>
             )}
 
-            {/* Deliberately outside the `!share?.singleObject` gate above -
-                unlike backlinks/sub-objects (which need to browse elsewhere
-                in the workspace), commenting is entirely local to this one
-                object, so a single-object share can use it too. */}
-            <CommentsPanel
-              objectId={object.id}
-              workspaceId={workspaceId}
-              commentsDisabled={object.commentsDisabled}
-              share={share}
-            />
-
             {/* Members-only, full stop - never shown for any kind of share,
                 not just single-object ones (see workspaces/access.ts's
                 `requireRealMemberAccess` on the server side for why running
@@ -461,6 +450,23 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               </CollapsibleSection>
             )}
           </div>
+
+          {/* Deliberately outside the READ_ONLY_LOCK-wrapped `<div>` above -
+              that class disables pointer-events on every input/button inside
+              it while the object is locked, which would silently swallow
+              clicks on the compose box/post/delete buttons here even though
+              the server-side route is explicitly lock-exempt (see
+              createCommentSchema's doc comment). Also outside the
+              `!share?.singleObject` gate above it - unlike backlinks/
+              sub-objects (which need to browse elsewhere in the workspace),
+              commenting is entirely local to this one object, so a
+              single-object share can use it too. */}
+          <CommentsPanel
+            objectId={object.id}
+            workspaceId={workspaceId}
+            commentsDisabled={object.commentsDisabled}
+            share={share}
+          />
         </div>
 
         <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
