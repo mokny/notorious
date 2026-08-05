@@ -39,6 +39,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "bookmark", label: "Bookmark", description: "Save a link with a title and description" },
   { type: "whiteboard", label: "Whiteboard", description: "Sketch with shapes, arrows and freehand drawing" },
   { type: "calendar", label: "Calendar", description: "Year/month/week/day/agenda calendar over one or more object types" },
+  { type: "voting", label: "Voting", description: "Reddit-style list with upvotes/downvotes on each item" },
 ];
 
 /**

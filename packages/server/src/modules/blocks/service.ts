@@ -1,7 +1,18 @@
 import { eq, and, isNull, desc } from "drizzle-orm";
-import type { CreateBlockInput, UpdateBlockInput, MoveBlockInput, RestoreBlockInput, Block, BlockHistoryEntry } from "@notorious/shared";
+import type {
+  CreateBlockInput,
+  UpdateBlockInput,
+  MoveBlockInput,
+  RestoreBlockInput,
+  Block,
+  BlockHistoryEntry,
+  CastVoteInput,
+  UpdateVotingSettingsInput,
+  VotingContent,
+  VoteSummary,
+} from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { blocks, objects, blockHistory } from "../../db/schema.js";
+import { blocks, objects, blockHistory, voteRecords } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { notFound, badRequest, conflict } from "../../lib/httpError.js";
 import { positionBetween } from "../../lib/position.js";
@@ -278,6 +289,102 @@ export async function toggleWhiteboardPresenting(blockId: string, presenting: bo
 
   const updatedAt = nowIso();
   const content = JSON.stringify({ ...JSON.parse(row.content), presenting });
+  await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
+  await touchObject(row.objectId);
+
+  return toBlock({ ...row, content, updatedAt });
+}
+
+/** Per-item vote counts and (if `voterKey` given) the caller's own vote - computed live from `vote_records` rather than stored on the block, since it's per-viewer and changes independently of the item list. */
+export async function getVoteSummary(blockId: string, voterKey: string | null): Promise<Record<string, VoteSummary>> {
+  const rows = await db
+    .select({ itemId: voteRecords.itemId, value: voteRecords.value, voterKey: voteRecords.voterKey })
+    .from(voteRecords)
+    .where(eq(voteRecords.blockId, blockId));
+
+  const summary: Record<string, VoteSummary> = {};
+  for (const row of rows) {
+    const entry = (summary[row.itemId] ??= { up: 0, down: 0, myVote: null });
+    if (row.value === "up") entry.up += 1;
+    else if (row.value === "down") entry.down += 1;
+    if (voterKey && row.voterKey === voterKey) entry.myVote = row.value as "up" | "down";
+  }
+  return summary;
+}
+
+/**
+ * Casts, changes, or retracts (`value: null`) one voter's vote on one item of
+ * a voting block - see `castVoteSchema`'s doc comment for why this is a
+ * narrow, lock-exempt endpoint rather than going through the generic
+ * `updateBlock`. Clicking the arrow that's already active retracts the vote;
+ * clicking the other one switches it. When the block's `allowMultipleVotes`
+ * is false, casting a vote also clears the same voter's vote on every other
+ * item in the block (single-choice poll behavior) - so it moves rather than
+ * adds to their previous pick.
+ */
+export async function castVote(blockId: string, voterKey: string, input: CastVoteInput): Promise<Record<string, VoteSummary>> {
+  const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Block not found");
+  if (row.type !== "voting") throw badRequest("Not a voting block");
+
+  const content = JSON.parse(row.content) as VotingContent;
+  if (!content.items.some((item) => item.id === input.itemId)) throw notFound("Voting item not found");
+  if (content.votingEndsAt && new Date(content.votingEndsAt).getTime() <= Date.now()) {
+    throw badRequest("Voting has closed");
+  }
+
+  const existing = await db
+    .select()
+    .from(voteRecords)
+    .where(and(eq(voteRecords.blockId, blockId), eq(voteRecords.itemId, input.itemId), eq(voteRecords.voterKey, voterKey)))
+    .limit(1);
+
+  if (input.value === null) {
+    if (existing[0]) await db.delete(voteRecords).where(eq(voteRecords.id, existing[0].id));
+  } else if (existing[0] && existing[0].value === input.value) {
+    await db.delete(voteRecords).where(eq(voteRecords.id, existing[0].id));
+  } else {
+    if (content.allowMultipleVotes === false) {
+      await db
+        .delete(voteRecords)
+        .where(and(eq(voteRecords.blockId, blockId), eq(voteRecords.voterKey, voterKey)));
+    }
+    if (existing[0] && content.allowMultipleVotes !== false) {
+      await db.update(voteRecords).set({ value: input.value }).where(eq(voteRecords.id, existing[0].id));
+    } else {
+      await db.insert(voteRecords).values({
+        id: newId(),
+        blockId,
+        itemId: input.itemId,
+        voterKey,
+        value: input.value,
+        createdAt: nowIso(),
+      });
+    }
+  }
+
+  return getVoteSummary(blockId, voterKey);
+}
+
+/**
+ * Owner-only voting settings (multi-vote allowance, deadline) - its own
+ * narrow, lock-exempt endpoint like `toggleWhiteboardPresenting`, kept
+ * separate from `updateBlock` so item edits (editor, blocked when locked)
+ * and settings edits (owner, lock-exempt) enforce different access rules.
+ */
+export async function updateVotingSettings(blockId: string, input: UpdateVotingSettingsInput): Promise<Block> {
+  const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Block not found");
+  if (row.type !== "voting") throw badRequest("Not a voting block");
+
+  const updatedAt = nowIso();
+  const content = JSON.stringify({
+    ...JSON.parse(row.content),
+    allowMultipleVotes: input.allowMultipleVotes,
+    votingEndsAt: input.votingEndsAt,
+  });
   await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
   await touchObject(row.objectId);
 

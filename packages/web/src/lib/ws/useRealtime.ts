@@ -50,6 +50,12 @@ function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient:
       // actually notice as "the template doesn't update".
       queryClient.invalidateQueries({ queryKey: ["blocksRendered", payload.objectId ?? ""] });
     }
+    // Unlike the rest of this branch, not gated by the self-echo check -
+    // a vote cast from this same tab already gets its own optimistic
+    // update (see VotingBlock.tsx), but this also has to cover *other*
+    // tabs/devices of the same voter, which the clientId check above would
+    // otherwise skip.
+    queryClient.invalidateQueries({ queryKey: ["blockVotes", payload.entityId] });
   } else if (payload.entity === "member") {
     queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
     queryClient.invalidateQueries({ queryKey: ["workspaces"] });

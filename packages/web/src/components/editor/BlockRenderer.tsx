@@ -21,6 +21,7 @@ import type {
   BookmarkContent,
   WhiteboardContent,
   CalendarBlockContent,
+  VotingContent,
 } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { ParagraphBlock } from "./blocks/ParagraphBlock.js";
@@ -41,6 +42,7 @@ import { SubObjectBlock } from "./blocks/SubObjectBlock.js";
 import { BookmarkBlock } from "./blocks/BookmarkBlock.js";
 import { WhiteboardBlock } from "./blocks/WhiteboardBlock.js";
 import { CalendarBlock } from "./blocks/CalendarBlock.js";
+import { VotingBlock } from "./blocks/VotingBlock.js";
 
 export interface BlockRendererProps {
   block: BlockNode;
@@ -51,6 +53,8 @@ export interface BlockRendererProps {
   onToggleChecklistItem: (itemId: string, checked: boolean) => Promise<void>;
   /** Owner-only, exempt from the object lock - see WhiteboardBlock.tsx and toggleWhiteboardPresentingSchema. Only relevant for `whiteboard` blocks. */
   onToggleWhiteboardPresenting: (presenting: boolean) => Promise<void>;
+  /** Owner-only, exempt from the object lock - see VotingBlock.tsx and updateVotingSettingsSchema. Only relevant for `voting` blocks. */
+  onUpdateVotingSettings: (allowMultipleVotes: boolean, votingEndsAt: string | null) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
   onSlashSelect: (type: BlockType, extraContent?: Record<string, unknown>) => void;
@@ -71,6 +75,7 @@ export function BlockRenderer({
   onSave,
   onToggleChecklistItem,
   onToggleWhiteboardPresenting,
+  onUpdateVotingSettings,
   onSlashSelect,
   objectTypes,
   embedAncestorIds,
@@ -160,6 +165,8 @@ export function BlockRenderer({
       );
     case "calendar":
       return <CalendarBlock content={content<CalendarBlockContent>()} workspaceId={workspaceId} objectTypes={objectTypes} onSave={save} />;
+    case "voting":
+      return <VotingBlock blockId={block.id} content={content<VotingContent>()} onSave={save} onUpdateSettings={onUpdateVotingSettings} />;
     default:
       return null;
   }

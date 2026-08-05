@@ -180,6 +180,15 @@ export function BlockEditor({
     onSuccess: invalidate,
   });
 
+  // Own mutation, not routed through `updateMutation` - same reasoning as
+  // `toggleWhiteboardPresentingMutation` above: owner-only, exempt from the
+  // object lock.
+  const updateVotingSettingsMutation = useMutation({
+    mutationFn: (input: { blockId: string; allowMultipleVotes: boolean; votingEndsAt: string | null }) =>
+      blockApi.updateVotingSettings(input.blockId, { allowMultipleVotes: input.allowMultipleVotes, votingEndsAt: input.votingEndsAt }),
+    onSuccess: invalidate,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (blockId: string) => blockApi.remove(blockId),
     onSuccess: invalidate,
@@ -340,6 +349,8 @@ export function BlockEditor({
         return {};
       case "calendar":
         return { objectTypeConfigs: [] };
+      case "voting":
+        return { items: [], allowMultipleVotes: true, votingEndsAt: null };
       default:
         return {};
     }
@@ -447,6 +458,8 @@ export function BlockEditor({
           toggleChecklistItemMutation.mutateAsync({ blockId, itemId, checked }).then(() => undefined),
         toggleWhiteboardPresenting: (blockId, presenting) =>
           toggleWhiteboardPresentingMutation.mutateAsync({ blockId, presenting }).then(() => undefined),
+        updateVotingSettings: (blockId, allowMultipleVotes, votingEndsAt) =>
+          updateVotingSettingsMutation.mutateAsync({ blockId, allowMultipleVotes, votingEndsAt }).then(() => undefined),
         deleteBlock: (blockId) => performDelete(blockId),
         moveBlock: (blockId, parentBlockId, afterBlockId) => performMove(blockId, parentBlockId, afterBlockId),
         pendingFocusBlockId,

@@ -7,7 +7,10 @@ import {
   restoreBlockSchema,
   toggleChecklistItemSchema,
   toggleWhiteboardPresentingSchema,
+  castVoteSchema,
+  updateVotingSettingsSchema,
 } from "@notorious/shared";
+import { badRequest } from "../../lib/httpError.js";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, resolveActor } from "../workspaces/access.js";
 import { getObjectWorkspaceId, getObject } from "../objects/service.js";
@@ -160,6 +163,81 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       clientId: getClientId(request),
       action: "updated",
       summary: `${actor.actorName} ${input.presenting ? "started" : "stopped"} presenting a whiteboard`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return block;
+  });
+
+  // Aggregated per-item vote counts plus (if identifiable) the caller's own
+  // vote - `viewer` minRole so any reader, including an anonymous share-link
+  // visitor, can see results. `voterKey` comes from the query string for
+  // anonymous callers (the client's persisted visitor id - see web's
+  // lib/visitorIdentity.ts); logged-in callers are identified by
+  // `request.user.id` instead, ignoring any `voterKey` they might send.
+  app.get("/api/v1/blocks/:id/votes", async (request) => {
+    const { id } = request.params as { id: string };
+    const { voterKey } = request.query as { voterKey?: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    await requireAccess(request, workspaceId, "viewer", { objectId });
+    const key = request.user?.id ?? voterKey ?? null;
+    return blockService.getVoteSummary(id, key);
+  });
+
+  // Casting/changing/retracting a vote is exempt from the object-lock and
+  // open to any viewer (including anonymous share-link visitors) - see
+  // castVoteSchema's doc comment. `minRole: "viewer"` is below the
+  // "editor" threshold that triggers the lock check in `requireAccess`, so
+  // this never needs `allowWhenLocked` to reach a locked object.
+  app.patch("/api/v1/blocks/:id/vote", async (request) => {
+    const { id } = request.params as { id: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    const access = await requireAccess(request, workspaceId, "viewer", { objectId });
+    const input = castVoteSchema.parse(request.body);
+    const voterKey = request.user?.id ?? input.voterKey;
+    if (!voterKey) throw badRequest("voterKey is required for anonymous voting");
+    const summary = await blockService.castVote(id, voterKey, input);
+
+    const actor = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${actor.actorName} voted`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return summary;
+  });
+
+  // Voting settings (multi-vote allowance, deadline) are owner-only and
+  // exempt from the object-lock, mirroring `whiteboard-presenting` above.
+  app.patch("/api/v1/blocks/:id/voting-settings", async (request) => {
+    const { id } = request.params as { id: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    const access = await requireAccess(request, workspaceId, "owner", { objectId, allowWhenLocked: true });
+    const input = updateVotingSettingsSchema.parse(request.body);
+    const block = await blockService.updateVotingSettings(id, input);
+
+    const actor = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${actor.actorName} changed voting settings`,
       entity: "block",
       entityId: id,
       realtimeAction: "updated",

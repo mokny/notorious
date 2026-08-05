@@ -212,6 +212,25 @@ export const blocks = sqliteTable("blocks", {
   slug: text("slug"),
 });
 
+export const voteRecords = sqliteTable(
+  "vote_records",
+  {
+    id: text("id").primaryKey(),
+    blockId: text("block_id")
+      .notNull()
+      .references(() => blocks.id, { onDelete: "cascade" }),
+    itemId: text("item_id").notNull(),
+    // A user id for logged-in members, or a client-generated visitor id for
+    // anonymous share-link visitors (see web's lib/visitorIdentity.ts) -
+    // there's no server-side identity for the latter otherwise (see
+    // workspaces/access.ts's `resolveActor`), so the client supplies one.
+    voterKey: text("voter_key").notNull(),
+    value: text("value").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.blockId, table.itemId, table.voterKey)],
+);
+
 export const files = sqliteTable("files", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id")

@@ -37,6 +37,10 @@ function previewTextFor(block: Block): string {
       return truncate(String(content.url ?? ""));
     case "bookmark":
       return truncate(String(content.title ?? content.url ?? ""));
+    case "voting": {
+      const items = (content.items as { title: string }[] | undefined) ?? [];
+      return truncate(items.map((item) => item.title).filter(Boolean).join(", "));
+    }
     default:
       return "";
   }

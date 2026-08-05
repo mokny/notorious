@@ -50,6 +50,37 @@ export const toggleWhiteboardPresentingSchema = z.object({
 });
 export type ToggleWhiteboardPresentingInput = z.infer<typeof toggleWhiteboardPresentingSchema>;
 
+/**
+ * Casting/changing/retracting a vote on a voting-block item is deliberately
+ * exempt from the object-lock, and open to any viewer (including anonymous
+ * share-link visitors) - see workspaces/access.ts's `allowWhenLocked` and
+ * blocks/routes.ts. `voterKey` is required for anonymous requests (the
+ * client's persisted visitor id, see web's lib/visitorIdentity.ts) since
+ * there's no server-side identity for them otherwise; ignored for logged-in
+ * requests, which use `request.user.id` instead. `value: null` retracts an
+ * existing vote.
+ */
+export const castVoteSchema = z.object({
+  itemId: z.string(),
+  value: z.enum(["up", "down"]).nullable(),
+  voterKey: z.string().optional(),
+});
+export type CastVoteInput = z.infer<typeof castVoteSchema>;
+
+/**
+ * Owner-only settings on a voting block (allowing multiple simultaneous
+ * votes per voter, and an optional voting deadline) - its own narrow,
+ * lock-exempt endpoint like `toggleWhiteboardPresentingSchema`, kept
+ * separate from the generic `updateBlockSchema` so item edits (editor-role,
+ * blocked when locked) and settings edits (owner-role, lock-exempt) can
+ * enforce different access rules.
+ */
+export const updateVotingSettingsSchema = z.object({
+  allowMultipleVotes: z.boolean(),
+  votingEndsAt: z.string().nullable(),
+});
+export type UpdateVotingSettingsInput = z.infer<typeof updateVotingSettingsSchema>;
+
 export const importMarkdownSchema = z.object({
   objectId: z.string(),
   markdown: z.string().max(2_000_000),

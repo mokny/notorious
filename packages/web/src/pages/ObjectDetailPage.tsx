@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi, blockApi } from "../lib/api/resources.js";
 import { getShareRole } from "../lib/api/shareMode.js";
-import { READ_ONLY_CONTENT_CLASS } from "../lib/readOnlyContent.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
@@ -28,20 +27,29 @@ import { useDocumentTitle } from "../hooks/useDocumentTitle.js";
 
 // Disables interactive edit controls for a read-only (viewer/commenter) share
 // - or an object the owner has locked, see `isLocked` below. See
-// readOnlyContent.ts for what this covers and why.
-const READ_ONLY_LOCK = READ_ONLY_CONTENT_CLASS;
+// readOnlyContent.ts for what READ_ONLY_CONTENT_CLASS covers; this is its own
+// local variant (not that shared constant) because voting buttons need a
+// `data-vote-exempt` carve-out here that embedded sub-object previews (the
+// shared constant's only other user, always read-only regardless of role)
+// deliberately don't get - casting a vote requires only viewer access (see
+// castVoteSchema), so it stays clickable even for a share visitor who can't
+// edit anything else, unlike the checklist exemption below which needs
+// editor access.
+const READ_ONLY_LOCK =
+  "locked-content [&_input:not([readonly])]:pointer-events-none [&_textarea:not([readonly])]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle]):not([data-vote-exempt])]:pointer-events-none [&_[contenteditable=true]]:pointer-events-none [&_canvas]:pointer-events-none [&_[data-pannable]_canvas]:pointer-events-auto";
 
 // Same as READ_ONLY_LOCK, but inputs marked `data-lock-exempt` (a checklist
-// item's checkbox - see ChecklistBlock.tsx) stay interactive. Used only when
-// the object's own lock is the *sole* reason editing is disabled (`isLocked`
-// below, with `canEdit` otherwise true) - checking off a to-do isn't
-// "editing" the object's content the way the lock is meant to guard, so it's
-// deliberately let through even then (see toggleChecklistItemSchema and
-// access.ts's `allowWhenLocked`). A plain read-only share (`!canEdit`) still
-// gets the strict variant above - the underlying endpoint requires editor
-// access regardless, so a share viewer's checkbox click would just 403.
+// item's checkbox - see ChecklistBlock.tsx) stay interactive too. Used only
+// when the object's own lock is the *sole* reason editing is disabled
+// (`isLocked` below, with `canEdit` otherwise true) - checking off a to-do
+// isn't "editing" the object's content the way the lock is meant to guard,
+// so it's deliberately let through even then (see toggleChecklistItemSchema
+// and access.ts's `allowWhenLocked`). A plain read-only share (`!canEdit`)
+// still gets the strict variant above for checklist items - the underlying
+// endpoint requires editor access regardless, so a share viewer's checkbox
+// click would just 403 (voting buttons stay exempt either way, see above).
 const READ_ONLY_LOCK_ALLOW_CHECKLIST =
-  "locked-content [&_input:not([data-lock-exempt]):not([readonly])]:pointer-events-none [&_textarea:not([readonly])]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable=true]]:pointer-events-none [&_canvas]:pointer-events-none [&_[data-pannable]_canvas]:pointer-events-auto";
+  "locked-content [&_input:not([data-lock-exempt]):not([readonly])]:pointer-events-none [&_textarea:not([readonly])]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle]):not([data-vote-exempt]):not([data-lock-exempt])]:pointer-events-none [&_[contenteditable=true]]:pointer-events-none [&_canvas]:pointer-events-none [&_[data-pannable]_canvas]:pointer-events-auto";
 
 export interface SharedObjectContext {
   role: WorkspaceRole;

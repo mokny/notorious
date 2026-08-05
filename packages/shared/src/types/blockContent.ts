@@ -125,6 +125,35 @@ export interface WhiteboardContent {
   presenting?: boolean;
 }
 
+/** One votable option in a Voting block's list - see `VotingContent`. */
+export interface VotingItem {
+  id: string;
+  title: string;
+  description?: string;
+}
+/**
+ * A Reddit-style votable list (see VotingBlock.tsx): each `VotingItem` gets
+ * its own upvote/downvote arrows and net-score/ratio display. Aggregated
+ * scores and the caller's own vote are NOT part of this content - they're
+ * computed server-side from the `vote_records` table (see modules/blocks/
+ * service.ts) and attached to the block response instead, since they depend
+ * on who's asking and change independently of the item list itself.
+ */
+export interface VotingContent {
+  items: VotingItem[];
+  /** Default true - lets a voter vote on more than one item in the same block. When false, voting on a different item moves the voter's single vote instead of adding one. */
+  allowMultipleVotes?: boolean;
+  /** ISO timestamp after which voting closes (arrows disable, results stay visible) - undefined/null means no deadline (the default). */
+  votingEndsAt?: string | null;
+}
+
+/** One item's live vote counts plus (if the caller is identifiable) their own vote - see `GET /api/v1/blocks/:id/votes` and modules/blocks/service.ts's `getVoteSummary`. */
+export interface VoteSummary {
+  up: number;
+  down: number;
+  myVote: "up" | "down" | null;
+}
+
 /** One object type plotted on a calendar block - which property supplies its date (a "date"/"datetime"/"daterange" property on that type), plus a View-style filter/sort scoped to just this type. */
 export interface CalendarBlockObjectTypeConfig {
   objectTypeId: string;

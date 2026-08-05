@@ -29,6 +29,9 @@ import type {
   UpdateBlockInput,
   ToggleChecklistItemInput,
   ToggleWhiteboardPresentingInput,
+  CastVoteInput,
+  UpdateVotingSettingsInput,
+  VoteSummary,
   MoveBlockInput,
   RestoreBlockInput,
   BlockHistoryEntry,
@@ -198,6 +201,15 @@ export const blockApi = {
   /** Owner-only, exempt from the object lock - see toggleWhiteboardPresentingSchema. */
   toggleWhiteboardPresenting: (id: string, input: ToggleWhiteboardPresentingInput) =>
     apiRequest<Block>(`/api/v1/blocks/${id}/whiteboard-presenting`, { method: "PATCH", body: input }),
+  /** Open to any viewer (incl. anonymous share visitors) - see castVoteSchema. `voterKey` is only read for anonymous callers. */
+  getVotes: (id: string, voterKey?: string) =>
+    apiRequest<Record<string, VoteSummary>>(`/api/v1/blocks/${id}/votes${voterKey ? `?voterKey=${encodeURIComponent(voterKey)}` : ""}`),
+  /** Exempt from the object lock, open to any viewer - see castVoteSchema. */
+  castVote: (id: string, input: CastVoteInput) =>
+    apiRequest<Record<string, VoteSummary>>(`/api/v1/blocks/${id}/vote`, { method: "PATCH", body: input }),
+  /** Owner-only, exempt from the object lock - see updateVotingSettingsSchema. */
+  updateVotingSettings: (id: string, input: UpdateVotingSettingsInput) =>
+    apiRequest<Block>(`/api/v1/blocks/${id}/voting-settings`, { method: "PATCH", body: input }),
   move: (id: string, input: MoveBlockInput) => apiRequest<Block>(`/api/v1/blocks/${id}/move`, { method: "POST", body: input }),
   remove: (id: string) => apiRequest<void>(`/api/v1/blocks/${id}`, { method: "DELETE" }),
   /** Undo/redo only - see useEditorHistory.ts. */

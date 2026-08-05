@@ -135,8 +135,11 @@ input[type="checkbox"] {
    `:not([data-view-toggle])` exempts the same "view, not edit" controls the
    button pointer-events rule below already exempts (e.g. MediaBlocks.tsx's
    image download button) - those should stay reachable while locked, same
-   as everything else marked `data-view-toggle`. */
-.locked-content [class*="group-hover"][class*="opacity-100"]:not([data-view-toggle]) {
+   as everything else marked `data-view-toggle`. `:not([data-lock-exempt])`
+   does the same for controls that are exempt from the object-lock
+   specifically (not a read-only share) - e.g. VotingBlock.tsx's owner-only
+   settings gear, see ObjectDetailPage.tsx's READ_ONLY_LOCK_ALLOW_CHECKLIST. */
+.locked-content [class*="group-hover"][class*="opacity-100"]:not([data-view-toggle]):not([data-lock-exempt]) {
   opacity: 0 !important;
   pointer-events: none !important;
 }
