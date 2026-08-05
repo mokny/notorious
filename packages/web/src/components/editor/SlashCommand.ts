@@ -38,6 +38,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "sub_object", label: "Existing Object", description: "Link an existing object, expandable to its own sub-objects" },
   { type: "bookmark", label: "Bookmark", description: "Save a link with a title and description" },
   { type: "whiteboard", label: "Whiteboard", description: "Sketch with shapes, arrows and freehand drawing" },
+  { type: "calendar", label: "Calendar", description: "Year/month/week/day/agenda calendar over one or more object types" },
 ];
 
 /**

@@ -5,6 +5,7 @@ export const PROPERTY_TYPES = [
   "boolean",
   "date",
   "datetime",
+  "daterange",
   "url",
   "email",
   "phone",
@@ -69,6 +70,8 @@ export type PropertyConfig =
   | { type: "number"; precision?: number }
   | { type: "boolean" | "checkbox" }
   | { type: "date" | "datetime" }
+  /** Start/end date pair (no time component) - e.g. a multi-day event or a vacation. Stored as `{ start, end }` (both "YYYY-MM-DD") in `object_values.value`. */
+  | { type: "daterange" }
   | { type: "tag" | "multi_tag" | "status" | "select" | "multi_select"; options: PropertyOption[] }
   | { type: "rating"; max: number }
   | { type: "file" | "image" }

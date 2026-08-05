@@ -20,6 +20,7 @@ import type {
   SubObjectContent,
   BookmarkContent,
   WhiteboardContent,
+  CalendarBlockContent,
 } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { ParagraphBlock } from "./blocks/ParagraphBlock.js";
@@ -39,6 +40,7 @@ import { DatabaseViewBlock } from "./blocks/DatabaseViewBlock.js";
 import { SubObjectBlock } from "./blocks/SubObjectBlock.js";
 import { BookmarkBlock } from "./blocks/BookmarkBlock.js";
 import { WhiteboardBlock } from "./blocks/WhiteboardBlock.js";
+import { CalendarBlock } from "./blocks/CalendarBlock.js";
 
 export interface BlockRendererProps {
   block: BlockNode;
@@ -156,6 +158,8 @@ export function BlockRenderer({
           onTogglePresenting={onToggleWhiteboardPresenting}
         />
       );
+    case "calendar":
+      return <CalendarBlock content={content<CalendarBlockContent>()} workspaceId={workspaceId} objectTypes={objectTypes} onSave={save} />;
     default:
       return null;
   }

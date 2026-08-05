@@ -338,6 +338,8 @@ export function BlockEditor({
         return { url: "" };
       case "whiteboard":
         return {};
+      case "calendar":
+        return { objectTypeConfigs: [] };
       default:
         return {};
     }

@@ -43,6 +43,8 @@ export interface Workspace {
   ownerId: string;
   /** The single object shown when opening this workspace, and linked as "Dashboard" in the nav - null until an owner/editor sets one. */
   dashboardObjectId: string | null;
+  /** Which day Week/Month calendar views start on - a workspace-wide setting so every member's calendar block lines up the same way. */
+  weekStartsOn: "sunday" | "monday";
   createdAt: ISODateString;
 }
 
@@ -86,7 +88,8 @@ export interface Property {
   position: number;
 }
 
-export type PropertyValue = string | number | boolean | string[] | null;
+/** The `{ start, end }` shape is only ever used by a "daterange" property (see propertyTypes.ts) - both "YYYY-MM-DD", no time component. */
+export type PropertyValue = string | number | boolean | string[] | { start: string; end: string } | null;
 
 export interface ObjectRecord {
   id: string;

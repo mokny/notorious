@@ -41,6 +41,34 @@ function regexInput(v: unknown): string {
   return s;
 }
 
+/** Reads a "date"/"datetime"/"daterange" property value (see propertyTypes.ts) off one `objects.where(...)` result item and normalizes it to a plain `[start, end]` day-string pair - a single date's `end` equals its `start`. Returns null for anything else (missing property, wrong shape). */
+function dateBoundsOf(item: unknown, propertyKey: string): [string, string] | null {
+  if (!item || typeof item !== "object") return null;
+  const properties = (item as { properties?: unknown }).properties;
+  if (!properties || typeof properties !== "object") return null;
+  const raw = (properties as Record<string, unknown>)[propertyKey];
+  if (typeof raw === "string") return raw ? [raw.slice(0, 10), raw.slice(0, 10)] : null;
+  if (raw && typeof raw === "object") {
+    const { start, end } = raw as { start?: unknown; end?: unknown };
+    if (typeof start !== "string" || !start) return null;
+    return [start.slice(0, 10), typeof end === "string" && end ? end.slice(0, 10) : start.slice(0, 10)];
+  }
+  return null;
+}
+
+function filterInRange(v: unknown, propertyKey: unknown, start: unknown, end: unknown): unknown {
+  if (!Array.isArray(v)) return v;
+  const key = stringify(propertyKey);
+  const rangeStart = stringify(start);
+  const rangeEnd = stringify(end);
+  return v.filter((item) => {
+    const bounds = dateBoundsOf(item, key);
+    if (!bounds) return false;
+    const [itemStart, itemEnd] = bounds;
+    return itemStart <= rangeEnd && itemEnd >= rangeStart;
+  });
+}
+
 export const FILTERS: Record<string, (value: unknown, ...args: unknown[]) => unknown> = {
   upper: (v) => stringify(v).toUpperCase(),
   lower: (v) => stringify(v).toLowerCase(),
@@ -114,6 +142,15 @@ export const FILTERS: Record<string, (value: unknown, ...args: unknown[]) => unk
     const match = compileSafeRegex(pattern, sanitizeRegexFlags(flags)).exec(regexInput(v));
     if (!match) return "";
     return match.length > 1 ? (match[1] ?? "") : match[0];
+  },
+  /** `objects.where(type="Termin") | in_range("Zeitraum", today, "2026-08-31")` - keeps only items whose date/datetime/daterange property (named by `propertyKey`) overlaps `[start, end]` (inclusive, "YYYY-MM-DD"). Items with no value (or a differently-shaped one) for that property are dropped. `today`/`now` are pre-set template globals - see renderer.ts's rootScope. */
+  in_range: (v, propertyKey, start, end) => filterInRange(v, propertyKey, start, end),
+  /** `objects.where(type="Termin") | upcoming("Zeitraum", 7)` - shorthand for `in_range(propertyKey, today, today + days)`. */
+  upcoming: (v, propertyKey, days) => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const windowDays = Math.max(0, Math.trunc(Number(days)) || 7);
+    const endIso = new Date(Date.now() + windowDays * 86_400_000).toISOString().slice(0, 10);
+    return filterInRange(v, propertyKey, todayIso, endIso);
   },
 };
 

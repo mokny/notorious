@@ -1,4 +1,5 @@
 import type { TableDoc } from "../utils/tableDoc.js";
+import type { ViewFilter, ViewSort } from "../constants/viewTypes.js";
 
 /**
  * Per-block-type content payloads stored in `blocks.content` (as JSON) and
@@ -122,6 +123,27 @@ export interface WhiteboardContent {
   sceneJson?: string;
   /** Presentation mode - while true, only the workspace owner can draw/edit; everyone else gets a live, view-only canvas (still pans/zooms, still sees updates in real time). Toggled by WhiteboardBlock.tsx, persisted like any other content field so it's in sync for every viewer. */
   presenting?: boolean;
+}
+
+/** One object type plotted on a calendar block - which property supplies its date (a "date"/"datetime"/"daterange" property on that type), plus a View-style filter/sort scoped to just this type. */
+export interface CalendarBlockObjectTypeConfig {
+  objectTypeId: string;
+  datePropertyId: string;
+  filters: ViewFilter[];
+  sorts: ViewSort[];
+}
+/**
+ * A calendar over one or more object types (each configured independently -
+ * see `CalendarBlockObjectTypeConfig`), rendered as Year/Month/Week/Day/Agenda
+ * (see CalendarBlock.tsx). Deliberately its own content shape rather than
+ * wrapping a saved `View` (unlike DatabaseViewContent) - a calendar combines
+ * several object types with a per-type date property, which the single-type
+ * `View`/`ViewConfig` model doesn't represent.
+ */
+export interface CalendarBlockContent {
+  objectTypeConfigs: CalendarBlockObjectTypeConfig[];
+  /** Last-viewed granularity - purely a per-block UX convenience (reopens where you left off), not collaborative state. */
+  granularity?: "year" | "month" | "week" | "day" | "agenda";
 }
 
 /**

@@ -245,6 +245,7 @@ export async function importWorkspace(ownerId: string, zipBuffer: Buffer, backup
     icon: manifest.workspace.icon,
     ownerId,
     dashboardObjectId: null,
+    weekStartsOn: "monday",
     createdAt,
   };
 }

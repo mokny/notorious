@@ -58,6 +58,7 @@ export const workspaces = sqliteTable("workspaces", {
   // inference for both table types. The actual foreign key (with
   // ON DELETE SET NULL) is still enforced at the SQL level, in the migration.
   dashboardObjectId: text("dashboard_object_id"),
+  weekStartsOn: text("week_starts_on").notNull().default("monday").$type<"sunday" | "monday">(),
   createdAt: text("created_at").notNull(),
 });
 

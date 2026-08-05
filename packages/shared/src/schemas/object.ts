@@ -6,6 +6,7 @@ const propertyValueSchema = z.union([
   z.number(),
   z.boolean(),
   z.array(z.string()),
+  z.object({ start: z.string(), end: z.string() }),
   z.null(),
 ]);
 

@@ -13,6 +13,7 @@ export const updateWorkspaceSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   icon: z.string().min(1).max(500).optional(),
   dashboardObjectId: z.string().nullable().optional(),
+  weekStartsOn: z.enum(["sunday", "monday"]).optional(),
 });
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 

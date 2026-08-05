@@ -495,12 +495,23 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
 
   const ctx: EvalContext = { budget, queryResults, httpResults };
 
+  // Precomputed once per render pass, not called functions - see filters.ts's
+  // top-of-file comment on why the filter table is the only way a template
+  // invokes any code at all; `today`/`now` are plain values instead so
+  // `{{ today }}` and `objects.where(...) | in_range("Zeitraum", today, ...)`
+  // both just read a scope variable like any other.
+  const nowDate = new Date();
+  const todayIso = nowDate.toISOString().slice(0, 10);
+  const nowIso = nowDate.toISOString();
+
   const seedBlocksMap: Record<string, unknown> = {};
   const seedScope = new Scope();
   seedScope.set("object", objectView);
   seedScope.set("objects", objectsMap);
   seedScope.set("variables", variablesMap);
   seedScope.set("blocks", seedBlocksMap);
+  seedScope.set("today", todayIso);
+  seedScope.set("now", nowIso);
   runRenderPass(orderedBlocks, parsedByBlock, seedScope, seedBlocksMap, ctx, false);
 
   const blocksMap: Record<string, unknown> = { ...seedBlocksMap };
@@ -509,5 +520,7 @@ export async function renderObjectBlocks(objectId: string, identity: ActingIdent
   rootScope.set("objects", objectsMap);
   rootScope.set("variables", variablesMap);
   rootScope.set("blocks", blocksMap);
+  rootScope.set("today", todayIso);
+  rootScope.set("now", nowIso);
   return runRenderPass(orderedBlocks, parsedByBlock, rootScope, blocksMap, ctx, true);
 }

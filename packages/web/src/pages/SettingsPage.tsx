@@ -143,6 +143,11 @@ export function SettingsPage() {
     renameMutation.mutateAsync(value).then(() => undefined),
   );
 
+  const updateWeekStartMutation = useMutation({
+    mutationFn: (weekStartsOn: "sunday" | "monday") => workspaceApi.update(workspaceId!, { weekStartsOn }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
+  });
+
   const deleteWorkspaceMutation = useMutation({
     mutationFn: () => workspaceApi.remove(workspaceId!),
     onSuccess: async () => {
@@ -192,6 +197,17 @@ export function SettingsPage() {
                   return fileApi.downloadUrl(asset.id);
                 }}
               />
+              <label className="flex max-w-sm items-center justify-between gap-2 text-sm">
+                <span>Calendar week starts on</span>
+                <select
+                  value={workspace.weekStartsOn}
+                  onChange={(e) => updateWeekStartMutation.mutate(e.target.value as "sunday" | "monday")}
+                  className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+                >
+                  <option value="sunday">Sunday</option>
+                  <option value="monday">Monday</option>
+                </select>
+              </label>
             </>
           )}
         </div>

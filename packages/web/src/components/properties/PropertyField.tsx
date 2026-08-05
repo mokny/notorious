@@ -91,6 +91,44 @@ export function PropertyField({
         />
       );
 
+    case "daterange": {
+      const range = value as { start: string; end: string } | null;
+      return (
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1 text-xs text-ink-muted">
+            Start
+            <input
+              className={inputClass}
+              type="date"
+              value={range?.start ?? ""}
+              onChange={(e) => {
+                if (!e.target.value) {
+                  onChange(range?.end ? { start: "", end: range.end } : null);
+                  return;
+                }
+                onChange({ start: e.target.value, end: range?.end ?? "" });
+              }}
+            />
+          </label>
+          <label className="flex items-center gap-1 text-xs text-ink-muted">
+            End
+            <input
+              className={inputClass}
+              type="date"
+              value={range?.end ?? ""}
+              onChange={(e) => {
+                if (!e.target.value) {
+                  onChange(range?.start ? { start: range.start, end: "" } : null);
+                  return;
+                }
+                onChange({ start: range?.start ?? "", end: e.target.value });
+              }}
+            />
+          </label>
+        </div>
+      );
+    }
+
     case "tag":
     case "status":
     case "select":
