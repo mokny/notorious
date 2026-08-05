@@ -37,6 +37,19 @@ export const toggleChecklistItemSchema = z.object({
 });
 export type ToggleChecklistItemInput = z.infer<typeof toggleChecklistItemSchema>;
 
+/**
+ * Starting/stopping a whiteboard presentation is deliberately exempt from
+ * the object-lock, but only for the workspace owner (see
+ * workspaces/access.ts's `allowWhenLocked` and blocks/routes.ts) - the owner
+ * needs to be able to reach this toggle even on a locked board. Its own
+ * narrow endpoint, like `toggleChecklistItemSchema`, so that exemption can
+ * never accidentally cover any other kind of edit to the block.
+ */
+export const toggleWhiteboardPresentingSchema = z.object({
+  presenting: z.boolean(),
+});
+export type ToggleWhiteboardPresentingInput = z.infer<typeof toggleWhiteboardPresentingSchema>;
+
 export const importMarkdownSchema = z.object({
   objectId: z.string(),
   markdown: z.string().max(2_000_000),

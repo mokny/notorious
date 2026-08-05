@@ -6,6 +6,7 @@ import {
   importMarkdownSchema,
   restoreBlockSchema,
   toggleChecklistItemSchema,
+  toggleWhiteboardPresentingSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, resolveActor } from "../workspaces/access.js";
@@ -129,6 +130,36 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       clientId: getClientId(request),
       action: "updated",
       summary: `${actor.actorName} ${input.checked ? "checked off" : "unchecked"} a checklist item`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return block;
+  });
+
+  // Starting/stopping a presentation is exempt from the object-lock, but
+  // only for the workspace owner - see toggleWhiteboardPresentingSchema's
+  // doc comment. `minRole: "owner"` (not "editor") is what enforces that;
+  // everything else about this route mirrors the checklist-item exemption
+  // above.
+  app.patch("/api/v1/blocks/:id/whiteboard-presenting", async (request) => {
+    const { id } = request.params as { id: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    const access = await requireAccess(request, workspaceId, "owner", { objectId, allowWhenLocked: true });
+    const input = toggleWhiteboardPresentingSchema.parse(request.body);
+    const block = await blockService.toggleWhiteboardPresenting(id, input.presenting);
+
+    const actor = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${actor.actorName} ${input.presenting ? "started" : "stopped"} presenting a whiteboard`,
       entity: "block",
       entityId: id,
       realtimeAction: "updated",

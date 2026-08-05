@@ -28,6 +28,7 @@ import type {
   CreateBlockInput,
   UpdateBlockInput,
   ToggleChecklistItemInput,
+  ToggleWhiteboardPresentingInput,
   MoveBlockInput,
   RestoreBlockInput,
   BlockHistoryEntry,
@@ -194,6 +195,9 @@ export const blockApi = {
   /** Exempt from the object lock - see toggleChecklistItemSchema. */
   toggleChecklistItem: (id: string, input: ToggleChecklistItemInput) =>
     apiRequest<Block>(`/api/v1/blocks/${id}/checklist-item`, { method: "PATCH", body: input }),
+  /** Owner-only, exempt from the object lock - see toggleWhiteboardPresentingSchema. */
+  toggleWhiteboardPresenting: (id: string, input: ToggleWhiteboardPresentingInput) =>
+    apiRequest<Block>(`/api/v1/blocks/${id}/whiteboard-presenting`, { method: "PATCH", body: input }),
   move: (id: string, input: MoveBlockInput) => apiRequest<Block>(`/api/v1/blocks/${id}/move`, { method: "POST", body: input }),
   remove: (id: string) => apiRequest<void>(`/api/v1/blocks/${id}`, { method: "DELETE" }),
   /** Undo/redo only - see useEditorHistory.ts. */

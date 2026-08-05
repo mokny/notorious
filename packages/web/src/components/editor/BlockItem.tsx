@@ -17,6 +17,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
     createBlockAfter,
     updateBlockContent,
     toggleChecklistItem,
+    toggleWhiteboardPresenting,
     deleteBlock,
     pendingFocusBlockId,
     clearPendingFocus,
@@ -75,6 +76,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
           objectId={objectId}
           onSave={(content) => updateBlockContent(block.id, content)}
           onToggleChecklistItem={(itemId, checked) => toggleChecklistItem(block.id, itemId, checked)}
+          onToggleWhiteboardPresenting={(presenting) => toggleWhiteboardPresenting(block.id, presenting)}
           onEnter={() => createBlockAfter(block.parentBlockId, block.id, "paragraph")}
           onBackspaceEmpty={() => deleteBlock(block.id)}
           onSlashSelect={(type: BlockType, extraContent?: Record<string, unknown>) =>

@@ -160,6 +160,16 @@ export function BlockEditor({
     onSuccess: invalidate,
   });
 
+  // Own mutation, not routed through `updateMutation` - same reasoning as
+  // `toggleChecklistItemMutation` above: this hits a dedicated endpoint
+  // that's exempt from the object lock (owner-only), so it needs to stay a
+  // distinct call the generic content-edit path never makes.
+  const toggleWhiteboardPresentingMutation = useMutation({
+    mutationFn: (input: { blockId: string; presenting: boolean }) =>
+      blockApi.toggleWhiteboardPresenting(input.blockId, { presenting: input.presenting }),
+    onSuccess: invalidate,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (blockId: string) => blockApi.remove(blockId),
     onSuccess: invalidate,
@@ -423,6 +433,8 @@ export function BlockEditor({
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),
         toggleChecklistItem: (blockId, itemId, checked) =>
           toggleChecklistItemMutation.mutateAsync({ blockId, itemId, checked }).then(() => undefined),
+        toggleWhiteboardPresenting: (blockId, presenting) =>
+          toggleWhiteboardPresentingMutation.mutateAsync({ blockId, presenting }).then(() => undefined),
         deleteBlock: (blockId) => performDelete(blockId),
         moveBlock: (blockId, parentBlockId, afterBlockId) => performMove(blockId, parentBlockId, afterBlockId),
         pendingFocusBlockId,

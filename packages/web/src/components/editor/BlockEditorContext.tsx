@@ -42,6 +42,8 @@ export interface BlockEditorActions {
   updateBlockContent: (blockId: string, content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see toggleChecklistItemSchema and ChecklistBlock.tsx. */
   toggleChecklistItem: (blockId: string, itemId: string, checked: boolean) => Promise<void>;
+  /** Owner-only, exempt from the object lock - see toggleWhiteboardPresentingSchema and WhiteboardBlock.tsx. */
+  toggleWhiteboardPresenting: (blockId: string, presenting: boolean) => Promise<void>;
   deleteBlock: (blockId: string) => void;
   moveBlock: (blockId: string, parentBlockId: string | null, afterBlockId: string | null) => void;
   /** The block that should receive focus once it appears (set right after Enter creates one). */

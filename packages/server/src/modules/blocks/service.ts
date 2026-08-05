@@ -262,6 +262,28 @@ export async function toggleChecklistItem(blockId: string, itemId: string, check
   return toBlock({ ...row, content, updatedAt });
 }
 
+/**
+ * Flips a whiteboard block's `presenting` field, leaving `sceneJson` and
+ * everything else untouched. Deliberately separate from `updateBlock` -
+ * callers use it specifically because it's exempt from the object-lock check
+ * (see workspaces/access.ts's `allowWhenLocked`), and that exemption needs to
+ * stay narrowly scoped to "flip the presentation toggle", not open up drawing
+ * on a locked board.
+ */
+export async function toggleWhiteboardPresenting(blockId: string, presenting: boolean): Promise<Block> {
+  const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Block not found");
+  if (row.type !== "whiteboard") throw badRequest("Not a whiteboard block");
+
+  const updatedAt = nowIso();
+  const content = JSON.stringify({ ...JSON.parse(row.content), presenting });
+  await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
+  await touchObject(row.objectId);
+
+  return toBlock({ ...row, content, updatedAt });
+}
+
 export async function moveBlock(blockId: string, input: MoveBlockInput): Promise<Block> {
   const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
   const row = rows[0];

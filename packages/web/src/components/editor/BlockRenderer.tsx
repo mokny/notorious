@@ -47,6 +47,8 @@ export interface BlockRendererProps {
   onSave: (content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see ChecklistBlock.tsx and toggleChecklistItemSchema. Only relevant for `checklist` blocks. */
   onToggleChecklistItem: (itemId: string, checked: boolean) => Promise<void>;
+  /** Owner-only, exempt from the object lock - see WhiteboardBlock.tsx and toggleWhiteboardPresentingSchema. Only relevant for `whiteboard` blocks. */
+  onToggleWhiteboardPresenting: (presenting: boolean) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
   onSlashSelect: (type: BlockType, extraContent?: Record<string, unknown>) => void;
@@ -66,6 +68,7 @@ export function BlockRenderer({
   objectId,
   onSave,
   onToggleChecklistItem,
+  onToggleWhiteboardPresenting,
   onSlashSelect,
   objectTypes,
   embedAncestorIds,
@@ -145,7 +148,14 @@ export function BlockRenderer({
     case "bookmark":
       return <BookmarkBlock content={content<BookmarkContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
     case "whiteboard":
-      return <WhiteboardBlock content={content<WhiteboardContent>()} workspaceId={workspaceId} onSave={save} />;
+      return (
+        <WhiteboardBlock
+          content={content<WhiteboardContent>()}
+          workspaceId={workspaceId}
+          onSave={save}
+          onTogglePresenting={onToggleWhiteboardPresenting}
+        />
+      );
     default:
       return null;
   }

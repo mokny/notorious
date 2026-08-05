@@ -49,10 +49,13 @@ export function WhiteboardBlock({
   content: externalContent,
   workspaceId,
   onSave,
+  onTogglePresenting,
 }: {
   content: WhiteboardContent;
   workspaceId: string;
   onSave: (c: WhiteboardContent) => Promise<void>;
+  /** Owner-only, exempt from the object lock - see toggleWhiteboardPresentingSchema. Goes through its own endpoint rather than `onSave` so the owner can still reach it on a locked board. */
+  onTogglePresenting: (presenting: boolean) => Promise<void>;
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -103,6 +106,8 @@ export function WhiteboardBlock({
   const isSavingRef = useRef(false);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
+  const onTogglePresentingRef = useRef(onTogglePresenting);
+  onTogglePresentingRef.current = onTogglePresenting;
 
   // Handle to the mounted canvas (set once Excalidraw itself mounts, via the
   // `excalidrawAPI` prop below) - used to push a collaborator's update onto
@@ -242,23 +247,22 @@ export function WhiteboardBlock({
   }, [externalContent]);
 
   /**
-   * Routed through the same `contentRef`/`pendingRef` pipeline `onChangeImpl`
-   * uses, not a separate direct `onSave` call - a save already queued from
-   * drawing (debounced up to `SAVE_DEBOUNCE_MS`) still holds whatever
+   * Goes through `onTogglePresenting` - its own owner-only endpoint that's
+   * exempt from the object lock (see toggleWhiteboardPresentingSchema) -
+   * rather than the regular `onSave`/`flush` pipeline, which a lock blocks
+   * entirely. `contentRef`/`pendingRef` are still updated locally so that a
+   * scene save already queued from drawing (debounced up to
+   * `SAVE_DEBOUNCE_MS`) - which would otherwise still hold whatever
    * `presenting` value was true *when that stroke was drawn*, baked in by
-   * `onChangeImpl`'s `{ ...contentRef.current, sceneJson }` spread. If this
-   * toggle saved independently, that stale queued save would land *after*
-   * it and silently flip `presenting` back - exactly the "turns itself back
-   * on shortly after I disabled it" bug. Folding the new value into the same
-   * pending value (and flushing immediately, ahead of the debounce timer)
-   * keeps there being only one, always-current save in flight/queued.
+   * `onChangeImpl`'s `{ ...contentRef.current, sceneJson }` spread - carries
+   * the new value too instead of silently flipping it back once it lands.
    */
   function togglePresenting(): void {
-    const next = { ...(pendingRef.current ?? contentRef.current), presenting: !presenting };
-    contentRef.current = next;
-    pendingRef.current = next;
-    clearTimeout(saveTimeout.current);
-    flush();
+    const next = !presenting;
+    const nextContent = { ...(pendingRef.current ?? contentRef.current), presenting: next };
+    contentRef.current = nextContent;
+    if (pendingRef.current !== null) pendingRef.current = nextContent;
+    void onTogglePresentingRef.current(next).catch(() => {});
   }
 
   /**
