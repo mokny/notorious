@@ -280,6 +280,8 @@ export interface PresenceViewer {
   avatarColor?: string;
   /** Precomputed by the server so the client never has to parse/strip the "Anonymous " prefix itself just to get an avatar initial. */
   avatarLetter: string;
+  /** Real members only, when they've uploaded a profile picture - takes priority over avatarColor/avatarLetter when set. */
+  avatarUrl?: string | null;
 }
 
 /**

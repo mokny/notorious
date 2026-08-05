@@ -8,6 +8,7 @@ interface ObjectPresenceEntry {
   /** Account name (member) or current animal/custom word (anonymous) - raw, not "Anonymous "-prefixed, not collision-suffixed. */
   name: string;
   avatarColor?: string;
+  avatarUrl?: string | null;
   /**
    * tabId -> last heartbeat epoch ms. A single identity can have several
    * open tabs on the same object; they collapse into one avatar (see
@@ -45,6 +46,7 @@ export interface TouchIdentity {
   visitorId?: string;
   name: string;
   avatarColor?: string;
+  avatarUrl?: string | null;
 }
 
 /** Registers (or refreshes) one tab's presence on an object. */
@@ -57,16 +59,25 @@ export function touch(objectId: string, workspaceId: string, identityKey: string
 
   let entry = room.viewers.get(identityKey);
   if (!entry) {
-    entry = { isAnonymous: identity.isAnonymous, userId: identity.userId, visitorId: identity.visitorId, name: identity.name, avatarColor: identity.avatarColor, tabs: new Map() };
+    entry = {
+      isAnonymous: identity.isAnonymous,
+      userId: identity.userId,
+      visitorId: identity.visitorId,
+      name: identity.name,
+      avatarColor: identity.avatarColor,
+      avatarUrl: identity.avatarUrl,
+      tabs: new Map(),
+    };
     room.viewers.set(identityKey, entry);
   } else {
-    // A rename, or a member's account name/color changing - refresh in
-    // place rather than re-inserting, so this identity keeps its original
+    // A rename, or a member's account name/color/avatar changing - refresh
+    // in place rather than re-inserting, so this identity keeps its original
     // Map insertion order (and therefore its collision-numbering priority,
     // see naming.ts's `applyCollisionSuffixes`) across a rename instead of
     // jumping to the back of the queue.
     entry.name = identity.name;
     entry.avatarColor = identity.avatarColor;
+    entry.avatarUrl = identity.avatarUrl;
   }
   entry.tabs.set(tabId, now);
 }
@@ -119,5 +130,6 @@ export function computeSnapshot(objectId: string): PresenceViewer[] {
     isAnonymous: entry.isAnonymous,
     avatarColor: entry.avatarColor,
     avatarLetter: avatarLetterFor(entry.name),
+    avatarUrl: entry.avatarUrl,
   }));
 }

@@ -51,6 +51,7 @@ export function PresencePanel({ objectId }: { objectId: string }) {
           }
 
           const clickToRename = isSelf && viewer.isAnonymous;
+          const hasAvatarImage = !viewer.isAnonymous && !!viewer.avatarUrl;
           return (
             <button
               key={viewer.viewerId}
@@ -62,11 +63,11 @@ export function PresencePanel({ objectId }: { objectId: string }) {
                 setEditing(true);
               }}
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                viewer.isAnonymous ? "border-2 border-dashed border-border bg-surface-raised text-ink-muted" : "text-white"
+                hasAvatarImage ? "overflow-hidden" : viewer.isAnonymous ? "border-2 border-dashed border-border bg-surface-raised text-ink-muted" : "text-white"
               } ${clickToRename ? "cursor-pointer hover:ring-2 hover:ring-accent/40" : "cursor-default"}`}
-              style={viewer.isAnonymous ? undefined : { backgroundColor: viewer.avatarColor }}
+              style={hasAvatarImage || viewer.isAnonymous ? undefined : { backgroundColor: viewer.avatarColor }}
             >
-              {viewer.avatarLetter}
+              {hasAvatarImage ? <img src={viewer.avatarUrl!} alt="" className="h-full w-full object-cover" /> : viewer.avatarLetter}
             </button>
           );
         })}

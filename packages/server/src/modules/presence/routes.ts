@@ -29,7 +29,7 @@ function resolveIdentity(request: FastifyRequest, body: { visitorId?: string; di
   if (request.user) {
     return {
       identityKey: `member:${request.user.id}`,
-      touch: { isAnonymous: false, userId: request.user.id, name: request.user.name, avatarColor: request.user.avatarColor },
+      touch: { isAnonymous: false, userId: request.user.id, name: request.user.name, avatarColor: request.user.avatarColor, avatarUrl: request.user.avatarUrl },
     };
   }
   if (!body.visitorId) throw badRequest("visitorId is required for an anonymous viewer");
