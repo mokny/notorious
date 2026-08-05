@@ -547,7 +547,8 @@ export function CalendarBlock({ content, workspaceId, objectTypes, onSave }: Cal
   const objectsQueries = useQueries({
     queries: content.objectTypeConfigs.map((cfg) => ({
       queryKey: ["objects", workspaceId, cfg.objectTypeId],
-      queryFn: () => objectApi.list(workspaceId, { objectTypeId: cfg.objectTypeId, limit: 500 }),
+      // 200 is listObjectsQuerySchema's hard max - a higher value 400s.
+      queryFn: () => objectApi.list(workspaceId, { objectTypeId: cfg.objectTypeId, limit: 200 }),
     })),
   });
   const propertiesQueries = useQueries({
