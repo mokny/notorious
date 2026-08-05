@@ -41,7 +41,7 @@ const READ_ONLY_LOCK = READ_ONLY_CONTENT_CLASS;
 // gets the strict variant above - the underlying endpoint requires editor
 // access regardless, so a share viewer's checkbox click would just 403.
 const READ_ONLY_LOCK_ALLOW_CHECKLIST =
-  "locked-content [&_input:not([data-lock-exempt]):not([readonly])]:pointer-events-none [&_textarea:not([readonly])]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable=true]]:pointer-events-none [&_canvas]:pointer-events-none";
+  "locked-content [&_input:not([data-lock-exempt]):not([readonly])]:pointer-events-none [&_textarea:not([readonly])]:pointer-events-none [&_select]:pointer-events-none [&_button:not([data-view-toggle])]:pointer-events-none [&_[contenteditable=true]]:pointer-events-none [&_canvas]:pointer-events-none [&_[data-pannable]_canvas]:pointer-events-auto";
 
 export interface SharedObjectContext {
   role: WorkspaceRole;
