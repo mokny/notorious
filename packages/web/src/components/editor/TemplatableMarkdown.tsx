@@ -46,7 +46,7 @@ export function TemplatableMarkdown({
   autoFocus,
   onAutoFocused,
 }: TemplatableMarkdownProps) {
-  const { readOnly } = useBlockEditor();
+  const { readOnly, searchHighlight } = useBlockEditor();
   const { rendered, showRendered, effectiveAutoFocus, startEditing, stopEditing } = useTemplatableField(blockId, field, autoFocus);
   // Clicking the rendered text swaps in a brand-new "edit" instance (see the
   // key change below), but a click that merely triggers a *remount* doesn't
@@ -54,6 +54,16 @@ export function TemplatableMarkdown({
   // see the raw source appear but still have to click a second time to
   // actually type. Reset once RichTextEditor's own autoFocus effect has run.
   const clickedToEditRef = useRef(false);
+  // Folded into both `key`s below so the search words changing (a new
+  // search, or closing the toolbar) forces a clean remount of the TipTap
+  // editor instead of trying to update an existing one's decorations in
+  // place - see SearchHighlight.ts's own doc comment for why relying on
+  // `extensions` reconfiguring an already-mounted editor turned out to be
+  // unreliable in this app (confirmed: closing the toolbar reliably cleared
+  // the URL/toolbar but left stale highlighting drawn in already-mounted
+  // TipTap editors). A remount is the one thing already proven reliable
+  // here (`key="rendered"`/`key="edit"` swapping this same way already).
+  const searchTermsKey = (searchHighlight?.terms ?? []).join(" ");
 
   if (showRendered) {
     return (
@@ -64,14 +74,20 @@ export function TemplatableMarkdown({
           startEditing();
         }}
       >
-        <RichTextEditor key="rendered" markdown={rendered ?? ""} className={className} editable={false} onSave={() => Promise.resolve()} />
+        <RichTextEditor
+          key={`rendered-${searchTermsKey}`}
+          markdown={rendered ?? ""}
+          className={className}
+          editable={false}
+          onSave={() => Promise.resolve()}
+        />
       </div>
     );
   }
 
   return (
     <RichTextEditor
-      key="edit"
+      key={`edit-${searchTermsKey}`}
       markdown={markdown}
       placeholder={placeholder}
       className={className}

@@ -1,4 +1,4 @@
-import type { Block } from "@notorious/shared";
+import { tableCellField, tableDocToTextGrid, type Block, type TableContent } from "@notorious/shared";
 import type { BlockNode } from "../components/editor/blockTree.js";
 
 export interface SearchMatch {
@@ -19,20 +19,97 @@ export function splitSearchTerms(query: string): string[] {
   return Array.from(new Set(query.trim().toLowerCase().split(/\s+/).filter(Boolean)));
 }
 
-/** Same recursive string-leaf walk as the server's search indexer (modules/search/indexer.ts's `extractText`) - kept in sync by hand so a term found here is the same text the search index itself matched against. */
-export function extractBlockText(content: Record<string, unknown>): string {
-  const parts: string[] = [];
-  function visit(value: unknown): void {
-    if (typeof value === "string") {
-      parts.push(value);
-    } else if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-    } else if (value && typeof value === "object") {
-      for (const v of Object.values(value)) visit(v);
-    }
+/** Excalidraw's `.excalidraw` scene format (see WhiteboardContent's own doc comment) - only enough of its shape to pull out visible text, not a full type. */
+interface WhiteboardSceneElement {
+  type?: string;
+  text?: string;
+}
+
+/** Only `type: "text"` elements carry anything a user would recognize as text - every other element (rectangle, arrow, freedraw, ...) is pure drawing geometry (coordinates, colors, seeds, ids) that would otherwise show up as false-positive matches (e.g. a search for a short number matching some element's `seed` or `id`). */
+function extractWhiteboardText(sceneJson: string | undefined): string {
+  if (!sceneJson) return "";
+  try {
+    const scene = JSON.parse(sceneJson) as { elements?: WhiteboardSceneElement[] };
+    return (scene.elements ?? [])
+      .filter((el) => el.type === "text" && typeof el.text === "string")
+      .map((el) => el.text as string)
+      .join(" ");
+  } catch {
+    return "";
   }
-  visit(content);
-  return parts.join(" ");
+}
+
+/**
+ * Extracts the text a user would actually recognize as "this block's
+ * content" - type-aware, not a blind recursive walk of every string in the
+ * block's JSON. An earlier, generic version of this walked ids, colors,
+ * ProseMirror node `type`s, ProseMirror `marks[].attrs` (e.g. a link's raw
+ * `href`), and whiteboard drawing geometry right along with real text,
+ * causing false-positive matches (a number matching some unrelated
+ * whiteboard element's id/seed, "table" matching any table block via its own
+ * `"type": "table"` node, etc).
+ *
+ * `renderedFields` (this object's `renderedBlocks[block.id]`, see
+ * BlockEditorContext.tsx) is consulted first for every templatable field -
+ * matching what modules/templates/renderer.ts's `getTemplatableFields`
+ * templates server-side - so a `{{ }}`/`{% %}` field is matched (and
+ * highlighted) by its rendered, user-visible value instead of its raw
+ * template source. Falls back to the raw field when that field's rendered
+ * value isn't present (no template syntax in it, or the fetch hasn't
+ * resolved yet).
+ */
+export function extractBlockText(block: Pick<Block, "id" | "type" | "content">, renderedFields?: Record<string, string>): string {
+  const content = block.content as Record<string, unknown>;
+  function field(key: string, raw: unknown): string {
+    const value = renderedFields?.[key] ?? raw;
+    return typeof value === "string" ? value : "";
+  }
+
+  switch (block.type) {
+    case "paragraph":
+    case "quote":
+    case "callout":
+      return field("markdown", content.markdown);
+    case "heading":
+      return field("markdown", content.markdown);
+    case "toggle":
+      return field("summaryMarkdown", content.summaryMarkdown);
+    case "checklist": {
+      const items = Array.isArray(content.items) ? (content.items as { markdown?: unknown }[]) : [];
+      return items.map((item, i) => field(`items.${i}`, item.markdown)).join(" ");
+    }
+    case "table": {
+      const grid = tableDocToTextGrid((content as unknown as TableContent).doc);
+      const parts: string[] = [];
+      grid.forEach((row, r) => row.forEach((cellText, c) => parts.push(field(tableCellField(r, c), cellText))));
+      return parts.join(" ");
+    }
+    case "code":
+      return typeof content.code === "string" ? content.code : "";
+    case "mermaid":
+      return typeof content.code === "string" ? content.code : "";
+    case "math":
+      return typeof content.latex === "string" ? content.latex : "";
+    case "image":
+    case "video":
+      return typeof content.caption === "string" ? content.caption : "";
+    case "bookmark":
+      return [content.title, content.description].filter((v): v is string => typeof v === "string").join(" ");
+    case "whiteboard":
+      return extractWhiteboardText(content.sceneJson as string | undefined);
+    case "voting": {
+      const items = Array.isArray(content.items) ? (content.items as { title?: unknown; description?: unknown }[]) : [];
+      return items
+        .map((item) => [item.title, item.description].filter((v): v is string => typeof v === "string").join(" "))
+        .join(" ");
+    }
+    // embed/divider/columns/database_view/sub_object/calendar carry no
+    // field a user would recognize as this block's own readable text (a
+    // sub_object's visible title belongs to the *linked* object, not this
+    // block; embed/database_view/calendar are pure references/config).
+    default:
+      return "";
+  }
 }
 
 /** Depth-first, top-to-bottom order matching how BlockList/BlockItem actually render the tree. */
@@ -89,13 +166,20 @@ export function findTextMatches(text: string, terms: string[]): TextMatch[] {
  * blocks (in document order, occurrences within one block ordered by where
  * they appear in its flattened text) - drives the search-match toolbar's
  * next/prev navigation and its "X of Y" count (see BlockEditor.tsx).
+ * `renderedBlocks` (BlockEditorContext.tsx's map of the same name) is
+ * threaded through to `extractBlockText` so a templated field is matched by
+ * its rendered value, not its raw `{{ }}` source.
  */
-export function findSearchMatches(blocksInOrder: Block[], query: string): SearchMatch[] {
+export function findSearchMatches(
+  blocksInOrder: Block[],
+  query: string,
+  renderedBlocks?: Record<string, Record<string, string>> | null,
+): SearchMatch[] {
   const terms = splitSearchTerms(query);
   if (terms.length === 0) return [];
   const matches: SearchMatch[] = [];
   for (const block of blocksInOrder) {
-    const found = findTextMatches(extractBlockText(block.content), terms);
+    const found = findTextMatches(extractBlockText(block, renderedBlocks?.[block.id]), terms);
     found.forEach((f, occurrenceIndexInBlock) => matches.push({ blockId: block.id, term: f.term, occurrenceIndexInBlock }));
   }
   return matches;

@@ -134,7 +134,7 @@ export function TableBlock({
   content: TableContent;
   onSave: (c: TableContent) => Promise<void>;
 }) {
-  const { readOnly, renderedBlocks } = useBlockEditor();
+  const { readOnly, renderedBlocks, searchHighlight } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const doc = content?.doc ?? createEmptyTableDoc();
 
@@ -143,21 +143,26 @@ export function TableBlock({
   const [editing, setEditing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const showRendered = hasTemplatedCells && (readOnly || !editing);
+  // Folded into every branch's `key` below - see TemplatableMarkdown.tsx's
+  // identical comment for why the search words changing forces a clean
+  // remount instead of trying to update an already-mounted editor's
+  // decorations in place.
+  const searchTermsKey = (searchHighlight?.terms ?? []).join(" ");
 
   let table: ReactNode;
   if (showRendered) {
     const renderedDoc = buildRenderedTableDoc(doc, renderedFields ?? {});
     table = (
       <div className={readOnly ? undefined : "cursor-text"} onClick={() => !readOnly && setEditing(true)}>
-        <ReadOnlyTable key="rendered" doc={renderedDoc} />
+        <ReadOnlyTable key={`rendered-${searchTermsKey}`} doc={renderedDoc} />
       </div>
     );
   } else if (readOnly) {
-    table = <ReadOnlyTable key="readonly" doc={doc} />;
+    table = <ReadOnlyTable key={`readonly-${searchTermsKey}`} doc={doc} />;
   } else {
     table = (
       <EditableTable
-        key="edit"
+        key={`edit-${searchTermsKey}`}
         doc={doc}
         editable
         onChange={(nextDoc) => save({ ...content, doc: nextDoc })}

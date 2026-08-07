@@ -144,8 +144,8 @@ export function BlockEditor({
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [forcedOpenBlockIds, setForcedOpenBlockIds] = useState<Set<string>>(new Set());
   const matches = useMemo(
-    () => (highlightQuery ? findSearchMatches(flattenBlockTree(tree), highlightQuery) : []),
-    [tree, highlightQuery],
+    () => (highlightQuery ? findSearchMatches(flattenBlockTree(tree), highlightQuery, renderedBlocks) : []),
+    [tree, highlightQuery, renderedBlocks],
   );
   useEffect(() => setActiveMatchIndex(0), [highlightQuery]);
   const clampedMatchIndex = matches.length > 0 ? Math.min(activeMatchIndex, matches.length - 1) : 0;
@@ -156,20 +156,40 @@ export function BlockEditor({
   }
 
   // Reveals + scrolls to the active match: force-opens any collapsed toggle
-  // ancestor (see ToggleBlock.tsx), then waits a frame for that state update
-  // to actually mount the match's DOM node before scrolling to it. Which
-  // occurrence is "active" (the brighter ring) is drawn separately, by
-  // ActiveMatchHighlight.tsx as an independent overlay - see its own doc
-  // comment for why that isn't done here as a DOM class toggle.
+  // ancestor (see ToggleBlock.tsx), then scrolls to the actual matched text
+  // - not just the enclosing block - so a long block (a checklist with many
+  // items, a paragraph with several lines) lands on the right line instead
+  // of just the block's top edge. Which occurrence is "active" (the
+  // brighter ring) is drawn separately, by ActiveMatchHighlight.tsx as an
+  // independent overlay - see its own doc comment for why that isn't done
+  // here as a DOM class toggle.
   useEffect(() => {
     if (!activeMatch) return;
     for (const ancestor of ancestorChain(blocks ?? [], activeMatch.blockId)) {
       if (ancestor.type === "toggle") forceOpenBlock(ancestor.id);
     }
-    const raf = requestAnimationFrame(() => {
-      document.querySelector(`[data-block-id="${activeMatch.blockId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-    return () => cancelAnimationFrame(raf);
+    const { blockId, occurrenceIndexInBlock } = activeMatch;
+    // A force-opened toggle's children (and a checklist's highlighted
+    // preview, which only appears once its own effects settle) may not be
+    // mounted on the very next frame - keep trying a few times rather than
+    // silently scrolling to nothing if the first attempt finds no match yet.
+    // Stops re-scrolling (which would otherwise interrupt its own smooth
+    // animation) the moment it actually lands on the real matched text
+    // rather than just the block's outer wrapper.
+    let landedOnMatch = false;
+    function scrollToMatch(): void {
+      if (landedOnMatch) return;
+      const blockEl = document.querySelector(`[data-block-id="${blockId}"]`);
+      const mark = blockEl?.querySelectorAll(".search-match")[occurrenceIndexInBlock];
+      (mark ?? blockEl)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (mark) landedOnMatch = true;
+    }
+    const raf = requestAnimationFrame(scrollToMatch);
+    const timers = [100, 250, 500].map((ms) => setTimeout(scrollToMatch, ms));
+    return () => {
+      cancelAnimationFrame(raf);
+      timers.forEach(clearTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMatch?.blockId, activeMatch?.occurrenceIndexInBlock, blocks]);
 

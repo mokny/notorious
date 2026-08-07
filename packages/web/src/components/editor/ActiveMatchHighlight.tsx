@@ -8,18 +8,32 @@ interface Rect {
   height: number;
 }
 
+function sameRect(a: Rect | null, b: Rect | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
+}
+
 /**
  * Draws a ring around the search toolbar's currently active match - as an
  * independent overlay, not a class added to the match's own `.search-match`
  * span. A version that toggled `.search-match-active` directly on that span
  * was tried first and dropped: both TipTap (paragraph/heading/table cells)
- * and React (checklist items) own that DOM and periodically re-render it
- * (confirmed - the added class kept vanishing within ~1-2s, well before any
- * doc edit, apparently from routine background re-renders unrelated to
- * search at all), silently wiping a class mutated in from outside. Reading
- * the target's `getBoundingClientRect()` and drawing on top sidesteps that
- * entirely - nothing about this overlay depends on either owner's DOM
- * surviving unchanged.
+ * and React (checklist items) own that DOM and periodically re-render it,
+ * silently wiping a class mutated in from outside within a second or two.
+ * Reading the target's `getBoundingClientRect()` and drawing on top
+ * sidesteps that entirely.
+ *
+ * Position is re-read on every animation frame (not just once, or via
+ * scroll/resize listeners) while a match is active - the listener-based
+ * version didn't reliably track the target either: this page has several
+ * nested scroll containers (the object detail column, a tablet split-view
+ * panel, ...) and the smooth `scrollIntoView` BlockEditor.tsx triggers is
+ * itself just one of many things that can move the target without firing a
+ * `scroll` event on the *specific* ancestor a listener happened to be on. A
+ * per-frame `getBoundingClientRect()` read is cheap enough for the one
+ * active element this ever tracks, and is correct regardless of *why* the
+ * page moved.
  */
 export function ActiveMatchHighlight({ blockId, occurrenceIndex }: { blockId: string | null; occurrenceIndex: number | null }) {
   const [rect, setRect] = useState<Rect | null>(null);
@@ -29,32 +43,21 @@ export function ActiveMatchHighlight({ blockId, occurrenceIndex }: { blockId: st
       setRect(null);
       return;
     }
-    function update() {
+    let raf: number;
+    function tick() {
       const blockEl = document.querySelector(`[data-block-id="${blockId}"]`);
       const mark = blockEl?.querySelectorAll(".search-match")[occurrenceIndex as number];
       if (!mark) {
-        setRect(null);
-        return;
+        setRect((prev) => (prev === null ? prev : null));
+      } else {
+        const r = mark.getBoundingClientRect();
+        const next = { top: r.top, left: r.left, width: r.width, height: r.height };
+        setRect((prev) => (sameRect(prev, next) ? prev : next));
       }
-      const r = mark.getBoundingClientRect();
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+      raf = requestAnimationFrame(tick);
     }
-    update();
-    // A few delayed re-reads, not just one - the target may still be
-    // settling into place right after this effect fires (a force-opened
-    // toggle mounting its children, the smooth `scrollIntoView` still
-    // animating).
-    const timers = [50, 150, 350, 600].map((ms) => setTimeout(update, ms));
-    // `true` (capture phase): scroll events don't bubble, but a capturing
-    // listener on window still sees them fire on any scrollable ancestor,
-    // which is what actually moves during the scroll-to-match animation.
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      timers.forEach(clearTimeout);
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [blockId, occurrenceIndex]);
 
   if (!rect) return null;
