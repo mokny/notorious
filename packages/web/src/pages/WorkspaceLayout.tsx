@@ -36,6 +36,14 @@ import { BottomTabBar } from "../components/nav/BottomTabBar.js";
 // (p-1.5 around a h-5 icon) = 48px, plus the safe-area inset itself.
 const MOBILE_HEADER_HEIGHT = "calc(env(safe-area-inset-top) + 48px)";
 
+// BottomTabBar's own rendered height (its fixed 52px row + the safe-area
+// inset it pads itself with - see BottomTabBar.tsx) - exposed as a CSS var
+// so <main>'s padding-bottom reserves exactly the space the (now
+// `position: fixed`) tab bar covers, keeping scrolled-to-bottom content from
+// ending up hidden underneath it. Update the 52px here if BottomTabBar's own
+// row height ever changes.
+const BOTTOM_TAB_BAR_HEIGHT = "calc(52px + env(safe-area-inset-bottom))";
+
 // `useMobileChrome` (consumed below by the mobile header) is set from
 // ObjectDetailPage/CoverImage.tsx, a descendant rendered through <Outlet/> -
 // the provider has to wrap that too, so it lives here around the whole
@@ -292,6 +300,7 @@ function WorkspaceLayoutInner() {
         style={
           {
             ...(showMobileHeader && { "--mobile-header-h": MOBILE_HEADER_HEIGHT }),
+            ...(isPhone && { "--bottom-tab-bar-h": BOTTOM_TAB_BAR_HEIGHT }),
             "--sticky-toolbar-top": stickyToolbarTop,
           } as CSSProperties
         }
@@ -351,13 +360,17 @@ function WorkspaceLayoutInner() {
         <main
           ref={mainRef}
           className="min-w-0 flex-1 overflow-y-auto"
-          style={
-            showMobileHeader
+          style={{
+            ...(showMobileHeader
               ? { paddingTop: "var(--mobile-header-h)" }
               : isPhone
                 ? { paddingTop: coverActive ? 0 : "env(safe-area-inset-top)" }
-                : undefined
-          }
+                : undefined),
+            // BottomTabBar is `position: fixed` now (see BottomTabBar.tsx),
+            // so it no longer takes flow space here - reserve the matching
+            // room at the bottom of the scroll area instead.
+            ...(isPhone && { paddingBottom: "var(--bottom-tab-bar-h)" }),
+          }}
         >
           {!shareToken && !coverFullBleed && <InstallAppHint />}
           <Outlet />

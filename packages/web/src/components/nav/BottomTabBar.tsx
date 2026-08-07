@@ -45,10 +45,19 @@ export function BottomTabBar({
   const isSearch = location.pathname === `/w/${workspaceId}/search`;
 
   return (
+    // `fixed` + `bottom-0`, not a normal flex-column child - pins the bar
+    // directly to the browser's own current viewport edge on every paint,
+    // instead of depending on the h-dvh flex column above (WorkspaceLayout)
+    // computing the exact same height. `<main>`'s own padding-bottom
+    // (--bottom-tab-bar-h, see WorkspaceLayout.tsx) reserves the matching
+    // space so scrolled content doesn't end up hidden underneath. z-20 (not
+    // z-30) so the sidebar drawer's backdrop still covers this when open,
+    // same as before.
     <nav
-      className="flex shrink-0 items-stretch border-t border-border bg-surface-raised md:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface-raised md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
+      <div className="flex h-[52px] items-stretch">
       <button
         onClick={() => navigate(dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`)}
         className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${isHome ? "text-accent" : "text-ink-muted"}`}
@@ -100,6 +109,7 @@ export function BottomTabBar({
         <Icon name="menu" className="h-5 w-5" />
         Menu
       </button>
+      </div>
     </nav>
   );
 }
