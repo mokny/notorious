@@ -40,18 +40,33 @@ export function SearchMatchToolbar({ current, total, onPrev, onNext, onClose }: 
       // `MOBILE_HEADER_HEIGHT`) so this never sits over either.
       style={{ top: "calc(env(safe-area-inset-top, 0px) + 56px)" }}
     >
-      <div className="pointer-events-auto flex items-center gap-1 rounded-lg bg-ink px-2 py-1.5 text-sm text-surface shadow-xl">
+      <div className="pointer-events-auto flex items-center gap-1 rounded-lg bg-ink px-2 py-1.5 text-sm text-surface shadow-xl [@media(pointer:coarse)]:gap-1.5 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2 [@media(pointer:coarse)]:text-base">
         <span className="px-2 tabular-nums">
           {current} of {total}
         </span>
-        <button type="button" onClick={onPrev} title="Previous match" className="rounded p-1 hover:bg-surface/10">
-          <Icon name="chevron-up" className="h-4 w-4" />
+        <button
+          type="button"
+          onClick={onPrev}
+          title="Previous match"
+          className="rounded p-1 hover:bg-surface/10 [@media(pointer:coarse)]:p-2.5"
+        >
+          <Icon name="chevron-up" className="h-4 w-4 [@media(pointer:coarse)]:h-5 [@media(pointer:coarse)]:w-5" />
         </button>
-        <button type="button" onClick={onNext} title="Next match" className="rounded p-1 hover:bg-surface/10">
-          <Icon name="chevron-down" className="h-4 w-4" />
+        <button
+          type="button"
+          onClick={onNext}
+          title="Next match"
+          className="rounded p-1 hover:bg-surface/10 [@media(pointer:coarse)]:p-2.5"
+        >
+          <Icon name="chevron-down" className="h-4 w-4 [@media(pointer:coarse)]:h-5 [@media(pointer:coarse)]:w-5" />
         </button>
-        <button type="button" onClick={onClose} title="Close" className="rounded p-1 hover:bg-surface/10">
-          <Icon name="close" className="h-4 w-4" />
+        <button
+          type="button"
+          onClick={onClose}
+          title="Close"
+          className="rounded p-1 hover:bg-surface/10 [@media(pointer:coarse)]:p-2.5"
+        >
+          <Icon name="close" className="h-4 w-4 [@media(pointer:coarse)]:h-5 [@media(pointer:coarse)]:w-5" />
         </button>
       </div>
     </div>,
