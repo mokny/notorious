@@ -6,6 +6,7 @@ import { systemApi } from "./lib/api/resources.js";
 import { usePullToRefresh } from "./hooks/usePullToRefresh.js";
 import { useDynamicViewportHeight } from "./hooks/useDynamicViewportHeight.js";
 import { useIOSStandaloneViewportFix } from "./hooks/useIOSStandaloneViewportFix.js";
+import { DebugFixedOverlay } from "./components/DebugFixedOverlay.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { SetupTwoFactorPage } from "./pages/SetupTwoFactorPage.js";
@@ -53,7 +54,9 @@ export function App() {
   useDynamicViewportHeight();
   useIOSStandaloneViewportFix();
   return (
-    <Routes>
+    <>
+      <DebugFixedOverlay />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/setup-2fa" element={<SetupTwoFactorPage />} />
@@ -93,6 +96,7 @@ export function App() {
         <Route path="chat" element={<AgentChatPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
