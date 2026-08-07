@@ -4,6 +4,7 @@ import { useAuth } from "./context/AuthContext.js";
 import { isSharedSession } from "./lib/api/shareMode.js";
 import { systemApi } from "./lib/api/resources.js";
 import { usePullToRefresh } from "./hooks/usePullToRefresh.js";
+import { useIOSStandaloneViewportFix } from "./hooks/useIOSStandaloneViewportFix.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { SetupTwoFactorPage } from "./pages/SetupTwoFactorPage.js";
@@ -48,6 +49,7 @@ function FullScreenSpinner() {
 
 export function App() {
   usePullToRefresh();
+  useIOSStandaloneViewportFix();
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

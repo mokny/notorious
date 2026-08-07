@@ -1,56 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { Icon } from "../ui/Icon.js";
-
-// TEMPORARY - remove once the safe-area-bottom gap is diagnosed. Shows the
-// actual runtime numbers (nothing here is guessable from a desktop browser,
-// since `env(safe-area-inset-*)` and `dvh` only resolve to real non-zero
-// values on an actual notched/Dynamic-Island device).
-function SafeAreaDebugBadge() {
-  const [info, setInfo] = useState("");
-  useEffect(() => {
-    function update() {
-      const probe = document.createElement("div");
-      probe.style.cssText = "position:fixed;bottom:0;height:env(safe-area-inset-bottom);visibility:hidden;";
-      document.body.appendChild(probe);
-      const sab = probe.getBoundingClientRect().height;
-      probe.style.top = "0";
-      probe.style.bottom = "";
-      probe.style.height = "env(safe-area-inset-top)";
-      const sat = probe.getBoundingClientRect().height;
-      document.body.removeChild(probe);
-      const nav = document.querySelector("[data-safe-area-debug-nav]");
-      const navRect = nav?.getBoundingClientRect();
-      setInfo(
-        [
-          `innerH=${window.innerHeight}`,
-          `visualVP=${Math.round(window.visualViewport?.height ?? -1)}`,
-          `docClientH=${document.documentElement.clientHeight}`,
-          `sat=${sat}`,
-          `sab=${sab}`,
-          `navBottom=${navRect ? Math.round(navRect.bottom) : "?"}`,
-          `navTop=${navRect ? Math.round(navRect.top) : "?"}`,
-        ].join(" "),
-      );
-    }
-    update();
-    window.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("resize", update);
-    };
-  }, []);
-  return (
-    <div className="fixed left-1 top-1/2 z-50 max-w-[95vw] -translate-y-1/2 break-words rounded bg-red-600 p-2 font-mono text-[10px] text-white">
-      {info}
-    </div>
-  );
-}
 
 /**
  * Fixed bottom tab bar shown only on the phone breakpoint (see WorkspaceLayout,
@@ -91,13 +45,10 @@ export function BottomTabBar({
   const isSearch = location.pathname === `/w/${workspaceId}/search`;
 
   return (
-    <>
-      <SafeAreaDebugBadge />
-      <nav
-        data-safe-area-debug-nav
-        className="flex shrink-0 items-stretch border-t border-border bg-surface-raised md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
+    <nav
+      className="flex shrink-0 items-stretch border-t border-border bg-surface-raised md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <button
         onClick={() => navigate(dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`)}
         className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${isHome ? "text-accent" : "text-ink-muted"}`}
@@ -149,7 +100,6 @@ export function BottomTabBar({
         <Icon name="menu" className="h-5 w-5" />
         Menu
       </button>
-      </nav>
-    </>
+    </nav>
   );
 }
