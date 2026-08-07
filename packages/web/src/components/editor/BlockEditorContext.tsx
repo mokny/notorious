@@ -76,6 +76,18 @@ export interface BlockEditorActions {
    */
   contextMenuBlockId: string | null;
   closeBlockMenu: () => void;
+  /**
+   * Search-result navigation (see SearchPage.tsx's `?highlight=` param and
+   * BlockEditor.tsx's match scanning) - which words every rich-text editor
+   * should highlight, and which single block currently owns the "active"
+   * (brighter) highlight. `null` when no search navigation is active, which
+   * every editor's SearchHighlight extension treats as "no terms" (cheap
+   * no-op, see useMarkdownEditor.ts).
+   */
+  searchHighlight: { terms: string[]; activeBlockId: string | null } | null;
+  /** Block ids a search-match navigation has force-opened (see ToggleBlock.tsx) so a match hidden inside a manually-collapsed toggle becomes visible. */
+  forcedOpenBlockIds: Set<string>;
+  forceOpenBlock: (blockId: string) => void;
 }
 
 const BlockEditorContext = createContext<BlockEditorActions | null>(null);

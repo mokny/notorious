@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { ToggleContent } from "@notorious/shared";
 import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 import { Icon } from "../../ui/Icon.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 interface ToggleBlockProps {
   blockId: string;
@@ -12,6 +13,14 @@ interface ToggleBlockProps {
 
 export function ToggleBlock({ blockId, content, onSave, children }: ToggleBlockProps) {
   const [open, setOpen] = useState(true);
+  // A search-match navigation force-opens a closed toggle that hides its
+  // target (see BlockEditor.tsx's ancestor-chain scroll effect) - `open`
+  // stays a plain local toggle otherwise, this just seeds it back to true
+  // when this block's id enters that set.
+  const { forcedOpenBlockIds } = useBlockEditor();
+  useEffect(() => {
+    if (forcedOpenBlockIds.has(blockId)) setOpen(true);
+  }, [forcedOpenBlockIds, blockId]);
 
   return (
     <div>

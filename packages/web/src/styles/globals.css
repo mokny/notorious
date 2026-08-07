@@ -111,6 +111,18 @@ body {
   text-decoration-skip-ink: none;
 }
 
+/* Search-result scroll-to-match highlighting - see SearchHighlight.ts.
+   `.search-match` marks every occurrence of the search words across the
+   object's blocks; `.search-match-active` (stacked on top of it, on the one
+   occurrence the floating SearchMatchToolbar is currently on) uses a
+   stronger color so it stands out from the rest. */
+.search-match {
+  @apply rounded-sm bg-yellow-200/70 dark:bg-yellow-500/30;
+}
+.search-match-active {
+  @apply bg-orange-400/80 dark:bg-orange-500/60;
+}
+
 /* A native checkbox's default size (or the app's own previous h-4/w-4) is a
    fiddly target to tap accurately with a finger - sized here once, app-wide
    (checklist items, property values, settings toggles, ...) rather than in

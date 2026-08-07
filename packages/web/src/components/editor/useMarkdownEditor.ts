@@ -9,6 +9,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { SlashCommand, slashCommandPluginKey } from "./SlashCommand.js";
 import { TemplateHighlight } from "./TemplateHighlight.js";
 import { TemplateSuggestion, templateSuggestionPluginKey } from "./TemplateSuggestion.js";
+import { SearchHighlight, searchHighlightKey } from "./SearchHighlight.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 
 /**
@@ -56,6 +57,10 @@ interface UseMarkdownEditorOptions {
    * while read-only.
    */
   editable?: boolean;
+  /** This field's own block id (see BlockIdContext.ts) - compared against `searchHighlight.activeBlockId` to decide whether this instance's SearchHighlight extension shows the "active" style. */
+  blockId?: string | null;
+  /** See BlockEditorContext.tsx's `searchHighlight`. */
+  searchHighlight?: { terms: string[]; activeBlockId: string | null } | null;
 }
 
 function isEmptyEditor(target: HTMLElement): boolean {
@@ -100,6 +105,11 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   const workspaceIdRef = useRef(options.workspaceId ?? "");
   const objectIdRef = useRef(options.objectId ?? "");
   const templateSchemaRef = useRef(options.templateSchema);
+  // Mutated in place (not part of the `extensions` dependency array below) by
+  // the effect further down - see SearchHighlight.ts's own doc comment for
+  // why this stays a ref instead of a reactive option.
+  const searchTermsRef = useRef<string[]>([]);
+  const searchIsActiveRef = useRef(false);
 
   onChangeRef.current = options.onChange;
   onEnterRef.current = options.onEnter;
@@ -150,6 +160,12 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
           ]
         : []),
       ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, objectIdRef, schemaRef: templateSchemaRef })] : []),
+      // Always included (cheap no-op when there are no active search terms)
+      // rather than conditional on `options.searchHighlight` - keeping it out
+      // of this array's identity means navigating between search matches
+      // never has to recreate every open editor's extensions/ProseMirror
+      // view, only dispatch the ref-driven refresh transaction below.
+      SearchHighlight.configure({ termsRef: searchTermsRef, isActiveRef: searchIsActiveRef }),
     ],
     [options.placeholder, hasSlashCommand, templateAware],
   );
@@ -221,6 +237,16 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   useEffect(() => {
     editor?.setEditable(options.editable ?? true, false);
   }, [options.editable, editor]);
+
+  // Pushes the current search terms / active-block state into the refs
+  // SearchHighlight.ts reads, then forces its decoration plugin to recompute
+  // - see that file for why a meta transaction instead of `setOptions()`.
+  useEffect(() => {
+    if (!editor) return;
+    searchTermsRef.current = options.searchHighlight?.terms ?? [];
+    searchIsActiveRef.current = Boolean(options.blockId && options.searchHighlight?.activeBlockId === options.blockId);
+    editor.view.dispatch(editor.state.tr.setMeta(searchHighlightKey, true));
+  }, [editor, options.searchHighlight, options.blockId]);
 
   // `content` above only seeds the editor once, on creation - by itself it
   // never notices later prop changes, so a block another collaborator (or

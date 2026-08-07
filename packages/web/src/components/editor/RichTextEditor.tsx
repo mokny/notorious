@@ -3,6 +3,7 @@ import { EditorContent } from "@tiptap/react";
 import type { BlockType, ObjectType } from "@notorious/shared";
 import { useMarkdownEditor } from "./useMarkdownEditor.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
+import { useCurrentBlockId } from "./BlockIdContext.js";
 import { useTemplateAutocompleteSchema } from "../../hooks/useTemplateAutocompleteSchema.js";
 
 interface RichTextEditorProps {
@@ -63,7 +64,8 @@ export function RichTextEditor({
   // here since `templateAware` is only ever set from within one (see
   // TemplatableMarkdown.tsx). `useTemplateAutocompleteSchema` is always
   // called (rules-of-hooks) but its query is harmless/idle-ish when unused.
-  const { workspaceId, objectId } = useBlockEditor();
+  const { workspaceId, objectId, searchHighlight } = useBlockEditor();
+  const blockId = useCurrentBlockId();
   const { data: templateSchema } = useTemplateAutocompleteSchema(workspaceId);
   const saveTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isSavingRef = useRef(false);
@@ -102,6 +104,8 @@ export function RichTextEditor({
     workspaceId,
     objectId,
     templateSchema,
+    blockId,
+    searchHighlight,
     // Save right away instead of waiting out the rest of the debounce below -
     // once focus has left, there's no more typing to coalesce, and a
     // templated field (see TemplatableMarkdown.tsx) is about to show its

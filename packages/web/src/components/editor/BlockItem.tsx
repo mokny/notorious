@@ -8,6 +8,7 @@ import { BlockList } from "./BlockList.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { BlockSlugButton } from "./BlockSlugButton.js";
 import { BlockContextMenu } from "./BlockContextMenu.js";
+import { BlockIdProvider } from "./BlockIdContext.js";
 import { Icon } from "../ui/Icon.js";
 import { useHasHover } from "../../hooks/useHasHover.js";
 import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
@@ -78,7 +79,9 @@ export function BlockItem({ block }: { block: BlockNode }) {
     // Outer wrapper stays static (no transform) so the delete-reveal panel
     // below sits fixed in place while the actual row (the drag source, one
     // level in) slides left over it - see deleteRevealProgress above.
-    <div className="relative">
+    // `data-block-id` is the scroll-to-match anchor for search navigation
+    // (see BlockEditor.tsx's search-highlight scroll effect).
+    <div className="relative" data-block-id={block.id}>
       {deleteRevealProgress > 0 && (
         <div
           className="pointer-events-none absolute inset-y-0 right-0 flex w-24 items-center justify-end rounded-md bg-red-500 pr-4 text-white"
@@ -140,6 +143,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
         )}
 
         <div className="min-w-0 flex-1">
+          <BlockIdProvider value={block.id}>
           <BlockRenderer
             block={block}
             workspaceId={workspaceId}
@@ -160,6 +164,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
             autoFocus={block.id === pendingFocusBlockId}
             onAutoFocused={clearPendingFocus}
           />
+          </BlockIdProvider>
         </div>
 
         {hasHover && <BlockSlugButton objectId={objectId} blockId={block.id} slug={block.slug} />}

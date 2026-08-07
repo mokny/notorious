@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -14,6 +14,8 @@ import { useKeepFocusedElementVisible } from "../../hooks/useKeepFocusedElementV
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "./blockGestures.js";
 import { UndoToast } from "./UndoToast.js";
+import { SearchMatchToolbar } from "./SearchMatchToolbar.js";
+import { ancestorChain, findSearchMatches, flattenBlockTree, splitSearchTerms } from "../../lib/searchHighlight.js";
 
 function isEditableElementFocused(): boolean {
   const el = document.activeElement as HTMLElement | null;
@@ -72,6 +74,10 @@ interface BlockEditorProps {
   renderedBlocks?: Record<string, Record<string, string>> | null;
   /** True while the fetch behind `renderedBlocks` is still in flight - see BlockEditorContext.tsx's `renderedBlocksLoading`. */
   renderedBlocksLoading?: boolean;
+  /** The active search query from a search-result click (see SearchPage.tsx's `?highlight=` param) - drives match scanning, scroll-to-match, and the floating SearchMatchToolbar below. `null`/omitted outside that flow. */
+  highlightQuery?: string | null;
+  /** Called when the user dismisses the search-match toolbar - ObjectDetailPage.tsx clears the `?highlight=` param. */
+  onCloseHighlight?: () => void;
 }
 
 export function BlockEditor({
@@ -83,6 +89,8 @@ export function BlockEditor({
   readOnly = false,
   renderedBlocks = null,
   renderedBlocksLoading = false,
+  highlightQuery = null,
+  onCloseHighlight,
 }: BlockEditorProps) {
   const queryClient = useQueryClient();
   const resolvedEmbedAncestorIds = embedAncestorIds ?? [objectId];
@@ -123,7 +131,43 @@ export function BlockEditor({
   useKeepFocusedElementVisible(editorContainerRef);
 
   const { data: blocks } = useQuery({ queryKey: ["blocks", objectId], queryFn: () => blockApi.list(objectId) });
-  const tree = buildBlockTree(blocks ?? []);
+  // Memoized (not recomputed inline every render) so `matches` below, which
+  // depends on it, doesn't get a new array identity - and therefore doesn't
+  // re-trigger the scroll-to-match effect - on every unrelated re-render.
+  const tree = useMemo(() => buildBlockTree(blocks ?? []), [blocks]);
+
+  // Search-result navigation (see SearchPage.tsx's `?highlight=` param) -
+  // only the top-level editor instance does any of this (an embedded
+  // sub_object preview never receives `highlightQuery`, see isEmbedded
+  // below), so it's harmless that this runs unconditionally.
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+  const [forcedOpenBlockIds, setForcedOpenBlockIds] = useState<Set<string>>(new Set());
+  const matches = useMemo(
+    () => (highlightQuery ? findSearchMatches(flattenBlockTree(tree), highlightQuery) : []),
+    [tree, highlightQuery],
+  );
+  useEffect(() => setActiveMatchIndex(0), [highlightQuery]);
+  const clampedMatchIndex = matches.length > 0 ? Math.min(activeMatchIndex, matches.length - 1) : 0;
+  const activeMatch = matches[clampedMatchIndex] ?? null;
+
+  function forceOpenBlock(blockId: string): void {
+    setForcedOpenBlockIds((prev) => (prev.has(blockId) ? prev : new Set(prev).add(blockId)));
+  }
+
+  // Reveals + scrolls to the active match: force-opens any collapsed toggle
+  // ancestor (see ToggleBlock.tsx), then waits a frame for that state update
+  // to actually mount the match's DOM node before scrolling to it.
+  useEffect(() => {
+    if (!activeMatch) return;
+    for (const ancestor of ancestorChain(blocks ?? [], activeMatch.blockId)) {
+      if (ancestor.type === "toggle") forceOpenBlock(ancestor.id);
+    }
+    const raf = requestAnimationFrame(() => {
+      document.querySelector(`[data-block-id="${activeMatch.blockId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMatch?.blockId, blocks]);
 
   // Same query key ObjectDetailPage.tsx and SubObjectBlock.tsx's picker
   // already use for this workspace's object types - shares their cache
@@ -530,6 +574,9 @@ export function BlockEditor({
         selectBlock: (blockId) => onSelectBlock?.(blockId),
         contextMenuBlockId,
         closeBlockMenu: () => setContextMenuBlockId(null),
+        searchHighlight: activeMatch ? { terms: splitSearchTerms(highlightQuery ?? ""), activeBlockId: activeMatch.blockId } : null,
+        forcedOpenBlockIds,
+        forceOpenBlock,
       }}
     >
       <div
@@ -576,6 +623,16 @@ export function BlockEditor({
             history.undo();
             setShowUndoToast(false);
           }}
+        />
+      )}
+
+      {!isEmbedded && highlightQuery && matches.length > 0 && (
+        <SearchMatchToolbar
+          current={clampedMatchIndex + 1}
+          total={matches.length}
+          onPrev={() => setActiveMatchIndex((i) => (i - 1 + matches.length) % matches.length)}
+          onNext={() => setActiveMatchIndex((i) => (i + 1) % matches.length)}
+          onClose={() => onCloseHighlight?.()}
         />
       )}
     </BlockEditorProvider>

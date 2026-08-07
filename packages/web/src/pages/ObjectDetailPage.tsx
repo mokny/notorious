@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi, blockApi } from "../lib/api/resources.js";
@@ -72,6 +72,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  // Set by SearchPage.tsx when navigating in from a search result - see
+  // BlockEditor.tsx's match scanning/scroll-to-match/SearchMatchToolbar.
+  // Reading straight off the URL (not a prop) means this also works
+  // unmodified for the tablet split-view instance of this page (it's
+  // rendered on the same `/search` route, just with an `?open=` param
+  // alongside this one - see SearchPage.tsx).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightQuery = searchParams.get("highlight");
   // A whole-workspace share is redirected onto this exact route with no
   // special props (see SharePage.tsx) - it's a real page in the normal
   // `/w/:workspaceId` tree, so this falls back to the active share session's
@@ -445,6 +453,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               readOnly={!effectiveCanEdit}
               renderedBlocks={renderedBlocks?.rendered ?? null}
               renderedBlocksLoading={renderedBlocksLoading}
+              highlightQuery={highlightQuery}
+              onCloseHighlight={() =>
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.delete("highlight");
+                  return next;
+                })
+              }
             />
 
             {/* Hidden only for a single-object share (it can't grant access

@@ -27,10 +27,12 @@ export function SearchPage() {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set("open", objectId);
+        next.set("highlight", debouncedQuery);
         return next;
       });
     } else {
-      navigate(`/w/${workspaceId}/objects/${objectId}`);
+      const params = new URLSearchParams({ highlight: debouncedQuery });
+      navigate(`/w/${workspaceId}/objects/${objectId}?${params}`);
     }
   }
 
