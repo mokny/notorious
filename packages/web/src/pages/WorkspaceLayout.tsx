@@ -66,9 +66,18 @@ function WorkspaceLayoutInner() {
   // this pairs with).
   const sidebarPersistent = breakpoint === "desktop" || (breakpoint === "tablet" && isLandscape);
   const { coverActive } = useMobileChrome();
-  // The mobile header only overlays a cover when it's actually the topmost
-  // thing on screen (no persistent sidebar taking that role instead).
-  const showCoverOverlay = coverActive && !sidebarPersistent;
+  // Phone drops the top bar entirely - BottomTabBar's own "Menu" button
+  // (rendered further down, phone-only) is the sole way to reach the
+  // sidebar there. Tablet-portrait has no bottom tab bar of its own, so it
+  // keeps this header as its only nav entry point.
+  const isPhone = breakpoint === "phone";
+  const showMobileHeader = !sidebarPersistent && !isPhone;
+  // The header only overlays a cover when it's actually rendered at all.
+  const showCoverOverlay = coverActive && showMobileHeader;
+  // True wherever a cover reaches the very top edge - under the
+  // tablet-portrait header's transparent overlay, or (with no header at all)
+  // straight under the phone's status bar/Dynamic Island.
+  const coverFullBleed = showCoverOverlay || (isPhone && coverActive);
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
@@ -246,9 +255,9 @@ function WorkspaceLayoutInner() {
 
       <div
         className="relative flex min-w-0 flex-1 flex-col"
-        style={!sidebarPersistent ? ({ "--mobile-header-h": MOBILE_HEADER_HEIGHT } as CSSProperties) : undefined}
+        style={showMobileHeader ? ({ "--mobile-header-h": MOBILE_HEADER_HEIGHT } as CSSProperties) : undefined}
       >
-        {!sidebarPersistent && (
+        {showMobileHeader && (
           // Always floats above <main> (never takes flow space itself) -
           // <main>'s own padding-top below compensates instead, which also
           // makes the action-toolbar sticky bar in ObjectDetailPage.tsx stick
@@ -277,12 +286,23 @@ function WorkspaceLayoutInner() {
         )}
         {/* Only for a real member - an anonymous share visitor has no
             account to "install their copy" of the app for. Hidden while a
-            cover is full-bleed under the overlay header (see showCoverOverlay
-            above) - it's in main's normal flow, so left up it would push the
-            cover down and break the "content reaches the very top" effect on
-            its first (undismissed) showing. */}
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto" style={!sidebarPersistent ? { paddingTop: "var(--mobile-header-h)" } : undefined}>
-          {!shareToken && !showCoverOverlay && <InstallAppHint />}
+            cover is full-bleed under the top edge (tablet-portrait's overlay
+            header, or phone's bare safe-area - see coverFullBleed below) -
+            it's in main's normal flow, so left up it would push the cover
+            down and break the "content reaches the very top" effect on its
+            first (undismissed) showing. */}
+        <main
+          ref={mainRef}
+          className="min-w-0 flex-1 overflow-y-auto"
+          style={
+            showMobileHeader
+              ? { paddingTop: "var(--mobile-header-h)" }
+              : isPhone
+                ? { paddingTop: coverActive ? 0 : "env(safe-area-inset-top)" }
+                : undefined
+          }
+        >
+          {!shareToken && !coverFullBleed && <InstallAppHint />}
           <Outlet />
         </main>
         {breakpoint === "phone" && (
