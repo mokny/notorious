@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { VotingContent, VotingItem, VoteSummary } from "@notorious/shared";
@@ -9,11 +9,14 @@ import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { useDragSelectGuard } from "../../../hooks/useDragSelectGuard.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { useKeepInViewport } from "../../../hooks/useKeepInViewport.js";
+import { useHasHover } from "../../../hooks/useHasHover.js";
 import { blockApi, workspaceApi } from "../../../lib/api/resources.js";
 import { getVisitorId } from "../../../lib/visitorIdentity.js";
 import { randomId } from "../../../lib/randomId.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
+import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGestures.js";
+import { UndoToast } from "../UndoToast.js";
 
 const EMPTY_SUMMARY: VoteSummary = { up: 0, down: 0, myVote: null };
 
@@ -129,100 +132,135 @@ function VotingItemRow({
   onRemove: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  // Same touch-vs-hover split as BlockItem.tsx/ChecklistBlock.tsx.
+  const hasHover = useHasHover();
+  const [isEditingContent, setIsEditingContent] = useState(false);
+  const canLongPressDrag = !hasHover && !readOnly && !isEditingContent;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging && hasHover ? 0.5 : 1,
+    boxShadow: isDragging && !hasHover ? "0 8px 24px rgb(0 0 0 / 0.25)" : undefined,
+    WebkitTouchCallout: !hasHover ? ("none" as const) : undefined,
+  };
+  const deleteRevealProgress =
+    isDragging && !hasHover && transform && transform.x < 0 ? Math.min(1, -transform.x / SWIPE_DELETE_THRESHOLD_PX) : 0;
   const total = summary.up + summary.down;
   const upRatio = total > 0 ? Math.round((summary.up / total) * 100) : 0;
   const score = summary.up - summary.down;
 
   return (
-    <div ref={setNodeRef} style={style} className="group/votingitem flex items-start gap-2">
-      <button
-        {...attributes}
-        {...listeners}
-        // Hidden while locked/read-only, same as ChecklistBlock's drag handle -
-        // reordering items is content editing, unlike the vote arrows next to it.
-        className="mt-1.5 shrink-0 cursor-grab rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/votingitem:opacity-100 disabled:opacity-0"
-        style={{ visibility: readOnly ? "hidden" : "visible" }}
-        title="Drag to reorder item"
+    <div className="relative">
+      {deleteRevealProgress > 0 && (
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 flex w-24 items-center justify-end rounded-md bg-red-500 pr-4 text-white"
+          style={{ opacity: deleteRevealProgress }}
+        >
+          <Icon name="close" className="h-4 w-4" />
+        </div>
+      )}
+      <div
+        ref={setNodeRef}
+        style={style}
+        onFocus={() => setIsEditingContent(true)}
+        onBlur={() => setIsEditingContent(false)}
+        {...(canLongPressDrag ? listeners : {})}
+        className={`group/votingitem relative flex items-start gap-2 ${!hasHover ? "bg-surface" : ""} ${
+          isDragging && !hasHover ? "z-10 scale-[1.02]" : ""
+        }`}
       >
-        <Icon name="grip-vertical" className="h-3.5 w-3.5" />
-      </button>
-
-      {/* Vote arrows - deliberately never gated by `readOnly`: voting stays
-          available on a locked object / for viewer-only share visitors, only
-          a passed deadline (`votingClosed`) disables them. */}
-      <div className="flex w-9 shrink-0 flex-col items-center pt-0.5">
-        <button
-          type="button"
-          // Stays clickable even when the object is locked or this is a
-          // read-only share visitor - see ObjectDetailPage.tsx's
-          // READ_ONLY_LOCK/READ_ONLY_LOCK_ALLOW_CHECKLIST and castVoteSchema.
-          data-vote-exempt
-          disabled={votingClosed}
-          onClick={() => onVote("up")}
-          title="Upvote"
-          className={`rounded p-0.5 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 ${
-            summary.myVote === "up" ? "text-accent" : "text-ink-muted hover:text-ink"
-          }`}
-        >
-          <Icon name="chevron-up" className="h-4 w-4" />
-        </button>
-        <span className="text-xs font-medium tabular-nums text-ink">{score}</span>
-        <button
-          type="button"
-          data-vote-exempt
-          disabled={votingClosed}
-          onClick={() => onVote("down")}
-          title="Downvote"
-          className={`rounded p-0.5 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 ${
-            summary.myVote === "down" ? "text-red-500" : "text-ink-muted hover:text-ink"
-          }`}
-        >
-          <Icon name="chevron-down" className="h-4 w-4" />
-        </button>
-        {total > 0 && (
-          <div className="mt-1 h-1 w-8 overflow-hidden rounded-full bg-red-500/30" title={`${upRatio}% upvoted`}>
-            <div className="h-full bg-accent" style={{ width: `${upRatio}%` }} />
-          </div>
+        {hasHover && (
+          <button
+            {...attributes}
+            {...listeners}
+            // Hidden while locked/read-only, same as ChecklistBlock's drag handle -
+            // reordering items is content editing, unlike the vote arrows next to it.
+            className="mt-1.5 shrink-0 cursor-grab rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/votingitem:opacity-100 disabled:opacity-0"
+            style={{ visibility: readOnly ? "hidden" : "visible" }}
+            title="Drag to reorder item"
+          >
+            <Icon name="grip-vertical" className="h-3.5 w-3.5" />
+          </button>
         )}
-      </div>
 
-      <div className="min-w-0 flex-1 space-y-0.5 py-0.5">
-        <textarea
-          ref={(el) => resizeTextarea(el)}
-          value={item.title}
-          onChange={(e) => {
-            onChangeTitle(e.target.value);
-            resizeTextarea(e.target);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.preventDefault();
-          }}
-          readOnly={readOnly}
-          placeholder="Option"
-          autoComplete="off"
-          rows={1}
-          className="w-full resize-none overflow-hidden border-none bg-transparent text-sm font-medium outline-none"
-        />
-        {(item.description || !readOnly) && (
-          <input
-            value={item.description ?? ""}
-            onChange={(e) => onChangeDescription(e.target.value)}
+        {/* Vote arrows - deliberately never gated by `readOnly`: voting stays
+            available on a locked object / for viewer-only share visitors, only
+            a passed deadline (`votingClosed`) disables them. */}
+        <div className="flex w-9 shrink-0 flex-col items-center pt-0.5">
+          <button
+            type="button"
+            // Stays clickable even when the object is locked or this is a
+            // read-only share visitor - see ObjectDetailPage.tsx's
+            // READ_ONLY_LOCK/READ_ONLY_LOCK_ALLOW_CHECKLIST and castVoteSchema.
+            data-vote-exempt
+            disabled={votingClosed}
+            onClick={() => onVote("up")}
+            title="Upvote"
+            className={`rounded p-0.5 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 ${
+              summary.myVote === "up" ? "text-accent" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            <Icon name="chevron-up" className="h-4 w-4" />
+          </button>
+          <span className="text-xs font-medium tabular-nums text-ink">{score}</span>
+          <button
+            type="button"
+            data-vote-exempt
+            disabled={votingClosed}
+            onClick={() => onVote("down")}
+            title="Downvote"
+            className={`rounded p-0.5 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 ${
+              summary.myVote === "down" ? "text-red-500" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            <Icon name="chevron-down" className="h-4 w-4" />
+          </button>
+          {total > 0 && (
+            <div className="mt-1 h-1 w-8 overflow-hidden rounded-full bg-red-500/30" title={`${upRatio}% upvoted`}>
+              <div className="h-full bg-accent" style={{ width: `${upRatio}%` }} />
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-0.5 py-0.5">
+          <textarea
+            ref={(el) => resizeTextarea(el)}
+            value={item.title}
+            onChange={(e) => {
+              onChangeTitle(e.target.value);
+              resizeTextarea(e.target);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.preventDefault();
+            }}
             readOnly={readOnly}
-            placeholder="Description (optional)"
+            placeholder="Option"
             autoComplete="off"
-            className="w-full border-none bg-transparent text-xs text-ink-muted outline-none"
+            rows={1}
+            className="w-full resize-none overflow-hidden border-none bg-transparent text-sm font-medium outline-none"
           />
+          {(item.description || !readOnly) && (
+            <input
+              value={item.description ?? ""}
+              onChange={(e) => onChangeDescription(e.target.value)}
+              readOnly={readOnly}
+              placeholder="Description (optional)"
+              autoComplete="off"
+              className="w-full border-none bg-transparent text-xs text-ink-muted outline-none"
+            />
+          )}
+        </div>
+
+        {hasHover && (
+          <button
+            onClick={onRemove}
+            style={{ visibility: readOnly ? "hidden" : "visible" }}
+            className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover/votingitem:opacity-100"
+          >
+            <Icon name="close" className="h-3.5 w-3.5" />
+          </button>
         )}
       </div>
-
-      <button
-        onClick={onRemove}
-        style={{ visibility: readOnly ? "hidden" : "visible" }}
-        className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover/votingitem:opacity-100"
-      >
-        <Icon name="close" className="h-3.5 w-3.5" />
-      </button>
     </div>
   );
 }
@@ -247,8 +285,15 @@ export function VotingBlock({
   const allowMultipleVotes = content.allowMultipleVotes !== false;
   const votingEndsAt = content.votingEndsAt ?? null;
   const votingClosed = votingEndsAt !== null && new Date(votingEndsAt).getTime() <= Date.now();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // Split by input type - see ChecklistBlock.tsx's identical sensors for why.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
   const dragSelectGuard = useDragSelectGuard();
+  // Touch-only swipe-delete undo - see ChecklistBlock.tsx's identical pair.
+  const [undoSnapshot, setUndoSnapshot] = useState<{ index: number; item: VotingItem } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Only a real workspace owner can reach `onUpdateSettings` server-side (see
   // updateVotingSettingsSchema's minRole) - hiding the gear for everyone else
@@ -285,13 +330,44 @@ export function VotingBlock({
     save({ ...content, items: items.filter((_, i) => i !== index) });
   }
 
+  /** Same delete, plus the "Item deleted / Undo" toast - see undoSnapshot above. */
+  function performSwipeDeleteItem(index: number): void {
+    const item = items[index];
+    if (!item) return;
+    removeItem(index);
+    setUndoSnapshot({ index, item });
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 5000);
+  }
+
+  function undoSwipeDelete(): void {
+    if (!undoSnapshot) return;
+    const next = [...items];
+    next.splice(undoSnapshot.index, 0, undoSnapshot.item);
+    save({ ...content, items: next });
+    setUndoSnapshot(null);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
-    if (!event.over || event.active.id === event.over.id) return;
     const ids = items.map((item) => item.id);
-    const oldIndex = ids.indexOf(String(event.active.id));
+    const activeIndex = ids.indexOf(String(event.active.id));
+
+    // Touch-only swipe-to-delete/tap-context split - see
+    // ChecklistBlock.tsx's identical handleDragEnd for the full reasoning.
+    if (event.activatorEvent.type === "touchstart") {
+      const absX = Math.abs(event.delta.x);
+      const absY = Math.abs(event.delta.y);
+      if (absX < TAP_MOVEMENT_TOLERANCE_PX && absY < TAP_MOVEMENT_TOLERANCE_PX) return;
+      if (absX > SWIPE_DELETE_THRESHOLD_PX && absX > absY) {
+        if (activeIndex !== -1) performSwipeDeleteItem(activeIndex);
+        return;
+      }
+    }
+
+    if (!event.over || event.active.id === event.over.id) return;
     const newIndex = ids.indexOf(String(event.over.id));
-    if (oldIndex === -1 || newIndex === -1) return;
-    save({ ...content, items: arrayMove(items, oldIndex, newIndex) });
+    if (activeIndex === -1 || newIndex === -1) return;
+    save({ ...content, items: arrayMove(items, activeIndex, newIndex) });
   }
 
   return (
@@ -337,6 +413,8 @@ export function VotingBlock({
           <Icon name="plus" className="h-3 w-3" /> Add option
         </button>
       )}
+
+      {undoSnapshot && <UndoToast message="Item deleted" onUndo={undoSwipeDelete} />}
     </div>
   );
 }

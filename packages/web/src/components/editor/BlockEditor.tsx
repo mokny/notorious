@@ -571,6 +571,7 @@ export function BlockEditor({
 
       {showUndoToast && (
         <UndoToast
+          message="Block deleted"
           onUndo={() => {
             history.undo();
             setShowUndoToast(false);
