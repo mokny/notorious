@@ -289,7 +289,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         icon={renderIcon}
       />
 
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:px-8 sm:py-10 lg:flex-row">
+      {/* No top padding once there's a cover (just a small `pt-2`) - the
+          sticky toolbar below is the first thing in this column then (the
+          icon+title row right after it is hidden, see the `!object.cover`
+          guard below), and it should sit close under the cover instead of
+          leaving the same big gap a bare title would've wanted. */}
+      <div
+        className={`mx-auto flex max-w-5xl flex-col gap-8 px-4 pb-6 sm:px-8 sm:pb-10 lg:flex-row ${object.cover ? "pt-2" : "pt-6 sm:pt-10"}`}
+      >
         <div className="min-w-0 flex-1">
           {/* Icon + title, own row above the action-button row below -
               hidden once there's a cover (CoverImage renders both as an

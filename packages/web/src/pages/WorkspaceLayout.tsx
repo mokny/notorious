@@ -128,6 +128,29 @@ function WorkspaceLayoutInner() {
     mainRef.current?.scrollTo(0, 0);
   }, [location.pathname]);
 
+  // On phone, a cover page has no header at all sitting over the status
+  // bar/Dynamic Island (see showMobileHeader above) - intentional, so the
+  // cover itself shows through there while at the very top. But once
+  // scrolled, that same now-unmasked strip would show whatever's scrolled
+  // underneath (block text, etc.) right behind the island, which looks
+  // broken rather than deliberate. This paints it over with the plain page
+  // background as soon as there's any scroll, and lets it go transparent
+  // again at the very top - see the mask element itself, further down.
+  const [phoneCoverScrolled, setPhoneCoverScrolled] = useState(false);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el || !isPhone || !coverActive) {
+      setPhoneCoverScrolled(false);
+      return;
+    }
+    function onScroll() {
+      setPhoneCoverScrolled((el?.scrollTop ?? 0) > 0);
+    }
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [isPhone, coverActive]);
+
   async function handleLogout() {
     const confirmed = await confirm({
       title: "Log out?",
@@ -297,6 +320,15 @@ function WorkspaceLayoutInner() {
             </button>
             <span className={`truncate text-sm font-medium ${showCoverOverlay ? "text-white" : ""}`}>{workspace?.name}</span>
           </div>
+        )}
+        {isPhone && coverActive && (
+          <div
+            aria-hidden
+            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-surface transition-opacity duration-150 ${
+              phoneCoverScrolled ? "opacity-100" : "opacity-0"
+            }`}
+            style={{ height: "env(safe-area-inset-top)" }}
+          />
         )}
         {/* Only for a real member - an anonymous share visitor has no
             account to "install their copy" of the app for. Hidden while a
