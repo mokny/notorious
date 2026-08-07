@@ -182,10 +182,15 @@ function WorkspaceLayoutInner() {
     // bar) rather than the tab bar sitting flush against it. Adding both
     // safe-area insets back on top of `100dvh` gives a box that actually
     // spans the full physical screen, the same way CoverImage.tsx's own
-    // negative margin explicitly reaches past `100dvh`'s top edge.
-    // `overflow-hidden` keeps it a hard one-screen-tall box now that its
-    // height is actually correct.
-    <div className="flex overflow-hidden" style={{ height: "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))" }}>
+    // negative margin explicitly reaches past `100dvh`'s top edge. No
+    // `overflow-hidden` here even though this is meant to be a hard
+    // one-screen-tall box - Safari drops `position: sticky` (used by
+    // ObjectDetailPage.tsx's action-toolbar) anywhere inside an ancestor
+    // chain that includes a *non-scrolling* `overflow: hidden`, not just
+    // inside the nearest actual scroll container - this element is exactly
+    // that, an non-scrolling ancestor of <main> (the real scroll container,
+    // which already clips its own overflow just fine on its own).
+    <div className="flex" style={{ height: "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))" }}>
       {sidebarOpen && !sidebarPersistent && (
         <div className="fixed inset-0 z-30 bg-black/30" onClick={() => setSidebarOpen(false)} />
       )}
