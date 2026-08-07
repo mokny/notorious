@@ -9,6 +9,12 @@
   --ink-muted: 100 116 139;
   --accent: 99 102 241;
   --border: 226 232 240;
+  /* WorkspaceLayout's root height - useDynamicViewportHeight overrides this
+     with a live-measured window.innerHeight px value on iOS standalone,
+     where that can briefly under-report right after a cold launch (see the
+     hook's own comment). 100dvh is the correct value everywhere else and the
+     correct starting value here too, before that hook's effect has run. */
+  --app-vh: 100dvh;
 }
 
 .dark {
