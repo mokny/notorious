@@ -5,6 +5,7 @@ import { objectApi, fileApi } from "../lib/api/resources.js";
 import { withShareToken } from "../lib/api/shareMode.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 import { useFitText } from "../hooks/useFitText.js";
+import { useBreakpoint } from "../hooks/useBreakpoint.js";
 import { DEFAULT_COVER_TEXT_STYLE, coverTextCss } from "../lib/coverTextStyle.js";
 import { CoverTextStyleEditor } from "./CoverTextStyleEditor.js";
 import { Icon } from "./ui/Icon.js";
@@ -31,6 +32,18 @@ function fileIdFromUrl(url: string): string | null {
   return url.startsWith("/api/v1/files/") ? url.slice("/api/v1/files/".length) : null;
 }
 
+// On the phone breakpoint a cover is always full-bleed (WorkspaceLayout
+// renders no header there, see coverFullBleed) - the image starts right at
+// the very top of the screen, under the status bar/Dynamic Island. The
+// title+icon row below is anchored to the image's own bottom edge, so a
+// short `coverHeight` (the workspace's slider setting, down to 50px) could
+// otherwise place that row's top edge within the Dynamic Island's own
+// footprint. This floor guarantees the image (and so the row anchored to
+// its bottom) is always at least tall enough to clear it, regardless of how
+// short the workspace's configured coverHeight is - only ever raises the
+// rendered height above `coverHeight`, never shrinks it below.
+const PHONE_MIN_COVER_HEIGHT = "calc(env(safe-area-inset-top) + 64px)";
+
 /**
  * Full-width banner shown above an object's content, capped at `coverHeight`
  * (the owning workspace's configurable max, see SettingsPage.tsx) tall
@@ -48,6 +61,7 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
   const [styleEditorOpen, setStyleEditorOpen] = useState(false);
   const { theme } = useTheme();
   const { setCoverActive } = useMobileChrome();
+  const isPhone = useBreakpoint() === "phone";
 
   // Tells WorkspaceLayout's mobile header to switch to its transparent
   // overlay style while this cover is on screen, and restores the Dynamic
@@ -184,7 +198,7 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
         src={withShareToken(cover)}
         alt=""
         className="w-full object-cover"
-        style={{ maxHeight: coverHeight }}
+        style={isPhone ? { height: `max(${coverHeight}px, ${PHONE_MIN_COVER_HEIGHT})` } : { maxHeight: coverHeight }}
         onLoad={handleImageLoad}
       />
 
