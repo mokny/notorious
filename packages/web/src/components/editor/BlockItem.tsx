@@ -53,6 +53,14 @@ export function BlockItem({ block }: { block: BlockNode }) {
     transition,
     opacity: isDragging && hasHover ? 0.5 : 1,
     boxShadow: isDragging && !hasHover ? "0 8px 24px rgb(0 0 0 / 0.25)" : undefined,
+    // iOS Safari's own long-press gesture on a link/image (the "peek"
+    // preview popup) fires from the same touch-and-hold this row's long-
+    // press-drag listens for, and wins the race - a block containing a link
+    // (e.g. a sub_object reference) opened link previews instead of ever
+    // reaching the drag/menu gesture. `-webkit-touch-callout` is what that
+    // popup is gated on; it's inherited, so setting it here on the row
+    // reaches every link/image inside without touching each block type.
+    WebkitTouchCallout: !hasHover ? ("none" as const) : undefined,
   };
   // How far left the row has been dragged, as a 0-1 fraction of the delete
   // threshold - drives the red delete-reveal panel's opacity below (see
