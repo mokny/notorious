@@ -1,10 +1,63 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { Icon } from "../ui/Icon.js";
+
+// TEMPORARY - remove once the persistent gap below the bottom tab bar is
+// diagnosed with real device numbers (two prior blind fixes - h-dvh vs.
+// fixed positioning, then a polled --app-vh var - both failed to close it,
+// so guessing further without data isn't worth it).
+function BottomBarDebugBadge({ navRef }: { navRef: React.RefObject<HTMLElement | null> }) {
+  const [info, setInfo] = useState("");
+  useEffect(() => {
+    function update() {
+      const probe = document.createElement("div");
+      probe.style.cssText = "position:fixed;bottom:0;height:env(safe-area-inset-bottom);visibility:hidden;";
+      document.body.appendChild(probe);
+      const sab = probe.getBoundingClientRect().height;
+      document.body.removeChild(probe);
+      const nav = navRef.current;
+      const navRect = nav?.getBoundingClientRect();
+      const navStyle = nav ? getComputedStyle(nav) : null;
+      const appVh = getComputedStyle(document.documentElement).getPropertyValue("--app-vh").trim();
+      setInfo(
+        [
+          `innerH=${window.innerHeight}`,
+          `visualVP=${Math.round(window.visualViewport?.height ?? -1)}`,
+          `docClientH=${document.documentElement.clientHeight}`,
+          `bodyClientH=${document.body.clientHeight}`,
+          `screenH=${window.screen.height}`,
+          `sab=${sab}`,
+          `appVh=${appVh}`,
+          `navBottom=${navRect ? Math.round(navRect.bottom) : "?"}`,
+          `navTop=${navRect ? Math.round(navRect.top) : "?"}`,
+          `navPos=${navStyle?.position}`,
+          `navBottomCSS=${navStyle?.bottom}`,
+          `standalone=${window.matchMedia("(display-mode: standalone)").matches}`,
+        ].join(" "),
+      );
+    }
+    update();
+    const t1 = setTimeout(update, 500);
+    const t2 = setTimeout(update, 2000);
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+    };
+  }, [navRef]);
+  return (
+    <div className="fixed left-1 top-1/2 z-[100] max-w-[95vw] -translate-y-1/2 break-words rounded bg-red-600 p-2 font-mono text-[10px] text-white">
+      {info}
+    </div>
+  );
+}
 
 /**
  * Fixed bottom tab bar shown only on the phone breakpoint (see WorkspaceLayout,
@@ -26,6 +79,7 @@ export function BottomTabBar({
   const shareToken = isSharedSession();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   const { data: objectTypes } = useQuery({
     queryKey: ["objectTypes", workspaceId],
@@ -53,10 +107,13 @@ export function BottomTabBar({
     // space so scrolled content doesn't end up hidden underneath. z-20 (not
     // z-30) so the sidebar drawer's backdrop still covers this when open,
     // same as before.
-    <nav
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface-raised md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
+    <>
+      <BottomBarDebugBadge navRef={navRef} />
+      <nav
+        ref={navRef}
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface-raised md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
       <div className="flex h-[52px] items-stretch">
       <button
         onClick={() => navigate(dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`)}
@@ -110,6 +167,7 @@ export function BottomTabBar({
         Menu
       </button>
       </div>
-    </nav>
+      </nav>
+    </>
   );
 }
