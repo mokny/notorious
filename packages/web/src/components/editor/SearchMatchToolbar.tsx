@@ -29,7 +29,17 @@ interface SearchMatchToolbarProps {
  */
 export function SearchMatchToolbar({ current, total, onPrev, onNext, onClose }: SearchMatchToolbarProps) {
   return createPortal(
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
+    <div
+      className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
+      // Fixed offset from the viewport (not WorkspaceLayout.tsx's
+      // `--sticky-toolbar-top`) - this is portaled straight to `document.body`,
+      // outside the DOM subtree that CSS custom property is set on, so it
+      // wouldn't inherit it anyway. `env(safe-area-inset-top)` alone still
+      // clears the iOS status bar/notch; the added 56px clears the mobile
+      // header bar underneath it (see WorkspaceLayout.tsx's
+      // `MOBILE_HEADER_HEIGHT`) so this never sits over either.
+      style={{ top: "calc(env(safe-area-inset-top, 0px) + 56px)" }}
+    >
       <div className="pointer-events-auto flex items-center gap-1 rounded-lg bg-ink px-2 py-1.5 text-sm text-surface shadow-xl">
         <span className="px-2 tabular-nums">
           {current} of {total}

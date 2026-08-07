@@ -15,6 +15,7 @@ import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "./blockGestures.js";
 import { UndoToast } from "./UndoToast.js";
 import { SearchMatchToolbar } from "./SearchMatchToolbar.js";
+import { ActiveMatchHighlight } from "./ActiveMatchHighlight.js";
 import { ancestorChain, findSearchMatches, flattenBlockTree, splitSearchTerms } from "../../lib/searchHighlight.js";
 
 function isEditableElementFocused(): boolean {
@@ -156,7 +157,10 @@ export function BlockEditor({
 
   // Reveals + scrolls to the active match: force-opens any collapsed toggle
   // ancestor (see ToggleBlock.tsx), then waits a frame for that state update
-  // to actually mount the match's DOM node before scrolling to it.
+  // to actually mount the match's DOM node before scrolling to it. Which
+  // occurrence is "active" (the brighter ring) is drawn separately, by
+  // ActiveMatchHighlight.tsx as an independent overlay - see its own doc
+  // comment for why that isn't done here as a DOM class toggle.
   useEffect(() => {
     if (!activeMatch) return;
     for (const ancestor of ancestorChain(blocks ?? [], activeMatch.blockId)) {
@@ -167,7 +171,7 @@ export function BlockEditor({
     });
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMatch?.blockId, blocks]);
+  }, [activeMatch?.blockId, activeMatch?.occurrenceIndexInBlock, blocks]);
 
   // Same query key ObjectDetailPage.tsx and SubObjectBlock.tsx's picker
   // already use for this workspace's object types - shares their cache
@@ -574,7 +578,9 @@ export function BlockEditor({
         selectBlock: (blockId) => onSelectBlock?.(blockId),
         contextMenuBlockId,
         closeBlockMenu: () => setContextMenuBlockId(null),
-        searchHighlight: activeMatch ? { terms: splitSearchTerms(highlightQuery ?? ""), activeBlockId: activeMatch.blockId } : null,
+        searchHighlight: activeMatch
+          ? { terms: splitSearchTerms(highlightQuery ?? ""), activeBlockId: activeMatch.blockId }
+          : null,
         forcedOpenBlockIds,
         forceOpenBlock,
       }}
@@ -627,13 +633,19 @@ export function BlockEditor({
       )}
 
       {!isEmbedded && highlightQuery && matches.length > 0 && (
-        <SearchMatchToolbar
-          current={clampedMatchIndex + 1}
-          total={matches.length}
-          onPrev={() => setActiveMatchIndex((i) => (i - 1 + matches.length) % matches.length)}
-          onNext={() => setActiveMatchIndex((i) => (i + 1) % matches.length)}
-          onClose={() => onCloseHighlight?.()}
-        />
+        <>
+          <ActiveMatchHighlight
+            blockId={activeMatch?.blockId ?? null}
+            occurrenceIndex={activeMatch?.occurrenceIndexInBlock ?? null}
+          />
+          <SearchMatchToolbar
+            current={clampedMatchIndex + 1}
+            total={matches.length}
+            onPrev={() => setActiveMatchIndex((i) => (i - 1 + matches.length) % matches.length)}
+            onNext={() => setActiveMatchIndex((i) => (i + 1) % matches.length)}
+            onClose={() => onCloseHighlight?.()}
+          />
+        </>
       )}
     </BlockEditorProvider>
   );

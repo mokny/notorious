@@ -13,13 +13,19 @@ import { useTemplateAutocompleteSchema } from "../../../hooks/useTemplateAutocom
 import { useBlockEditor } from "../BlockEditorContext.js";
 import { TemplateHighlight } from "../TemplateHighlight.js";
 import { TemplateSuggestion } from "../TemplateSuggestion.js";
+import { SearchHighlight } from "../SearchHighlight.js";
 import { Icon } from "../../ui/Icon.js";
 import { TableCell, TableHeader } from "./tableExtensions.js";
 import { TableFormatToolbar } from "./TableFormatToolbar.js";
 import { TableGridControls } from "./TableGridControls.js";
 
 /** `templateAware` mirrors RichTextEditor.tsx's prop of the same name - only ever true for the live-editable table (see EditableTable below), never the read-only/rendered variant, which shows already-evaluated cell text, not template source. */
-function buildExtensions(templateAware: boolean, workspaceIdRef?: { current: string }, schemaRef?: { current: TemplateAutocompleteSchemaResponse | undefined }) {
+function buildExtensions(
+  templateAware: boolean,
+  workspaceIdRef?: { current: string },
+  schemaRef?: { current: TemplateAutocompleteSchemaResponse | undefined },
+  searchTerms: string[] = [],
+) {
   return [
     StarterKit.configure({
       heading: false,
@@ -40,6 +46,11 @@ function buildExtensions(templateAware: boolean, workspaceIdRef?: { current: str
     TableHeader,
     TableCell,
     ...(templateAware && workspaceIdRef && schemaRef ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, schemaRef })] : []),
+    // Always included (cheap no-op with no active search terms) - see
+    // SearchHighlight.ts's own doc comment for why it only ever tracks
+    // *which words* to highlight, not which occurrence is "active" (that's
+    // applied directly on the DOM by BlockEditor.tsx instead).
+    SearchHighlight.configure({ terms: searchTerms }),
   ];
 }
 
@@ -59,14 +70,20 @@ function EditableTable({
   onFocus: () => void;
   onBlur: () => void;
 }) {
-  const { workspaceId } = useBlockEditor();
+  const { workspaceId, searchHighlight } = useBlockEditor();
   const { data: templateSchema } = useTemplateAutocompleteSchema(workspaceId);
   const workspaceIdRef = useRef(workspaceId);
   workspaceIdRef.current = workspaceId;
   const schemaRef = useRef(templateSchema);
   schemaRef.current = templateSchema;
+  const searchTerms = searchHighlight?.terms ?? [];
+  const searchTermsKey = searchTerms.join(" ");
 
-  const extensions = useMemo(() => buildExtensions(true, workspaceIdRef, schemaRef), []);
+  const extensions = useMemo(
+    () => buildExtensions(true, workspaceIdRef, schemaRef, searchTerms),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchTermsKey],
+  );
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
 
@@ -96,7 +113,14 @@ function EditableTable({
 
 /** Read-only rendering of a doc (e.g. the templated/rendered variant while unfocused, or any table when the object/share is read-only) - no toolbar, no grid controls, click-to-edit handled by the parent. */
 function ReadOnlyTable({ doc }: { doc: TableDoc }) {
-  const extensions = useMemo(() => buildExtensions(false), []);
+  const { searchHighlight } = useBlockEditor();
+  const searchTerms = searchHighlight?.terms ?? [];
+  const searchTermsKey = searchTerms.join(" ");
+  const extensions = useMemo(
+    () => buildExtensions(false, undefined, undefined, searchTerms),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchTermsKey],
+  );
   const editor = useEditor({ extensions, content: doc as unknown as Record<string, unknown>, editable: false });
   return <EditorContent editor={editor} className="notorious-table-editor overflow-x-auto rounded-lg border border-border p-1" />;
 }

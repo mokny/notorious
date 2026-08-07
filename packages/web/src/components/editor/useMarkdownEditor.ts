@@ -57,8 +57,6 @@ interface UseMarkdownEditorOptions {
    * while read-only.
    */
   editable?: boolean;
-  /** This field's own block id (see BlockIdContext.ts) - compared against `searchHighlight.activeBlockId` to decide whether this instance's SearchHighlight extension shows the "active" style. */
-  blockId?: string | null;
   /** See BlockEditorContext.tsx's `searchHighlight`. */
   searchHighlight?: { terms: string[]; activeBlockId: string | null } | null;
 }
@@ -120,7 +118,6 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   const hasSlashCommand = Boolean(options.onSlashSelect);
   const templateAware = Boolean(options.templateAware);
   const searchTerms = options.searchHighlight?.terms ?? [];
-  const isActiveSearchBlock = Boolean(options.blockId && options.searchHighlight?.activeBlockId === options.blockId);
   // Joined to a primitive for the dependency array below - the array itself
   // is a fresh object every render (BlockEditor.tsx doesn't memoize it), so
   // depending on it by reference would recompute `extensions` on every
@@ -162,14 +159,13 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
           ]
         : []),
       ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, objectIdRef, schemaRef: templateSchemaRef })] : []),
-      // Recreated (not ref-driven) whenever the search words or this
-      // instance's active/inactive state changes - see SearchHighlight.ts's
-      // own doc comment for why a ref+meta-transaction version of this was
-      // dropped in favor of just letting `extensions` recompute here.
-      SearchHighlight.configure({ terms: searchTerms, isActive: isActiveSearchBlock }),
+      // Always included (cheap no-op when there are no active search terms) -
+      // see SearchHighlight.ts's own doc comment for why it only ever tracks
+      // *which words* to highlight, not which occurrence is "active".
+      SearchHighlight.configure({ terms: searchTerms }),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [options.placeholder, hasSlashCommand, templateAware, searchTermsKey, isActiveSearchBlock],
+    [options.placeholder, hasSlashCommand, templateAware, searchTermsKey],
   );
 
   const editorProps = useMemo(

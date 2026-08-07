@@ -117,10 +117,10 @@ body {
    occurrence the floating SearchMatchToolbar is currently on) uses a
    stronger color so it stands out from the rest. */
 .search-match {
-  @apply rounded-sm bg-yellow-200/70 dark:bg-yellow-500/30;
+  @apply rounded-sm bg-yellow-200/70 text-ink dark:bg-yellow-500/30;
 }
 .search-match-active {
-  @apply bg-orange-400/80 dark:bg-orange-500/60;
+  @apply rounded-sm bg-orange-500 font-semibold text-white shadow-[0_0_0_2px_rgb(249_115_22/0.5)] dark:bg-orange-500;
 }
 
 /* A native checkbox's default size (or the app's own previous h-4/w-4) is a

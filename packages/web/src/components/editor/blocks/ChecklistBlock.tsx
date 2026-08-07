@@ -12,6 +12,7 @@ import { useBlockEditor } from "../BlockEditorContext.js";
 import { useTemplatableField } from "../useTemplatableField.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGestures.js";
 import { UndoToast } from "../UndoToast.js";
+import { HighlightedText } from "../HighlightedText.js";
 
 /** Grows a textarea to fit its (possibly wrapped, no literal newlines) content instead of scrolling/clipping it - reset to "auto" first so it can shrink back down too, not just grow. */
 function resizeTextarea(el: HTMLTextAreaElement | null): void {
@@ -38,6 +39,7 @@ function ChecklistItemRow({
   onFlush,
   registerInputRef,
   readOnly,
+  searchTerms,
 }: {
   sortableId: string;
   /** This item's owning block id and its key in `renderedBlocks` (`items.<index>` - see modules/templates/renderer.ts and useTemplatableField.ts). */
@@ -55,6 +57,8 @@ function ChecklistItemRow({
   registerInputRef: (el: HTMLTextAreaElement | null) => void;
   /** Native `readOnly`, not `disabled` - keeps the item's text selectable/copyable while the object is locked (see BlockEditorContext.tsx and readOnlyContent.ts's `:not([readonly])` carve-out), unlike the checkbox above, which stays interactive either way. */
   readOnly: boolean;
+  /** See BlockEditorContext.tsx's `searchHighlight` - checklist items aren't TipTap instances, so they can't use SearchHighlight.ts's decorations (see HighlightedText.tsx). */
+  searchTerms: string[];
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   // Same touch-vs-hover split as BlockItem.tsx: no real hover means the
@@ -79,6 +83,17 @@ function ChecklistItemRow({
     isDragging && !hasHover && transform && transform.x < 0 ? Math.min(1, -transform.x / SWIPE_DELETE_THRESHOLD_PX) : 0;
   const canToggleWhileLocked = Boolean(item.id && onToggleItem);
   const { rendered, showRendered, startEditing, stopEditing } = useTemplatableField(blockId, field);
+  // useTemplatableField's own `showRendered` only ever fires for a
+  // *templated* field (`rendered !== undefined` - see its own doc comment),
+  // which most checklist items aren't - so on its own it would never show
+  // search highlighting for the common case. This is a second, independent
+  // rendered/editable swap purely for that: shows a highlighted plain-text
+  // preview instead of the textarea whenever there are active search terms,
+  // until the user clicks in to actually edit (mirrors the templated
+  // rendered-until-clicked UX below). Reset on blur so it goes back to
+  // showing the highlight once editing ends.
+  const [searchPreviewOverridden, setSearchPreviewOverridden] = useState(false);
+  const showSearchPreview = !showRendered && searchTerms.length > 0 && !searchPreviewOverridden;
   // Only autofocus the textarea after the *user* clicked the rendered text
   // to start editing it - not on every mount, which would otherwise steal
   // focus from whatever else is on the page whenever a templated item first
@@ -139,7 +154,18 @@ function ChecklistItemRow({
             }}
             className={`flex-1 py-0.5 text-sm ${readOnly ? "" : "cursor-text"} ${item.checked ? "text-ink-muted line-through" : ""}`}
           >
-            {rendered || " "}
+            <HighlightedText text={rendered || item.markdown || ""} terms={searchTerms} />
+          </div>
+        ) : showSearchPreview ? (
+          <div
+            onClick={() => {
+              if (readOnly) return;
+              focusOnEditRef.current = true;
+              setSearchPreviewOverridden(true);
+            }}
+            className={`flex-1 py-0.5 text-sm ${readOnly ? "" : "cursor-text"} ${item.checked ? "text-ink-muted line-through" : ""}`}
+          >
+            <HighlightedText text={item.markdown || ""} terms={searchTerms} />
           </div>
         ) : (
           <textarea
@@ -172,6 +198,7 @@ function ChecklistItemRow({
             onBlur={() => {
               onFlush();
               stopEditing();
+              setSearchPreviewOverridden(false);
             }}
             readOnly={readOnly}
             placeholder="To-do"
@@ -215,9 +242,10 @@ export function ChecklistBlock({
   /** Exempt-from-lock path for checking an item off - see toggleChecklistItemSchema. */
   onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
 }) {
-  const { readOnly } = useBlockEditor();
+  const { readOnly, searchHighlight } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const items = content.items ?? [];
+  const searchTerms = searchHighlight?.terms ?? [];
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
   // Split by input type, same reasoning as BlockEditor.tsx's own sensors:
@@ -354,6 +382,7 @@ export function ChecklistBlock({
                 inputRefs.current[index] = el;
                 resizeTextarea(el);
               }}
+              searchTerms={searchTerms}
             />
           ))}
         </SortableContext>

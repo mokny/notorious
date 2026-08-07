@@ -8,7 +8,6 @@ import { BlockList } from "./BlockList.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { BlockSlugButton } from "./BlockSlugButton.js";
 import { BlockContextMenu } from "./BlockContextMenu.js";
-import { BlockIdProvider } from "./BlockIdContext.js";
 import { Icon } from "../ui/Icon.js";
 import { useHasHover } from "../../hooks/useHasHover.js";
 import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
@@ -143,7 +142,6 @@ export function BlockItem({ block }: { block: BlockNode }) {
         )}
 
         <div className="min-w-0 flex-1">
-          <BlockIdProvider value={block.id}>
           <BlockRenderer
             block={block}
             workspaceId={workspaceId}
@@ -164,7 +162,6 @@ export function BlockItem({ block }: { block: BlockNode }) {
             autoFocus={block.id === pendingFocusBlockId}
             onAutoFocused={clearPendingFocus}
           />
-          </BlockIdProvider>
         </div>
 
         {hasHover && <BlockSlugButton objectId={objectId} blockId={block.id} slug={block.slug} />}
