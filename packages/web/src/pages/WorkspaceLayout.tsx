@@ -78,6 +78,15 @@ function WorkspaceLayoutInner() {
   // tablet-portrait header's transparent overlay, or (with no header at all)
   // straight under the phone's status bar/Dynamic Island.
   const coverFullBleed = showCoverOverlay || (isPhone && coverActive);
+  // Where ObjectDetailPage.tsx's sticky action-toolbar should stop when
+  // scrolling - right below the tablet-portrait header, or (phone, no header
+  // at all) right below the status bar/Dynamic Island regardless of whether
+  // a cover is currently pulling <main> itself flush to the true top edge
+  // (see coverFullBleed/CoverImage.tsx) - the two are deliberately not tied
+  // together: unlike <main>'s own padding, this must stay put even while a
+  // full-bleed cover is scrolled past, or it would end up stuck underneath
+  // the island instead of below it.
+  const stickyToolbarTop = showMobileHeader ? MOBILE_HEADER_HEIGHT : isPhone ? "env(safe-area-inset-top)" : "0px";
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
@@ -255,7 +264,12 @@ function WorkspaceLayoutInner() {
 
       <div
         className="relative flex min-w-0 flex-1 flex-col"
-        style={showMobileHeader ? ({ "--mobile-header-h": MOBILE_HEADER_HEIGHT } as CSSProperties) : undefined}
+        style={
+          {
+            ...(showMobileHeader && { "--mobile-header-h": MOBILE_HEADER_HEIGHT }),
+            "--sticky-toolbar-top": stickyToolbarTop,
+          } as CSSProperties
+        }
       >
         {showMobileHeader && (
           // Always floats above <main> (never takes flow space itself) -

@@ -335,7 +335,15 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               subtree entirely - which visually looked like a stray, floating
               icon sitting on top of whatever the sidebar's own content
               happened to be underneath it. Not worth it for one button. */}
-          <div className={`sticky top-0 z-10 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}>
+          {/* `top` comes from WorkspaceLayout.tsx's `--sticky-toolbar-top` -
+              not a plain `top-0` - so this stops right below the mobile
+              header (or, on phone where there is no header at all, right
+              below the status bar/Dynamic Island) instead of scrolling
+              underneath it. */}
+          <div
+            className={`sticky z-10 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}
+            style={{ top: "var(--sticky-toolbar-top, 0px)" }}
+          >
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
                 else gets a plain, non-interactive indicator. */}
