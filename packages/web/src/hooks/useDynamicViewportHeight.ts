@@ -1,12 +1,5 @@
 import { useEffect } from "react";
-import { isIOS } from "../lib/platform.js";
-
-function isStandalone(): boolean {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (navigator as unknown as { standalone?: boolean }).standalone === true
-  );
-}
+import { isIOS, isStandalone } from "../lib/platform.js";
 
 const SHRINK_THRESHOLD_PX = 8;
 const RELOAD_COUNT_KEY = "notorious:viewport-reload-count";
@@ -61,6 +54,11 @@ export function reloadIfViewportShrunk(): void {
   if (count >= MAX_AUTO_RELOADS) return;
   sessionStorage.setItem(RELOAD_COUNT_KEY, String(count + 1));
   window.location.reload();
+}
+
+/** Gives the next reloadIfViewportShrunk() call a fresh MAX_AUTO_RELOADS budget - called by BottomTabBar.tsx on every workspace switch, since a switch doesn't itself trigger a real navigation/remount that would otherwise reset nothing. */
+export function resetViewportReloadCount(): void {
+  sessionStorage.removeItem(RELOAD_COUNT_KEY);
 }
 
 /** Keeps `--app-vh` (WorkspaceLayout's root height, instead of the `dvh` unit) in sync with window.innerHeight for the lifetime of the app - harmless and worth doing everywhere, unlike the reload fix above. */

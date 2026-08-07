@@ -20,6 +20,8 @@ interface CoverImageProps {
   title: string;
   onTitleChange: (value: string) => void;
   coverTextStyle: CoverTextStyle | null;
+  /** Max height (px) to crop the cover image to - the workspace's `coverHeight` setting (see SettingsPage.tsx), defaults to 300 if not passed. */
+  coverHeight?: number;
   /** Renders the object's icon (IconPicker if editable, a plain Icon otherwise - see ObjectDetailPage.tsx) at the given pixel size, beside the title overlay - called with the title's own auto-fit font size so the icon visually matches it. */
   icon: (size: number) => ReactNode;
 }
@@ -30,7 +32,8 @@ function fileIdFromUrl(url: string): string | null {
 }
 
 /**
- * Full-width banner shown above an object's content, capped at 300px tall
+ * Full-width banner shown above an object's content, capped at `coverHeight`
+ * (the owning workspace's configurable max, see SettingsPage.tsx) tall
  * (cropped, not stretched) - see ObjectDetailPage. When a cover is set, the
  * object's title renders as an overlay on top of it instead of in its usual
  * spot below (ObjectDetailPage hides that copy whenever `cover` is set), fit
@@ -38,7 +41,7 @@ function fileIdFromUrl(url: string): string | null {
  * `coverTextStyle` (see CoverTextStyleEditor.tsx, opened via the palette
  * button next to Change/Remove).
  */
-export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTitleChange, coverTextStyle, icon }: CoverImageProps) {
+export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTitleChange, coverTextStyle, coverHeight = 300, icon }: CoverImageProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hover, setHover] = useState(false);
@@ -177,7 +180,13 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" onLoad={handleImageLoad} />
+      <img
+        src={withShareToken(cover)}
+        alt=""
+        className="w-full object-cover"
+        style={{ maxHeight: coverHeight }}
+        onLoad={handleImageLoad}
+      />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
         <div ref={rowRef} className="pointer-events-auto mx-auto flex max-w-full items-center justify-center gap-2">

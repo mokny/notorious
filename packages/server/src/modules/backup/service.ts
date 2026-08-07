@@ -246,6 +246,7 @@ export async function importWorkspace(ownerId: string, zipBuffer: Buffer, backup
     ownerId,
     dashboardObjectId: null,
     weekStartsOn: "monday",
+    coverHeight: 300,
     createdAt,
   };
 }

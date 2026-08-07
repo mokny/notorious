@@ -59,6 +59,7 @@ export const workspaces = sqliteTable("workspaces", {
   // ON DELETE SET NULL) is still enforced at the SQL level, in the migration.
   dashboardObjectId: text("dashboard_object_id"),
   weekStartsOn: text("week_starts_on").notNull().default("monday").$type<"sunday" | "monday">(),
+  coverHeight: integer("cover_height").notNull().default(300),
   createdAt: text("created_at").notNull(),
 });
 

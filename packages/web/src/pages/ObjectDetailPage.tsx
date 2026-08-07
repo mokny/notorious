@@ -286,6 +286,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         title={title}
         onTitleChange={setTitle}
         coverTextStyle={object.coverTextStyle}
+        coverHeight={workspace?.coverHeight}
         icon={renderIcon}
       />
 

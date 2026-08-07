@@ -42,7 +42,7 @@ export async function createWorkspace(
     await db.update(workspaces).set({ dashboardObjectId }).where(eq(workspaces.id, id));
   }
 
-  return { id, name: input.name, icon: input.icon, ownerId, dashboardObjectId, weekStartsOn: "monday", createdAt };
+  return { id, name: input.name, icon: input.icon, ownerId, dashboardObjectId, weekStartsOn: "monday", coverHeight: 300, createdAt };
 }
 
 export async function listWorkspacesForUser(userId: string): Promise<Workspace[]> {
@@ -54,6 +54,7 @@ export async function listWorkspacesForUser(userId: string): Promise<Workspace[]
       ownerId: workspaces.ownerId,
       dashboardObjectId: workspaces.dashboardObjectId,
       weekStartsOn: workspaces.weekStartsOn,
+      coverHeight: workspaces.coverHeight,
       createdAt: workspaces.createdAt,
     })
     .from(workspaceMembers)

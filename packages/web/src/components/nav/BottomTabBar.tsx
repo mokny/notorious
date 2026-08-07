@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
-import { reloadIfViewportShrunk } from "../../hooks/useDynamicViewportHeight.js";
+import { reloadIfViewportShrunk, resetViewportReloadCount } from "../../hooks/useDynamicViewportHeight.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -29,6 +29,7 @@ export function BottomTabBar({
   const { user } = useAuth();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevWorkspaceIdRef = useRef(workspaceId);
 
   const { data: objectTypes } = useQuery({
     queryKey: ["objectTypes", workspaceId],
@@ -48,14 +49,25 @@ export function BottomTabBar({
   const isSearch = location.pathname === `/w/${workspaceId}/search`;
   const isSettings = location.pathname === `/w/${workspaceId}/settings`;
 
-  // Runs once, right when this bar is first shown - not any earlier (e.g.
-  // the app-wide level), so a launch that never makes it past the workspace
+  // Runs right when this bar is first shown - not any earlier (e.g. the
+  // app-wide level), so a launch that never makes it past the workspace
   // picker (no bottom bar there, nothing visibly broken yet) never reloads
   // for a problem the user hasn't even seen. See reloadIfViewportShrunk's
-  // own comment for why this needs a reload at all.
+  // own comment for why this needs a reload at all. Also re-runs on every
+  // workspace switch (the `[workspaceId]` dep) - WorkspaceLayout doesn't key
+  // its route on workspaceId, so switching workspaces navigates without
+  // remounting this component, and the viewport can resurface the same iOS
+  // bug on the new workspace's phone view. Each switch gets its own fresh
+  // reload budget (not just piggybacking on whatever budget the previous
+  // workspace already used up), since it's effectively a new opportunity for
+  // the bug to show up rather than a retry of the same one.
   useEffect(() => {
+    if (prevWorkspaceIdRef.current !== workspaceId) {
+      resetViewportReloadCount();
+      prevWorkspaceIdRef.current = workspaceId;
+    }
     reloadIfViewportShrunk();
-  }, []);
+  }, [workspaceId]);
 
   return (
     // `fixed` + `bottom-0`, not a normal flex-column child - pins the bar

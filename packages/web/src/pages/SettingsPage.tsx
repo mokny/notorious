@@ -8,6 +8,7 @@ import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
 import { IconPicker } from "../components/IconPicker.js";
+import { Icon } from "../components/ui/Icon.js";
 import { ApiError } from "../lib/api/client.js";
 import { NotificationSettings } from "../components/NotificationSettings.js";
 import { ApiKeysSettings } from "../components/ApiKeysSettings.js";
@@ -148,6 +149,20 @@ export function SettingsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
   });
 
+  // Local draft while dragging - only committed to the server on release
+  // (onPointerUp/onKeyUp below), so dragging the slider doesn't fire an API
+  // call per pixel. Cleared once the mutation's own refetch lands, so the
+  // slider never visibly snaps back to the pre-drag value in between.
+  const [coverHeightDraft, setCoverHeightDraft] = useState<number | null>(null);
+  const updateCoverHeightMutation = useMutation({
+    mutationFn: (coverHeight: number) => workspaceApi.update(workspaceId!, { coverHeight }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
+      setCoverHeightDraft(null);
+    },
+  });
+  const coverHeight = coverHeightDraft ?? workspace?.coverHeight ?? 300;
+
   const deleteWorkspaceMutation = useMutation({
     mutationFn: () => workspaceApi.remove(workspaceId!),
     onSuccess: async () => {
@@ -208,6 +223,29 @@ export function SettingsPage() {
                   <option value="monday">Monday</option>
                 </select>
               </label>
+              <div className="max-w-sm space-y-2">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span>Cover height</span>
+                  <span className="text-ink-muted">{coverHeight}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={50}
+                  max={300}
+                  value={coverHeight}
+                  onChange={(e) => setCoverHeightDraft(Number(e.target.value))}
+                  onPointerUp={(e) => updateCoverHeightMutation.mutate(Number(e.currentTarget.value))}
+                  onKeyUp={(e) => updateCoverHeightMutation.mutate(Number(e.currentTarget.value))}
+                  className="w-full accent-accent"
+                  aria-label="Cover height"
+                />
+                <div
+                  className="flex w-full items-center justify-center rounded-lg bg-gradient-to-br from-accent/30 to-accent/10 text-ink-muted"
+                  style={{ height: coverHeight }}
+                >
+                  <Icon name="image" className="h-5 w-5" />
+                </div>
+              </div>
             </>
           )}
         </div>

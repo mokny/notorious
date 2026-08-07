@@ -13,6 +13,7 @@ import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
 import { useDragSelectGuard } from "../hooks/useDragSelectGuard.js";
 import { useBreakpoint, useIsLandscape } from "../hooks/useBreakpoint.js";
+import { isStandalone } from "../lib/platform.js";
 import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
 import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
@@ -80,6 +81,10 @@ function WorkspaceLayoutInner() {
   // keeps this header as its only nav entry point.
   const isPhone = breakpoint === "phone";
   const showMobileHeader = !sidebarPersistent && !isPhone;
+  // Avatar + name in the sidebar footer button below is swapped for a plain
+  // Settings icon when installed as a PWA - display mode doesn't change
+  // without a fresh install, so no need to track this as reactive state.
+  const isPWA = isStandalone();
   // The header only overlays a cover when it's actually rendered at all.
   const showCoverOverlay = coverActive && showMobileHeader;
   // True wherever a cover reaches the very top edge - under the
@@ -276,7 +281,9 @@ function WorkspaceLayoutInner() {
               className="flex items-center gap-2 overflow-hidden rounded-lg p-1 -m-1 text-left hover:bg-surface"
               title="Settings"
             >
-              {user?.avatarUrl ? (
+              {isPWA ? (
+                <Icon name="settings" className="h-5 w-5 shrink-0 text-ink-muted" />
+              ) : user?.avatarUrl ? (
                 <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
               ) : (
                 <span
@@ -286,7 +293,7 @@ function WorkspaceLayoutInner() {
                   {user?.name?.[0]}
                 </span>
               )}
-              <span className="truncate text-sm">{user?.name}</span>
+              <span className="truncate text-sm">{isPWA ? "Settings" : user?.name}</span>
             </button>
           )}
           <div className="flex items-center gap-1">

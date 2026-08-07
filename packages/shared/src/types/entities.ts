@@ -45,6 +45,8 @@ export interface Workspace {
   dashboardObjectId: string | null;
   /** Which day Week/Month calendar views start on - a workspace-wide setting so every member's calendar block lines up the same way. */
   weekStartsOn: "sunday" | "monday";
+  /** Max height (px, 50-300) object cover banners are cropped to in this workspace - see CoverImage.tsx. */
+  coverHeight: number;
   createdAt: ISODateString;
 }
 
