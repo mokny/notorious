@@ -9,7 +9,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { SlashCommand, slashCommandPluginKey } from "./SlashCommand.js";
 import { TemplateHighlight } from "./TemplateHighlight.js";
 import { TemplateSuggestion, templateSuggestionPluginKey } from "./TemplateSuggestion.js";
-import { SearchHighlight, searchHighlightKey } from "./SearchHighlight.js";
+import { SearchHighlight } from "./SearchHighlight.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 
 /**
@@ -105,11 +105,6 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   const workspaceIdRef = useRef(options.workspaceId ?? "");
   const objectIdRef = useRef(options.objectId ?? "");
   const templateSchemaRef = useRef(options.templateSchema);
-  // Mutated in place (not part of the `extensions` dependency array below) by
-  // the effect further down - see SearchHighlight.ts's own doc comment for
-  // why this stays a ref instead of a reactive option.
-  const searchTermsRef = useRef<string[]>([]);
-  const searchIsActiveRef = useRef(false);
 
   onChangeRef.current = options.onChange;
   onEnterRef.current = options.onEnter;
@@ -124,6 +119,13 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
 
   const hasSlashCommand = Boolean(options.onSlashSelect);
   const templateAware = Boolean(options.templateAware);
+  const searchTerms = options.searchHighlight?.terms ?? [];
+  const isActiveSearchBlock = Boolean(options.blockId && options.searchHighlight?.activeBlockId === options.blockId);
+  // Joined to a primitive for the dependency array below - the array itself
+  // is a fresh object every render (BlockEditor.tsx doesn't memoize it), so
+  // depending on it by reference would recompute `extensions` on every
+  // unrelated re-render instead of only when the actual words change.
+  const searchTermsKey = searchTerms.join(" ");
 
   const extensions = useMemo(
     () => [
@@ -160,14 +162,14 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
           ]
         : []),
       ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, objectIdRef, schemaRef: templateSchemaRef })] : []),
-      // Always included (cheap no-op when there are no active search terms)
-      // rather than conditional on `options.searchHighlight` - keeping it out
-      // of this array's identity means navigating between search matches
-      // never has to recreate every open editor's extensions/ProseMirror
-      // view, only dispatch the ref-driven refresh transaction below.
-      SearchHighlight.configure({ termsRef: searchTermsRef, isActiveRef: searchIsActiveRef }),
+      // Recreated (not ref-driven) whenever the search words or this
+      // instance's active/inactive state changes - see SearchHighlight.ts's
+      // own doc comment for why a ref+meta-transaction version of this was
+      // dropped in favor of just letting `extensions` recompute here.
+      SearchHighlight.configure({ terms: searchTerms, isActive: isActiveSearchBlock }),
     ],
-    [options.placeholder, hasSlashCommand, templateAware],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [options.placeholder, hasSlashCommand, templateAware, searchTermsKey, isActiveSearchBlock],
   );
 
   const editorProps = useMemo(
@@ -237,16 +239,6 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
   useEffect(() => {
     editor?.setEditable(options.editable ?? true, false);
   }, [options.editable, editor]);
-
-  // Pushes the current search terms / active-block state into the refs
-  // SearchHighlight.ts reads, then forces its decoration plugin to recompute
-  // - see that file for why a meta transaction instead of `setOptions()`.
-  useEffect(() => {
-    if (!editor) return;
-    searchTermsRef.current = options.searchHighlight?.terms ?? [];
-    searchIsActiveRef.current = Boolean(options.blockId && options.searchHighlight?.activeBlockId === options.blockId);
-    editor.view.dispatch(editor.state.tr.setMeta(searchHighlightKey, true));
-  }, [editor, options.searchHighlight, options.blockId]);
 
   // `content` above only seeds the editor once, on creation - by itself it
   // never notices later prop changes, so a block another collaborator (or

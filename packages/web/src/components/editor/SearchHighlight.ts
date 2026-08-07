@@ -6,15 +6,11 @@ import { flattenDocText } from "./templateSyntax.js";
 
 export const searchHighlightKey = new PluginKey("searchHighlight");
 
-interface MutableRef<T> {
-  current: T;
-}
-
 export interface SearchHighlightOptions {
-  /** Lowercased search words - mutated in place by useMarkdownEditor.ts (a plain ref, not a reactive option) so updating it doesn't require recreating this extension. */
-  termsRef: MutableRef<string[]>;
+  /** Lowercased search words - see BlockEditorContext.tsx's `searchHighlight`. */
+  terms: string[];
   /** Whether *this* editor instance is the search toolbar's currently active block - see useMarkdownEditor.ts. */
-  isActiveRef: MutableRef<boolean>;
+  isActive: boolean;
 }
 
 function buildDecorations(doc: ProseMirrorNode, terms: string[], isActive: boolean): DecorationSet {
@@ -50,34 +46,34 @@ function buildDecorations(doc: ProseMirrorNode, terms: string[], isActive: boole
 
 /**
  * Purely visual, same re-scan-from-scratch approach as TemplateHighlight.ts.
- * Unlike that extension, the thing that changes here (which words to
- * highlight, which block is "active") isn't a doc edit - it's driven by
- * external state (the search-match toolbar). `termsRef`/`isActiveRef` are
- * refs mutated by useMarkdownEditor.ts's effect, then a no-op meta
- * transaction is dispatched to force this plugin to recompute - see that
- * file for why refs instead of TipTap's normal `editor.setOptions()` (which
- * would recreate the extensions array on every navigation and risk the same
- * dropped-keystroke issue that array is deliberately memoized against).
+ * Unlike that extension, `terms`/`isActive` are plain reactive options (not
+ * refs) - useMarkdownEditor.ts includes them in its `extensions` memo's
+ * dependency array, so navigating between search matches gets a fresh
+ * Extension instance (and fresh decorations) instead of needing an
+ * out-of-band refresh mechanism. A ref+meta-transaction version of this was
+ * tried first but proved unreliable: React 18 StrictMode's double-render of
+ * `useEditor` can end up wiring a *different* Plugin instance's closure than
+ * the ref the rest of the component mutates, silently decorating nothing -
+ * confirmed by tagging both sides with a debug id and finding they pointed
+ * at two different ref objects. Recomputing decorations directly from a
+ * `props.decorations` closure (no plugin *state* at all) sidesteps that
+ * entirely - there's no ref to get out of sync with.
  */
 export const SearchHighlight = Extension.create<SearchHighlightOptions>({
   name: "searchHighlight",
 
   addOptions() {
-    return { termsRef: { current: [] }, isActiveRef: { current: false } };
+    return { terms: [], isActive: false };
   },
 
   addProseMirrorPlugins() {
-    const { termsRef, isActiveRef } = this.options;
+    const { terms, isActive } = this.options;
     return [
       new Plugin({
         key: searchHighlightKey,
-        state: {
-          init: (_, { doc }) => buildDecorations(doc, termsRef.current, isActiveRef.current),
-          apply: (tr, old) => (tr.docChanged || tr.getMeta(searchHighlightKey) ? buildDecorations(tr.doc, termsRef.current, isActiveRef.current) : old),
-        },
         props: {
           decorations(state) {
-            return this.getState(state);
+            return buildDecorations(state.doc, terms, isActive);
           },
         },
       }),
