@@ -17,17 +17,23 @@ import { useBlockEditor } from "./BlockEditorContext.js";
  * when one exists, since there's no edit mode for it to switch into.
  */
 export function useTemplatableField(blockId: string, field: string, autoFocus?: boolean) {
-  const { readOnly, renderedBlocks } = useBlockEditor();
+  const { readOnly, renderedBlocks, renderedBlocksLoading } = useBlockEditor();
   const rendered = renderedBlocks?.[blockId]?.[field];
-  const [editing, setEditing] = useState(Boolean(autoFocus));
+  const [editing, setEditing] = useState(Boolean(autoFocus) && !renderedBlocksLoading);
 
   useEffect(() => {
-    if (autoFocus) setEditing(true);
-  }, [autoFocus]);
+    if (autoFocus && !renderedBlocksLoading) setEditing(true);
+  }, [autoFocus, renderedBlocksLoading]);
 
   return {
     rendered,
     showRendered: rendered !== undefined && (readOnly || !editing),
+    // Suppressed while renderedBlocks is still loading, so a field that's
+    // about to auto-focus doesn't briefly flash its raw `{{ }}` source with
+    // TemplateSuggestion's cursor-position popup before the rendered value
+    // (or lack thereof) is known - see BlockEditorContext.tsx's
+    // `renderedBlocksLoading` doc comment.
+    effectiveAutoFocus: Boolean(autoFocus) && !renderedBlocksLoading,
     startEditing: () => {
       if (!readOnly) setEditing(true);
     },

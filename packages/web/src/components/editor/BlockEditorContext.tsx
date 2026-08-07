@@ -38,6 +38,16 @@ export interface BlockEditorActions {
    * hasn't been given one (see BlockEditor.tsx).
    */
   renderedBlocks: Record<string, Record<string, string>> | null;
+  /**
+   * True while the `renderedBlocks` fetch above is still in flight (e.g. a
+   * slow template field running `http.get`). `useTemplatableField.ts` uses
+   * this to hold off auto-focusing a templatable field until it resolves -
+   * otherwise the field would auto-focus into its raw `{{ }}` source with
+   * TemplateSuggestion's cursor-position popup firing on it before the
+   * rendered value is known. Always `false` for an embedded editor that
+   * hasn't been given a `renderedBlocks` map (see BlockEditor.tsx).
+   */
+  renderedBlocksLoading: boolean;
   createBlockAfter: (parentBlockId: string | null, afterBlockId: string | null, type: BlockType, extraContent?: Record<string, unknown>) => void;
   updateBlockContent: (blockId: string, content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see toggleChecklistItemSchema and ChecklistBlock.tsx. */

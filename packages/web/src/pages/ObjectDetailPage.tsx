@@ -127,7 +127,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // pass entirely for an object with no template syntax at all), not gated
   // behind a separate mode. Each templatable field shows this instead of its
   // raw `{{ }}` source whenever it isn't focused - see TemplatableMarkdown.tsx.
-  const { data: renderedBlocks } = useQuery({
+  const { data: renderedBlocks, isLoading: renderedBlocksLoading } = useQuery({
     queryKey: ["blocksRendered", objectId],
     queryFn: () => blockApi.rendered(objectId!),
     enabled: Boolean(objectId),
@@ -421,6 +421,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               onSelectBlock={setSelectedBlockId}
               readOnly={!effectiveCanEdit}
               renderedBlocks={renderedBlocks?.rendered ?? null}
+              renderedBlocksLoading={renderedBlocksLoading}
             />
 
             {/* Hidden only for a single-object share (it can't grant access

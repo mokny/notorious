@@ -249,7 +249,7 @@ function EmbeddedContent({
   // rendered {{ }} template output too, not the raw source. Called
   // unconditionally (hooks can't follow the early returns below), but
   // skipped whenever we're not actually going to render the BlockEditor.
-  const { data: renderedBlocks } = useQuery({
+  const { data: renderedBlocks, isLoading: renderedBlocksLoading } = useQuery({
     queryKey: ["blocksRendered", objectId],
     queryFn: () => blockApi.rendered(objectId),
     enabled: !isCircular && !isTooDeep,
@@ -284,6 +284,7 @@ function EmbeddedContent({
         objectId={objectId}
         embedAncestorIds={[...embedAncestorIds, objectId]}
         renderedBlocks={renderedBlocks?.rendered ?? null}
+        renderedBlocksLoading={renderedBlocksLoading}
       />
     </div>
   );

@@ -68,6 +68,8 @@ interface BlockEditorProps {
   readOnly?: boolean;
   /** This object's template-rendered block text (see modules/templates/ on the server) - blockId -> field -> rendered text, only for fields whose raw source actually has `{{ }}`/`{% %}` syntax. See BlockEditorContext.tsx's `renderedBlocks` for how each templatable field uses this. */
   renderedBlocks?: Record<string, Record<string, string>> | null;
+  /** True while the fetch behind `renderedBlocks` is still in flight - see BlockEditorContext.tsx's `renderedBlocksLoading`. */
+  renderedBlocksLoading?: boolean;
 }
 
 export function BlockEditor({
@@ -78,6 +80,7 @@ export function BlockEditor({
   embedAncestorIds,
   readOnly = false,
   renderedBlocks = null,
+  renderedBlocksLoading = false,
 }: BlockEditorProps) {
   const queryClient = useQueryClient();
   const resolvedEmbedAncestorIds = embedAncestorIds ?? [objectId];
@@ -455,6 +458,7 @@ export function BlockEditor({
         embedAncestorIds: resolvedEmbedAncestorIds,
         readOnly: effectiveReadOnly,
         renderedBlocks,
+        renderedBlocksLoading,
         createBlockAfter: (parentBlockId, afterBlockId, type, extraContent) =>
           createMutation.mutate({ parentBlockId, afterBlockId, type, content: { ...defaultContentFor(type), ...extraContent } }),
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),
