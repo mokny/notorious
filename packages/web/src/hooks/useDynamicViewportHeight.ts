@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
 import { isIOS } from "../lib/platform.js";
 
 function isStandalone(): boolean {
@@ -48,31 +47,34 @@ function publishAppVh(): void {
  * in-page trick that doesn't involve a real navigation (forcing a reflow by
  * toggling `display`, nudging every scrollable ancestor by a pixel and
  * back) - none of them budged it. A real `location.reload()` is the only
- * thing that does.
+ * thing that does. Deliberately NOT called from here: this hook runs on
+ * every page including the workspace picker (no bottom bar, nothing for the
+ * mismatch to visibly break yet) - BottomTabBar.tsx calls
+ * `reloadIfViewportShrunk()` itself instead, right when it first mounts, so
+ * a cold launch that never reaches a workspace phone view never reloads for
+ * a problem that was never visible to begin with.
  */
-export function useDynamicViewportHeight(): void {
-  const location = useLocation();
+export function reloadIfViewportShrunk(): void {
+  if (!isIOS() || !isStandalone()) return;
+  if (expectedHeight() - window.innerHeight <= SHRINK_THRESHOLD_PX) return;
+  const count = Number(sessionStorage.getItem(RELOAD_COUNT_KEY) ?? "0");
+  if (count >= MAX_AUTO_RELOADS) return;
+  sessionStorage.setItem(RELOAD_COUNT_KEY, String(count + 1));
+  window.location.reload();
+}
 
+/** Keeps `--app-vh` (WorkspaceLayout's root height, instead of the `dvh` unit) in sync with window.innerHeight for the lifetime of the app - harmless and worth doing everywhere, unlike the reload fix above. */
+export function useDynamicViewportHeight(): void {
   useEffect(() => {
     publishAppVh();
-
     function onResize() {
       publishAppVh();
     }
     window.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
-
-    if (isIOS() && isStandalone() && expectedHeight() - window.innerHeight > SHRINK_THRESHOLD_PX) {
-      const count = Number(sessionStorage.getItem(RELOAD_COUNT_KEY) ?? "0");
-      if (count < MAX_AUTO_RELOADS) {
-        sessionStorage.setItem(RELOAD_COUNT_KEY, String(count + 1));
-        window.location.reload();
-      }
-    }
-
     return () => {
       window.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
     };
-  }, [location.pathname]);
+  }, []);
 }

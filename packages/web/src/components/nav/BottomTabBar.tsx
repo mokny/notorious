@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
+import { reloadIfViewportShrunk } from "../../hooks/useDynamicViewportHeight.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
@@ -44,6 +45,15 @@ export function BottomTabBar({
   const isHome = dashboardObjectId ? location.pathname === `/w/${workspaceId}/objects/${dashboardObjectId}` : location.pathname === `/w/${workspaceId}`;
   const isSearch = location.pathname === `/w/${workspaceId}/search`;
 
+  // Runs once, right when this bar is first shown - not any earlier (e.g.
+  // the app-wide level), so a launch that never makes it past the workspace
+  // picker (no bottom bar there, nothing visibly broken yet) never reloads
+  // for a problem the user hasn't even seen. See reloadIfViewportShrunk's
+  // own comment for why this needs a reload at all.
+  useEffect(() => {
+    reloadIfViewportShrunk();
+  }, []);
+
   return (
     // `fixed` + `bottom-0`, not a normal flex-column child - pins the bar
     // directly to the browser's own current viewport edge on every paint,
@@ -52,9 +62,7 @@ export function BottomTabBar({
     // (--bottom-tab-bar-h, see WorkspaceLayout.tsx) reserves the matching
     // space so scrolled content doesn't end up hidden underneath. z-20 (not
     // z-30) so the sidebar drawer's backdrop still covers this when open,
-    // same as before. On the WKWebView cold-launch viewport bug this bar can
-    // still float above the real edge on - see
-    // useIOSStandaloneViewportFix.ts, which reloads once to correct it.
+    // same as before.
     <nav
       className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface-raised md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
