@@ -173,8 +173,15 @@ function WorkspaceLayoutInner() {
     // viewport when the on-screen keyboard opens, but leave the plain
     // layout viewport (what `100vh` measures) unchanged. With `h-screen`
     // the bottom tab bar and sidebar footer would get pushed down behind
-    // the keyboard instead of reflowing above it.
-    <div className="flex h-dvh">
+    // the keyboard instead of reflowing above it. `overflow-hidden` makes
+    // this a hard, exactly-one-screen-tall box - without it, BottomTabBar's
+    // own safe-area-inset-bottom padding (needed so its buttons don't sit
+    // under the home indicator) could push the total content past `h-dvh`
+    // on iOS, and since nothing would clip that overflow, the whole page
+    // grows past the real screen height instead - which reads as a second,
+    // too-large gap (plain body background) below the tab bar rather than
+    // the tab bar simply sitting flush against the true bottom edge.
+    <div className="flex h-dvh overflow-hidden">
       {sidebarOpen && !sidebarPersistent && (
         <div className="fixed inset-0 z-30 bg-black/30" onClick={() => setSidebarOpen(false)} />
       )}
