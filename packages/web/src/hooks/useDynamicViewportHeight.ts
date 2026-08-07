@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { isIOS } from "../lib/platform.js";
 
 function isStandalone(): boolean {
@@ -8,21 +9,40 @@ function isStandalone(): boolean {
   );
 }
 
-const SHRINK_THRESHOLD_PX = 4;
+const SHRINK_THRESHOLD_PX = 8;
 const HEAL_DELAY_MS = 140;
 const POLL_INTERVAL_MS = 2000;
-const SCROLL_NUDGE_DELAYS_MS = [50, 300, 800];
+const SCROLL_NUDGE_DELAYS_MS = [50, 300, 800, 1500];
+
+/**
+ * How tall the viewport *should* be. window.screen.height is a genuinely
+ * independent measurement from window.innerHeight/visualViewport.height/the
+ * `dvh` unit - those are exactly the values this whole file exists because
+ * iOS's WKWebView can report wrong, so comparing innerHeight against a
+ * self-tracked "largest innerHeight ever seen" (an earlier version of this
+ * hook did that) never actually detects anything if the very first
+ * measurement is already wrong, which real-device testing showed is
+ * genuinely the case here (confirmed via a debug overlay: innerHeight read
+ * 894 from the very first paint, no earlier "correct" value was ever
+ * observed to fall from). screen.height doesn't share that failure mode -
+ * it's what caught the mismatch reliably enough to fire the old reload-based
+ * fix (that fix's problem was the reload itself not helping, not the
+ * detection). Falls back to screen.width in landscape, where the shorter
+ * dimension is the relevant one.
+ */
+function expectedHeight(): number {
+  return window.innerWidth > window.innerHeight ? window.screen.width : window.screen.height;
+}
 
 /**
  * Nudges every currently-scrollable ancestor by 1px and back - on a cold
  * launch of an installed iOS standalone PWA, the bar sitting too high (with
  * a dead gap below it) fixes itself the instant the user scrolls even
- * slightly, before any keyboard has ever been focused - a separate,
- * complementary iOS WKWebView quirk from the keyboard-shrink one `heal()`
- * targets below: it only (re)computes its real content-view bounds on the
- * first scroll gesture, not on initial layout. This does that same nudge
- * programmatically instead of waiting for the user to discover it by
- * accident. `.overflow-y-auto` matches every scroll container in this
+ * slightly - a complementary iOS WKWebView quirk from the keyboard-shrink
+ * one `heal()` targets below: it only (re)computes its real content-view
+ * bounds on the first scroll gesture, not on initial layout. This does that
+ * same nudge programmatically instead of waiting for the user to discover
+ * it by accident. `.overflow-y-auto` matches every scroll container in this
  * codebase (see CLAUDE.md's "conventions worth reusing").
  */
 function nudgeScrollableAncestors(): void {
@@ -37,26 +57,24 @@ function nudgeScrollableAncestors(): void {
 }
 
 /**
- * iOS's WKWebView has a well-documented standalone-PWA bug: the first time
- * the on-screen keyboard opens (a login field, a search box, anything), it
- * permanently shrinks window.innerHeight/visualViewport.height/the `dvh`
- * unit by roughly the keyboard's height and never recovers on its own - not
- * on blur, not on a page reload, not even on deleting and re-adding the
- * home-screen icon from scratch (all three were tried and ruled out
- * diagnosing this - a real device stayed at innerHeight=894 against a real
- * screen.height=956 no matter which of those we threw at it). Only
- * force-quitting the app resets it - or forcing WebKit to synchronously
- * re-measure by toggling `display` off and back on on a full-viewport
- * element, which is what `heal()` below does. Tracks the largest
- * innerHeight ever observed (our best evidence of the real, un-shrunk
- * height) and heals whenever the current one falls meaningfully short of
- * it - reactively on focusout (the moment a keyboard most likely just
- * closed) and defensively via a light poll, since not every trigger is a
- * text input blur. Also fires `nudgeScrollableAncestors()` a few times right
- * after a cold launch, for the separate not-yet-settled-bounds quirk above.
+ * iOS's WKWebView has a well-documented standalone-PWA bug where
+ * window.innerHeight/visualViewport.height/the `dvh` unit report several
+ * dozen points shorter than the real screen (confirmed on a real device:
+ * innerHeight=894 against a real screen.height=956, and it doesn't recover
+ * on its own - not on blur, not on a page reload, not on deleting and
+ * re-adding the home-screen icon from scratch, all tried and ruled out
+ * diagnosing this). Only force-quitting the app resets it - or forcing
+ * WebKit to synchronously re-measure by toggling `display` off and back on
+ * on a full-viewport element, which `heal()` does. Runs that (and the
+ * scroll nudge above) on a poll for the lifetime of the app, and again on
+ * every route change - a workspace's own scrollable `<main>` (and thus
+ * anything for the nudge above to grab onto) only exists *after* navigating
+ * past the workspace picker, which has nothing to scroll at all, so a
+ * mount-once-only pass can end up doing all its work before that content
+ * ever exists.
  */
 export function useDynamicViewportHeight(): void {
-  const maxVH = useRef(window.innerHeight);
+  const location = useLocation();
 
   useEffect(() => {
     function publish() {
@@ -64,8 +82,10 @@ export function useDynamicViewportHeight(): void {
     }
     publish();
 
+    if (!isIOS() || !isStandalone()) return;
+
     function heal() {
-      if (maxVH.current - window.innerHeight <= SHRINK_THRESHOLD_PX) return;
+      if (expectedHeight() - window.innerHeight <= SHRINK_THRESHOLD_PX) return;
       const el = document.body;
       const display = el.style.display;
       el.style.display = "none";
@@ -75,7 +95,6 @@ export function useDynamicViewportHeight(): void {
     }
 
     function onResize() {
-      maxVH.current = Math.max(maxVH.current, window.innerHeight);
       publish();
     }
 
@@ -86,14 +105,6 @@ export function useDynamicViewportHeight(): void {
     window.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
     document.addEventListener("focusout", onFocusOut);
-
-    if (!isIOS() || !isStandalone()) {
-      return () => {
-        window.removeEventListener("resize", onResize);
-        window.visualViewport?.removeEventListener("resize", onResize);
-        document.removeEventListener("focusout", onFocusOut);
-      };
-    }
 
     const interval = setInterval(heal, POLL_INTERVAL_MS);
     const nudgeTimers = SCROLL_NUDGE_DELAYS_MS.map((delay) =>
@@ -109,5 +120,5 @@ export function useDynamicViewportHeight(): void {
       clearInterval(interval);
       nudgeTimers.forEach(clearTimeout);
     };
-  }, []);
+  }, [location.pathname]);
 }
