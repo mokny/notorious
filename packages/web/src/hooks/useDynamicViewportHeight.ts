@@ -30,7 +30,7 @@ const SCROLL_NUDGE_DELAYS_MS = [50, 300, 800, 1500];
  * detection). Falls back to screen.width in landscape, where the shorter
  * dimension is the relevant one.
  */
-function expectedHeight(): number {
+export function expectedHeight(): number {
   return window.innerWidth > window.innerHeight ? window.screen.width : window.screen.height;
 }
 
@@ -45,7 +45,7 @@ function expectedHeight(): number {
  * it by accident. `.overflow-y-auto` matches every scroll container in this
  * codebase (see CLAUDE.md's "conventions worth reusing").
  */
-function nudgeScrollableAncestors(): void {
+export function nudgeScrollableAncestors(): void {
   for (const el of document.querySelectorAll<HTMLElement>(".overflow-y-auto")) {
     if (el.scrollHeight <= el.clientHeight) continue;
     const top = el.scrollTop;
@@ -54,6 +54,22 @@ function nudgeScrollableAncestors(): void {
   }
   window.scrollTo(0, 1);
   window.scrollTo(0, 0);
+}
+
+export function publishAppVh(): void {
+  document.documentElement.style.setProperty("--app-vh", `${window.innerHeight}px`);
+}
+
+/** Forces WebKit to synchronously re-measure the viewport - see the file-level comment. Returns whether it ran (i.e. a mismatch was actually detected). */
+export function healViewport(): boolean {
+  if (expectedHeight() - window.innerHeight <= SHRINK_THRESHOLD_PX) return false;
+  const el = document.body;
+  const display = el.style.display;
+  el.style.display = "none";
+  void el.offsetHeight; // force a synchronous reflow, so WebKit re-measures before display is restored
+  el.style.display = display;
+  publishAppVh();
+  return true;
 }
 
 /**
@@ -65,52 +81,39 @@ function nudgeScrollableAncestors(): void {
  * re-adding the home-screen icon from scratch, all tried and ruled out
  * diagnosing this). Only force-quitting the app resets it - or forcing
  * WebKit to synchronously re-measure by toggling `display` off and back on
- * on a full-viewport element, which `heal()` does. Runs that (and the
- * scroll nudge above) on a poll for the lifetime of the app, and again on
- * every route change - a workspace's own scrollable `<main>` (and thus
- * anything for the nudge above to grab onto) only exists *after* navigating
- * past the workspace picker, which has nothing to scroll at all, so a
- * mount-once-only pass can end up doing all its work before that content
- * ever exists.
+ * on a full-viewport element, which `healViewport()` above does. Runs that
+ * (and the scroll nudge above) on a poll for the lifetime of the app, and
+ * again on every route change - a workspace's own scrollable `<main>` (and
+ * thus anything for the nudge above to grab onto) only exists *after*
+ * navigating past the workspace picker, which has nothing to scroll at all,
+ * so a mount-once-only pass can end up doing all its work before that
+ * content ever exists.
  */
 export function useDynamicViewportHeight(): void {
   const location = useLocation();
 
   useEffect(() => {
-    function publish() {
-      document.documentElement.style.setProperty("--app-vh", `${window.innerHeight}px`);
-    }
-    publish();
+    publishAppVh();
 
     if (!isIOS() || !isStandalone()) return;
 
-    function heal() {
-      if (expectedHeight() - window.innerHeight <= SHRINK_THRESHOLD_PX) return;
-      const el = document.body;
-      const display = el.style.display;
-      el.style.display = "none";
-      void el.offsetHeight; // force a synchronous reflow, so WebKit re-measures before display is restored
-      el.style.display = display;
-      publish();
-    }
-
     function onResize() {
-      publish();
+      publishAppVh();
     }
 
     function onFocusOut() {
-      setTimeout(heal, HEAL_DELAY_MS);
+      setTimeout(healViewport, HEAL_DELAY_MS);
     }
 
     window.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
     document.addEventListener("focusout", onFocusOut);
 
-    const interval = setInterval(heal, POLL_INTERVAL_MS);
+    const interval = setInterval(healViewport, POLL_INTERVAL_MS);
     const nudgeTimers = SCROLL_NUDGE_DELAYS_MS.map((delay) =>
       setTimeout(() => {
         nudgeScrollableAncestors();
-        heal();
+        healViewport();
       }, delay),
     );
     return () => {
