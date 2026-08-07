@@ -66,6 +66,16 @@ export interface BlockEditorActions {
   /** Which block's edit history shows in the Properties sidebar (see BlockHistoryPanel.tsx) - lifted above the editor since the sidebar isn't part of this component tree. */
   selectedBlockId: string | null;
   selectBlock: (blockId: string) => void;
+  /**
+   * Which block's touch context menu is open - set by BlockEditor.tsx's
+   * handleDragEnd when a touch long-press activates a drag but the pointer
+   * never actually moved (see BlockItem.tsx: on touch, the drag handle/id/
+   * delete buttons are removed entirely to reclaim content width, so a
+   * long-press-then-release-without-moving opens this menu instead, bundling
+   * what those buttons used to do). `null` when closed.
+   */
+  contextMenuBlockId: string | null;
+  closeBlockMenu: () => void;
 }
 
 const BlockEditorContext = createContext<BlockEditorActions | null>(null);

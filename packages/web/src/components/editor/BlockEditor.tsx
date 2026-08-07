@@ -12,6 +12,8 @@ import { BlockList } from "./BlockList.js";
 import { useEditorHistory, type BlockSnapshot } from "./useEditorHistory.js";
 import { useKeepFocusedElementVisible } from "../../hooks/useKeepFocusedElementVisible.js";
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
+import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "./blockGestures.js";
+import { UndoToast } from "./UndoToast.js";
 
 function isEditableElementFocused(): boolean {
   const el = document.activeElement as HTMLElement | null;
@@ -105,6 +107,15 @@ export function BlockEditor({
   const [pendingFocusBlockId, setPendingFocusBlockId] = useState<string | null>(null);
   const [isDraggingAny, setIsDraggingAny] = useState(false);
   const dragSelectGuard = useDragSelectGuard();
+  // Touch-only long-press gesture state (see blockGestures.ts and
+  // BlockItem.tsx) - contextMenuBlockId opens the menu that replaced the
+  // per-block id/delete buttons removed on touch; showUndoToast follows a
+  // swipe-delete specifically (the one new destructive gesture), not every
+  // delete path - the toolbar delete button and backspace-on-empty already
+  // have Ctrl+Z for that.
+  const [contextMenuBlockId, setContextMenuBlockId] = useState<string | null>(null);
+  const [showUndoToast, setShowUndoToast] = useState(false);
+  const undoToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const dragDepth = useRef(0);
@@ -249,6 +260,22 @@ export function BlockEditor({
   }
 
   /**
+   * Same delete, plus a dismissible "Block deleted / Undo" toast - only for
+   * the touch swipe-left gesture (see handleDragEnd below), since that's the
+   * one delete path here with no confirmation step of its own. "Undo" just
+   * calls the same history.undo() Ctrl+Z already uses, not a bespoke
+   * by-block-id restore - the toast's short auto-dismiss window means the
+   * swipe is virtually always still the top of the undo stack when it's
+   * clicked.
+   */
+  function performSwipeDelete(blockId: string): void {
+    performDelete(blockId);
+    setShowUndoToast(true);
+    if (undoToastTimerRef.current) clearTimeout(undoToastTimerRef.current);
+    undoToastTimerRef.current = setTimeout(() => setShowUndoToast(false), 5000);
+  }
+
+  /**
    * Looks up the block's current (full, pre-merge) content before saving,
    * so a content edit is undoable too - one step per committed save, same
    * as create/delete/move, not one per keystroke (see useEditorHistory.ts).
@@ -361,16 +388,42 @@ export function BlockEditor({
     }
   }
 
-  function handleDragStart(_event: DragStartEvent) {
+  function handleDragStart(event: DragStartEvent) {
     setIsDraggingAny(true);
     dragSelectGuard.onDragStart();
+    // Confirms the long-press activated (see blockGestures.ts) - the one
+    // moment worth a haptic nudge, since the block row otherwise gives no
+    // other feedback that it just became draggable (no visible handle on
+    // touch, see BlockItem.tsx). Silently a no-op on browsers/devices
+    // without vibration support.
+    if (event.activatorEvent.type === "touchstart") navigator.vibrate?.(15);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setIsDraggingAny(false);
     dragSelectGuard.onDragEnd();
-    if (!event.over || event.active.id === event.over.id) return;
     const blockId = String(event.active.id);
+
+    // Touch-only: the row itself is now the drag source (see BlockItem.tsx),
+    // not just a small handle, so the same long-press gesture has to double
+    // as "open the block's menu" (no movement) and "delete" (swiped left far
+    // enough) before falling through to the desktop reorder logic below,
+    // which only ever runs from the dedicated grip handle and has no such
+    // ambiguity to resolve.
+    if (event.activatorEvent.type === "touchstart") {
+      const absX = Math.abs(event.delta.x);
+      const absY = Math.abs(event.delta.y);
+      if (absX < TAP_MOVEMENT_TOLERANCE_PX && absY < TAP_MOVEMENT_TOLERANCE_PX) {
+        setContextMenuBlockId(blockId);
+        return;
+      }
+      if (absX > SWIPE_DELETE_THRESHOLD_PX && absX > absY) {
+        performSwipeDelete(blockId);
+        return;
+      }
+    }
+
+    if (!event.over || event.active.id === event.over.id) return;
     const overId = String(event.over.id);
     const all = blocks ?? [];
     const draggedBlock = all.find((b) => b.id === blockId);
@@ -475,6 +528,8 @@ export function BlockEditor({
         isDraggingAny,
         selectedBlockId,
         selectBlock: (blockId) => onSelectBlock?.(blockId),
+        contextMenuBlockId,
+        closeBlockMenu: () => setContextMenuBlockId(null),
       }}
     >
       <div
@@ -513,6 +568,15 @@ export function BlockEditor({
           </div>
         </DndContext>
       </div>
+
+      {showUndoToast && (
+        <UndoToast
+          onUndo={() => {
+            history.undo();
+            setShowUndoToast(false);
+          }}
+        />
+      )}
     </BlockEditorProvider>
   );
 }
