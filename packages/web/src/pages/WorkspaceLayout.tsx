@@ -200,7 +200,10 @@ function WorkspaceLayoutInner() {
         }`}
       >
         {shareToken ? (
-          <div className="flex items-center gap-2 border-b border-border px-4 py-4">
+          <div
+            className="flex items-center gap-2 border-b border-border px-4 pb-4"
+            style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}
+          >
             <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
             <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
             <span className="ml-auto shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs text-ink-muted">Shared</span>
@@ -208,7 +211,8 @@ function WorkspaceLayoutInner() {
         ) : (
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-2 border-b border-border px-4 py-4 text-left hover:bg-surface"
+            className="flex items-center gap-2 border-b border-border px-4 pb-4 text-left hover:bg-surface"
+            style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}
           >
             <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
             <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
@@ -258,21 +262,20 @@ function WorkspaceLayoutInner() {
           {/* "Recently edited BY ME" doesn't apply to an anonymous visitor,
               and its endpoint isn't share-aware server-side. */}
           {!shareToken && <RecentlyEditedNavSection workspaceId={workspaceId!} />}
-
-          {!shareToken && (
-            <div className="mt-3 border-t border-border pt-2">
-              <NavLink to={`/w/${workspaceId}/settings`} className={({ isActive }) => navLinkClass(isActive)}>
-                <Icon name="settings" className="h-4 w-4" /> Settings
-              </NavLink>
-            </div>
-          )}
         </nav>
 
-        <div className="flex items-center justify-between border-t border-border p-3">
+        <div
+          className="flex items-center justify-between border-t border-border p-3"
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+        >
           {shareToken ? (
             <span className="truncate text-sm text-ink-muted">Viewing via a shared link</span>
           ) : (
-            <div className="flex items-center gap-2 overflow-hidden">
+            <button
+              onClick={() => navigate(`/w/${workspaceId}/settings`)}
+              className="flex items-center gap-2 overflow-hidden rounded-lg p-1 -m-1 text-left hover:bg-surface"
+              title="Settings"
+            >
               {user?.avatarUrl ? (
                 <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
               ) : (
@@ -284,7 +287,7 @@ function WorkspaceLayoutInner() {
                 </span>
               )}
               <span className="truncate text-sm">{user?.name}</span>
-            </div>
+            </button>
           )}
           <div className="flex items-center gap-1">
             {!shareToken && workspaceId && <NotificationBell workspaceId={workspaceId} />}
