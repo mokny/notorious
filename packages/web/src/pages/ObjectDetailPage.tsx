@@ -355,6 +355,13 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </span>
               )
             )}
+            {/* Only shown once a cover is set - that's the only case where
+                the plain title input above is hidden entirely (see the
+                `!object.cover` guard around it), so this is the sole visible
+                copy of the title once you've scrolled the cover itself out
+                of view. `min-w-0` lets it actually shrink/truncate instead
+                of pushing the (all `shrink-0`) action buttons off screen. */}
+            {object.cover && <span className="min-w-0 flex-1 truncate text-sm font-medium">{title || "Untitled"}</span>}
             {/* `key={object.id}` forces a full remount on every object
                 change, same reasoning as CoverImage's own `key` above -
                 without it, navigating from one object to another reuses

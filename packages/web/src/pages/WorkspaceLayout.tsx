@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -22,6 +22,19 @@ import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSec
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 import { NotificationBell } from "../components/nav/NotificationBell.js";
 import { BottomTabBar } from "../components/nav/BottomTabBar.js";
+
+// The mobile header's own rendered height (safe-area inset + its content) -
+// exposed as a CSS var so <main>'s padding-top, the sticky action-toolbar in
+// ObjectDetailPage.tsx (which sticks at that padding's inner edge for free,
+// no extra offset needed), and CoverImage.tsx's negative margin (pulling
+// itself back up under the header on a cover page) all agree on the same
+// number without measuring anything at runtime. Kept as a plain CSS formula
+// (not a ResizeObserver measurement) so it's correct on the very first paint
+// - a measured value would start at 0 and jump once the effect ran. If the
+// header's own padding/icon-button sizing below ever changes, update this to
+// match: 0.5rem top/bottom padding (p-2) around a 32px-tall icon button
+// (p-1.5 around a h-5 icon) = 48px, plus the safe-area inset itself.
+const MOBILE_HEADER_HEIGHT = "calc(env(safe-area-inset-top) + 48px)";
 
 // `useMobileChrome` (consumed below by the mobile header) is set from
 // ObjectDetailPage/CoverImage.tsx, a descendant rendered through <Outlet/> -
@@ -55,7 +68,7 @@ function WorkspaceLayoutInner() {
   const { coverActive } = useMobileChrome();
   // The mobile header only overlays a cover when it's actually the topmost
   // thing on screen (no persistent sidebar taking that role instead).
-  const overlayHeader = coverActive && !sidebarPersistent;
+  const showCoverOverlay = coverActive && !sidebarPersistent;
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
@@ -231,46 +244,45 @@ function WorkspaceLayoutInner() {
         </div>
       </aside>
 
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div
+        className="relative flex min-w-0 flex-1 flex-col"
+        style={!sidebarPersistent ? ({ "--mobile-header-h": MOBILE_HEADER_HEIGHT } as CSSProperties) : undefined}
+      >
         {!sidebarPersistent && (
-          // `padding-top` (not the block's own top offset) absorbs the
-          // Dynamic Island/status-bar inset, so the bar's background - solid
-          // bg-surface normally, or transparent floating over a cover's own
-          // image (see overlayHeader above, driven by CoverImage.tsx) -
-          // extends all the way up under it instead of stopping short.
+          // Always floats above <main> (never takes flow space itself) -
+          // <main>'s own padding-top below compensates instead, which also
+          // makes the action-toolbar sticky bar in ObjectDetailPage.tsx stick
+          // right at that padding's inner edge (i.e. right below this bar)
+          // for free, with no extra offset math needed there. A permanent
+          // (not scroll-dependent, to avoid a jump-cut once it would
+          // otherwise toggle) dark scrim keeps the icon/text legible over a
+          // cover image; solid bg-surface otherwise.
           <div
-            className={
-              overlayHeader
-                ? "absolute inset-x-0 top-0 z-20 flex items-center gap-2 p-2"
-                : "relative z-10 flex items-center gap-2 border-b border-border bg-surface p-2"
-            }
+            className={`absolute inset-x-0 top-0 z-20 flex items-center gap-2 p-2 ${
+              showCoverOverlay ? "bg-gradient-to-b from-black/60 to-transparent" : "border-b border-border bg-surface"
+            }`}
             style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
           >
             <button
               onClick={() => setSidebarOpen(true)}
               className={`rounded-md p-1.5 hover:bg-surface-raised ${
-                overlayHeader ? "text-white drop-shadow hover:text-white" : "text-ink-muted hover:text-ink"
+                showCoverOverlay ? "text-white hover:text-white" : "text-ink-muted hover:text-ink"
               }`}
               title="Open menu"
             >
               <Icon name="menu" className="h-5 w-5" />
             </button>
-            <span
-              className={`truncate text-sm font-medium ${overlayHeader ? "text-white" : ""}`}
-              style={overlayHeader ? { textShadow: "0 1px 3px rgba(0,0,0,0.7)" } : undefined}
-            >
-              {workspace?.name}
-            </span>
+            <span className={`truncate text-sm font-medium ${showCoverOverlay ? "text-white" : ""}`}>{workspace?.name}</span>
           </div>
         )}
         {/* Only for a real member - an anonymous share visitor has no
             account to "install their copy" of the app for. Hidden while a
-            cover is full-bleed under the overlay header (see overlayHeader
-            above) - it's in normal flow, so left up it would push the cover
-            down and break the "content reaches the very top" effect on its
-            first (undismissed) showing. */}
-        {!shareToken && !overlayHeader && <InstallAppHint />}
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
+            cover is full-bleed under the overlay header (see showCoverOverlay
+            above) - it's in main's normal flow, so left up it would push the
+            cover down and break the "content reaches the very top" effect on
+            its first (undismissed) showing. */}
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto" style={!sidebarPersistent ? { paddingTop: "var(--mobile-header-h)" } : undefined}>
+          {!shareToken && !showCoverOverlay && <InstallAppHint />}
           <Outlet />
         </main>
         {breakpoint === "phone" && (

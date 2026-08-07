@@ -164,7 +164,19 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
   const textCss = coverTextCss(style);
 
   return (
-    <div className="relative w-full" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+    <div
+      className="relative w-full"
+      // Pulls the cover back up underneath WorkspaceLayout.tsx's mobile
+      // header - <main> there gets a matching padding-top so everything
+      // *after* this element still lands exactly where it would without
+      // this margin (see MOBILE_HEADER_HEIGHT's own comment). Resolves to a
+      // no-op (var falls back to 0px) wherever that padding isn't set - the
+      // persistent-sidebar breakpoints, and desktop, where there's no
+      // floating header to duck under in the first place.
+      style={{ marginTop: "calc(-1 * var(--mobile-header-h, 0px))" }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
       <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" onLoad={handleImageLoad} />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
