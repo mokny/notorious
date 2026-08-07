@@ -21,6 +21,7 @@ import {
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { seedSystemObjectTypes } from "../schema/systemTypes.js";
+import { seedDashboardNote } from "./dashboardSeed.js";
 import { positionBetween } from "../../lib/position.js";
 import { deleteWorkspaceFilesFromDisk } from "../files/service.js";
 import { removeWorkspaceFromIndex } from "../search/indexer.js";
@@ -36,7 +37,12 @@ export async function createWorkspace(
   await db.insert(workspaceMembers).values({ workspaceId: id, userId: ownerId, role: "owner", joinedAt: createdAt });
   await seedSystemObjectTypes(id);
 
-  return { id, name: input.name, icon: input.icon, ownerId, dashboardObjectId: null, weekStartsOn: "monday", createdAt };
+  const dashboardObjectId = await seedDashboardNote(id, ownerId);
+  if (dashboardObjectId) {
+    await db.update(workspaces).set({ dashboardObjectId }).where(eq(workspaces.id, id));
+  }
+
+  return { id, name: input.name, icon: input.icon, ownerId, dashboardObjectId, weekStartsOn: "monday", createdAt };
 }
 
 export async function listWorkspacesForUser(userId: string): Promise<Workspace[]> {
