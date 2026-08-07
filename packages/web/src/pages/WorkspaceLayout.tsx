@@ -171,26 +171,12 @@ function WorkspaceLayoutInner() {
   }
 
   return (
-    // Not plain `h-dvh` (`100dvh`) - on iOS Safari, `dvh` itself already
-    // excludes the top/bottom safe areas (Dynamic Island, home indicator),
-    // so a `100dvh` box is *shorter* than the physical screen by design,
-    // regardless of `viewport-fit=cover`. That left this whole layout too
-    // short: BottomTabBar's own `env(safe-area-inset-bottom)` padding (see
-    // that component) was reserving space *inside* an already-too-short
-    // box, instead of reaching the true bottom edge, which read as a
-    // second, oversized gap (plain body background showing below the tab
-    // bar) rather than the tab bar sitting flush against it. Adding both
-    // safe-area insets back on top of `100dvh` gives a box that actually
-    // spans the full physical screen, the same way CoverImage.tsx's own
-    // negative margin explicitly reaches past `100dvh`'s top edge. No
-    // `overflow-hidden` here even though this is meant to be a hard
-    // one-screen-tall box - Safari drops `position: sticky` (used by
-    // ObjectDetailPage.tsx's action-toolbar) anywhere inside an ancestor
-    // chain that includes a *non-scrolling* `overflow: hidden`, not just
-    // inside the nearest actual scroll container - this element is exactly
-    // that, an non-scrolling ancestor of <main> (the real scroll container,
-    // which already clips its own overflow just fine on its own).
-    <div className="flex" style={{ height: "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))" }}>
+    // `h-dvh`, not `h-screen` (`100vh`) - iOS/Android shrink the *dynamic*
+    // viewport when the on-screen keyboard opens, but leave the plain
+    // layout viewport (what `100vh` measures) unchanged. With `h-screen`
+    // the bottom tab bar and sidebar footer would get pushed down behind
+    // the keyboard instead of reflowing above it.
+    <div className="flex h-dvh">
       {sidebarOpen && !sidebarPersistent && (
         <div className="fixed inset-0 z-30 bg-black/30" onClick={() => setSidebarOpen(false)} />
       )}
