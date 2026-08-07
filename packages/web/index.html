@@ -3,11 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Lets the installed PWA render under the status bar/Dynamic Island
+         (paired with viewport-fit=cover above and the safe-area padding in
+         WorkspaceLayout.tsx) instead of iOS drawing its own fixed white/black
+         bar there - required for the theme-color meta below to have any
+         visible effect in standalone mode at all. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>Notorious</title>
+    <script>
+      // Applies the persisted/system theme (and its matching theme-color)
+      // synchronously, before the first paint - ThemeContext.tsx does the
+      // same thing on mount, but only inside a React effect that runs after
+      // hydration, which left a brief flash of the wrong theme (and wrong
+      // Dynamic Island color) on every load. Keep the two color values below
+      // in sync with THEME_COLORS in src/lib/themeColors.ts by hand - this
+      // script runs before any bundled module, so it can't import from it.
+      (function () {
+        var stored = localStorage.getItem("notorious-theme");
+        var theme = stored === "light" || stored === "dark" ? stored : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.classList.toggle("dark", theme === "dark");
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "dark" ? "#0f111a" : "#ffffff");
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

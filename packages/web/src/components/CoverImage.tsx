@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CoverTextStyle } from "@notorious/shared";
 import { objectApi, fileApi } from "../lib/api/resources.js";
@@ -8,6 +8,9 @@ import { useFitText } from "../hooks/useFitText.js";
 import { DEFAULT_COVER_TEXT_STYLE, coverTextCss } from "../lib/coverTextStyle.js";
 import { CoverTextStyleEditor } from "./CoverTextStyleEditor.js";
 import { Icon } from "./ui/Icon.js";
+import { useTheme } from "../context/ThemeContext.js";
+import { useMobileChrome } from "../context/MobileChromeContext.js";
+import { THEME_COLORS } from "../lib/themeColors.js";
 
 interface CoverImageProps {
   workspaceId: string;
@@ -40,6 +43,59 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hover, setHover] = useState(false);
   const [styleEditorOpen, setStyleEditorOpen] = useState(false);
+  const { theme } = useTheme();
+  const { setCoverActive } = useMobileChrome();
+
+  // Tells WorkspaceLayout's mobile header to switch to its transparent
+  // overlay style while this cover is on screen, and restores the Dynamic
+  // Island color to the plain theme color (set by handleImageLoad below in
+  // the meantime) once it isn't - on unmount (covers a real cover being
+  // removed too, since setCoverMutation's onSuccess invalidates the object
+  // query and this whole component gets a fresh `key` per object, see
+  // ObjectDetailPage.tsx) and whenever `cover` itself goes null.
+  useEffect(() => {
+    if (!cover) return;
+    setCoverActive(true);
+    return () => {
+      setCoverActive(false);
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLORS[theme]);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cover]);
+
+  // Approximates the cover's dominant color by downsampling it onto a tiny
+  // canvas and averaging the pixels - cheap, and close enough for a status
+  // bar tint (no need for a real clustering algorithm here).
+  function handleImageLoad(e: SyntheticEvent<HTMLImageElement>) {
+    try {
+      const img = e.currentTarget;
+      const size = 8;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, size, size);
+      const { data } = ctx.getImageData(0, 0, size, size);
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      const pixelCount = data.length / 4;
+      for (let i = 0; i < data.length; i += 4) {
+        r += data[i] ?? 0;
+        g += data[i + 1] ?? 0;
+        b += data[i + 2] ?? 0;
+      }
+      const toHex = (n: number) => Math.round(n / pixelCount).toString(16).padStart(2, "0");
+      const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", hex);
+    } catch {
+      // A non-same-origin cover would taint the canvas and make
+      // getImageData throw - falls back to just leaving the theme's own
+      // status-bar color in place. Covers are always same-origin uploads
+      // (see fileIdFromUrl above), so this is only a safety net.
+    }
+  }
 
   const setCoverMutation = useMutation({
     mutationFn: (newCover: string | null) => objectApi.update(objectId, { cover: newCover }),
@@ -109,7 +165,7 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
 
   return (
     <div className="relative w-full" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" />
+      <img src={withShareToken(cover)} alt="" className="max-h-[300px] w-full object-cover" onLoad={handleImageLoad} />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
         <div ref={rowRef} className="pointer-events-auto mx-auto flex max-w-full items-center justify-center gap-2">

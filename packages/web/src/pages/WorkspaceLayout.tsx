@@ -7,6 +7,7 @@ import { workspaceApi, authApi, aiApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useConfirm } from "../context/ConfirmContext.js";
 import { useTheme } from "../context/ThemeContext.js";
+import { MobileChromeProvider, useMobileChrome } from "../context/MobileChromeContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
@@ -22,7 +23,19 @@ import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 import { NotificationBell } from "../components/nav/NotificationBell.js";
 import { BottomTabBar } from "../components/nav/BottomTabBar.js";
 
+// `useMobileChrome` (consumed below by the mobile header) is set from
+// ObjectDetailPage/CoverImage.tsx, a descendant rendered through <Outlet/> -
+// the provider has to wrap that too, so it lives here around the whole
+// layout rather than at the route level in App.tsx.
 export function WorkspaceLayout() {
+  return (
+    <MobileChromeProvider>
+      <WorkspaceLayoutInner />
+    </MobileChromeProvider>
+  );
+}
+
+function WorkspaceLayoutInner() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user, refetch } = useAuth();
   const { theme, toggle } = useTheme();
@@ -39,6 +52,10 @@ export function WorkspaceLayout() {
   // drawer there (see ObjectTypePage/SearchPage for the split-view panes
   // this pairs with).
   const sidebarPersistent = breakpoint === "desktop" || (breakpoint === "tablet" && isLandscape);
+  const { coverActive } = useMobileChrome();
+  // The mobile header only overlays a cover when it's actually the topmost
+  // thing on screen (no persistent sidebar taking that role instead).
+  const overlayHeader = coverActive && !sidebarPersistent;
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
@@ -214,22 +231,45 @@ export function WorkspaceLayout() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         {!sidebarPersistent && (
-          <div className="flex items-center gap-2 border-b border-border p-2">
+          // `padding-top` (not the block's own top offset) absorbs the
+          // Dynamic Island/status-bar inset, so the bar's background - solid
+          // bg-surface normally, or transparent floating over a cover's own
+          // image (see overlayHeader above, driven by CoverImage.tsx) -
+          // extends all the way up under it instead of stopping short.
+          <div
+            className={
+              overlayHeader
+                ? "absolute inset-x-0 top-0 z-20 flex items-center gap-2 p-2"
+                : "relative z-10 flex items-center gap-2 border-b border-border bg-surface p-2"
+            }
+            style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}
+          >
             <button
               onClick={() => setSidebarOpen(true)}
-              className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
+              className={`rounded-md p-1.5 hover:bg-surface-raised ${
+                overlayHeader ? "text-white drop-shadow hover:text-white" : "text-ink-muted hover:text-ink"
+              }`}
               title="Open menu"
             >
               <Icon name="menu" className="h-5 w-5" />
             </button>
-            <span className="truncate text-sm font-medium">{workspace?.name}</span>
+            <span
+              className={`truncate text-sm font-medium ${overlayHeader ? "text-white" : ""}`}
+              style={overlayHeader ? { textShadow: "0 1px 3px rgba(0,0,0,0.7)" } : undefined}
+            >
+              {workspace?.name}
+            </span>
           </div>
         )}
         {/* Only for a real member - an anonymous share visitor has no
-            account to "install their copy" of the app for. */}
-        {!shareToken && <InstallAppHint />}
+            account to "install their copy" of the app for. Hidden while a
+            cover is full-bleed under the overlay header (see overlayHeader
+            above) - it's in normal flow, so left up it would push the cover
+            down and break the "content reaches the very top" effect on its
+            first (undismissed) showing. */}
+        {!shareToken && !overlayHeader && <InstallAppHint />}
         <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>

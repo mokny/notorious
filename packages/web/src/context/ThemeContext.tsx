@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { THEME_COLORS } from "../lib/themeColors.js";
 
 type Theme = "light" | "dark";
 const STORAGE_KEY = "notorious-theme";
@@ -22,6 +23,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem(STORAGE_KEY, theme);
+    // A cover page (CoverImage.tsx) may have overwritten this with the
+    // cover's own dominant color - an explicit theme toggle deliberately
+    // takes priority back over that until the next cover mounts/unmounts.
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLORS[theme]);
   }, [theme]);
 
   return (
