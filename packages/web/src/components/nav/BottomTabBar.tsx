@@ -5,6 +5,7 @@ import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { reloadIfViewportShrunk } from "../../hooks/useDynamicViewportHeight.js";
+import { useAuth } from "../../context/AuthContext.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
@@ -25,6 +26,7 @@ export function BottomTabBar({
   const location = useLocation();
   const navigate = useNavigate();
   const shareToken = isSharedSession();
+  const { user } = useAuth();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +46,7 @@ export function BottomTabBar({
 
   const isHome = dashboardObjectId ? location.pathname === `/w/${workspaceId}/objects/${dashboardObjectId}` : location.pathname === `/w/${workspaceId}`;
   const isSearch = location.pathname === `/w/${workspaceId}/search`;
+  const isSettings = location.pathname === `/w/${workspaceId}/settings`;
 
   // Runs once, right when this bar is first shown - not any earlier (e.g.
   // the app-wide level), so a launch that never makes it past the workspace
@@ -119,6 +122,29 @@ export function BottomTabBar({
           <Icon name="menu" className="h-5 w-5" />
           Menu
         </button>
+
+        {!shareToken && (
+          <button
+            onClick={() => navigate(`/w/${workspaceId}/settings`)}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${isSettings ? "text-accent" : "text-ink-muted"}`}
+          >
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt=""
+                className={`h-5 w-5 rounded-full object-cover ${isSettings ? "ring-2 ring-accent" : ""}`}
+              />
+            ) : (
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold text-white ${isSettings ? "ring-2 ring-accent" : ""}`}
+                style={{ backgroundColor: user?.avatarColor }}
+              >
+                {user?.name?.[0]}
+              </span>
+            )}
+            Settings
+          </button>
+        )}
       </div>
     </nav>
   );
