@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { isIOS } from "../lib/platform.js";
 
 function isStandalone(): boolean {
@@ -8,46 +8,74 @@ function isStandalone(): boolean {
   );
 }
 
-const POLL_INTERVAL_MS = 200;
-const POLL_DURATION_MS = 3000;
+const SHRINK_THRESHOLD_PX = 4;
+const HEAL_DELAY_MS = 140;
+const POLL_INTERVAL_MS = 2000;
 
 /**
- * On a cold launch (tapping the home-screen icon), iOS's WKWebView
- * sometimes settles into its real, full-screen size a moment *after* the
- * page has already painted with a shorter one - window.innerHeight (and
- * env(safe-area-inset-bottom)) read short at first, leaving WorkspaceLayout
- * (sized off this) and BottomTabBar (position: fixed, so it tracks whatever
- * height the browser is currently reporting) both floating above the true
- * bottom edge until something re-reads the now-correct value.
- *
- * A previous version of this fix force-reloaded the page once, based on
- * comparing window.innerHeight against window.screen.height - but that
- * comparison double-counted the safe-area insets (they're already *inside*
- * innerHeight under viewport-fit=cover, not additional to it), so the
- * threshold it checked against essentially never tripped, and the only thing
- * that ever actually fixed the gap in practice was a manual pull-to-refresh
- * (itself just a plain reload - see usePullToRefresh.ts). The real fix
- * doesn't need a reload at all: just keep re-reading window.innerHeight for
- * the few seconds after launch during which WKWebView is still settling, and
- * publish it as a CSS var WorkspaceLayout's root sizes itself off (instead
- * of the `dvh` unit, which only reflects the same possibly-still-wrong
- * number). Once the browser's own number is right, ours is too, on the very
- * next tick - no full-page reload, no lost scroll position or in-progress
- * edits.
+ * iOS's WKWebView has a well-documented standalone-PWA bug: the first time
+ * the on-screen keyboard opens (a login field, a search box, anything), it
+ * permanently shrinks window.innerHeight/visualViewport.height/the `dvh`
+ * unit by roughly the keyboard's height and never recovers on its own - not
+ * on blur, not on a page reload, not even on deleting and re-adding the
+ * home-screen icon from scratch (all three were tried and ruled out
+ * diagnosing this - a real device stayed at innerHeight=894 against a real
+ * screen.height=956 no matter which of those we threw at it). Only
+ * force-quitting the app resets it - or forcing WebKit to synchronously
+ * re-measure by toggling `display` off and back on on a full-viewport
+ * element, which is what `heal()` below does. Tracks the largest
+ * innerHeight ever observed (our best evidence of the real, un-shrunk
+ * height) and heals whenever the current one falls meaningfully short of
+ * it - reactively on focusout (the moment a keyboard most likely just
+ * closed) and defensively via a light poll, since not every trigger is a
+ * text input blur.
  */
 export function useDynamicViewportHeight(): void {
+  const maxVH = useRef(window.innerHeight);
+
   useEffect(() => {
     function publish() {
       document.documentElement.style.setProperty("--app-vh", `${window.innerHeight}px`);
     }
     publish();
-    if (!isIOS() || !isStandalone()) return;
 
-    const interval = setInterval(publish, POLL_INTERVAL_MS);
-    const timeout = setTimeout(() => clearInterval(interval), POLL_DURATION_MS);
+    function heal() {
+      if (maxVH.current - window.innerHeight <= SHRINK_THRESHOLD_PX) return;
+      const el = document.body;
+      const display = el.style.display;
+      el.style.display = "none";
+      void el.offsetHeight; // force a synchronous reflow, so WebKit re-measures before display is restored
+      el.style.display = display;
+      publish();
+    }
+
+    function onResize() {
+      maxVH.current = Math.max(maxVH.current, window.innerHeight);
+      publish();
+    }
+
+    function onFocusOut() {
+      setTimeout(heal, HEAL_DELAY_MS);
+    }
+
+    window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    document.addEventListener("focusout", onFocusOut);
+
+    if (!isIOS() || !isStandalone()) {
+      return () => {
+        window.removeEventListener("resize", onResize);
+        window.visualViewport?.removeEventListener("resize", onResize);
+        document.removeEventListener("focusout", onFocusOut);
+      };
+    }
+
+    const interval = setInterval(heal, POLL_INTERVAL_MS);
     return () => {
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      document.removeEventListener("focusout", onFocusOut);
       clearInterval(interval);
-      clearTimeout(timeout);
     };
   }, []);
 }
