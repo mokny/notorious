@@ -79,14 +79,16 @@ function WorkspaceLayoutInner() {
   // straight under the phone's status bar/Dynamic Island.
   const coverFullBleed = showCoverOverlay || (isPhone && coverActive);
   // Where ObjectDetailPage.tsx's sticky action-toolbar should stop when
-  // scrolling - right below the tablet-portrait header, or (phone, no header
-  // at all) right below the status bar/Dynamic Island regardless of whether
-  // a cover is currently pulling <main> itself flush to the true top edge
-  // (see coverFullBleed/CoverImage.tsx) - the two are deliberately not tied
-  // together: unlike <main>'s own padding, this must stay put even while a
-  // full-bleed cover is scrolled past, or it would end up stuck underneath
-  // the island instead of below it.
-  const stickyToolbarTop = showMobileHeader ? MOBILE_HEADER_HEIGHT : isPhone ? "env(safe-area-inset-top)" : "0px";
+  // scrolling. A sticky element's own `top` stacks *on top of* its
+  // scrolling ancestor's padding-top (the padding already shifts the
+  // scrollport's sticky-constraint box down by that much, then `top` shifts
+  // it down again) - so whenever <main>'s own padding-top already supplies
+  // the right offset (no cover: header height, safe-area, or 0 - see
+  // <main>'s own style below), this stays 0 to avoid double-applying it.
+  // Only with a cover (where <main> has *no* padding-top, so the cover
+  // itself can reach the true top edge - see CoverImage.tsx's negative
+  // margin) does the offset have to come from `top` itself instead.
+  const stickyToolbarTop = !coverActive ? "0px" : showMobileHeader ? MOBILE_HEADER_HEIGHT : isPhone ? "env(safe-area-inset-top)" : "0px";
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
@@ -169,19 +171,21 @@ function WorkspaceLayoutInner() {
   }
 
   return (
-    // `h-dvh`, not `h-screen` (`100vh`) - iOS/Android shrink the *dynamic*
-    // viewport when the on-screen keyboard opens, but leave the plain
-    // layout viewport (what `100vh` measures) unchanged. With `h-screen`
-    // the bottom tab bar and sidebar footer would get pushed down behind
-    // the keyboard instead of reflowing above it. `overflow-hidden` makes
-    // this a hard, exactly-one-screen-tall box - without it, BottomTabBar's
-    // own safe-area-inset-bottom padding (needed so its buttons don't sit
-    // under the home indicator) could push the total content past `h-dvh`
-    // on iOS, and since nothing would clip that overflow, the whole page
-    // grows past the real screen height instead - which reads as a second,
-    // too-large gap (plain body background) below the tab bar rather than
-    // the tab bar simply sitting flush against the true bottom edge.
-    <div className="flex h-dvh overflow-hidden">
+    // Not plain `h-dvh` (`100dvh`) - on iOS Safari, `dvh` itself already
+    // excludes the top/bottom safe areas (Dynamic Island, home indicator),
+    // so a `100dvh` box is *shorter* than the physical screen by design,
+    // regardless of `viewport-fit=cover`. That left this whole layout too
+    // short: BottomTabBar's own `env(safe-area-inset-bottom)` padding (see
+    // that component) was reserving space *inside* an already-too-short
+    // box, instead of reaching the true bottom edge, which read as a
+    // second, oversized gap (plain body background showing below the tab
+    // bar) rather than the tab bar sitting flush against it. Adding both
+    // safe-area insets back on top of `100dvh` gives a box that actually
+    // spans the full physical screen, the same way CoverImage.tsx's own
+    // negative margin explicitly reaches past `100dvh`'s top edge.
+    // `overflow-hidden` keeps it a hard one-screen-tall box now that its
+    // height is actually correct.
+    <div className="flex overflow-hidden" style={{ height: "calc(100dvh + env(safe-area-inset-top) + env(safe-area-inset-bottom))" }}>
       {sidebarOpen && !sidebarPersistent && (
         <div className="fixed inset-0 z-30 bg-black/30" onClick={() => setSidebarOpen(false)} />
       )}
@@ -328,11 +332,20 @@ function WorkspaceLayoutInner() {
             <span className={`truncate text-sm font-medium ${showCoverOverlay ? "text-white" : ""}`}>{workspace?.name}</span>
           </div>
         )}
-        {isPhone && coverActive && (
+        {isPhone && (
+          // Masks the status bar/Dynamic Island strip with the plain page
+          // background. Without a cover, this is on unconditionally: <main>
+          // below is a *scrolling* container, and a scroll container's own
+          // `padding-top` only ever creates a gap at scrollTop 0 - it
+          // scrolls away like any other content as soon as you scroll even
+          // slightly, which would otherwise let scrolled-past content peek
+          // out from right behind the island. With a cover, this only fades
+          // in once scrolled (see phoneCoverScrolled above) so the cover
+          // itself still shows through while at the very top.
           <div
             aria-hidden
-            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-surface transition-opacity duration-150 ${
-              phoneCoverScrolled ? "opacity-100" : "opacity-0"
+            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-surface ${coverActive ? "transition-opacity duration-150" : ""} ${
+              !coverActive || phoneCoverScrolled ? "opacity-100" : "opacity-0"
             }`}
             style={{ height: "env(safe-area-inset-top)" }}
           />
