@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { searchApi } from "../../lib/api/resources.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
@@ -14,6 +14,8 @@ interface SearchPanelProps {
   /** Called with the picked result's id and the in-progress query (for highlight-on-open) - the caller decides how to navigate (full page vs. tablet split-view vs. closing the mobile sheet first). */
   onSelect: (objectId: string, query: string) => void;
   autoFocus?: boolean;
+  /** Exposes the search input so SearchSheet.tsx can focus it explicitly once its open animation finishes, instead of relying on `autoFocus` (which would fight the slide-up transition and pop the keyboard mid-animation). */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -22,7 +24,7 @@ interface SearchPanelProps {
  * `/search` route and the mobile slide-up SearchSheet.tsx, which has no
  * route of its own (see SearchOverlayContext.tsx).
  */
-export function SearchPanel({ workspaceId, onSelect, autoFocus = true }: SearchPanelProps) {
+export function SearchPanel({ workspaceId, onSelect, autoFocus = true, inputRef }: SearchPanelProps) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [fuzzy, setFuzzy] = useState(true);
@@ -52,6 +54,7 @@ export function SearchPanel({ workspaceId, onSelect, autoFocus = true }: SearchP
     <div>
       <div className="flex items-center gap-2">
         <TextField
+          ref={inputRef}
           autoFocus={autoFocus}
           placeholder="Search everything in this workspace…"
           value={query}

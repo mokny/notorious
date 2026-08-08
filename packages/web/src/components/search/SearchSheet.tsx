@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
@@ -20,6 +21,18 @@ const DISMISS_VELOCITY = 500;
 export function SearchSheet({ workspaceId }: { workspaceId: string }) {
   const { isOpen, close } = useSearchOverlay();
   const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // `autoFocus` on the input itself (see SearchPanel.tsx's own prop) would
+  // pop the keyboard the instant this mounts, fighting the slide-up
+  // animation below (spring, damping 32/stiffness 320 - settles in ~350ms).
+  // Focusing explicitly once that's roughly done reads as "the sheet
+  // arrives, then the keyboard follows" instead of both happening at once.
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 350);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
 
   function handleSelect(objectId: string, query: string) {
     close();
@@ -58,7 +71,7 @@ export function SearchSheet({ workspaceId }: { workspaceId: string }) {
               <div className="h-1.5 w-10 rounded-full bg-ink-muted/30" />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
-              <SearchPanel workspaceId={workspaceId} onSelect={handleSelect} autoFocus={false} />
+              <SearchPanel workspaceId={workspaceId} onSelect={handleSelect} autoFocus={false} inputRef={inputRef} />
             </div>
           </motion.div>
         </>
