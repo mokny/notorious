@@ -8,6 +8,7 @@ import { useDebouncedValue } from "../../../hooks/useDebouncedValue.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { objectHref } from "../../../lib/api/shareMode.js";
 import { READ_ONLY_CONTENT_CLASS } from "../../../lib/readOnlyContent.js";
+import { useExportMode } from "../../../lib/export/exportMode.js";
 import { Icon } from "../../ui/Icon.js";
 import { BlockEditor } from "../BlockEditor.js";
 import { HighlightedText } from "../HighlightedText.js";
@@ -299,6 +300,13 @@ function EmbeddedContent({
 }
 
 export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds }: SubObjectBlockProps) {
+  // Export always embeds a sub_object's full content regardless of the
+  // block's own stored displayMode (a user picking "link" for normal viewing
+  // still expects a self-contained export to include what's linked, not a
+  // dead reference into an app they may not have access to) - see
+  // exportMode.tsx. Called before the early returns below - Rules of Hooks.
+  const exportMode = useExportMode();
+
   if (!content.objectId && content.pendingObjectTypeId) {
     return (
       <PendingNewSubObject
@@ -312,7 +320,7 @@ export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds 
     return <SubObjectPicker workspaceId={workspaceId} onPicked={(objectId) => onSave({ ...content, objectId })} />;
   }
 
-  const displayMode = content.displayMode ?? "link";
+  const displayMode = exportMode ? "embed" : content.displayMode ?? "link";
 
   return (
     <div className="space-y-2">
@@ -320,6 +328,7 @@ export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds 
         <div className="min-w-0 flex-1">
           <SubObjectRow workspaceId={workspaceId} objectId={content.objectId} depth={0} />
         </div>
+        {!exportMode && (
         <div className="mt-2 flex shrink-0 gap-0.5 rounded-md border border-border p-0.5">
           <button
             type="button"
@@ -344,6 +353,7 @@ export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds 
             <Icon name="embed" className="h-3.5 w-3.5" />
           </button>
         </div>
+        )}
       </div>
       {displayMode === "embed" && (
         <EmbeddedContent workspaceId={workspaceId} objectId={content.objectId} embedAncestorIds={embedAncestorIds} />

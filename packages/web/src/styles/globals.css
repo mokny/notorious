@@ -281,3 +281,26 @@ input[type="checkbox"] {
   background: rgb(var(--accent) / 0.15);
   pointer-events: none;
 }
+
+/* PDF export (lib/export/triggerExport.ts's exportAsPdf, via window.print()).
+   The ExportView instance it prints is portaled directly onto <body> (not
+   under #root), off-screen (see #notorious-export-root below) until this
+   class is added for the duration of the print call - at which point every
+   *other* direct child of <body> (the whole normal app, including #root)
+   disappears from the print output and only the export content remains. */
+body.notorious-exporting-print > *:not(#notorious-export-root) {
+  display: none !important;
+}
+#notorious-export-root {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 800px;
+}
+@media print {
+  body.notorious-exporting-print #notorious-export-root {
+    position: static;
+    left: auto;
+    width: auto;
+  }
+}

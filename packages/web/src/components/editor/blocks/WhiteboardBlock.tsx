@@ -6,6 +6,7 @@ import type { WhiteboardContent } from "@notorious/shared";
 import { useTheme } from "../../../context/ThemeContext.js";
 import { useAuth } from "../../../context/AuthContext.js";
 import { workspaceApi } from "../../../lib/api/resources.js";
+import { useExportMode } from "../../../lib/export/exportMode.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 
@@ -45,6 +46,46 @@ function parseInitialData(sceneJson: string | undefined): ImportedDataState | nu
   }
 }
 
+/**
+ * Export renders a static SVG snapshot (Excalidraw's own `exportToSvg`,
+ * driven straight off the stored `sceneJson`) instead of mounting the full
+ * interactive `<Excalidraw>` canvas below - avoids the zoom/fullscreen/
+ * presenting toolbar chrome showing up in the export, and (for the HTML
+ * export specifically) a live `<canvas>` wouldn't survive DOM
+ * serialization at all, since a canvas's drawn pixels aren't part of its
+ * HTML markup.
+ */
+function WhiteboardExport({ sceneJson }: { sceneJson: string | undefined }) {
+  const [svg, setSvg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const parsed = parseInitialData(sceneJson);
+      if (!parsed) {
+        if (!cancelled) setSvg(null);
+        return;
+      }
+      const mod = await import("@excalidraw/excalidraw");
+      const restored = mod.restore(parsed, null, null);
+      const svgEl = await mod.exportToSvg({
+        elements: restored.elements,
+        appState: { ...restored.appState, exportBackground: true },
+        files: restored.files ?? {},
+      });
+      if (!cancelled) setSvg(svgEl.outerHTML);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sceneJson]);
+
+  if (!svg) {
+    return <div className="flex h-40 items-center justify-center text-sm text-ink-muted">Loading whiteboard…</div>;
+  }
+  return <div className="overflow-hidden rounded-lg border border-border" dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
 export function WhiteboardBlock({
   content: externalContent,
   workspaceId,
@@ -57,6 +98,7 @@ export function WhiteboardBlock({
   /** Owner-only, exempt from the object lock - see toggleWhiteboardPresentingSchema. Goes through its own endpoint rather than `onSave` so the owner can still reach it on a locked board. */
   onTogglePresenting: (presenting: boolean) => Promise<void>;
 }) {
+  const exportMode = useExportMode();
   const { theme } = useTheme();
   const { user } = useAuth();
   // Same query key ObjectDetailPage.tsx/WorkspaceLayout.tsx already use for
@@ -308,6 +350,10 @@ export function WhiteboardBlock({
 
   function zoomToFit(): void {
     excalidrawApiRef.current?.scrollToContent(undefined, { fitToContent: true, animate: true });
+  }
+
+  if (exportMode) {
+    return <WhiteboardExport sceneJson={externalContent.sceneJson} />;
   }
 
   return (

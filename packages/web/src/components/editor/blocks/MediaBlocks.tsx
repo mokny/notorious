@@ -4,6 +4,7 @@ import type { ImageContent, VideoContent, EmbedContent } from "@notorious/shared
 import { fileApi } from "../../../lib/api/resources.js";
 import { withShareToken } from "../../../lib/api/shareMode.js";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
+import { useExportMode } from "../../../lib/export/exportMode.js";
 import { Icon } from "../../ui/Icon.js";
 
 interface MediaProps<T> {
@@ -128,9 +129,25 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
 
 export function VideoBlock({ content, workspaceId, objectId, onSave }: MediaProps<VideoContent>) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const exportMode = useExportMode();
 
   if (content.url) {
-    return <video src={withShareToken(content.url)} controls className="max-h-96 w-full rounded-lg bg-black" />;
+    const src = withShareToken(content.url);
+    // Video can't play in a static PDF/JPEG/HTML export - shows the poster
+    // frame (whatever the browser decodes at `preload="metadata"`, since no
+    // server-generated thumbnail exists - see VideoContent) with a play-icon
+    // overlay and a link back to the real, playable file instead.
+    if (exportMode) {
+      return (
+        <a href={src} target="_blank" rel="noreferrer" className="group relative block overflow-hidden rounded-lg bg-black">
+          <video src={src} preload="metadata" muted className="max-h-96 w-full" />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <Icon name="play" className="h-10 w-10 text-white" />
+          </span>
+        </a>
+      );
+    }
+    return <video src={src} controls className="max-h-96 w-full rounded-lg bg-black" />;
   }
 
   return (

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import * as Dialog from "@radix-ui/react-dialog";
 import type { MapsContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
+import { useExportMode } from "../../../lib/export/exportMode.js";
 import { Icon } from "../../ui/Icon.js";
 
 const DEFAULT_HEIGHT = 384;
@@ -19,13 +20,14 @@ function parseQuery(query: string): { origin: string; destination: string } | { 
   return { place: trimmed };
 }
 
-function embedSrcFor(query: string): string {
+/** Exported for ExportView.tsx: JPEG export can't rasterize the live iframe below (html2canvas can't read cross-origin canvas/iframe content), so it renders a link-only placeholder built from the same query parsing instead. */
+export function embedSrcFor(query: string): string {
   const parsed = parseQuery(query);
   if ("place" in parsed) return `https://maps.google.com/maps?q=${encodeURIComponent(parsed.place)}&output=embed`;
   return `https://maps.google.com/maps?saddr=${encodeURIComponent(parsed.origin)}&daddr=${encodeURIComponent(parsed.destination)}&output=embed`;
 }
 
-function externalHrefFor(query: string): string {
+export function externalHrefFor(query: string): string {
   const parsed = parseQuery(query);
   if ("place" in parsed) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parsed.place)}`;
   return `https://www.google.com/maps/dir/${encodeURIComponent(parsed.origin)}/${encodeURIComponent(parsed.destination)}`;
@@ -43,6 +45,7 @@ function externalHrefFor(query: string): string {
  * usable while locked, same as the fullscreen toggle on ImageBlock.
  */
 export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (content: MapsContent) => void }) {
+  const exportMode = useExportMode();
   const [query, setQuery] = useDebouncedSave(content.query, async (query) => onSave({ ...content, query }));
   const [height, setHeight] = useState(content.height ?? DEFAULT_HEIGHT);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
@@ -88,6 +91,18 @@ export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (
 
   const embedSrc = embedSrcFor(query);
   const externalHref = externalHrefFor(query);
+
+  if (exportMode?.format === "jpeg") {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised p-4 text-sm">
+        <Icon name="map" className="h-6 w-6 shrink-0 text-ink-muted" />
+        <div className="min-w-0">
+          <p className="truncate font-medium">{query}</p>
+          <p className="truncate text-ink-muted">{externalHref}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group/maps relative">

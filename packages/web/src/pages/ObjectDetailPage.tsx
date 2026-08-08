@@ -18,6 +18,7 @@ import { CommentsPanel } from "../components/CommentsPanel.js";
 import { IconPicker } from "../components/IconPicker.js";
 import { CoverImage } from "../components/CoverImage.js";
 import { ShareDialog } from "../components/ShareDialog.js";
+import { ExportMenu } from "../components/ExportMenu.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
 import { PresencePanel } from "../components/PresencePanel.js";
 import { useConfirm } from "../context/ConfirmContext.js";
@@ -425,6 +426,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             >
               <Icon name="eye" className="h-4 w-4" />
             </button>
+            {/* Outside the `!share` gate below (unlike ShareDialog right next
+                to it) - a read-only share visitor can see this object, so
+                they should be able to export it too, not just a workspace
+                member. See ExportMenu.tsx's own doc comment. */}
+            <ExportMenu workspaceId={workspaceId} objectId={object.id} title={title || "Untitled"} />
             {!share && (
               <>
                 <button
