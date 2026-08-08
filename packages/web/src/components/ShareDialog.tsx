@@ -4,6 +4,7 @@ import type { CreateShareLinkInput } from "@notorious/shared";
 import { shareLinkApi } from "../lib/api/resources.js";
 import { useClickOutside } from "../hooks/useClickOutside.js";
 import { Button } from "./ui/Button.js";
+import { Modal } from "./ui/Modal.js";
 import { Icon } from "./ui/Icon.js";
 
 type ShareRole = CreateShareLinkInput["role"];
@@ -103,103 +104,122 @@ export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar" 
     setTimeout(() => setCopyState((current) => (current?.linkId === linkId ? null : current)), 2000);
   }
 
-  return (
-    <div ref={containerRef} className="relative">
-      {variant === "menuItem" ? (
+  const body = (
+    <>
+      <p className="mb-3 text-xs text-ink-muted">
+        Anyone with the link can access {objectId ? "this object" : "this workspace"} without an account, at the role you
+        choose below.
+      </p>
+
+      <div className="max-h-56 space-y-2 overflow-y-auto">
+        {links?.map((link) => (
+          <div key={link.id} className="rounded-md border border-border p-2">
+            <div className="flex items-center justify-between gap-1">
+              <code className="min-w-0 flex-1 truncate text-xs">{shareUrl(link.token)}</code>
+              {copyState?.linkId === link.id ? (
+                <span className={`shrink-0 px-1 text-[11px] ${copyState.ok ? "text-green-600" : "text-red-500"}`}>
+                  {copyState.ok ? "Copied!" : "Copy failed"}
+                </span>
+              ) : (
+                <button
+                  onClick={() => void handleCopy(link.id, link.token)}
+                  title="Copy link"
+                  className="shrink-0 rounded p-1 text-ink-muted hover:bg-surface hover:text-ink"
+                >
+                  <Icon name="copy" className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button
+                onClick={() => revokeMutation.mutate(link.id)}
+                title="Revoke this link"
+                className="shrink-0 rounded p-1 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
+              >
+                <Icon name="trash" className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] capitalize text-ink-muted">
+              {link.role}
+              {link.expiresAt ? ` · expires ${new Date(link.expiresAt).toLocaleString()}` : " · never expires"}
+            </p>
+          </div>
+        ))}
+        {links?.length === 0 && <p className="text-xs text-ink-muted">No active share links yet.</p>}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as ShareRole)}
+          className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs capitalize"
+        >
+          {ROLES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <select
+          value={expiryMs ?? ""}
+          onChange={(e) => setExpiryMs(e.target.value ? Number(e.target.value) : null)}
+          className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs"
+        >
+          {EXPIRY_PRESETS.map((preset) => (
+            <option key={preset.label} value={preset.ms ?? ""}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Button
+        variant="primary"
+        className="mt-2 w-full justify-center"
+        disabled={createMutation.isPending}
+        onClick={() => createMutation.mutate()}
+      >
+        <Icon name="plus" className="h-3.5 w-3.5" /> Create link
+      </Button>
+    </>
+  );
+
+  const title = objectId ? "Share this object" : "Share this workspace";
+
+  // `variant="menuItem"`: this popover used to be a plain `absolute` div,
+  // same as the toolbar variant below - fine on desktop/tablet, but nested
+  // inside MobileTopBar.tsx's "…" menu (a small, `overflow-hidden` panel)
+  // it got visually clipped/squeezed into that panel's own bounds instead
+  // of floating freely. A portaled Modal sidesteps that entirely - it's not
+  // a descendant of the menu in the rendered DOM at all.
+  if (variant === "menuItem") {
+    return (
+      <>
         <button
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
           className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink active:bg-surface"
         >
           <span className="min-w-0 flex-1 truncate">{label}</span>
           <Icon name="share" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
         </button>
-      ) : (
-        <button
-          onClick={() => setOpen((v) => !v)}
-          title={label}
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
-        >
-          <Icon name="share" className="h-3.5 w-3.5" /> {label}
-        </button>
-      )}
+        <Modal open={open} onOpenChange={setOpen} title={title}>
+          {body}
+        </Modal>
+      </>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title={label}
+        className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
+      >
+        <Icon name="share" className="h-3.5 w-3.5" /> {label}
+      </button>
 
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
-            {objectId ? "Share this object" : "Share this workspace"}
-          </p>
-          <p className="mb-3 text-xs text-ink-muted">
-            Anyone with the link can access {objectId ? "this object" : "this workspace"} without an account, at the role
-            you choose below.
-          </p>
-
-          <div className="max-h-56 space-y-2 overflow-y-auto">
-            {links?.map((link) => (
-              <div key={link.id} className="rounded-md border border-border p-2">
-                <div className="flex items-center justify-between gap-1">
-                  <code className="min-w-0 flex-1 truncate text-xs">{shareUrl(link.token)}</code>
-                  {copyState?.linkId === link.id ? (
-                    <span className={`shrink-0 px-1 text-[11px] ${copyState.ok ? "text-green-600" : "text-red-500"}`}>
-                      {copyState.ok ? "Copied!" : "Copy failed"}
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => void handleCopy(link.id, link.token)}
-                      title="Copy link"
-                      className="shrink-0 rounded p-1 text-ink-muted hover:bg-surface hover:text-ink"
-                    >
-                      <Icon name="copy" className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => revokeMutation.mutate(link.id)}
-                    title="Revoke this link"
-                    className="shrink-0 rounded p-1 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
-                  >
-                    <Icon name="trash" className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <p className="mt-1 text-[11px] capitalize text-ink-muted">
-                  {link.role}
-                  {link.expiresAt ? ` · expires ${new Date(link.expiresAt).toLocaleString()}` : " · never expires"}
-                </p>
-              </div>
-            ))}
-            {links?.length === 0 && <p className="text-xs text-ink-muted">No active share links yet.</p>}
-          </div>
-
-          <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as ShareRole)}
-              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs capitalize"
-            >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-            <select
-              value={expiryMs ?? ""}
-              onChange={(e) => setExpiryMs(e.target.value ? Number(e.target.value) : null)}
-              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs"
-            >
-              {EXPIRY_PRESETS.map((preset) => (
-                <option key={preset.label} value={preset.ms ?? ""}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button
-            variant="primary"
-            className="mt-2 w-full justify-center"
-            disabled={createMutation.isPending}
-            onClick={() => createMutation.mutate()}
-          >
-            <Icon name="plus" className="h-3.5 w-3.5" /> Create link
-          </Button>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">{title}</p>
+          {body}
         </div>
       )}
     </div>

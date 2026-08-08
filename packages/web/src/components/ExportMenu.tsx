@@ -5,6 +5,7 @@ import { ExportView } from "./export/ExportView.js";
 import type { ExportFormat } from "../lib/export/exportMode.js";
 import { waitForDomSettled } from "../lib/export/domUtils.js";
 import { exportAsPdf, exportAsJpeg, exportAsHtml, exportAsMarkdown } from "../lib/export/triggerExport.js";
+import { Modal } from "./ui/Modal.js";
 import { Icon } from "./ui/Icon.js";
 
 interface ExportMenuProps {
@@ -77,30 +78,59 @@ export function ExportMenu({ workspaceId, objectId, title, variant = "toolbar" }
     }
   }
 
-  return (
-    <div ref={menuRef} className="relative">
-      {variant === "menuItem" ? (
+  const options = (
+    <div className="-mx-5 -mb-5 -mt-2 divide-y divide-border">
+      {OPTIONS.map((option) => (
+        <button
+          key={option.format}
+          type="button"
+          onClick={() => void runExport(option.format)}
+          className="block w-full px-5 py-3 text-left text-sm hover:bg-surface active:bg-surface"
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // See ShareDialog.tsx's own comment on why `variant="menuItem"` uses a
+  // portaled Modal instead of the plain `absolute` dropdown below - nested
+  // inside MobileTopBar.tsx's "…" menu (an `overflow-hidden` panel), that
+  // dropdown got visually clipped/squeezed into the panel's own bounds.
+  if (variant === "menuItem") {
+    return (
+      <>
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
           disabled={busyFormat !== null}
           className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink active:bg-surface disabled:opacity-40"
         >
           <span className="min-w-0 flex-1 truncate">Export</span>
           <Icon name={busyFormat ? "refresh" : "download"} className={`h-[18px] w-[18px] shrink-0 text-ink-muted ${busyFormat ? "animate-spin" : ""}`} />
         </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          disabled={busyFormat !== null}
-          title="Export this object"
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-muted hover:bg-surface-raised disabled:opacity-50"
-        >
-          <Icon name={busyFormat ? "refresh" : "download"} className={`h-4 w-4 ${busyFormat ? "animate-spin" : ""}`} />
-          Export
-        </button>
-      )}
+        <Modal open={open} onOpenChange={setOpen} title="Export">
+          {options}
+        </Modal>
+        {renderFormat &&
+          portalRef.current &&
+          createPortal(<ExportView workspaceId={workspaceId} objectId={objectId} format={renderFormat} />, portalRef.current)}
+      </>
+    );
+  }
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busyFormat !== null}
+        title="Export this object"
+        className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-muted hover:bg-surface-raised disabled:opacity-50"
+      >
+        <Icon name={busyFormat ? "refresh" : "download"} className={`h-4 w-4 ${busyFormat ? "animate-spin" : ""}`} />
+        Export
+      </button>
       {open && (
         <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border border-border bg-surface py-1 shadow-lg">
           {OPTIONS.map((option) => (

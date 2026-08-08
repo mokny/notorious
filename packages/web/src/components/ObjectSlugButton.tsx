@@ -4,6 +4,7 @@ import { objectApi } from "../lib/api/resources.js";
 import { useClickOutside } from "../hooks/useClickOutside.js";
 import { useKeepInViewport } from "../hooks/useKeepInViewport.js";
 import { ApiError } from "../lib/api/client.js";
+import { Modal } from "./ui/Modal.js";
 import { Icon } from "./ui/Icon.js";
 
 /**
@@ -70,15 +71,43 @@ export function ObjectSlugButton({
     onError: (err) => setError(err instanceof ApiError ? err.message : "Could not save this id"),
   });
 
-  return (
-    <div ref={containerRef} className="relative">
-      {variant === "menuItem" ? (
+  const form = (
+    <>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="e.g. project_alpha"
+        autoComplete="off"
+        className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+      />
+      <p className="mt-1.5 text-xs text-ink-muted">
+        Reference this object from another object&apos;s template as objects.{value || "…"}.
+      </p>
+      {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+      <button
+        type="button"
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending}
+        className="mt-3 w-full rounded-md bg-accent px-2 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+      >
+        Save
+      </button>
+    </>
+  );
+
+  // See ShareDialog.tsx's own comment on why `variant="menuItem"` uses a
+  // portaled Modal instead of the plain `absolute` popover below - nested
+  // inside MobileTopBar.tsx's "…" menu (an `overflow-hidden` panel), that
+  // popover got visually clipped/squeezed into the panel's own bounds.
+  if (variant === "menuItem") {
+    return (
+      <>
         <button
           type="button"
           onClick={() => {
             setValue(slug ?? "");
             setError(null);
-            setOpen((v) => !v);
+            setOpen(true);
           }}
           disabled={disabled}
           className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink active:bg-surface disabled:opacity-40"
@@ -86,43 +115,32 @@ export function ObjectSlugButton({
           <span className="min-w-0 flex-1 truncate">Object id</span>
           <Icon name="braces" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
         </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setValue(slug ?? "");
-            setError(null);
-            setOpen((v) => !v);
-          }}
-          disabled={disabled}
-          title={disabled ? "Unlock this object to edit its id" : "Object id (for templates)"}
-          className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-        >
-          <Icon name="braces" className="h-4 w-4" />
-        </button>
-      )}
+        <Modal open={open} onOpenChange={setOpen} title="Object id">
+          {form}
+        </Modal>
+      </>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setValue(slug ?? "");
+          setError(null);
+          setOpen((v) => !v);
+        }}
+        disabled={disabled}
+        title={disabled ? "Unlock this object to edit its id" : "Object id (for templates)"}
+        className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+      >
+        <Icon name="braces" className="h-4 w-4" />
+      </button>
       {open && (
         <div ref={popoverRef} style={clampStyle} className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Object id</p>
-          <input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="e.g. project_alpha"
-            autoComplete="off"
-            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
-          />
-          <p className="mt-1 text-[11px] text-ink-muted">
-            Reference this object from another object&apos;s template as objects.{value || "…"}.
-          </p>
-          {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-          <button
-            type="button"
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="mt-2 w-full rounded-md bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
-            Save
-          </button>
+          {form}
         </div>
       )}
     </div>
