@@ -363,30 +363,34 @@ function WorkspaceLayoutInner() {
           </div>
         )}
         {isPhone && (
+          // Masks the whole floating-pill zone (status bar strip through
+          // where MobileTopBar's pills sit) with a top-to-bottom fade to the
+          // plain page background, not a hard-edged block - <main> below is
+          // a *scrolling* container, and a scroll container's own
+          // `padding-top` only ever creates a gap at scrollTop 0, so
+          // scrolled-past content would otherwise show through in the gaps
+          // around/behind the pills (they're separate floating pills with
+          // translucent backdrop-blur, not one solid bar). Rendered *before*
+          // MobileTopBar below (same z-20) so the pills themselves stack
+          // visually on top of this fade rather than being dimmed by it.
+          // Without a cover, this is on unconditionally. With a cover, it
+          // only fades in once scrolled (see phoneCoverScrolled above) so
+          // the cover itself still shows through while at the very top.
+          <div
+            aria-hidden
+            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface via-surface/90 to-transparent ${coverActive ? "transition-opacity duration-150" : ""} ${
+              !coverActive || phoneCoverScrolled ? "opacity-100" : "opacity-0"
+            }`}
+            style={{ height: "var(--mobile-top-bar-h)" }}
+          />
+        )}
+        {isPhone && (
           <MobileTopBar
             workspaceId={workspaceId!}
             workspaceName={workspace?.name ?? "Workspace"}
             workspaceIcon={workspace?.icon ?? "sparkles"}
             dashboardObjectId={workspace?.dashboardObjectId ?? undefined}
             onOpenSidebar={() => setSidebarOpen(true)}
-          />
-        )}
-        {isPhone && (
-          // Masks the status bar/Dynamic Island strip with the plain page
-          // background. Without a cover, this is on unconditionally: <main>
-          // below is a *scrolling* container, and a scroll container's own
-          // `padding-top` only ever creates a gap at scrollTop 0 - it
-          // scrolls away like any other content as soon as you scroll even
-          // slightly, which would otherwise let scrolled-past content peek
-          // out from right behind the island. With a cover, this only fades
-          // in once scrolled (see phoneCoverScrolled above) so the cover
-          // itself still shows through while at the very top.
-          <div
-            aria-hidden
-            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-surface ${coverActive ? "transition-opacity duration-150" : ""} ${
-              !coverActive || phoneCoverScrolled ? "opacity-100" : "opacity-0"
-            }`}
-            style={{ height: "env(safe-area-inset-top)" }}
           />
         )}
         {/* Only for a real member - an anonymous share visitor has no
@@ -416,7 +420,7 @@ function WorkspaceLayoutInner() {
         </main>
         {isPhone && (
           <>
-            <MobileBottomBar workspaceId={workspaceId!} />
+            <MobileBottomBar workspaceId={workspaceId!} dashboardObjectId={workspace?.dashboardObjectId ?? undefined} />
             <SearchSheet workspaceId={workspaceId!} />
           </>
         )}

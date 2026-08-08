@@ -1,25 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { reloadIfViewportShrunk, resetViewportReloadCount } from "../../hooks/useDynamicViewportHeight.js";
-import { useAuth } from "../../context/AuthContext.js";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
  * Floating pill-shaped bottom toolbar shown only on the phone breakpoint -
  * replaces the old flat 5-tab BottomTabBar.tsx (Home/Search/New/Menu/
- * Settings). Down to 3 actions (search, profile → settings, new object) -
- * Home and Menu/sidebar access moved into MobileTopBar.tsx's "…" overflow
- * menu instead, see that component's own doc comment.
+ * Settings). Down to 3 actions (search, home, new object) - Settings and
+ * sidebar/menu access live in MobileTopBar.tsx's "…" overflow menu instead,
+ * see that component's own doc comment.
  */
-export function MobileBottomBar({ workspaceId }: { workspaceId: string }) {
+export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceId: string; dashboardObjectId?: string }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const shareToken = isSharedSession();
-  const { user } = useAuth();
   const { open: openSearch } = useSearchOverlay();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,6 +49,9 @@ export function MobileBottomBar({ workspaceId }: { workspaceId: string }) {
     reloadIfViewportShrunk();
   }, [workspaceId]);
 
+  const homePath = dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`;
+  const isHome = location.pathname === homePath;
+
   return (
     <nav
       className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center md:hidden"
@@ -64,24 +66,13 @@ export function MobileBottomBar({ workspaceId }: { workspaceId: string }) {
           <Icon name="search" className="h-5 w-5" />
         </button>
 
-        {!shareToken && (
-          <button
-            onClick={() => navigate(`/w/${workspaceId}/settings`)}
-            className="flex h-11 w-11 items-center justify-center rounded-full"
-            title="Settings"
-          >
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
-            ) : (
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
-                style={{ backgroundColor: user?.avatarColor }}
-              >
-                {user?.name?.[0]}
-              </span>
-            )}
-          </button>
-        )}
+        <button
+          onClick={() => navigate(homePath)}
+          className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface ${isHome ? "text-accent" : "text-ink-muted hover:text-ink"}`}
+          title="Home"
+        >
+          <Icon name="layout-dashboard" className="h-5 w-5" />
+        </button>
 
         {!shareToken && (
           <div ref={containerRef} className="relative">
