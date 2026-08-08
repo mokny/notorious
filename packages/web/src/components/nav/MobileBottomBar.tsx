@@ -90,7 +90,16 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
       className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center md:hidden"
       style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
-      <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-surface-raised/95 p-1.5 shadow-lg backdrop-blur">
+      {/* `relative` + a separate `-z-10` background layer for the pill's
+          border/blur/shadow, instead of putting `backdrop-blur` directly on
+          this flex container - `backdrop-filter` (like `transform`/`filter`)
+          establishes a new containing block for any `position: fixed`
+          descendant, which would otherwise make IOSMenu's full-screen
+          backdrop below (a `fixed inset-0` div) size itself to *this pill*
+          instead of the viewport - shrinking its tap-outside-to-close area
+          down to just this ~50px-tall bar instead of the whole screen. */}
+      <div className="pointer-events-auto relative flex items-center gap-1 p-1.5">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-full border border-border bg-surface-raised/95 shadow-lg backdrop-blur" />
         {showLock &&
           (isOwner ? (
             <button
