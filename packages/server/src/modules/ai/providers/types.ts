@@ -2,6 +2,8 @@ export interface ProviderToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /** Gemini's thought_signature - must be resent verbatim on later turns or the provider rejects the request. Absent for providers that don't use it. */
+  signature?: string;
 }
 
 /** Provider-neutral chat message - `agent.ts` builds a list of these from persisted `ai_chat_messages` rows and passes it to whichever adapter matches the user's configured provider. */

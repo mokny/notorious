@@ -7,6 +7,8 @@ interface OpenAiToolCallWire {
   id: string;
   type: "function";
   function: { name: string; arguments: string };
+  /** Gemini-specific (Google's OpenAI-compat layer nests thought_signature here rather than at the top level). */
+  extra_content?: { google: { thought_signature: string } };
 }
 
 /** OpenAI's chat completions wire format - `role: "tool"` messages need a `tool_call_id`, and an assistant message that called tools carries them back as `tool_calls` with JSON-stringified (not object) arguments. */
@@ -22,6 +24,7 @@ function toWireMessages(systemPrompt: string, messages: ChatMessage[]): unknown[
             id: call.id,
             type: "function",
             function: { name: call.name, arguments: JSON.stringify(call.arguments) },
+            ...(call.signature ? { extra_content: { google: { thought_signature: call.signature } } } : {}),
           }),
         ),
       });
@@ -74,6 +77,7 @@ export const openAiAdapter: AiProviderAdapter = {
       id: call.id,
       name: call.function.name,
       arguments: parseArguments(call.function.arguments),
+      signature: call.extra_content?.google.thought_signature,
     }));
 
     return { content: message?.content ?? null, toolCalls };
