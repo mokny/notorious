@@ -9,6 +9,8 @@ interface ConfirmOptions {
   cancelLabel?: string;
   /** Renders the confirm button as destructive (red) - for anything that deletes or otherwise can't be undone. */
   danger?: boolean;
+  /** Extra content rendered between the description and the footer buttons - e.g. a "Don't show this again" checkbox (see AiBlock.tsx). */
+  children?: ReactNode;
 }
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
@@ -58,6 +60,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         }}
         title={options?.title ?? ""}
         description={options?.description}
+        children={options?.children}
         footer={
           <>
             <Button variant="secondary" onClick={() => settle(false)}>

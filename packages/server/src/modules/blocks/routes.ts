@@ -259,7 +259,7 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
     const access = await requireAccess(request, workspaceId, "editor", { objectId });
     const input = generateAiBlockSchema.parse(request.body);
     const actor = resolveActor(request, access);
-    const block = await blockService.generateAiBlockAnswer(id, actor.actorId, input.prompt);
+    const block = await blockService.generateAiBlockAnswer(id, actor.actorId, input.prompt, input.includeContext);
 
     await recordAndBroadcast({
       workspaceId,

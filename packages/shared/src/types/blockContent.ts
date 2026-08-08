@@ -171,6 +171,8 @@ export interface AiContent {
   prompt: string;
   answer?: string;
   isError?: boolean;
+  /** Whether the host object's title + block tree is sent along as context for this prompt - see AiBlock.tsx. Default false/undefined (off) - an explicit opt-in since the object's content leaves the app to whatever provider the acting user has configured. */
+  includeContext?: boolean;
 }
 
 /** One object type plotted on a calendar block - which property supplies its date (a "date"/"datetime"/"daterange" property on that type), plus a View-style filter/sort scoped to just this type. */

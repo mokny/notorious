@@ -90,6 +90,8 @@ export type UpdateVotingSettingsInput = z.infer<typeof updateVotingSettingsSchem
  */
 export const generateAiBlockSchema = z.object({
   prompt: z.string().min(1).max(20_000),
+  /** Off by default - see AiContent's doc comment for why this is an explicit opt-in. */
+  includeContext: z.boolean().default(false),
 });
 export type GenerateAiBlockInput = z.infer<typeof generateAiBlockSchema>;
 

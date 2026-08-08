@@ -103,10 +103,12 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
  * A single one-shot completion for an AI block (see modules/blocks - the
  * only caller): no tool-calling loop, no chat-history persistence - the
  * result is written straight into the block's own content instead. `context`
- * is the host object's title + its blocks rendered to Markdown, so prompts
- * like "summarize this page" have something to work with.
+ * is the host object's title + its blocks rendered to Markdown (so prompts
+ * like "summarize this page" have something to work with), or `null` when
+ * the block's "include page context" toggle is off - the common/default
+ * case, since sending it is an explicit per-request opt-in.
  */
-export async function generateBlockAnswer(userId: string, prompt: string, context: string): Promise<string> {
+export async function generateBlockAnswer(userId: string, prompt: string, context: string | null): Promise<string> {
   const config = await getDecryptedAiConfig(userId);
   if (!config) throw badRequest("No AI provider configured - set one up in Settings first");
 
@@ -116,8 +118,8 @@ export async function generateBlockAnswer(userId: string, prompt: string, contex
     baseUrl: resolveBaseUrl(config.provider, config.baseUrl),
     model: config.model,
     systemPrompt:
-      "You are an AI block embedded inline in a page of a notes app called Notorious. Answer the user's prompt directly and concisely, formatted as Markdown. You have no tools - use only the prompt and the page context below to answer.",
-    messages: [{ role: "user", content: `Page context:\n${context}\n\n---\n\nPrompt: ${prompt}` }],
+      "You are an AI block embedded inline in a page of a notes app called Notorious. Answer the user's prompt directly and concisely, formatted as Markdown. You have no tools - use only the prompt (and the page context below, if given) to answer.",
+    messages: [{ role: "user", content: context ? `Page context:\n${context}\n\n---\n\nPrompt: ${prompt}` : prompt }],
     tools: [],
   });
   return result.content ?? "";
