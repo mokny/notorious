@@ -22,6 +22,7 @@ import type {
   WhiteboardContent,
   CalendarBlockContent,
   VotingContent,
+  AiContent,
 } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { ParagraphBlock } from "./blocks/ParagraphBlock.js";
@@ -43,6 +44,7 @@ import { BookmarkBlock } from "./blocks/BookmarkBlock.js";
 import { WhiteboardBlock } from "./blocks/WhiteboardBlock.js";
 import { CalendarBlock } from "./blocks/CalendarBlock.js";
 import { VotingBlock } from "./blocks/VotingBlock.js";
+import { AiBlock } from "./blocks/AiBlock.js";
 
 export interface BlockRendererProps {
   block: BlockNode;
@@ -167,6 +169,8 @@ export function BlockRenderer({
       return <CalendarBlock content={content<CalendarBlockContent>()} workspaceId={workspaceId} objectTypes={objectTypes} onSave={save} />;
     case "voting":
       return <VotingBlock blockId={block.id} content={content<VotingContent>()} onSave={save} onUpdateSettings={onUpdateVotingSettings} />;
+    case "ai":
+      return <AiBlock blockId={block.id} content={content<AiContent>()} onSave={save} />;
     default:
       return null;
   }

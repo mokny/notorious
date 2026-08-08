@@ -21,6 +21,7 @@ export const BLOCK_TYPES = [
   "whiteboard",
   "calendar",
   "voting",
+  "ai",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -49,4 +50,5 @@ export const LEAF_BLOCK_TYPES: readonly BlockType[] = [
   "whiteboard",
   "calendar",
   "voting",
+  "ai",
 ];

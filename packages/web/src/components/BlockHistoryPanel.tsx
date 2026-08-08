@@ -41,6 +41,8 @@ function previewTextFor(block: Block): string {
       const items = (content.items as { title: string }[] | undefined) ?? [];
       return truncate(items.map((item) => item.title).filter(Boolean).join(", "));
     }
+    case "ai":
+      return truncate(String(content.answer ?? content.prompt ?? ""));
     default:
       return "";
   }

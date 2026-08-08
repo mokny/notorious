@@ -98,3 +98,27 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
   appended.push(cappedRow);
   return appended;
 }
+
+/**
+ * A single one-shot completion for an AI block (see modules/blocks - the
+ * only caller): no tool-calling loop, no chat-history persistence - the
+ * result is written straight into the block's own content instead. `context`
+ * is the host object's title + its blocks rendered to Markdown, so prompts
+ * like "summarize this page" have something to work with.
+ */
+export async function generateBlockAnswer(userId: string, prompt: string, context: string): Promise<string> {
+  const config = await getDecryptedAiConfig(userId);
+  if (!config) throw badRequest("No AI provider configured - set one up in Settings first");
+
+  const adapter = getProviderAdapter(config.provider);
+  const result = await adapter.chat({
+    apiKey: config.apiKey,
+    baseUrl: resolveBaseUrl(config.provider, config.baseUrl),
+    model: config.model,
+    systemPrompt:
+      "You are an AI block embedded inline in a page of a notes app called Notorious. Answer the user's prompt directly and concisely, formatted as Markdown. You have no tools - use only the prompt and the page context below to answer.",
+    messages: [{ role: "user", content: `Page context:\n${context}\n\n---\n\nPrompt: ${prompt}` }],
+    tools: [],
+  });
+  return result.content ?? "";
+}

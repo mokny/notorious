@@ -33,6 +33,7 @@ import type {
   UpdateBlockInput,
   ToggleChecklistItemInput,
   ToggleWhiteboardPresentingInput,
+  GenerateAiBlockInput,
   CastVoteInput,
   UpdateVotingSettingsInput,
   VoteSummary,
@@ -216,6 +217,9 @@ export const blockApi = {
   /** Owner-only, exempt from the object lock - see updateVotingSettingsSchema. */
   updateVotingSettings: (id: string, input: UpdateVotingSettingsInput) =>
     apiRequest<Block>(`/api/v1/blocks/${id}/voting-settings`, { method: "PATCH", body: input }),
+  /** Runs the AI block's prompt server-side and writes the answer straight into the block's content - see generateAiBlockSchema. */
+  generateAi: (id: string, input: GenerateAiBlockInput) =>
+    apiRequest<Block>(`/api/v1/blocks/${id}/ai-generate`, { method: "POST", body: input }),
   move: (id: string, input: MoveBlockInput) => apiRequest<Block>(`/api/v1/blocks/${id}/move`, { method: "POST", body: input }),
   remove: (id: string) => apiRequest<void>(`/api/v1/blocks/${id}`, { method: "DELETE" }),
   /** Undo/redo only - see useEditorHistory.ts. */

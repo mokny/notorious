@@ -18,9 +18,11 @@ import { notFound, badRequest, conflict } from "../../lib/httpError.js";
 import { positionBetween } from "../../lib/position.js";
 import { randomSlugSuffix } from "../../lib/slug.js";
 import { reindexObjectBody } from "../search/indexer.js";
-import { createRelation, deleteRelationByTriple, getObjectWorkspaceId } from "../objects/service.js";
+import { createRelation, deleteRelationByTriple, getObjectWorkspaceId, getObject } from "../objects/service.js";
 import { listProperties } from "../schema/service.js";
 import { SUB_OBJECTS_PROPERTY_KEY } from "../schema/subObjects.js";
+import { generateBlockAnswer } from "../ai/agent.js";
+import { blocksToMarkdown } from "./markdown.js";
 
 function toBlock(row: typeof blocks.$inferSelect): Block {
   return {
@@ -385,6 +387,42 @@ export async function updateVotingSettings(blockId: string, input: UpdateVotingS
     allowMultipleVotes: input.allowMultipleVotes,
     votingEndsAt: input.votingEndsAt,
   });
+  await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
+  await touchObject(row.objectId);
+
+  return toBlock({ ...row, content, updatedAt });
+}
+
+/**
+ * Runs the AI block's prompt against the acting user's configured provider
+ * and writes the result (or, on failure, the error message with
+ * `isError: true`) straight into the block's content - see
+ * generateAiBlockSchema's doc comment for why this is its own endpoint
+ * rather than going through `updateBlock`. Context sent to the model is the
+ * host object's title plus its entire block tree rendered to Markdown
+ * (independent of where this block sits in it), so prompts like "summarize
+ * this page" have something to work with.
+ */
+export async function generateAiBlockAnswer(blockId: string, aiUserId: string, prompt: string): Promise<Block> {
+  const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Block not found");
+  if (row.type !== "ai") throw badRequest("Not an AI block");
+
+  const [object, siblingBlocks] = await Promise.all([getObject(row.objectId), listBlocks(row.objectId)]);
+  const context = `# ${object.title}\n\n${blocksToMarkdown(siblingBlocks)}`;
+
+  let answer: string;
+  let isError = false;
+  try {
+    answer = await generateBlockAnswer(aiUserId, prompt, context);
+  } catch (error) {
+    answer = error instanceof Error ? error.message : "AI request failed";
+    isError = true;
+  }
+
+  const updatedAt = nowIso();
+  const content = JSON.stringify({ prompt, answer, isError });
   await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
   await touchObject(row.objectId);
 

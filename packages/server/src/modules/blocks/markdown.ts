@@ -152,6 +152,8 @@ function renderBlock(block: Block, byParent: Map<string | null, Block[]>): strin
       return renderLevelFor(block.id, byParent);
     case "database_view":
       return `<!-- Linked view: ${content.viewId ?? ""} (live data, not exportable to static Markdown) -->`;
+    case "ai":
+      return content.answer ? String(content.answer) : "";
     case "whiteboard":
       return "<!-- Whiteboard (drawing canvas, not exportable to static Markdown) -->";
     default:

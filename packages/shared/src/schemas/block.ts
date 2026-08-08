@@ -81,6 +81,18 @@ export const updateVotingSettingsSchema = z.object({
 });
 export type UpdateVotingSettingsInput = z.infer<typeof updateVotingSettingsSchema>;
 
+/**
+ * Sends a prompt to the AI block's own generation endpoint (see
+ * blocks/routes.ts's `/ai-generate`) - deliberately its own narrow endpoint
+ * rather than going through `updateBlockSchema`, since it also has to run
+ * the actual AI call server-side and needs the acting user's AI config, not
+ * just persist a content payload.
+ */
+export const generateAiBlockSchema = z.object({
+  prompt: z.string().min(1).max(20_000),
+});
+export type GenerateAiBlockInput = z.infer<typeof generateAiBlockSchema>;
+
 export const importMarkdownSchema = z.object({
   objectId: z.string(),
   markdown: z.string().max(2_000_000),

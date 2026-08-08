@@ -451,6 +451,8 @@ export function BlockEditor({
         return { objectTypeConfigs: [] };
       case "voting":
         return { items: [], allowMultipleVotes: true, votingEndsAt: null };
+      case "ai":
+        return { prompt: "" };
       default:
         return {};
     }

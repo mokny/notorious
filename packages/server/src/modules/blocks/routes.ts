@@ -9,6 +9,7 @@ import {
   toggleWhiteboardPresentingSchema,
   castVoteSchema,
   updateVotingSettingsSchema,
+  generateAiBlockSchema,
 } from "@notorious/shared";
 import { badRequest } from "../../lib/httpError.js";
 import { requireUser, getClientId } from "../../plugins/session.js";
@@ -238,6 +239,36 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       clientId: getClientId(request),
       action: "updated",
       summary: `${actor.actorName} changed voting settings`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return block;
+  });
+
+  // Runs the AI block's prompt server-side and writes the answer (or, on
+  // failure, an error message - see generateAiBlockAnswer's doc comment)
+  // straight into the block's content. Same access level as the generic
+  // PATCH above (editor, blocked when the object is locked) - an AI answer
+  // is content, not a UI-only toggle like the checklist/vote exemptions.
+  app.post("/api/v1/blocks/:id/ai-generate", async (request) => {
+    const { id } = request.params as { id: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    const access = await requireAccess(request, workspaceId, "editor", { objectId });
+    const input = generateAiBlockSchema.parse(request.body);
+    const actor = resolveActor(request, access);
+    const block = await blockService.generateAiBlockAnswer(id, actor.actorId, input.prompt);
+
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${actor.actorName} generated an AI answer`,
       entity: "block",
       entityId: id,
       realtimeAction: "updated",

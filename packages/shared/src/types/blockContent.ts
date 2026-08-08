@@ -156,6 +156,23 @@ export interface VoteSummary {
   myVote: "up" | "down" | null;
 }
 
+/**
+ * A prompt-in, answer-out block (see AiBlock.tsx): `prompt` is the last
+ * SENT prompt (not updated on every keystroke - only once "Send" is
+ * clicked). `answer` is absent while the block is in edit mode (no prompt
+ * sent yet, or "Edit" was just clicked to compose a new one); once present,
+ * the block shows it instead of the prompt input. `answer` is itself a
+ * plain, freely-editable Markdown field once set - editing it does not
+ * re-trigger generation, only clicking "Send" again does. `isError` marks
+ * an `answer` that's actually a persisted failure message (timeout, no
+ * provider configured, provider error) rather than a real AI response.
+ */
+export interface AiContent {
+  prompt: string;
+  answer?: string;
+  isError?: boolean;
+}
+
 /** One object type plotted on a calendar block - which property supplies its date (a "date"/"datetime"/"daterange" property on that type), plus a View-style filter/sort scoped to just this type. */
 export interface CalendarBlockObjectTypeConfig {
   objectTypeId: string;
