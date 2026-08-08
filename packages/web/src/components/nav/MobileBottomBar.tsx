@@ -105,13 +105,13 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
             <button
               onClick={() => lockMutation.mutate(!isLocked)}
               disabled={lockMutation.isPending}
-              className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface disabled:opacity-50 ${isLocked ? "text-accent" : "text-ink-muted hover:text-ink"}`}
+              className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface disabled:opacity-50 ${isLocked ? "text-red-500" : "text-ink-muted hover:text-ink"}`}
               title={isLocked ? "Unlock this object" : "Lock this object against edits"}
             >
               <Icon name={isLocked ? "lock" : "unlock"} className="h-5 w-5" />
             </button>
           ) : (
-            <span className="flex h-11 w-11 items-center justify-center text-accent" title="This object is locked against edits">
+            <span className="flex h-11 w-11 items-center justify-center text-red-500" title="This object is locked against edits">
               <Icon name="lock" className="h-5 w-5" />
             </span>
           ))}
