@@ -1,11 +1,18 @@
 import type { Block } from "@notorious/shared";
-import { tableDocToTextGrid } from "@notorious/shared";
+import { tableDocToTextGrid, tableCellField } from "@notorious/shared";
 import { objectApi, blockApi, viewApi, schemaApi } from "../api/resources.js";
 import { buildBlockTree, type BlockNode } from "../../components/editor/blockTree.js";
 import { externalHrefFor } from "../../components/editor/blocks/MapsBlock.js";
 
 /** Mirrors SubObjectBlock.tsx's own cap - see its doc comment. */
 const MAX_EMBED_DEPTH = 4;
+
+type RenderedBlocks = Record<string, Record<string, string>>;
+
+/** blockId/field -> template-rendered text, same shape/source (`GET /api/v1/objects/:objectId/blocks/rendered`) as ExportView.tsx passes into BlockEditor for the PDF/JPEG/HTML paths - see useTemplatableField.ts for the field-key convention ("markdown", "summaryMarkdown", "items.<index>", "cells.<row>.<col>"). Falls back to the raw field untouched wherever nothing was rendered for it (no `{{ }}` syntax present, or the fetch failed). */
+function renderedField(renderedBlocks: RenderedBlocks | null, blockId: string, field: string, raw: string): string {
+  return renderedBlocks?.[blockId]?.[field] ?? raw;
+}
 
 function indentBlockquote(text: string): string {
   return text
@@ -73,38 +80,67 @@ async function databaseViewMarkdown(workspaceId: string, viewId: string): Promis
   return markdownTable(header, rows);
 }
 
-async function subObjectMarkdown(workspaceId: string, objectId: string, ancestorIds: string[], headingDepth: number): Promise<string> {
+async function subObjectMarkdown(
+  workspaceId: string,
+  objectId: string,
+  ancestorIds: string[],
+  headingDepth: number,
+): Promise<string> {
   if (ancestorIds.includes(objectId) || ancestorIds.length >= MAX_EMBED_DEPTH) {
     const object = await objectApi.get(objectId).catch(() => null);
     return `*[${object?.title || "Untitled"} - not expanded further, see the object in the app]*`;
   }
-  const object = await objectApi.get(objectId);
+  const [object, blocks, renderedResponse] = await Promise.all([
+    objectApi.get(objectId),
+    blockApi.list(objectId),
+    blockApi.rendered(objectId).catch(() => null),
+  ]);
   const heading = `${"#".repeat(Math.min(6, headingDepth + 1))} ${object.title || "Untitled"}`;
-  const blocks = await blockApi.list(objectId);
-  const body = await blocksToMarkdown(buildBlockTree(blocks), workspaceId, [...ancestorIds, objectId], headingDepth + 1);
+  const body = await blocksToMarkdown(
+    buildBlockTree(blocks),
+    workspaceId,
+    [...ancestorIds, objectId],
+    headingDepth + 1,
+    renderedResponse?.rendered ?? null,
+  );
   return `${heading}\n\n${body}`;
 }
 
-async function blockToMarkdown(node: BlockNode, workspaceId: string, ancestorIds: string[], headingDepth: number): Promise<string> {
+async function blockToMarkdown(
+  node: BlockNode,
+  workspaceId: string,
+  ancestorIds: string[],
+  headingDepth: number,
+  renderedBlocks: RenderedBlocks | null,
+): Promise<string> {
   const content = node.content as Record<string, unknown>;
   switch (node.type) {
     case "paragraph":
-      return (content.markdown as string) ?? "";
-    case "heading":
-      return `${"#".repeat(Math.min(6, (content.level as number) + headingDepth))} ${content.markdown ?? ""}`;
+      return renderedField(renderedBlocks, node.id, "markdown", (content.markdown as string) ?? "");
+    case "heading": {
+      const markdown = renderedField(renderedBlocks, node.id, "markdown", (content.markdown as string) ?? "");
+      return `${"#".repeat(Math.min(6, (content.level as number) + headingDepth))} ${markdown}`;
+    }
     case "quote":
-      return indentBlockquote((content.markdown as string) ?? "");
-    case "callout":
-      return indentBlockquote(`**${content.icon ?? "ℹ️"}** ${content.markdown ?? ""}`);
+      return indentBlockquote(renderedField(renderedBlocks, node.id, "markdown", (content.markdown as string) ?? ""));
+    case "callout": {
+      const markdown = renderedField(renderedBlocks, node.id, "markdown", (content.markdown as string) ?? "");
+      return indentBlockquote(`**${content.icon ?? "ℹ️"}** ${markdown}`);
+    }
     case "checklist": {
       const items = (content.items as { markdown: string; checked: boolean }[]) ?? [];
-      return items.map((item) => `- [${item.checked ? "x" : " "}] ${item.markdown}`).join("\n");
+      return items
+        .map((item, i) => `- [${item.checked ? "x" : " "}] ${renderedField(renderedBlocks, node.id, `items.${i}`, item.markdown)}`)
+        .join("\n");
     }
     case "table": {
-      const grid = tableDocToTextGrid(content.doc as never);
-      const [header, ...rows] = grid;
-      if (!header) return "";
-      return markdownTable(header, rows);
+      const doc = content.doc as never;
+      const grid = tableDocToTextGrid(doc);
+      if (grid.length === 0) return "";
+      const renderedGrid = grid.map((row, r) => row.map((cell, c) => renderedField(renderedBlocks, node.id, tableCellField(r, c), cell)));
+      const [renderedHeader, ...renderedRows] = renderedGrid;
+      if (!renderedHeader) return "";
+      return markdownTable(renderedHeader, renderedRows);
     }
     case "code":
       return `\`\`\`${content.language ?? ""}\n${content.code ?? ""}\n\`\`\``;
@@ -125,15 +161,16 @@ async function blockToMarkdown(node: BlockNode, workspaceId: string, ancestorIds
     case "maps":
       return content.query ? `[Map: ${content.query}](${externalHrefFor(content.query as string)})` : "";
     case "toggle": {
-      const inner = await blocksToMarkdown(node.children, workspaceId, ancestorIds, headingDepth);
-      return `<details>\n<summary>${content.summaryMarkdown ?? ""}</summary>\n\n${inner}\n\n</details>`;
+      const summary = renderedField(renderedBlocks, node.id, "summaryMarkdown", (content.summaryMarkdown as string) ?? "");
+      const inner = await blocksToMarkdown(node.children, workspaceId, ancestorIds, headingDepth, renderedBlocks);
+      return `<details>\n<summary>${summary}</summary>\n\n${inner}\n\n</details>`;
     }
     case "columns": {
       const columnCount = (content.columnCount as number) ?? 2;
       const columns: string[] = [];
       for (let i = 0; i < columnCount; i++) {
         const columnBlocks = node.children.filter((child) => (child.content as { columnIndex?: number }).columnIndex === i);
-        const columnMarkdown = await blocksToMarkdown(columnBlocks, workspaceId, ancestorIds, headingDepth);
+        const columnMarkdown = await blocksToMarkdown(columnBlocks, workspaceId, ancestorIds, headingDepth, renderedBlocks);
         if (columnMarkdown.trim()) columns.push(`**Column ${i + 1}**\n\n${columnMarkdown}`);
       }
       return columns.join("\n\n");
@@ -159,15 +196,25 @@ async function blockToMarkdown(node: BlockNode, workspaceId: string, ancestorIds
   }
 }
 
-async function blocksToMarkdown(nodes: BlockNode[], workspaceId: string, ancestorIds: string[], headingDepth: number): Promise<string> {
-  const parts = await Promise.all(nodes.map((node) => blockToMarkdown(node, workspaceId, ancestorIds, headingDepth)));
+async function blocksToMarkdown(
+  nodes: BlockNode[],
+  workspaceId: string,
+  ancestorIds: string[],
+  headingDepth: number,
+  renderedBlocks: RenderedBlocks | null,
+): Promise<string> {
+  const parts = await Promise.all(nodes.map((node) => blockToMarkdown(node, workspaceId, ancestorIds, headingDepth, renderedBlocks)));
   return parts.filter((part) => part.trim().length > 0).join("\n\n");
 }
 
-/** Builds the full Markdown document for one object, recursively expanding embedded sub_object blocks - see ExportMenu.tsx. */
+/** Builds the full Markdown document for one object, recursively expanding embedded sub_object blocks - see ExportMenu.tsx. Every templatable field ({{ }}/{% %} syntax) is substituted with its already-rendered text (see renderedField above), same as every other export format. */
 export async function buildObjectMarkdown(workspaceId: string, objectId: string): Promise<string> {
-  const [object, blocks] = await Promise.all([objectApi.get(objectId), blockApi.list(objectId)]);
-  const body = await blocksToMarkdown(buildBlockTree(blocks), workspaceId, [objectId], 1);
+  const [object, blocks, renderedResponse] = await Promise.all([
+    objectApi.get(objectId),
+    blockApi.list(objectId),
+    blockApi.rendered(objectId).catch(() => null),
+  ]);
+  const body = await blocksToMarkdown(buildBlockTree(blocks), workspaceId, [objectId], 1, renderedResponse?.rendered ?? null);
   return `# ${object.title || "Untitled"}\n\n${body}\n`;
 }
 
