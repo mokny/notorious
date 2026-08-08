@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion, type PanInfo } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
@@ -8,6 +9,36 @@ import { SearchPanel } from "./SearchPanel.js";
 // mirrors the rough feel of iOS's own sheet dismiss gesture.
 const DISMISS_DISTANCE = 120;
 const DISMISS_VELOCITY = 500;
+
+/**
+ * How much of the layout viewport's bottom edge is currently covered by the
+ * on-screen keyboard (0 when it's closed) - `window.innerHeight` doesn't
+ * shrink for this on iOS Safari/PWA (that's what useDynamicViewportHeight.ts
+ * works around for the app's own root height, see its doc comment), but
+ * `visualViewport` does, so the gap between the two *is* the keyboard's
+ * height. Local to this component rather than folded into that shared
+ * `--app-vh` mechanism - this needs the *live*, keyboard-reactive value
+ * (visualViewport.height), not the deliberately-more-stable one that hook
+ * publishes for the rest of the app's layout.
+ */
+function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    function update() {
+      setInset(Math.max(0, window.innerHeight - vv!.height - vv!.offsetTop));
+    }
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+  return inset;
+}
 
 /**
  * iOS-style slide-up search sheet for the phone breakpoint - see
@@ -29,6 +60,7 @@ const DISMISS_VELOCITY = 500;
 export function SearchSheet({ workspaceId }: { workspaceId: string }) {
   const { isOpen, close, inputRef } = useSearchOverlay();
   const navigate = useNavigate();
+  const keyboardInset = useKeyboardInset();
 
   function handleSelect(objectId: string, query: string) {
     close();
@@ -50,8 +82,16 @@ export function SearchSheet({ workspaceId }: { workspaceId: string }) {
         onClick={close}
       />
       <motion.div
-        className={`fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl bg-surface shadow-2xl md:hidden ${isOpen ? "" : "pointer-events-none"}`}
-        style={{ top: "calc(env(safe-area-inset-top) + 2.5rem)" }}
+        className={`fixed inset-x-0 z-40 flex flex-col rounded-t-2xl bg-surface shadow-2xl md:hidden ${isOpen ? "" : "pointer-events-none"}`}
+        // `bottom: keyboardInset` (not a plain `bottom-0`) - when the
+        // keyboard opens, this shrinks the sheet up from the bottom to fit
+        // above it, instead of keeping its old full height and relying on
+        // iOS's own "scroll the focused input into view" to compensate,
+        // which shifts *everything* fixed-positioned (this sheet included)
+        // upward as a page-level pan - enough to push the search input in
+        // the drag handle's row right off the top of the screen. See
+        // useKeyboardInset's own comment.
+        style={{ top: "calc(env(safe-area-inset-top) + 2.5rem)", bottom: keyboardInset }}
         animate={{ y: isOpen ? 0 : "100%" }}
         transition={{ type: "spring", damping: 32, stiffness: 320 }}
         drag={isOpen ? "y" : false}
