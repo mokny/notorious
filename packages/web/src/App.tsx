@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./context/AuthContext.js";
 import { isSharedSession } from "./lib/api/shareMode.js";
 import { systemApi } from "./lib/api/resources.js";
-import { usePullToRefresh } from "./hooks/usePullToRefresh.js";
 import { useDynamicViewportHeight } from "./hooks/useDynamicViewportHeight.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
@@ -48,7 +47,6 @@ function FullScreenSpinner() {
 }
 
 export function App() {
-  usePullToRefresh();
   useDynamicViewportHeight();
   return (
     <Routes>

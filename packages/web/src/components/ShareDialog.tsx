@@ -23,6 +23,8 @@ interface ShareDialogProps {
   /** null shares the whole workspace; an object id scopes the share to just that object. */
   objectId: string | null;
   label: string;
+  /** "menuItem" renders the trigger as a full-width iOS-context-menu-style row (icon right, ~44px tap target) for embedding inside MobileTopBar.tsx's "…" menu (see IOSMenu.tsx) - the popover content itself is unchanged either way. Defaults to the compact toolbar-icon trigger used everywhere else. */
+  variant?: "toolbar" | "menuItem";
 }
 
 function shareUrl(token: string): string {
@@ -64,7 +66,7 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /** Popover for creating/listing/revoking public share links - reused for both whole-workspace shares (Settings) and single-object shares (ObjectDetailPage). */
-export function ShareDialog({ workspaceId, objectId, label }: ShareDialogProps) {
+export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar" }: ShareDialogProps) {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<ShareRole>("viewer");
   const [expiryMs, setExpiryMs] = useState<number | null>(null);
@@ -103,13 +105,23 @@ export function ShareDialog({ workspaceId, objectId, label }: ShareDialogProps) 
 
   return (
     <div ref={containerRef} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title={label}
-        className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
-      >
-        <Icon name="share" className="h-3.5 w-3.5" /> {label}
-      </button>
+      {variant === "menuItem" ? (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink active:bg-surface"
+        >
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <Icon name="share" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          title={label}
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
+        >
+          <Icon name="share" className="h-3.5 w-3.5" /> {label}
+        </button>
+      )}
 
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-80 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">

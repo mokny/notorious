@@ -1,11 +1,17 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useClickOutside } from "../../hooks/useClickOutside.js";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { objectApi, workspaceApi } from "../../lib/api/resources.js";
 import { useObjectHistory } from "../../context/ObjectHistoryContext.js";
 import { useDeleteObject } from "../../hooks/useDeleteObject.js";
+import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
+import { useMobileChrome } from "../../context/MobileChromeContext.js";
+import { useAuth } from "../../context/AuthContext.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { ShareDialog } from "../ShareDialog.js";
 import { ExportMenu } from "../ExportMenu.js";
+import { ObjectSlugButton } from "../ObjectSlugButton.js";
+import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "./IOSMenu.js";
 import { Icon } from "../ui/Icon.js";
 
 interface MobileTopBarProps {
@@ -24,21 +30,22 @@ interface MobileTopBarProps {
  * reference iOS-style app the user asked to match): a back button, a
  * title pill (current object's icon+title, or the workspace's own if
  * there isn't one - tap opens the visited-objects breadcrumb, see
- * ObjectHistoryContext.tsx), and a "…" overflow menu combining
- * object-specific actions (share/export/delete - only while on an actual
- * object page) with app-level navigation (home, sidebar, settings) that
- * used to live in the old flat BottomTabBar.
+ * ObjectHistoryContext.tsx), and a "…" overflow menu. That menu now
+ * carries *every* action ObjectDetailPage.tsx's sticky in-page toolbar
+ * used to show on phone (that toolbar is `hidden md:flex` there now,
+ * lock excepted - see MobileBottomBar.tsx) plus app-level navigation
+ * (home, sidebar, settings, refresh) that used to live in the old flat
+ * BottomTabBar. Styled as a native-iOS-context-menu (IOSMenu.tsx).
  */
 export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashboardObjectId, onOpenSidebar }: MobileTopBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { entries, current, goBack, jumpTo } = useObjectHistory();
+  const { sectionsVisible, setSectionsVisible } = useMobileChrome();
   const [breadcrumbOpen, setBreadcrumbOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const breadcrumbRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  useClickOutside(breadcrumbRef, () => setBreadcrumbOpen(false));
-  useClickOutside(menuRef, () => setMenuOpen(false));
 
   // The route itself doesn't expose params to a layout-level component like
   // this one (useParams() only sees params matched up to where it's
@@ -49,6 +56,31 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
   const routeObjectId = routeObjectMatch?.[1];
   const onObjectPage = Boolean(routeObjectId) && current?.id === routeObjectId;
   const shareToken = isSharedSession();
+
+  const { data: object } = useQuery({
+    queryKey: ["object", routeObjectId],
+    queryFn: () => objectApi.get(routeObjectId!),
+    enabled: Boolean(routeObjectId),
+  });
+  const { data: workspace } = useQuery({
+    queryKey: ["workspace", workspaceId],
+    queryFn: () => workspaceApi.get(workspaceId),
+    enabled: Boolean(routeObjectId),
+  });
+  const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
+  const isLocked = Boolean(object?.lockedAt);
+  const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
+  const pinned = object ? isPinned(object.id) : false;
+  const isDashboard = workspace?.dashboardObjectId === object?.id;
+
+  const dashboardMutation = useMutation({
+    mutationFn: (nextDashboardObjectId: string | null) => workspaceApi.update(workspaceId, { dashboardObjectId: nextDashboardObjectId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
+  });
+  const commentsDisabledMutation = useMutation({
+    mutationFn: (disabled: boolean) => objectApi.setCommentsDisabled(routeObjectId!, { disabled }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", routeObjectId] }),
+  });
 
   const { deleteObject } = useDeleteObject(workspaceId, onObjectPage ? routeObjectId : undefined);
 
@@ -78,7 +110,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
         <Icon name="chevron-left" className="h-5 w-5" />
       </button>
 
-      <div ref={breadcrumbRef} className="pointer-events-auto relative min-w-0 flex-1">
+      <div className="pointer-events-auto relative min-w-0 flex-1">
         <button
           onClick={() => setBreadcrumbOpen((v) => !v)}
           className="flex w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised/95 px-3 py-2 text-left shadow-lg backdrop-blur"
@@ -87,30 +119,29 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
           <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
         </button>
 
-        {breadcrumbOpen && (
-          <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
-            {entries.length === 0 && <p className="px-2 py-1.5 text-xs text-ink-muted">No objects visited yet this session.</p>}
-            {[...entries].reverse().map((entry) => (
-              <button
-                key={entry.id}
-                onClick={() => {
-                  jumpTo(entry.id);
-                  navigate(`/w/${workspaceId}/objects/${entry.id}`);
-                  setBreadcrumbOpen(false);
-                }}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface ${
-                  entry.id === current?.id ? "text-accent" : ""
-                }`}
-              >
-                <Icon name={entry.icon ?? "file-text"} className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{entry.title || "Untitled"}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        <IOSMenu open={breadcrumbOpen} onClose={() => setBreadcrumbOpen(false)} align="start" widthClassName="w-64 max-h-72 overflow-y-auto">
+          {entries.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-ink-muted">No objects visited yet this session.</p>
+          ) : (
+            <IOSMenuGroup>
+              {[...entries].reverse().map((entry) => (
+                <IOSMenuItem
+                  key={entry.id}
+                  icon={entry.icon ?? "file-text"}
+                  label={entry.title || "Untitled"}
+                  onClick={() => {
+                    jumpTo(entry.id);
+                    navigate(`/w/${workspaceId}/objects/${entry.id}`);
+                    setBreadcrumbOpen(false);
+                  }}
+                />
+              ))}
+            </IOSMenuGroup>
+          )}
+        </IOSMenu>
       </div>
 
-      <div ref={menuRef} className="pointer-events-auto relative shrink-0">
+      <div className="pointer-events-auto relative shrink-0">
         <button
           onClick={() => setMenuOpen((v) => !v)}
           className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface-raised/95 shadow-lg backdrop-blur"
@@ -119,62 +150,93 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
           <Icon name="more" className="h-5 w-5" />
         </button>
 
-        {menuOpen && (
-          <div className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
-            {onObjectPage && !shareToken && (
-              <>
-                <p className="px-2 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted">This object</p>
-                <div className="px-1">
-                  <ShareDialog workspaceId={workspaceId} objectId={routeObjectId!} label="Share" />
-                </div>
-                <div className="px-1">
-                  <ExportMenu workspaceId={workspaceId} objectId={routeObjectId!} title={title} />
-                </div>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void deleteObject(title);
-                  }}
-                  className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-ink-muted hover:bg-red-500/10 hover:text-red-500"
-                >
-                  <Icon name="trash" className="h-3.5 w-3.5" /> Delete
-                </button>
-                <div className="my-1 border-t border-border" />
-              </>
-            )}
+        <IOSMenu open={menuOpen} onClose={() => setMenuOpen(false)}>
+          {onObjectPage && object && (
+            <IOSMenuGroup>
+              <IOSMenuItem
+                icon="eye"
+                label={sectionsVisible ? "Hide details" : "Show details"}
+                onClick={() => {
+                  setSectionsVisible(!sectionsVisible);
+                  setMenuOpen(false);
+                }}
+              />
+              <ExportMenu variant="menuItem" workspaceId={workspaceId} objectId={object.id} title={title} />
+              {!shareToken && (
+                <>
+                  <ObjectSlugButton variant="menuItem" objectId={object.id} slug={object.slug} disabled={isLocked} />
+                  <IOSMenuItem
+                    icon={pinned ? "pin-off" : "pin"}
+                    label={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+                    onClick={() => {
+                      togglePin(object.id);
+                      setMenuOpen(false);
+                    }}
+                  />
+                  <IOSMenuItem
+                    icon="layout-dashboard"
+                    label={isDashboard ? "Remove as dashboard" : "Set as dashboard"}
+                    onClick={() => {
+                      dashboardMutation.mutate(isDashboard ? null : object.id);
+                      setMenuOpen(false);
+                    }}
+                  />
+                  {isOwner && (
+                    <IOSMenuItem
+                      icon={object.commentsDisabled ? "comment-off" : "comment"}
+                      label={object.commentsDisabled ? "Enable comments" : "Disable comments"}
+                      onClick={() => {
+                        commentsDisabledMutation.mutate(!object.commentsDisabled);
+                        setMenuOpen(false);
+                      }}
+                    />
+                  )}
+                  <ShareDialog variant="menuItem" workspaceId={workspaceId} objectId={object.id} label="Share" />
+                  <IOSMenuItem
+                    icon="trash"
+                    label="Delete"
+                    destructive
+                    disabled={isLocked}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void deleteObject(title);
+                    }}
+                  />
+                </>
+              )}
+            </IOSMenuGroup>
+          )}
 
-            <p className="px-2 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted">Navigate</p>
-            <button
+          <IOSMenuGroup>
+            <IOSMenuItem
+              icon="layout-dashboard"
+              label="Home"
               onClick={() => {
                 setMenuOpen(false);
                 goHome();
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
-            >
-              <Icon name="layout-dashboard" className="h-4 w-4" /> Home
-            </button>
-            <button
+            />
+            <IOSMenuItem
+              icon="menu"
+              label="Sidebar"
               onClick={() => {
                 setMenuOpen(false);
                 onOpenSidebar();
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
-            >
-              <Icon name="menu" className="h-4 w-4" /> Sidebar
-            </button>
+            />
             {!shareToken && (
-              <button
+              <IOSMenuItem
+                icon="settings"
+                label="Settings"
                 onClick={() => {
                   setMenuOpen(false);
                   navigate(`/w/${workspaceId}/settings`);
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
-              >
-                <Icon name="settings" className="h-4 w-4" /> Settings
-              </button>
+              />
             )}
-          </div>
-        )}
+            <IOSMenuItem icon="refresh" label="Refresh" onClick={() => window.location.reload()} />
+          </IOSMenuGroup>
+        </IOSMenu>
       </div>
     </div>
   );

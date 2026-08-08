@@ -31,7 +31,18 @@ import { Icon } from "./ui/Icon.js";
  * not hidden, so a locked object still shows *that* this control exists,
  * just not usable right now.
  */
-export function ObjectSlugButton({ objectId, slug, disabled }: { objectId: string; slug: string | null; disabled?: boolean }) {
+export function ObjectSlugButton({
+  objectId,
+  slug,
+  disabled,
+  variant = "toolbar",
+}: {
+  objectId: string;
+  slug: string | null;
+  disabled?: boolean;
+  /** See ShareDialog.tsx's own `variant` doc comment - same idea, same two variants. */
+  variant?: "toolbar" | "menuItem";
+}) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(slug ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -61,19 +72,35 @@ export function ObjectSlugButton({ objectId, slug, disabled }: { objectId: strin
 
   return (
     <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        onClick={() => {
-          setValue(slug ?? "");
-          setError(null);
-          setOpen((v) => !v);
-        }}
-        disabled={disabled}
-        title={disabled ? "Unlock this object to edit its id" : "Object id (for templates)"}
-        className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-      >
-        <Icon name="braces" className="h-4 w-4" />
-      </button>
+      {variant === "menuItem" ? (
+        <button
+          type="button"
+          onClick={() => {
+            setValue(slug ?? "");
+            setError(null);
+            setOpen((v) => !v);
+          }}
+          disabled={disabled}
+          className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink active:bg-surface disabled:opacity-40"
+        >
+          <span className="min-w-0 flex-1 truncate">Object id</span>
+          <Icon name="braces" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setValue(slug ?? "");
+            setError(null);
+            setOpen((v) => !v);
+          }}
+          disabled={disabled}
+          title={disabled ? "Unlock this object to edit its id" : "Object id (for templates)"}
+          className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+        >
+          <Icon name="braces" className="h-4 w-4" />
+        </button>
+      )}
       {open && (
         <div ref={popoverRef} style={clampStyle} className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Object id</p>

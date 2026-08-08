@@ -7,6 +7,7 @@ import { isSharedSession } from "../../lib/api/shareMode.js";
 import { reloadIfViewportShrunk, resetViewportReloadCount } from "../../hooks/useDynamicViewportHeight.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
+import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "./IOSMenu.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
@@ -27,7 +28,6 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
   const { user } = useAuth();
   const { open: openSearch } = useSearchOverlay();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
   const prevWorkspaceIdRef = useRef(workspaceId);
 
   // Same "parse it off the URL" approach as MobileTopBar.tsx - this is a
@@ -124,7 +124,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
         </button>
 
         {!shareToken && (
-          <div ref={containerRef} className="relative">
+          <div className="relative">
             <button
               onClick={() => setNewMenuOpen((v) => !v)}
               className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
@@ -133,24 +133,15 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
               <Icon name="pencil" className="h-5 w-5" />
             </button>
 
-            {newMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setNewMenuOpen(false)} />
-                <div className="absolute bottom-full right-0 z-50 mb-2 max-h-72 w-48 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
-                  {objectTypes &&
-                    sortObjectTypesForDisplay(objectTypes).map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => createObjectMutation.mutate(type.id)}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
-                      >
-                        <Icon name={type.icon} className="h-3.5 w-3.5" />
-                        {type.name}
-                      </button>
-                    ))}
-                </div>
-              </>
-            )}
+            <IOSMenu open={newMenuOpen} onClose={() => setNewMenuOpen(false)} side="top" widthClassName="w-52 max-h-72 overflow-y-auto">
+              {objectTypes && (
+                <IOSMenuGroup>
+                  {sortObjectTypesForDisplay(objectTypes).map((type) => (
+                    <IOSMenuItem key={type.id} icon={type.icon} label={type.name} onClick={() => createObjectMutation.mutate(type.id)} />
+                  ))}
+                </IOSMenuGroup>
+              )}
+            </IOSMenu>
           </div>
         )}
       </div>

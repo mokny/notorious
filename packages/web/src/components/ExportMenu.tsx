@@ -11,6 +11,8 @@ interface ExportMenuProps {
   workspaceId: string;
   objectId: string;
   title: string;
+  /** See ShareDialog.tsx's own `variant` doc comment - same idea, same two variants. */
+  variant?: "toolbar" | "menuItem";
 }
 
 const OPTIONS: { format: ExportFormat; label: string }[] = [
@@ -36,7 +38,7 @@ const OPTIONS: { format: ExportFormat; label: string }[] = [
  * this outside its `!share` gate), unlike ShareDialog right next to it,
  * which only a member ever sees.
  */
-export function ExportMenu({ workspaceId, objectId, title }: ExportMenuProps) {
+export function ExportMenu({ workspaceId, objectId, title, variant = "toolbar" }: ExportMenuProps) {
   const [open, setOpen] = useState(false);
   const [busyFormat, setBusyFormat] = useState<ExportFormat | null>(null);
   const [renderFormat, setRenderFormat] = useState<ExportFormat | null>(null);
@@ -77,16 +79,28 @@ export function ExportMenu({ workspaceId, objectId, title }: ExportMenuProps) {
 
   return (
     <div ref={menuRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        disabled={busyFormat !== null}
-        title="Export this object"
-        className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-muted hover:bg-surface-raised disabled:opacity-50"
-      >
-        <Icon name={busyFormat ? "refresh" : "download"} className={`h-4 w-4 ${busyFormat ? "animate-spin" : ""}`} />
-        Export
-      </button>
+      {variant === "menuItem" ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          disabled={busyFormat !== null}
+          className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink active:bg-surface disabled:opacity-40"
+        >
+          <span className="min-w-0 flex-1 truncate">Export</span>
+          <Icon name={busyFormat ? "refresh" : "download"} className={`h-[18px] w-[18px] shrink-0 text-ink-muted ${busyFormat ? "animate-spin" : ""}`} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          disabled={busyFormat !== null}
+          title="Export this object"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink-muted hover:bg-surface-raised disabled:opacity-50"
+        >
+          <Icon name={busyFormat ? "refresh" : "download"} className={`h-4 w-4 ${busyFormat ? "animate-spin" : ""}`} />
+          Export
+        </button>
+      )}
       {open && (
         <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border border-border bg-surface py-1 shadow-lg">
           {OPTIONS.map((option) => (

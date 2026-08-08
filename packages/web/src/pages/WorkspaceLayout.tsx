@@ -364,28 +364,27 @@ function WorkspaceLayoutInner() {
         )}
         {isPhone && (
           // Masks the whole floating-pill zone (status bar strip through
-          // where MobileTopBar's pills sit, right down to where
-          // ObjectDetailPage's sticky action-toolbar takes over - see
-          // `--sticky-toolbar-top` above, which parks that toolbar's own
-          // *opaque* row at exactly this element's bottom edge). <main>
-          // below is a *scrolling* container, and a scroll container's own
-          // `padding-top` only ever creates a gap at scrollTop 0, so
-          // scrolled-past content would otherwise show through in the gaps
-          // around/behind the pills (they're separate floating pills with
-          // translucent backdrop-blur, not one solid bar). The gradient only
-          // softens the very top edge (blending into the status bar strip) -
-          // it stays fully opaque for the rest of its height, all the way
-          // down to that handoff with the sticky toolbar, so there's no
-          // sliver of un-masked scrolled content exposed just above it.
-          // Rendered *before* MobileTopBar below (same z-20) so the pills
-          // themselves stack visually on top of this fade rather than being
-          // dimmed by it. Without a cover, this is on unconditionally. With
-          // a cover, it only fades in once scrolled (see phoneCoverScrolled
-          // above) so the cover itself still shows through while at the
-          // very top.
+          // where MobileTopBar's pills sit) with a top-to-bottom fade to the
+          // plain page background. <main> below is a *scrolling* container,
+          // and a scroll container's own `padding-top` only ever creates a
+          // gap at scrollTop 0, so scrolled-past content would otherwise
+          // show through in the gaps around/behind the pills (they're
+          // separate floating pills with translucent backdrop-blur, not one
+          // solid bar). ObjectDetailPage's sticky action-toolbar used to sit
+          // right at this element's bottom edge and hand off to it there
+          // (hence a since-reverted "stay opaque all the way down" version
+          // of this gradient) - that toolbar is hidden entirely on phone now
+          // (see its own comment), so there's nothing left to hand off to,
+          // and this just fades to transparent again like a normal top
+          // scroll-fade. Rendered *before* MobileTopBar below (same z-20) so
+          // the pills themselves stack visually on top of this fade rather
+          // than being dimmed by it. Without a cover, this is on
+          // unconditionally. With a cover, it only fades in once scrolled
+          // (see phoneCoverScrolled above) so the cover itself still shows
+          // through while at the very top.
           <div
             aria-hidden
-            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface/60 via-surface to-surface ${coverActive ? "transition-opacity duration-150" : ""} ${
+            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface via-surface/90 to-transparent ${coverActive ? "transition-opacity duration-150" : ""} ${
               !coverActive || phoneCoverScrolled ? "opacity-100" : "opacity-0"
             }`}
             style={{ height: "var(--mobile-top-bar-h)" }}

@@ -22,6 +22,7 @@ import { ExportMenu } from "../components/ExportMenu.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
 import { PresencePanel } from "../components/PresencePanel.js";
 import { useAuth } from "../context/AuthContext.js";
+import { useMobileChrome } from "../context/MobileChromeContext.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
@@ -142,9 +143,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // behind this one toggle so they don't dominate the page, and deliberately
   // *not* persisted (localStorage etc.): always starts collapsed on a fresh
   // page load. Reset per-object too, so toggling it on one object doesn't
-  // leak into the next one navigated to.
-  const [sectionsVisible, setSectionsVisible] = useState(false);
-  useEffect(() => setSectionsVisible(false), [objectId]);
+  // leak into the next one navigated to. Lifted into MobileChromeContext
+  // (rather than local state) so MobileTopBar.tsx's "…" menu can toggle it
+  // too - see that context's own comment.
+  const { sectionsVisible, setSectionsVisible } = useMobileChrome();
+  useEffect(() => setSectionsVisible(false), [objectId, setSectionsVisible]);
 
   // Every block's template-rendered text (see modules/templates/ on the
   // server) - always fetched (cheap: the server itself skips the render
@@ -353,31 +356,32 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               happened to be underneath it. Not worth it for one button. */}
           {/* `top` comes from WorkspaceLayout.tsx's `--sticky-toolbar-top` -
               not a plain `top-0` - so this stops right below the mobile
-              header (or, on phone where there is no header at all, right
-              below the status bar/Dynamic Island) instead of scrolling
-              underneath it. */}
+              header on desktop/tablet instead of scrolling underneath it.
+              Hidden entirely on phone (`hidden md:flex`) - every action here
+              lives in MobileTopBar.tsx's "…" menu instead there (lock is the
+              one exception, in MobileBottomBar.tsx's floating toolbar - see
+              those components' own comments), so a phone user never loses
+              scroll real estate to a bar that would otherwise just duplicate
+              that menu. */}
           <div
-            className={`sticky z-10 relative flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}
+            className={`sticky z-10 relative hidden items-center gap-2 bg-surface py-2 md:flex ${object.cover ? "" : "mt-2"}`}
             style={{ top: "var(--sticky-toolbar-top, 0px)" }}
           >
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
-                else gets a plain, non-interactive indicator. Hidden on phone
-                (`hidden md:*`) - MobileBottomBar.tsx shows the same toggle
-                as the leftmost pill in the floating bottom toolbar there
-                instead, see its own doc comment. */}
+                else gets a plain, non-interactive indicator. */}
             {isOwner ? (
               <button
                 onClick={() => lockMutation.mutate(!isLocked)}
                 disabled={lockMutation.isPending}
                 title={isLocked ? "Unlock this object" : "Lock this object against edits"}
-                className={`hidden shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 md:inline-flex ${isLocked ? "text-accent" : "text-ink-muted"}`}
+                className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isLocked ? "text-accent" : "text-ink-muted"}`}
               >
                 <Icon name={isLocked ? "lock" : "unlock"} className="h-4 w-4" />
               </button>
             ) : (
               isLocked && (
-                <span className="hidden shrink-0 p-1.5 text-accent md:inline-flex" title="This object is locked against edits">
+                <span className="shrink-0 p-1.5 text-accent" title="This object is locked against edits">
                   <Icon name="lock" className="h-4 w-4" />
                 </span>
               )
@@ -401,7 +405,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 over from the *previous* object instead of resetting. */}
             {!share && <ObjectSlugButton key={object.id} objectId={object.id} slug={object.slug} disabled={isLocked} />}
             <button
-              onClick={() => setSectionsVisible((v) => !v)}
+              onClick={() => setSectionsVisible(!sectionsVisible)}
               title={sectionsVisible ? "Hide viewing now/properties/sub-objects/backlinks/script" : "Show viewing now/properties/sub-objects/backlinks/script"}
               // A view action, not an edit - exempt from READ_ONLY_LOCK's
               // pointer-events-none like CollapsibleSection's own toggle.
@@ -458,17 +462,6 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </button>
               </>
             )}
-            {/* Mirrors WorkspaceLayout.tsx's mobile top-bar fade (phone only,
-                see its own comment) but for the *bottom* edge of this sticky
-                toolbar - as content scrolls up and emerges from underneath
-                it, it fades in smoothly instead of being sharply cut off by
-                the toolbar's hard bottom edge. `top-full` anchors it right
-                below the row (this element's `relative` above), independent
-                of the row's own height so it doesn't need to track that. */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-full h-6 bg-gradient-to-b from-surface to-transparent md:hidden"
-            />
           </div>
 
           {hasRecurrence && !share && (
