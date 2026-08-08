@@ -10,6 +10,8 @@ import { objectHref } from "../../../lib/api/shareMode.js";
 import { READ_ONLY_CONTENT_CLASS } from "../../../lib/readOnlyContent.js";
 import { Icon } from "../../ui/Icon.js";
 import { BlockEditor } from "../BlockEditor.js";
+import { HighlightedText } from "../HighlightedText.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
 
 interface SubObjectBlockProps {
   content: SubObjectContent;
@@ -37,6 +39,10 @@ const MAX_EMBED_DEPTH = 4;
 function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; objectId: string; depth: number }) {
   const [expanded, setExpanded] = useState(false);
   const { title, icon } = useObjectTitle(workspaceId, objectId);
+  // Same search-navigation words BlockEditor.tsx highlights matches with
+  // elsewhere on the page (see BlockEditorContext.tsx's `searchHighlight`) -
+  // reused here so an embedded sub-object's title highlights consistently.
+  const { searchHighlight } = useBlockEditor();
   const { data: object } = useQuery({ queryKey: ["object", objectId], queryFn: () => objectApi.get(objectId) });
   const childIds = Array.isArray(object?.values.sub_objects) ? object.values.sub_objects : [];
   const hasChildren = childIds.length > 0;
@@ -61,7 +67,9 @@ function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; o
         </button>
         <Link to={objectHref(workspaceId, objectId)} className={`flex min-w-0 flex-1 items-center hover:underline ${isRoot ? "gap-2" : "gap-1.5"}`}>
           <Icon name={icon} className={`shrink-0 text-ink-muted ${isRoot ? "h-5 w-5" : "h-4 w-4"}`} />
-          <span className={`truncate ${isRoot ? "text-base font-semibold" : "text-sm"}`}>{title}</span>
+          <span className={`truncate ${isRoot ? "text-base font-semibold" : "text-sm"}`}>
+            <HighlightedText text={title} terms={searchHighlight?.terms ?? []} />
+          </span>
         </Link>
       </div>
       {expanded && hasChildren && (

@@ -38,19 +38,28 @@ function toWireMessages(systemPrompt: string, messages: ChatMessage[]): unknown[
 export const openAiAdapter: AiProviderAdapter = {
   async chat(params: ProviderChatParams): Promise<ProviderChatResult> {
     const baseUrl = params.baseUrl?.replace(/\/$/, "") || DEFAULT_BASE_URL;
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${params.apiKey}` },
-      body: JSON.stringify({
-        model: params.model,
-        messages: toWireMessages(params.systemPrompt, params.messages),
-        tools: params.tools.map((tool) => ({
-          type: "function",
-          function: { name: tool.name, description: tool.description, parameters: tool.parameters },
-        })),
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${params.apiKey}` },
+        body: JSON.stringify({
+          model: params.model,
+          messages: toWireMessages(params.systemPrompt, params.messages),
+          tools: params.tools.map((tool) => ({
+            type: "function",
+            function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+          })),
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      // See anthropic.ts's identical catch for why this needs to exist at
+      // all - a timeout/network failure here used to surface as a generic
+      // 500 "Internal server error" with no detail.
+      const reason = error instanceof DOMException && error.name === "TimeoutError" ? "timed out after 60s" : error instanceof Error ? error.message : "network error";
+      throw badRequest(`AI provider request failed: ${reason}`);
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");

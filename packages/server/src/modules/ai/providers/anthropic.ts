@@ -50,22 +50,34 @@ function toWireMessages(messages: ChatMessage[]): WireMessage[] {
 export const anthropicAdapter: AiProviderAdapter = {
   async chat(params: ProviderChatParams): Promise<ProviderChatResult> {
     const baseUrl = params.baseUrl?.replace(/\/$/, "") || API_URL;
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": params.apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify({
-        model: params.model,
-        max_tokens: MAX_TOKENS,
-        system: params.systemPrompt,
-        messages: toWireMessages(params.messages),
-        tools: params.tools.map((tool) => ({ name: tool.name, description: tool.description, input_schema: tool.parameters })),
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
+    let response: Response;
+    try {
+      response = await fetch(baseUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": params.apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+        },
+        body: JSON.stringify({
+          model: params.model,
+          max_tokens: MAX_TOKENS,
+          system: params.systemPrompt,
+          messages: toWireMessages(params.messages),
+          tools: params.tools.map((tool) => ({ name: tool.name, description: tool.description, input_schema: tool.parameters })),
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      // The timeout above and a plain network failure (DNS, connection
+      // refused, TLS error, ...) both throw here rather than resolving with
+      // a non-ok `response` - left uncaught, this became a generic 500
+      // "Internal server error" with no indication anything was even
+      // attempted, let alone why it failed (see AgentChatPage.tsx, which now
+      // surfaces this message verbatim instead of a hardcoded string).
+      const reason = error instanceof DOMException && error.name === "TimeoutError" ? "timed out after 60s" : error instanceof Error ? error.message : "network error";
+      throw badRequest(`AI provider request failed: ${reason}`);
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");

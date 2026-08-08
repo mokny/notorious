@@ -5,6 +5,8 @@ import { objectApi, fileApi } from "../lib/api/resources.js";
 import { withShareToken } from "../lib/api/shareMode.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 import { useFitText } from "../hooks/useFitText.js";
+import { HighlightableTitle } from "./editor/HighlightableTitle.js";
+import { HighlightedText } from "./editor/HighlightedText.js";
 import { useBreakpoint } from "../hooks/useBreakpoint.js";
 import { DEFAULT_COVER_TEXT_STYLE, coverTextCss } from "../lib/coverTextStyle.js";
 import { CoverTextStyleEditor } from "./CoverTextStyleEditor.js";
@@ -25,6 +27,8 @@ interface CoverImageProps {
   coverHeight?: number;
   /** Renders the object's icon (IconPicker if editable, a plain Icon otherwise - see ObjectDetailPage.tsx) at the given pixel size, beside the title overlay - called with the title's own auto-fit font size so the icon visually matches it. */
   icon: (size: number) => ReactNode;
+  /** Search words to highlight in the title overlay - see HighlightableTitle.tsx. */
+  highlightTerms?: string[];
 }
 
 /** Extracts the file id from a `fileApi.downloadUrl()`-shaped icon/cover value, so a replaced upload can clean up the one it's replacing. */
@@ -54,7 +58,18 @@ const PHONE_MIN_COVER_HEIGHT = "calc(env(safe-area-inset-top) + 64px)";
  * `coverTextStyle` (see CoverTextStyleEditor.tsx, opened via the palette
  * button next to Change/Remove).
  */
-export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTitleChange, coverTextStyle, coverHeight = 300, icon }: CoverImageProps) {
+export function CoverImage({
+  workspaceId,
+  objectId,
+  cover,
+  canEdit,
+  title,
+  onTitleChange,
+  coverTextStyle,
+  coverHeight = 300,
+  icon,
+  highlightTerms = [],
+}: CoverImageProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hover, setHover] = useState(false);
@@ -240,16 +255,18 @@ export function CoverImage({ workspaceId, objectId, cover, canEdit, title, onTit
               {displayTitle}
             </span>
             {canEdit ? (
-              <input
+              <HighlightableTitle
                 value={title}
-                onChange={(e) => onTitleChange(e.target.value)}
+                onChange={onTitleChange}
+                readOnly={false}
+                terms={highlightTerms}
                 placeholder="Untitled"
                 className="w-full border-none bg-transparent text-center outline-none"
                 style={{ ...textCss, fontSize }}
               />
             ) : (
               <div className="w-full truncate text-center" style={{ ...textCss, fontSize }}>
-                {displayTitle}
+                <HighlightedText text={displayTitle} terms={highlightTerms} />
               </div>
             )}
           </div>

@@ -14,6 +14,8 @@
     "generate-vapid-keys": "tsx src/scripts/generateVapidKeys.ts",
     "create-user": "tsx src/scripts/createUser.ts",
     "create-user:prod": "node dist/scripts/createUser.js",
+    "delete-user": "tsx src/scripts/deleteUser.ts",
+    "delete-user:prod": "node dist/scripts/deleteUser.js",
     "set-registration": "tsx src/scripts/setRegistration.ts",
     "set-registration:prod": "node dist/scripts/setRegistration.js",
     "set-require-2fa": "tsx src/scripts/setRequire2fa.ts",

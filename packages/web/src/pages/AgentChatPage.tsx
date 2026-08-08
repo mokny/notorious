@@ -101,7 +101,13 @@ export function AgentChatPage() {
         )}
         {messages?.map((message) => <MessageBubble key={message.id} message={message} />)}
         {sendMutation.isPending && <p className="text-xs text-ink-muted">Thinking…</p>}
-        {sendMutation.isError && <p className="text-xs text-red-500">Something went wrong - try again.</p>}
+        {/* Shows the server's actual error message (e.g. the AI provider's
+            own error body, or a network/timeout failure - see agent.ts and
+            the provider adapters) instead of a generic string, so a bad API
+            key/rate limit/timeout is distinguishable at a glance. */}
+        {sendMutation.isError && (
+          <p className="text-xs text-red-500">{sendMutation.error instanceof Error ? sendMutation.error.message : "Something went wrong - try again."}</p>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="mt-3 flex gap-2">

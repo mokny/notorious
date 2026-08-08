@@ -5,6 +5,9 @@ import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi, blockApi } from "../lib/api/resources.js";
 import { getShareRole } from "../lib/api/shareMode.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
+import { HighlightableTitle } from "../components/editor/HighlightableTitle.js";
+import { HighlightedText } from "../components/editor/HighlightedText.js";
+import { splitSearchTerms } from "../lib/searchHighlight.js";
 import { PropertyCell } from "../components/properties/PropertyCell.js";
 import { BacklinksPanel } from "../components/BacklinksPanel.js";
 import { SubObjectsPanel } from "../components/SubObjectsPanel.js";
@@ -80,6 +83,10 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // alongside this one - see SearchPage.tsx).
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightQuery = searchParams.get("highlight");
+  // Same word-splitting BlockEditor.tsx feeds into its own content matching
+  // (see searchHighlight.ts) - reused here so the title and any linked-
+  // object titles on this page highlight the exact same words.
+  const titleTerms = highlightQuery ? splitSearchTerms(highlightQuery) : [];
   // A whole-workspace share is redirected onto this exact route with no
   // special props (see SharePage.tsx) - it's a real page in the normal
   // `/w/:workspaceId` tree, so this falls back to the active share session's
@@ -129,6 +136,15 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // object, so a stale selection from the last object never lingers.
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   useEffect(() => setSelectedBlockId(null), [objectId]);
+
+  // Viewing Now, Properties, Sub-objects, Linked-from and Script are all
+  // secondary/meta info rather than the object's actual content - hidden
+  // behind this one toggle so they don't dominate the page, and deliberately
+  // *not* persisted (localStorage etc.): always starts collapsed on a fresh
+  // page load. Reset per-object too, so toggling it on one object doesn't
+  // leak into the next one navigated to.
+  const [sectionsVisible, setSectionsVisible] = useState(false);
+  useEffect(() => setSectionsVisible(false), [objectId]);
 
   // Every block's template-rendered text (see modules/templates/ on the
   // server) - always fetched (cheap: the server itself skips the render
@@ -296,6 +312,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         coverTextStyle={object.coverTextStyle}
         coverHeight={workspace?.coverHeight}
         icon={renderIcon}
+        highlightTerms={titleTerms}
       />
 
       {/* No top padding once there's a cover (just a small `pt-2`) - the
@@ -318,11 +335,12 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
           {!object.cover && (
             <div className="flex items-center gap-2">
               {renderIcon()}
-              <input
+              <HighlightableTitle
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={setTitle}
                 placeholder="Untitled"
                 readOnly={!effectiveCanEdit}
+                terms={titleTerms}
                 className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
               />
             </div>
@@ -385,7 +403,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 copy of the title once you've scrolled the cover itself out
                 of view. `min-w-0` lets it actually shrink/truncate instead
                 of pushing the (all `shrink-0`) action buttons off screen. */}
-            {object.cover && <span className="min-w-0 flex-1 truncate text-sm font-medium">{title || "Untitled"}</span>}
+            {object.cover && (
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                <HighlightedText text={title || "Untitled"} terms={titleTerms} />
+              </span>
+            )}
             {/* `key={object.id}` forces a full remount on every object
                 change, same reasoning as CoverImage's own `key` above -
                 without it, navigating from one object to another reuses
@@ -393,6 +415,16 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 open/closed popover, the in-progress slug edit) would carry
                 over from the *previous* object instead of resetting. */}
             {!share && <ObjectSlugButton key={object.id} objectId={object.id} slug={object.slug} disabled={isLocked} />}
+            <button
+              onClick={() => setSectionsVisible((v) => !v)}
+              title={sectionsVisible ? "Hide viewing now/properties/sub-objects/backlinks/script" : "Show viewing now/properties/sub-objects/backlinks/script"}
+              // A view action, not an edit - exempt from READ_ONLY_LOCK's
+              // pointer-events-none like CollapsibleSection's own toggle.
+              data-view-toggle
+              className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${sectionsVisible ? "text-accent" : "text-ink-muted"}`}
+            >
+              <Icon name="eye" className="h-4 w-4" />
+            </button>
             {!share && (
               <>
                 <button
@@ -465,8 +497,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
             {/* Hidden only for a single-object share (it can't grant access
                 to browse anywhere else) - a whole-workspace share can, so
-                these stay visible there, same as for a logged-in member. */}
-            {!share?.singleObject && (
+                these stay visible there, same as for a logged-in member.
+                Also gated behind the master `sectionsVisible` toggle above -
+                `forceExpanded` skips their own nested chevron since that
+                toggle already decided whether they're shown at all. */}
+            {sectionsVisible && !share?.singleObject && (
               <>
                 <SubObjectsPanel
                   workspaceId={workspaceId}
@@ -474,8 +509,10 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                   objectTypeId={object.objectTypeId}
                   subObjectIds={Array.isArray(object.values.sub_objects) ? object.values.sub_objects : []}
                   canCreate={!share && !isLocked}
+                  forceExpanded
+                  highlightTerms={titleTerms}
                 />
-                <BacklinksPanel objectId={object.id} workspaceId={workspaceId} />
+                <BacklinksPanel objectId={object.id} workspaceId={workspaceId} forceExpanded highlightTerms={titleTerms} />
               </>
             )}
 
@@ -483,9 +520,9 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 not just single-object ones (see workspaces/access.ts's
                 `requireRealMemberAccess` on the server side for why running
                 arbitrary scripts is a stricter boundary than the rest of
-                this page's editing). */}
-            {!share && (
-              <CollapsibleSection title="Script">
+                this page's editing). Also gated behind `sectionsVisible`. */}
+            {sectionsVisible && !share && (
+              <CollapsibleSection title="Script" forceExpanded>
                 <ScriptPanel workspaceId={workspaceId} object={object} />
               </CollapsibleSection>
             )}
@@ -510,40 +547,44 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         </div>
 
         <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-          {/* Shown for anonymous share visitors too, not just real members -
-              they're exactly who gets the "Anonymous <Animal>" identity and
-              rename affordance this feature is for (see PresencePanel.tsx),
-              same as `object.id` below is already safe to dereference
-              unguarded for either audience once `object` has loaded. */}
-          <PresencePanel objectId={object.id} />
-          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
-          <div className={`space-y-3 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
-            {properties
-              .filter((property) => property.key !== "sub_objects")
-              .map((property) => (
-                <div key={property.id}>
-                  <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
-                  <PropertyCell workspaceId={workspaceId} object={object} property={property} />
-                </div>
-              ))}
+          {sectionsVisible && (
+            <>
+              {/* Shown for anonymous share visitors too, not just real members -
+                  they're exactly who gets the "Anonymous <Animal>" identity and
+                  rename affordance this feature is for (see PresencePanel.tsx),
+                  same as `object.id` below is already safe to dereference
+                  unguarded for either audience once `object` has loaded. */}
+              <PresencePanel objectId={object.id} />
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
+              <div className={`space-y-3 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
+                {properties
+                  .filter((property) => property.key !== "sub_objects")
+                  .map((property) => (
+                    <div key={property.id}>
+                      <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
+                      <PropertyCell workspaceId={workspaceId} object={object} property={property} />
+                    </div>
+                  ))}
 
-            {objectType?.key === "variable" && (
-              <div>
-                <label className="mb-1 block text-xs text-ink-muted">Computed Value</label>
-                {object.values.computedValueError ? (
-                  <p className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
-                    ⚠ {String(object.values.computedValueError)}
-                  </p>
-                ) : (
-                  <code className="block break-all rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink">
-                    {object.values.computedValue === null || object.values.computedValue === undefined
-                      ? "—"
-                      : String(object.values.computedValue)}
-                  </code>
+                {objectType?.key === "variable" && (
+                  <div>
+                    <label className="mb-1 block text-xs text-ink-muted">Computed Value</label>
+                    {object.values.computedValueError ? (
+                      <p className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
+                        ⚠ {String(object.values.computedValueError)}
+                      </p>
+                    ) : (
+                      <code className="block break-all rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink">
+                        {object.values.computedValue === null || object.values.computedValue === undefined
+                          ? "—"
+                          : String(object.values.computedValue)}
+                      </code>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           {selectedBlockId && <BlockHistoryPanel objectId={object.id} blockId={selectedBlockId} />}
         </aside>

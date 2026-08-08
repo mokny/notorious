@@ -5,6 +5,7 @@ import { searchApi } from "../../lib/api/resources.js";
 import { objectHref } from "../../lib/api/shareMode.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useObjectTitle } from "../../hooks/useObjectTitle.js";
+import { HighlightedText } from "../editor/HighlightedText.js";
 import { Icon } from "../ui/Icon.js";
 
 interface RelationPickerProps {
@@ -13,9 +14,11 @@ interface RelationPickerProps {
   value: string[];
   onAdd: (objectId: string) => void;
   onRemove: (objectId: string) => void;
+  /** Search words to highlight in each linked object's title pill - see ObjectDetailPage.tsx's `titleTerms`. */
+  highlightTerms?: string[];
 }
 
-export function RelationPicker({ workspaceId, targetObjectTypeId, value, onAdd, onRemove }: RelationPickerProps) {
+export function RelationPicker({ workspaceId, targetObjectTypeId, value, onAdd, onRemove, highlightTerms = [] }: RelationPickerProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const debouncedQuery = useDebouncedValue(query);
@@ -30,7 +33,13 @@ export function RelationPicker({ workspaceId, targetObjectTypeId, value, onAdd, 
     <div className="space-y-1.5">
       <div className="flex flex-wrap gap-1.5">
         {value.map((objectId) => (
-          <RelationPill key={objectId} objectId={objectId} onRemove={() => onRemove(objectId)} workspaceId={workspaceId} />
+          <RelationPill
+            key={objectId}
+            objectId={objectId}
+            onRemove={() => onRemove(objectId)}
+            workspaceId={workspaceId}
+            highlightTerms={highlightTerms}
+          />
         ))}
       </div>
 
@@ -73,17 +82,19 @@ function RelationPill({
   objectId,
   workspaceId,
   onRemove,
+  highlightTerms = [],
 }: {
   objectId: string;
   workspaceId: string;
   onRemove: () => void;
+  highlightTerms?: string[];
 }) {
   const { title, icon } = useObjectTitle(workspaceId, objectId);
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs">
       <Icon name={icon} className="h-3 w-3 text-ink-muted" />
       <Link to={objectHref(workspaceId, objectId)} className="hover:underline">
-        {title}
+        <HighlightedText text={title} terms={highlightTerms} />
       </Link>
       <button type="button" onClick={onRemove} className="text-ink-muted hover:text-red-500">
         ×

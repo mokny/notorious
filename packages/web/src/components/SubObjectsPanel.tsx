@@ -15,6 +15,10 @@ interface SubObjectsPanelProps {
   subObjectIds: string[];
   /** Hides "New sub-object" - an anonymous share session can't create objects (not share-aware server-side), so the button would just fail. Defaults to true for normal, logged-in usage. */
   canCreate?: boolean;
+  /** Forwarded to the underlying CollapsibleSection - see its own doc comment. */
+  forceExpanded?: boolean;
+  /** Forwarded to the underlying RelationPicker/RelationPill - see RelationPicker.tsx. */
+  highlightTerms?: string[];
 }
 
 /**
@@ -23,7 +27,15 @@ interface SubObjectsPanelProps {
  * so any object - a Note, a Book, whatever - can have child objects of any
  * type, not just the type-specific relations like Task's parent_task.
  */
-export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObjectIds, canCreate = true }: SubObjectsPanelProps) {
+export function SubObjectsPanel({
+  workspaceId,
+  objectId,
+  objectTypeId,
+  subObjectIds,
+  canCreate = true,
+  forceExpanded,
+  highlightTerms,
+}: SubObjectsPanelProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const mutations = useObjectMutations(workspaceId);
@@ -62,6 +74,7 @@ export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObject
   return (
     <CollapsibleSection
       title="Sub-objects"
+      forceExpanded={forceExpanded}
       actions={
         canCreate && (
           <div
@@ -104,6 +117,7 @@ export function SubObjectsPanel({ workspaceId, objectId, objectTypeId, subObject
         value={subObjectIds}
         onAdd={(targetId) => void mutations.addRelation(objectId, subObjectsProperty, targetId)}
         onRemove={(targetId) => void mutations.removeRelation(objectId, subObjectsProperty, targetId)}
+        highlightTerms={highlightTerms}
       />
     </CollapsibleSection>
   );
