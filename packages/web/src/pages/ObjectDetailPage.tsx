@@ -357,7 +357,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               below the status bar/Dynamic Island) instead of scrolling
               underneath it. */}
           <div
-            className={`sticky z-10 flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}
+            className={`sticky z-10 relative flex items-center gap-2 bg-surface py-2 ${object.cover ? "" : "mt-2"}`}
             style={{ top: "var(--sticky-toolbar-top, 0px)" }}
           >
             {/* Visible to anyone (so a non-owner understands why editing is
@@ -455,6 +455,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </button>
               </>
             )}
+            {/* Mirrors WorkspaceLayout.tsx's mobile top-bar fade (phone only,
+                see its own comment) but for the *bottom* edge of this sticky
+                toolbar - as content scrolls up and emerges from underneath
+                it, it fades in smoothly instead of being sharply cut off by
+                the toolbar's hard bottom edge. `top-full` anchors it right
+                below the row (this element's `relative` above), independent
+                of the row's own height so it doesn't need to track that. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-full h-6 bg-gradient-to-b from-surface to-transparent md:hidden"
+            />
           </div>
 
           {hasRecurrence && !share && (
