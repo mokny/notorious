@@ -1,28 +1,61 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
-import { schemaApi, objectApi } from "../../lib/api/resources.js";
+import { schemaApi, objectApi, workspaceApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { reloadIfViewportShrunk, resetViewportReloadCount } from "../../hooks/useDynamicViewportHeight.js";
+import { useAuth } from "../../context/AuthContext.js";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
  * Floating pill-shaped bottom toolbar shown only on the phone breakpoint -
  * replaces the old flat 5-tab BottomTabBar.tsx (Home/Search/New/Menu/
- * Settings). Down to 3 actions (search, home, new object) - Settings and
+ * Settings). Down to 3 actions (search, home, new object), plus a 4th
+ * leftmost lock toggle whenever an object is actually open - moved here
+ * from ObjectDetailPage.tsx's sticky action-toolbar, which hides its own
+ * copy on phone (`hidden md:*`) so it isn't duplicated. Settings and
  * sidebar/menu access live in MobileTopBar.tsx's "…" overflow menu instead,
  * see that component's own doc comment.
  */
 export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceId: string; dashboardObjectId?: string }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const shareToken = isSharedSession();
+  const { user } = useAuth();
   const { open: openSearch } = useSearchOverlay();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const prevWorkspaceIdRef = useRef(workspaceId);
+
+  // Same "parse it off the URL" approach as MobileTopBar.tsx - this is a
+  // layout-level component too, so useParams() here wouldn't see a nested
+  // route's :objectId.
+  const routeObjectId = location.pathname.match(/\/objects\/([^/]+)/)?.[1];
+
+  const { data: object } = useQuery({
+    queryKey: ["object", routeObjectId],
+    queryFn: () => objectApi.get(routeObjectId!),
+    enabled: Boolean(routeObjectId),
+  });
+  const { data: workspace } = useQuery({
+    queryKey: ["workspace", workspaceId],
+    queryFn: () => workspaceApi.get(workspaceId),
+    enabled: Boolean(routeObjectId),
+  });
+  const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
+  const isLocked = Boolean(object?.lockedAt);
+  // Same visibility rule as the sticky toolbar's own version of this button
+  // (ObjectDetailPage.tsx): the owner always gets the toggle, anyone else
+  // only sees it (as a plain indicator, not a button) while it's locked.
+  const showLock = Boolean(routeObjectId && object && !shareToken && (isOwner || isLocked));
+
+  const lockMutation = useMutation({
+    mutationFn: (locked: boolean) => objectApi.setLocked(routeObjectId!, { locked }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", routeObjectId] }),
+  });
 
   const { data: objectTypes } = useQuery({
     queryKey: ["objectTypes", workspaceId],
@@ -58,6 +91,22 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
       style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
       <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-surface-raised/95 p-1.5 shadow-lg backdrop-blur">
+        {showLock &&
+          (isOwner ? (
+            <button
+              onClick={() => lockMutation.mutate(!isLocked)}
+              disabled={lockMutation.isPending}
+              className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface disabled:opacity-50 ${isLocked ? "text-accent" : "text-ink-muted hover:text-ink"}`}
+              title={isLocked ? "Unlock this object" : "Lock this object against edits"}
+            >
+              <Icon name={isLocked ? "lock" : "unlock"} className="h-5 w-5" />
+            </button>
+          ) : (
+            <span className="flex h-11 w-11 items-center justify-center text-accent" title="This object is locked against edits">
+              <Icon name="lock" className="h-5 w-5" />
+            </span>
+          ))}
+
         <button
           onClick={openSearch}
           className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"

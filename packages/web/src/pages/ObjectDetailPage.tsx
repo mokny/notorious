@@ -362,19 +362,22 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
           >
             {/* Visible to anyone (so a non-owner understands why editing is
                 blocked), but only the owner can actually toggle it - everyone
-                else gets a plain, non-interactive indicator. */}
+                else gets a plain, non-interactive indicator. Hidden on phone
+                (`hidden md:*`) - MobileBottomBar.tsx shows the same toggle
+                as the leftmost pill in the floating bottom toolbar there
+                instead, see its own doc comment. */}
             {isOwner ? (
               <button
                 onClick={() => lockMutation.mutate(!isLocked)}
                 disabled={lockMutation.isPending}
                 title={isLocked ? "Unlock this object" : "Lock this object against edits"}
-                className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isLocked ? "text-accent" : "text-ink-muted"}`}
+                className={`hidden shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 md:inline-flex ${isLocked ? "text-accent" : "text-ink-muted"}`}
               >
                 <Icon name={isLocked ? "lock" : "unlock"} className="h-4 w-4" />
               </button>
             ) : (
               isLocked && (
-                <span className="shrink-0 p-1.5 text-accent" title="This object is locked against edits">
+                <span className="hidden shrink-0 p-1.5 text-accent md:inline-flex" title="This object is locked against edits">
                   <Icon name="lock" className="h-4 w-4" />
                 </span>
               )
