@@ -453,6 +453,8 @@ export function BlockEditor({
         return { items: [], allowMultipleVotes: true, votingEndsAt: null };
       case "ai":
         return { prompt: "" };
+      case "maps":
+        return { query: "" };
       default:
         return {};
     }

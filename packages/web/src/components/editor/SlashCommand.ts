@@ -29,6 +29,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "image", label: "Image", description: "Upload or embed an image" },
   { type: "video", label: "Video", description: "Embed a video" },
   { type: "embed", label: "Embed", description: "Embed a link" },
+  { type: "maps", label: "Maps", description: "Embed a Google Maps address, coordinates, or route" },
   { type: "math", label: "Math", description: "LaTeX formula" },
   { type: "mermaid", label: "Mermaid diagram", description: "Flowcharts and diagrams" },
   { type: "toggle", label: "Toggle", description: "Collapsible section" },

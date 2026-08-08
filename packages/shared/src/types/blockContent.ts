@@ -197,6 +197,20 @@ export interface CalendarBlockContent {
 }
 
 /**
+ * A Google Maps embed driven by one free-text field (see MapsBlock.tsx):
+ * an address/place name, a "lat, lng" coordinate pair, or an
+ * "origin -> destination" route (split on the first "->"), auto-detected
+ * from `query` alone rather than stored as a separate mode. No API key
+ * involved - built from the key-less `maps.google.com/maps?...&output=embed`
+ * iframe endpoint.
+ */
+export interface MapsContent {
+  query: string;
+  /** Persisted iframe height in px, set by dragging the block's resize handle - undefined uses MapsBlock.tsx's default. */
+  height?: number;
+}
+
+/**
  * Picks a sensible block type/content for a file, based on its MIME type -
  * shared between the web drop handler (BlockEditor.tsx) and the server's
  * share-target commit flow (modules/shareTarget/service.ts), which both need
