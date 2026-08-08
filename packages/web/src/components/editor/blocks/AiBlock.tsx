@@ -81,14 +81,14 @@ export function AiBlock({
     }
   }
 
-  async function handleSend() {
-    const trimmed = prompt.trim();
+  async function runGenerate(promptText: string, useContext: boolean) {
+    const trimmed = promptText.trim();
     if (!trimmed || isGenerating) return;
     isGeneratingRef.current = true;
     setIsGenerating(true);
     setSendError(null);
     try {
-      const block = await blockApi.generateAi(blockId, { prompt: trimmed, includeContext });
+      const block = await blockApi.generateAi(blockId, { prompt: trimmed, includeContext: useContext });
       setContent(block.content as unknown as AiContent);
       setManualEditing(false);
     } catch (error) {
@@ -97,6 +97,15 @@ export function AiBlock({
       isGeneratingRef.current = false;
       setIsGenerating(false);
     }
+  }
+
+  function handleSend() {
+    return runGenerate(prompt, includeContext);
+  }
+
+  /** Re-runs the last sent prompt as-is, with whichever "include context" setting it was originally sent with - no re-confirmation, since that context was already sent under this same prompt before. */
+  function handleRegenerate() {
+    return runGenerate(content.prompt, content.includeContext ?? false);
   }
 
   return (
@@ -145,8 +154,20 @@ export function AiBlock({
             className={`tiptap prose-p:my-0 text-sm leading-relaxed ${content.isError ? "text-red-500" : ""}`}
             onSave={(markdown) => onSave({ ...content, answer: markdown })}
           />
-          <div className="flex justify-end" data-lock-hide>
-            <button onClick={startEditing} className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent">
+          {sendError && <p className="text-xs text-red-500">{sendError}</p>}
+          <div className="flex justify-end gap-3" data-lock-hide>
+            <button
+              onClick={handleRegenerate}
+              disabled={isGenerating}
+              className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent disabled:opacity-50"
+            >
+              <Icon name="refresh" className="h-3 w-3" /> {isGenerating ? "Regenerating…" : "Regenerate"}
+            </button>
+            <button
+              onClick={startEditing}
+              disabled={isGenerating}
+              className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent disabled:opacity-50"
+            >
               <Icon name="pencil" className="h-3 w-3" /> Edit
             </button>
           </div>

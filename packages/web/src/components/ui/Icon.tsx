@@ -73,6 +73,7 @@ import {
   MessageSquare,
   MessageSquareOff,
   Bell,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 
@@ -149,6 +150,7 @@ const ICONS: Record<string, LucideIcon> = {
   comment: MessageSquare,
   "comment-off": MessageSquareOff,
   bell: Bell,
+  refresh: RefreshCw,
 };
 
 function isImageUrl(value: string): boolean {
