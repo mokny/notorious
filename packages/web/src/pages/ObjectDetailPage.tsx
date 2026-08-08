@@ -546,7 +546,15 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
           )}
         </div>
 
-        <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <aside
+          className={`w-full shrink-0 space-y-3 lg:w-72 ${
+            // The dividing border/padding only makes sense when there's
+            // actually something below it to divide from the content above -
+            // otherwise (sectionsVisible off and no block history selected)
+            // this would just be a stray line with nothing under it.
+            sectionsVisible || selectedBlockId ? "border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" : ""
+          }`}
+        >
           {sectionsVisible && (
             <>
               {/* Shown for anonymous share visitors too, not just real members -
