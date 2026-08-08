@@ -11,6 +11,7 @@ import { TemplateHighlight } from "./TemplateHighlight.js";
 import { TemplateSuggestion, templateSuggestionPluginKey } from "./TemplateSuggestion.js";
 import { SearchHighlight } from "./SearchHighlight.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
+import { externalLinkAttrs } from "../../lib/externalLink.js";
 
 /**
  * `Link`'s `autolink`/`linkOnPaste` options (disabled below for templateAware
@@ -23,7 +24,21 @@ import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
  * corrupting the template source on save - confirmed by inspecting a
  * corrupted block directly in the dev DB.
  */
-const TemplateAwareLink = Link.extend({
+/**
+ * Rewrites an external link's rendered `href`/`target`/`rel` to route through
+ * the referrer-stripping redirect proxy (see externalLink.ts) - only the DOM
+ * output changes, the mark's own `href` attribute (and therefore the saved
+ * markdown source) stays the original URL.
+ */
+const LinkWithExternalRedirect = Link.extend({
+  renderHTML(props) {
+    const [tag, attrs, hole] = this.parent?.(props) as [string, Record<string, unknown>, number];
+    if (typeof attrs.href === "string" && attrs.href) Object.assign(attrs, externalLinkAttrs(attrs.href));
+    return [tag, attrs, hole];
+  },
+});
+
+const TemplateAwareLink = LinkWithExternalRedirect.extend({
   addPasteRules() {
     return [];
   },
@@ -147,7 +162,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       // own comment above), which these two options alone don't cover.
       templateAware
         ? TemplateAwareLink.configure({ openOnClick: false, autolink: false, linkOnPaste: false })
-        : Link.configure({ openOnClick: false }),
+        : LinkWithExternalRedirect.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder: options.placeholder ?? "Type '/' for commands…" }),
       Markdown.configure({ html: false, transformPastedText: true }),
       ...(hasSlashCommand

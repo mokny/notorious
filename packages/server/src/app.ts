@@ -29,6 +29,7 @@ import { registerBackupRoutes } from "./modules/backup/routes.js";
 import { registerRealtimeRoutes } from "./modules/realtime/routes.js";
 import { registerApiKeyRoutes } from "./modules/apiKeys/routes.js";
 import { registerLinkPreviewRoutes } from "./modules/linkPreview/routes.js";
+import { registerLinkOutRoutes } from "./modules/linkOut/routes.js";
 import { registerSystemRoutes } from "./modules/system/routes.js";
 import { registerShareLinkRoutes } from "./modules/shareLinks/routes.js";
 import { registerScriptRoutes } from "./modules/scripting/routes.js";
@@ -114,6 +115,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerRealtimeRoutes(app);
   await registerApiKeyRoutes(app);
   await registerLinkPreviewRoutes(app);
+  await registerLinkOutRoutes(app);
   await registerSystemRoutes(app);
   await registerShareLinkRoutes(app);
   await registerScriptRoutes(app);

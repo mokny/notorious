@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { BookmarkContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { linkPreviewApi, fileApi } from "../../../lib/api/resources.js";
+import { externalLinkAttrs } from "../../../lib/externalLink.js";
 import { IconPicker } from "../../IconPicker.js";
 import { Icon } from "../../ui/Icon.js";
 
@@ -93,7 +94,7 @@ export function BookmarkBlock({
           autoComplete="off"
           className="w-full border-none bg-transparent text-xs text-ink-muted outline-none"
         />
-        <a href={content.url} target="_blank" rel="noreferrer" className="block truncate text-xs text-accent hover:underline">
+        <a {...externalLinkAttrs(content.url)} className="block truncate text-xs text-accent hover:underline">
           {content.url}
         </a>
       </div>

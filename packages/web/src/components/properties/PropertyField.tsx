@@ -4,6 +4,7 @@ import { RelationPicker } from "./RelationPicker.js";
 import { RatingInput } from "./RatingInput.js";
 import { FilePropertyField } from "./FilePropertyField.js";
 import { DebouncedTextInput } from "./DebouncedTextInput.js";
+import { externalLinkAttrs } from "../../lib/externalLink.js";
 
 interface PropertyFieldProps {
   property: Property;
@@ -37,7 +38,7 @@ export function PropertyField({
 
     case "url":
       return value ? (
-        <a href={value as string} target="_blank" rel="noreferrer" className="truncate text-sm text-accent hover:underline">
+        <a {...externalLinkAttrs(value as string)} className="truncate text-sm text-accent hover:underline">
           {value as string}
         </a>
       ) : (
