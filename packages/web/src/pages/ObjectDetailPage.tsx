@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi, blockApi } from "../lib/api/resources.js";
@@ -21,11 +21,12 @@ import { ShareDialog } from "../components/ShareDialog.js";
 import { ExportMenu } from "../components/ExportMenu.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
 import { PresencePanel } from "../components/PresencePanel.js";
-import { useConfirm } from "../context/ConfirmContext.js";
 import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
+import { useObjectHistory } from "../context/ObjectHistoryContext.js";
+import { useDeleteObject } from "../hooks/useDeleteObject.js";
 import { useRecentObjects } from "../hooks/useRecentObjects.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 import { useDocumentTitle } from "../hooks/useDocumentTitle.js";
@@ -74,8 +75,6 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const workspaceId = workspaceIdProp ?? params.workspaceId;
   const objectId = objectIdProp ?? params.objectId;
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const confirm = useConfirm();
   // Set by SearchPage.tsx when navigating in from a search result - see
   // BlockEditor.tsx's match scanning/scroll-to-match/SearchMatchToolbar.
   // Reading straight off the URL (not a prop) means this also works
@@ -173,6 +172,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
   const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
   const { addRecent } = useRecentObjects(workspaceId);
+  const { visit: visitObjectHistory } = useObjectHistory();
   const { user } = useAuth();
 
   const { data: workspace } = useQuery({
@@ -199,40 +199,21 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => objectApi.remove(objectId!),
-    onSuccess: async () => {
-      void queryClient.invalidateQueries({ queryKey: ["objects", workspaceId] });
-      void queryClient.invalidateQueries({ queryKey: ["viewResults"] });
-      queryClient.removeQueries({ queryKey: ["object", objectId] });
-      // If this was the workspace's dashboard object, the FK that pointed to
-      // it has already been cleared server-side (ON DELETE SET NULL) - but
-      // `invalidateQueries` only *schedules* a refetch; navigating before it
-      // resolves would land WorkspaceHome on the still-cached (stale)
-      // dashboardObjectId, bouncing it straight back to this now-deleted
-      // object's URL. Awaiting it first guarantees the redirect target is
-      // computed from the post-delete workspace state.
-      await queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
-      navigate(`/w/${workspaceId}`);
-    },
-  });
-
-  async function handleDelete() {
-    if (!object) return;
-    const confirmed = await confirm({
-      title: `"${object.title || "Untitled"}" endgültig löschen?`,
-      description:
-        "Dateien, die nur diesem Objekt gehören, werden mitgelöscht, und Verlinkungen von anderen Objekten hierher werden entfernt. Das kann nicht rückgängig gemacht werden.",
-      confirmLabel: "Delete",
-      danger: true,
-    });
-    if (confirmed) deleteMutation.mutate();
-  }
+  const { deleteObject, isDeleting } = useDeleteObject(workspaceId, objectId);
+  const handleDelete = () => deleteObject(object?.title ?? "");
 
   useEffect(() => {
     if (objectId) addRecent(objectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectId]);
+
+  // Feeds the floating mobile header's back button/breadcrumb list (see
+  // ObjectHistoryContext.tsx) - a no-op outside WorkspaceLayout's tree (e.g.
+  // a standalone share-link view).
+  useEffect(() => {
+    if (object) visitObjectHistory({ id: object.id, title: object.title, icon: object.icon });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [object?.id, object?.title, object?.icon]);
 
   if (objectLoadFailed) {
     return (
@@ -466,7 +447,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 <ShareDialog workspaceId={workspaceId} objectId={object.id} label="Share" />
                 <button
                   onClick={handleDelete}
-                  disabled={deleteMutation.isPending || isLocked}
+                  disabled={isDeleting || isLocked}
                   title={isLocked ? "Unlock this object before deleting it" : "Delete object"}
                   className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
                 >

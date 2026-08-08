@@ -8,6 +8,8 @@ import { useAuth } from "../context/AuthContext.js";
 import { useConfirm } from "../context/ConfirmContext.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { MobileChromeProvider, useMobileChrome } from "../context/MobileChromeContext.js";
+import { ObjectHistoryProvider } from "../context/ObjectHistoryContext.js";
+import { SearchOverlayProvider } from "../context/SearchOverlayContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
@@ -22,7 +24,9 @@ import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 import { NotificationBell } from "../components/nav/NotificationBell.js";
-import { BottomTabBar } from "../components/nav/BottomTabBar.js";
+import { MobileTopBar } from "../components/nav/MobileTopBar.js";
+import { MobileBottomBar } from "../components/nav/MobileBottomBar.js";
+import { SearchSheet } from "../components/search/SearchSheet.js";
 
 // The mobile header's own rendered height (safe-area inset + its content) -
 // exposed as a CSS var so <main>'s padding-top, the sticky action-toolbar in
@@ -43,7 +47,14 @@ const MOBILE_HEADER_HEIGHT = "calc(env(safe-area-inset-top) + 48px)";
 // `position: fixed`) tab bar covers, keeping scrolled-to-bottom content from
 // ending up hidden underneath it. Update the 52px here if BottomTabBar's own
 // row height ever changes.
-const BOTTOM_TAB_BAR_HEIGHT = "calc(52px + env(safe-area-inset-bottom))";
+// The phone breakpoint's floating pill header/toolbar (MobileTopBar.tsx,
+// MobileBottomBar.tsx) - both `position: fixed` overlays, not part of the
+// normal flex flow, so <main>'s own padding reserves the matching space the
+// same way it does for MOBILE_HEADER_HEIGHT above. Numbers derived from each
+// component's own sizing (pill button height + its container padding) -
+// update these if that sizing ever changes.
+const MOBILE_TOP_BAR_HEIGHT = "calc(env(safe-area-inset-top) + 3.5rem)";
+const MOBILE_BOTTOM_BAR_HEIGHT = "calc(4.25rem + env(safe-area-inset-bottom))";
 
 // `useMobileChrome` (consumed below by the mobile header) is set from
 // ObjectDetailPage/CoverImage.tsx, a descendant rendered through <Outlet/> -
@@ -52,7 +63,11 @@ const BOTTOM_TAB_BAR_HEIGHT = "calc(52px + env(safe-area-inset-bottom))";
 export function WorkspaceLayout() {
   return (
     <MobileChromeProvider>
-      <WorkspaceLayoutInner />
+      <ObjectHistoryProvider>
+        <SearchOverlayProvider>
+          <WorkspaceLayoutInner />
+        </SearchOverlayProvider>
+      </ObjectHistoryProvider>
     </MobileChromeProvider>
   );
 }
@@ -101,7 +116,7 @@ function WorkspaceLayoutInner() {
   // Only with a cover (where <main> has *no* padding-top, so the cover
   // itself can reach the true top edge - see CoverImage.tsx's negative
   // margin) does the offset have to come from `top` itself instead.
-  const stickyToolbarTop = !coverActive ? "0px" : showMobileHeader ? MOBILE_HEADER_HEIGHT : isPhone ? "env(safe-area-inset-top)" : "0px";
+  const stickyToolbarTop = !coverActive ? "0px" : showMobileHeader ? MOBILE_HEADER_HEIGHT : isPhone ? MOBILE_TOP_BAR_HEIGHT : "0px";
 
   useRealtime(workspaceId, shareToken ?? undefined);
   const { pinnedIds, reorder } = useWorkspacePins(workspaceId);
@@ -315,7 +330,7 @@ function WorkspaceLayoutInner() {
         style={
           {
             ...(showMobileHeader && { "--mobile-header-h": MOBILE_HEADER_HEIGHT }),
-            ...(isPhone && { "--bottom-tab-bar-h": BOTTOM_TAB_BAR_HEIGHT }),
+            ...(isPhone && { "--mobile-top-bar-h": MOBILE_TOP_BAR_HEIGHT, "--bottom-tab-bar-h": MOBILE_BOTTOM_BAR_HEIGHT }),
             "--sticky-toolbar-top": stickyToolbarTop,
           } as CSSProperties
         }
@@ -346,6 +361,15 @@ function WorkspaceLayoutInner() {
             </button>
             <span className={`truncate text-sm font-medium ${showCoverOverlay ? "text-white" : ""}`}>{workspace?.name}</span>
           </div>
+        )}
+        {isPhone && (
+          <MobileTopBar
+            workspaceId={workspaceId!}
+            workspaceName={workspace?.name ?? "Workspace"}
+            workspaceIcon={workspace?.icon ?? "sparkles"}
+            dashboardObjectId={workspace?.dashboardObjectId ?? undefined}
+            onOpenSidebar={() => setSidebarOpen(true)}
+          />
         )}
         {isPhone && (
           // Masks the status bar/Dynamic Island strip with the plain page
@@ -379,7 +403,7 @@ function WorkspaceLayoutInner() {
             ...(showMobileHeader
               ? { paddingTop: "var(--mobile-header-h)" }
               : isPhone
-                ? { paddingTop: coverActive ? 0 : "env(safe-area-inset-top)" }
+                ? { paddingTop: coverActive ? 0 : "var(--mobile-top-bar-h)" }
                 : undefined),
             // BottomTabBar is `position: fixed` now (see BottomTabBar.tsx),
             // so it no longer takes flow space here - reserve the matching
@@ -390,12 +414,11 @@ function WorkspaceLayoutInner() {
           {!shareToken && !coverFullBleed && <InstallAppHint />}
           <Outlet />
         </main>
-        {breakpoint === "phone" && (
-          <BottomTabBar
-            workspaceId={workspaceId!}
-            dashboardObjectId={workspace?.dashboardObjectId ?? undefined}
-            onOpenMenu={() => setSidebarOpen(true)}
-          />
+        {isPhone && (
+          <>
+            <MobileBottomBar workspaceId={workspaceId!} />
+            <SearchSheet workspaceId={workspaceId!} />
+          </>
         )}
       </div>
     </div>

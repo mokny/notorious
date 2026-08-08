@@ -37,6 +37,7 @@
     "@tiptap/starter-kit": "^2.10.4",
     "@tiptap/suggestion": "^2.10.4",
     "fractional-indexing": "^3.4.0",
+    "framer-motion": "^13.0.0",
     "html2canvas": "^1.4.1",
     "katex": "^0.16.11",
     "lucide-react": "^0.462.0",
