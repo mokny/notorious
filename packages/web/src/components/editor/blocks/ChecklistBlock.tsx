@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -6,6 +6,8 @@ import type { ChecklistContent, ChecklistItem } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { useDragSelectGuard } from "../../../hooks/useDragSelectGuard.js";
 import { useHasHover } from "../../../hooks/useHasHover.js";
+import { useClickOutside } from "../../../hooks/useClickOutside.js";
+import { useKeepInViewport } from "../../../hooks/useKeepInViewport.js";
 import { randomId } from "../../../lib/randomId.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
@@ -19,6 +21,42 @@ function resizeTextarea(el: HTMLTextAreaElement | null): void {
   if (!el) return;
   el.style.height = "auto";
   el.style.height = `${el.scrollHeight}px`;
+}
+
+/** Delay before a checked-off item slides to the bottom - see ChecklistContent.sortCheckedToBottom. */
+const CHECKED_MOVE_DELAY_MS = 2000;
+
+function ChecklistSettingsPopover({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  useClickOutside(containerRef, () => setOpen(false), open);
+  const clampStyle = useKeepInViewport(popoverRef, open);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title="Checklist settings"
+        className="shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/block:opacity-100"
+      >
+        <Icon name="settings" className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div
+          ref={popoverRef}
+          style={clampStyle}
+          className="absolute right-0 z-50 mt-1 w-64 space-y-2 rounded-lg border border-border bg-surface-raised p-2 shadow-lg"
+        >
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" className="accent-accent" checked={enabled} onChange={(e) => onChange(e.target.checked)} />
+            Move checked items to the bottom after 2s
+          </label>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Backfills a stable `id` on any item that doesn't have one yet - see `ChecklistItem.id`'s doc comment for why this only matters for checklists saved before drag-reordering existed. */
@@ -101,7 +139,7 @@ function ChecklistItemRow({
   const focusOnEditRef = useRef(false);
 
   return (
-    <div className="relative">
+    <div className="relative" data-flip-id={sortableId}>
       {deleteRevealProgress > 0 && (
         <div
           className="pointer-events-none absolute inset-y-0 right-0 flex w-24 items-center justify-end rounded-md bg-red-500 pr-4 text-white"
@@ -244,7 +282,7 @@ export function ChecklistBlock({
 }) {
   const { readOnly, searchHighlight } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
-  const items = content.items ?? [];
+  const items = useMemo(() => content.items ?? [], [content.items]);
   const searchTerms = searchHighlight?.terms ?? [];
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
@@ -264,6 +302,118 @@ export function ChecklistBlock({
   // giving the same "oops" recovery window for the same new gesture.
   const [undoSnapshot, setUndoSnapshot] = useState<{ index: number; item: ChecklistItem } | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sortCheckedToBottom = content.sortCheckedToBottom ?? false;
+  // Always-current `items` for the setTimeout callbacks below, which close
+  // over whatever `items` was at schedule time otherwise - a stale array
+  // would silently undo any edit/reorder that happened during the 2s wait.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const moveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Items this feature itself moved to the bottom, so unchecking them again
+  // knows to jump back to the top - a manual drag away from the bottom (see
+  // handleDragEnd) clears an item out of this set, since it's no longer in
+  // the "parked at the bottom by auto-sort" state that jump should undo.
+  const movedToBottomRef = useRef<Set<string>>(new Set());
+  const listRef = useRef<HTMLDivElement>(null);
+  // Set right before an auto-sort reorder's `save()` call, to the rows'
+  // pre-reorder positions - the layout effect below diffs against the
+  // post-reorder DOM and FLIP-animates the delta. Left `null` for every
+  // other kind of reorder (drag, add, remove), which already have their own
+  // (or no) transition.
+  const flipPrevRectsRef = useRef<Map<string, DOMRect> | null>(null);
+
+  useEffect(() => () => moveTimersRef.current.forEach((t) => clearTimeout(t)), []);
+
+  function captureRowRects(): Map<string, DOMRect> {
+    const map = new Map<string, DOMRect>();
+    listRef.current?.querySelectorAll<HTMLElement>("[data-flip-id]").forEach((el) => {
+      map.set(el.dataset.flipId!, el.getBoundingClientRect());
+    });
+    return map;
+  }
+
+  useLayoutEffect(() => {
+    const prevRects = flipPrevRectsRef.current;
+    if (!prevRects) return;
+    flipPrevRectsRef.current = null;
+    listRef.current?.querySelectorAll<HTMLElement>("[data-flip-id]").forEach((el) => {
+      const before = prevRects.get(el.dataset.flipId!);
+      if (!before) return;
+      const deltaY = before.top - el.getBoundingClientRect().top;
+      if (!deltaY) return;
+      el.style.transition = "none";
+      el.style.transform = `translateY(${deltaY}px)`;
+      el.getBoundingClientRect(); // forces a reflow so the line below animates from this transform, not the target one
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 300ms ease";
+        el.style.transform = "";
+      });
+    });
+  }, [items]);
+
+  function clearMoveTimer(itemId: string): void {
+    const timer = moveTimersRef.current.get(itemId);
+    if (timer) {
+      clearTimeout(timer);
+      moveTimersRef.current.delete(itemId);
+    }
+  }
+
+  function scheduleMoveToBottom(itemId: string): void {
+    clearMoveTimer(itemId);
+    moveTimersRef.current.set(
+      itemId,
+      setTimeout(() => {
+        moveTimersRef.current.delete(itemId);
+        const current = itemsRef.current;
+        const index = current.findIndex((item) => item.id === itemId);
+        const target = current[index];
+        if (!target) return;
+        movedToBottomRef.current.add(itemId);
+        flipPrevRectsRef.current = captureRowRects();
+        save({ ...content, items: [...current.slice(0, index), ...current.slice(index + 1), target] });
+        flushSave();
+      }, CHECKED_MOVE_DELAY_MS),
+    );
+  }
+
+  /** Called on every check/uncheck of an item, from either toggle path (see the two `onToggle*` props below) - schedules or cancels the delayed move-to-bottom, or jumps a parked item back to the top on uncheck. No-op unless `sortCheckedToBottom` is on. */
+  function handleCheckedChange(itemId: string | undefined, checked: boolean): void {
+    if (!itemId || !sortCheckedToBottom) return;
+    if (checked) {
+      scheduleMoveToBottom(itemId);
+      return;
+    }
+    clearMoveTimer(itemId);
+    if (!movedToBottomRef.current.delete(itemId)) return;
+    const current = itemsRef.current;
+    const index = current.findIndex((item) => item.id === itemId);
+    const target = current[index];
+    if (index <= 0 || !target) return;
+    flipPrevRectsRef.current = captureRowRects();
+    save({ ...content, items: [target, ...current.slice(0, index), ...current.slice(index + 1)] });
+    flushSave();
+  }
+
+  function updateSettings(nextEnabled: boolean): void {
+    if (!nextEnabled) {
+      moveTimersRef.current.forEach((t) => clearTimeout(t));
+      moveTimersRef.current.clear();
+      movedToBottomRef.current.clear();
+      save({ ...content, sortCheckedToBottom: nextEnabled });
+    } else {
+      // Turning it on immediately parks every already-checked item at the
+      // bottom, so the list matches the setting right away instead of only
+      // catching up as items get toggled from here on.
+      const unchecked = items.filter((item) => !item.checked);
+      const checked = items.filter((item) => item.checked);
+      checked.forEach((item) => item.id && movedToBottomRef.current.add(item.id));
+      flipPrevRectsRef.current = captureRowRects();
+      save({ ...content, sortCheckedToBottom: nextEnabled, items: [...unchecked, ...checked] });
+    }
+    flushSave();
+  }
 
   useEffect(() => {
     if (pendingFocusIndex === null) return;
@@ -348,12 +498,29 @@ export function ChecklistBlock({
     if (!event.over || event.active.id === event.over.id) return;
     const newIndex = sortableIds.indexOf(String(event.over.id));
     if (activeIndex === -1 || newIndex === -1) return;
+    // A manual drag overrides wherever auto-sort last parked this item -
+    // see movedToBottomRef's own doc comment.
+    movedToBottomRef.current.delete(String(event.active.id));
     save({ ...content, items: arrayMove(items, activeIndex, newIndex) });
     flushSave();
   }
 
+  // Wraps the lock-exempt toggle path so the auto-sort logic above sees a
+  // check/uncheck the instant it's clicked, rather than only after this
+  // round-trips through the server and back (see toggleChecklistItemSchema
+  // and BlockEditor.tsx's toggleChecklistItemMutation).
+  const wrappedOnToggleItem = onToggleItem
+    ? async (itemId: string, checked: boolean) => {
+        handleCheckedChange(itemId, checked);
+        await onToggleItem(itemId, checked);
+      }
+    : undefined;
+
   return (
-    <div className="space-y-1">
+    <div className="group/block space-y-1">
+      <div className="flex items-center justify-end">
+        {!readOnly && <ChecklistSettingsPopover enabled={sortCheckedToBottom} onChange={updateSettings} />}
+      </div>
       <DndContext
         sensors={sensors}
         onDragStart={dragSelectGuard.onDragStart}
@@ -364,27 +531,32 @@ export function ChecklistBlock({
         }}
       >
         <SortableContext items={items.map((item, index) => item.id ?? `unindexed-${index}`)} strategy={verticalListSortingStrategy}>
-          {items.map((item, index) => (
-            <ChecklistItemRow
-              key={item.id ?? index}
-              sortableId={item.id ?? `unindexed-${index}`}
-              blockId={blockId}
-              field={`items.${index}`}
-              item={item}
-              onToggle={(checked) => updateItem(index, { checked })}
-              onToggleItem={onToggleItem}
-              onChangeText={(markdown) => updateItem(index, { markdown })}
-              onEnter={addItem}
-              onRemove={() => removeItem(index)}
-              onFlush={flushSave}
-              readOnly={readOnly}
-              registerInputRef={(el) => {
-                inputRefs.current[index] = el;
-                resizeTextarea(el);
-              }}
-              searchTerms={searchTerms}
-            />
-          ))}
+          <div ref={listRef}>
+            {items.map((item, index) => (
+              <ChecklistItemRow
+                key={item.id ?? index}
+                sortableId={item.id ?? `unindexed-${index}`}
+                blockId={blockId}
+                field={`items.${index}`}
+                item={item}
+                onToggle={(checked) => {
+                  updateItem(index, { checked });
+                  handleCheckedChange(item.id, checked);
+                }}
+                onToggleItem={wrappedOnToggleItem}
+                onChangeText={(markdown) => updateItem(index, { markdown })}
+                onEnter={addItem}
+                onRemove={() => removeItem(index)}
+                onFlush={flushSave}
+                readOnly={readOnly}
+                registerInputRef={(el) => {
+                  inputRefs.current[index] = el;
+                  resizeTextarea(el);
+                }}
+                searchTerms={searchTerms}
+              />
+            ))}
+          </div>
         </SortableContext>
       </DndContext>
       <button

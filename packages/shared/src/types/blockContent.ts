@@ -38,6 +38,8 @@ export interface ChecklistItem {
 }
 export interface ChecklistContent {
   items: ChecklistItem[];
+  /** When true, checking an item off moves it to the bottom of the list after a short delay instead of leaving it in place - see ChecklistBlock.tsx's CHECKED_MOVE_DELAY_MS. Default false. */
+  sortCheckedToBottom?: boolean;
 }
 /**
  * Unlike other rich-text block content, a table's content is a TipTap/
