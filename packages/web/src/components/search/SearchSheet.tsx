@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
 import { SearchPanel } from "./SearchPanel.js";
@@ -47,18 +47,9 @@ function useKeyboardInset(): number {
  * the desktop/tablet `/search` route). Rendered once in WorkspaceLayout,
  * over whatever page is currently open, instead of being a route of its
  * own - closing it just leaves the underlying page exactly as it was.
- *
- * Always mounted (driven by the `animate` prop, not an `AnimatePresence`
- * conditional that would mount/unmount the whole subtree) - its `<input>`
- * needs to exist in the DOM *before* the user ever opens the sheet, so
- * SearchOverlayContext's `open()` can call `.focus()` on it synchronously
- * within the same tap that triggered it. That's the only way iOS Safari/PWA
- * actually pops the on-screen keyboard for a programmatic focus; see that
- * context's own comment. Hidden via `pointer-events-none` + sliding off
- * (backdrop) / down (panel) while closed, instead of not rendering at all.
  */
 export function SearchSheet({ workspaceId }: { workspaceId: string }) {
-  const { isOpen, close, inputRef } = useSearchOverlay();
+  const { isOpen, close } = useSearchOverlay();
   const navigate = useNavigate();
   const keyboardInset = useKeyboardInset();
 
@@ -73,39 +64,44 @@ export function SearchSheet({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <>
-      <motion.div
-        aria-hidden
-        className={`fixed inset-0 z-40 bg-black/40 md:hidden ${isOpen ? "" : "pointer-events-none"}`}
-        animate={{ opacity: isOpen ? 1 : 0 }}
-        transition={{ duration: 0.2 }}
-        onClick={close}
-      />
-      <motion.div
-        className={`fixed inset-x-0 z-40 flex flex-col rounded-t-2xl bg-surface shadow-2xl md:hidden ${isOpen ? "" : "pointer-events-none"}`}
-        // `bottom: keyboardInset` (not a plain `bottom-0`) - when the
-        // keyboard opens, this shrinks the sheet up from the bottom to fit
-        // above it, instead of keeping its old full height and relying on
-        // iOS's own "scroll the focused input into view" to compensate,
-        // which shifts *everything* fixed-positioned (this sheet included)
-        // upward as a page-level pan - enough to push the search input in
-        // the drag handle's row right off the top of the screen. See
-        // useKeyboardInset's own comment.
-        style={{ top: "calc(env(safe-area-inset-top) + 2.5rem)", bottom: keyboardInset }}
-        animate={{ y: isOpen ? 0 : "100%" }}
-        transition={{ type: "spring", damping: 32, stiffness: 320 }}
-        drag={isOpen ? "y" : false}
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0, bottom: 0.6 }}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex shrink-0 justify-center py-2">
-          <div className="h-1.5 w-10 rounded-full bg-ink-muted/30" />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
-          <SearchPanel workspaceId={workspaceId} onSelect={handleSelect} autoFocus={false} inputRef={inputRef} />
-        </div>
-      </motion.div>
-    </>
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={close}
+          />
+          <motion.div
+            className="fixed inset-x-0 z-40 flex flex-col rounded-t-2xl bg-surface shadow-2xl md:hidden"
+            // `bottom: keyboardInset` (not a plain `bottom-0`) - if the
+            // user taps the field and the keyboard opens, this shrinks the
+            // sheet up from the bottom to fit above it, instead of keeping
+            // its full height and relying on iOS's own "scroll the focused
+            // input into view" to compensate, which can end up shifting the
+            // whole fixed sheet upward as a page-level pan. See
+            // useKeyboardInset's own comment.
+            style={{ top: "calc(env(safe-area-inset-top) + 2.5rem)", bottom: keyboardInset }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 32, stiffness: 320 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.6 }}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex shrink-0 justify-center py-2">
+              <div className="h-1.5 w-10 rounded-full bg-ink-muted/30" />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+              <SearchPanel workspaceId={workspaceId} onSelect={handleSelect} autoFocus={false} />
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
