@@ -59,6 +59,17 @@ export function SearchPanel({ workspaceId, onSelect, autoFocus = true, inputRef 
           placeholder="Search everything in this workspace…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          // iOS Safari/PWA auto-zooms the whole page in on focus whenever a
+          // focused input's *computed* font-size is under 16px (its way of
+          // keeping the text legible) - TextField's own text-sm is 14px.
+          // That zoom is almost certainly the real cause behind "the sheet
+          // slides off the top when the keyboard opens" (SearchSheet.tsx's
+          // visualViewport-based keyboard-inset fix addresses a real but
+          // separate issue - the sheet's own height not shrinking - and
+          // wasn't enough on its own). An inline style, not a `text-base`
+          // class, so it reliably wins regardless of Tailwind's generated
+          // CSS order for two same-specificity utility classes.
+          style={{ fontSize: 16 }}
         />
         <Button variant={fuzzy ? "primary" : "secondary"} onClick={() => setFuzzy((v) => !v)} title="Toggle fuzzy/typo-tolerant search">
           Fuzzy
