@@ -3,6 +3,7 @@ import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
 import { sortObjectTypesForDisplay, type BlockType, type ObjectType } from "@notorious/shared";
+import { popupPopperOptions } from "./popupPositioning.js";
 
 export interface SlashCommandItem {
   type: BlockType;
@@ -130,6 +131,7 @@ function buildSuggestion(
             interactive: true,
             trigger: "manual",
             placement: "bottom-start",
+            popperOptions: popupPopperOptions,
           });
         },
         onUpdate: (props) => {

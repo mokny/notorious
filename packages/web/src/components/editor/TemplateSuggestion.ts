@@ -6,6 +6,7 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { TemplateAutocompleteSchemaResponse } from "@notorious/shared";
 import { searchApi, blockApi } from "../../lib/api/resources.js";
 import { findTemplateRegions, regionAt, findOpenRegionAt, flattenDocText, TEMPLATE_FILTERS } from "./templateSyntax.js";
+import { popupPopperOptions } from "./popupPositioning.js";
 
 interface SuggestionItem {
   label: string;
@@ -245,6 +246,7 @@ function buildSuggestion(
             interactive: true,
             trigger: "manual",
             placement: "bottom-start",
+            popperOptions: popupPopperOptions,
           });
           window.addEventListener("scroll", handleScroll, true);
         },
