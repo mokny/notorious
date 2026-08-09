@@ -138,9 +138,9 @@ function WorkspaceLayoutInner() {
   // `!shareToken` check below) - skipped for an anonymous share visitor,
   // whose session can't call this endpoint anyway.
   const { data: aiConfig } = useQuery({
-    queryKey: ["aiConfig"],
-    queryFn: aiApi.getConfig,
-    enabled: !shareToken,
+    queryKey: ["aiConfig", workspaceId],
+    queryFn: () => aiApi.getConfig(workspaceId!),
+    enabled: !shareToken && Boolean(workspaceId),
     staleTime: 60_000,
   });
 

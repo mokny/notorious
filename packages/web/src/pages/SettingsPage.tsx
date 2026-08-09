@@ -18,7 +18,7 @@ import { AccountSettings } from "../components/AccountSettings.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 import { ActiveShareLinksList } from "../components/ActiveShareLinksList.js";
 import { WebhooksSettings } from "../components/WebhooksSettings.js";
-import { AiSettings } from "../components/AiSettings.js";
+import { WorkspaceAiSettings } from "../components/WorkspaceAiSettings.js";
 import { BackupSettings } from "../components/BackupSettings.js";
 import { ProgressPopup } from "../components/ui/ProgressPopup.js";
 import { Modal } from "../components/ui/Modal.js";
@@ -277,16 +277,6 @@ export function SettingsPage() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold">AI</h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Configure your own API key for an AI provider to use the Agent Chat, which can create and edit objects for
-          you from a prompt. Also used by external MCP clients (Claude Desktop, Claude Code, ...) - see the API
-          docs for how to point one at this workspace with a personal API key.
-        </p>
-        <AiSettings />
-      </section>
-
-      <section>
         <h2 className="text-lg font-semibold">Members</h2>
         <p className="mt-1 text-sm text-ink-muted">Everyone below can access "{workspace?.name}".</p>
 
@@ -370,6 +360,17 @@ export function SettingsPage() {
             Active share links (workspace and individual objects)
           </p>
           <ActiveShareLinksList workspaceId={workspaceId!} />
+        </section>
+      )}
+
+      {isOwner && (
+        <section>
+          <h2 className="text-lg font-semibold">AI</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Configure one AI provider API key shared by everyone in this workspace, used by the Agent Chat and AI
+            blocks. Optionally cap total token usage and pick how often it resets.
+          </p>
+          <WorkspaceAiSettings workspaceId={workspaceId!} />
         </section>
       )}
 

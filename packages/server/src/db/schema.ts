@@ -510,18 +510,28 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
   createdAt: text("created_at").notNull(),
 });
 
-// One active AI provider profile per user (not per workspace - same "global,
-// user-owned secret" shape as apiKeys) - see modules/ai/service.ts.
-export const aiConfigs = sqliteTable("ai_configs", {
-  userId: text("user_id")
+// One active AI provider profile per workspace, set by the workspace owner
+// and shared by every member - see modules/ai/service.ts. Also tracks a
+// rolling token budget that resets on `usageResetInterval`.
+export const workspaceAiConfigs = sqliteTable("workspace_ai_configs", {
+  workspaceId: text("workspace_id")
     .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   provider: text("provider").notNull().$type<"openai" | "anthropic" | "google" | "openai-compatible">(),
   // Only set for 'openai-compatible' (e.g. a local Ollama server's URL).
   baseUrl: text("base_url"),
   model: text("model").notNull(),
   // AES-256-GCM encrypted at rest (lib/crypto.ts), same as totp_secret/webhooks.secret.
   apiKey: text("api_key").notNull(),
+  // Null = unlimited.
+  maxTokenBudget: integer("max_token_budget"),
+  consumedTokens: integer("consumed_tokens").notNull().default(0),
+  usageResetInterval: text("usage_reset_interval").notNull().default("monthly").$type<"hourly" | "daily" | "weekly" | "monthly">(),
+  usageResetAt: text("usage_reset_at").notNull(),
+  // Set once the owner has been notified that the budget was hit this cycle
+  // - cleared on reset or on a config edit, so the notification fires once
+  // per breach rather than on every subsequent blocked request.
+  budgetNotifiedAt: text("budget_notified_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

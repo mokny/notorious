@@ -84,7 +84,7 @@ export const anthropicAdapter: AiProviderAdapter = {
       throw badRequest(`AI provider request failed (${response.status}): ${body.slice(0, 500)}`);
     }
 
-    const data = (await response.json()) as { content: ContentBlock[] };
+    const data = (await response.json()) as { content: ContentBlock[]; usage?: { input_tokens: number; output_tokens: number } };
     let text: string | null = null;
     const toolCalls: ProviderToolCall[] = [];
     for (const block of data.content) {
@@ -92,6 +92,10 @@ export const anthropicAdapter: AiProviderAdapter = {
       else if (block.type === "tool_use") toolCalls.push({ id: block.id, name: block.name, arguments: block.input });
     }
 
-    return { content: text, toolCalls };
+    return {
+      content: text,
+      toolCalls,
+      usage: { promptTokens: data.usage?.input_tokens ?? 0, completionTokens: data.usage?.output_tokens ?? 0 },
+    };
   },
 };

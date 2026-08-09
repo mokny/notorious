@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { AiChatMessage } from "@notorious/shared";
 import { badRequest } from "../../lib/httpError.js";
-import { getDecryptedAiConfig, listChatMessages, appendChatMessage } from "./service.js";
+import { getDecryptedWorkspaceAiConfig, listChatMessages, appendChatMessage, assertBudgetNotExceeded, recordTokenUsage } from "./service.js";
 import { getProviderAdapter, resolveBaseUrl, type ChatMessage } from "./providers/index.js";
 import { AI_TOOLS, findTool, toolParametersJsonSchema } from "./tools.js";
 
@@ -35,8 +35,8 @@ function toChatMessage(message: AiChatMessage): ChatMessage {
  * along the way is persisted, so a page reload doesn't lose the exchange.
  */
 export async function sendChatMessage(userId: string, workspaceId: string, userMessage: string): Promise<AiChatMessage[]> {
-  const config = await getDecryptedAiConfig(userId);
-  if (!config) throw badRequest("No AI provider configured - set one up in Settings first");
+  const config = await getDecryptedWorkspaceAiConfig(workspaceId);
+  if (!config) throw badRequest("No AI provider configured for this workspace - ask a workspace owner to set one up in Settings");
 
   const adapter = getProviderAdapter(config.provider);
   const toolDefs = AI_TOOLS.map((tool) => ({ name: tool.name, description: tool.description, parameters: toolParametersJsonSchema(tool) }));
@@ -48,6 +48,7 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
   const history = (await listChatMessages(userId, workspaceId)).map(toChatMessage);
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+    await assertBudgetNotExceeded(workspaceId);
     const result = await adapter.chat({
       apiKey: config.apiKey,
       baseUrl: resolveBaseUrl(config.provider, config.baseUrl),
@@ -56,6 +57,7 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
       messages: history,
       tools: toolDefs,
     });
+    await recordTokenUsage(workspaceId, result.usage.promptTokens, result.usage.completionTokens);
 
     if (result.toolCalls.length === 0) {
       const assistantRow = await appendChatMessage(userId, workspaceId, { role: "assistant", content: result.content ?? "" });
@@ -108,10 +110,11 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
  * the block's "include page context" toggle is off - the common/default
  * case, since sending it is an explicit per-request opt-in.
  */
-export async function generateBlockAnswer(userId: string, prompt: string, context: string | null): Promise<string> {
-  const config = await getDecryptedAiConfig(userId);
-  if (!config) throw badRequest("No AI provider configured - set one up in Settings first");
+export async function generateBlockAnswer(workspaceId: string, prompt: string, context: string | null): Promise<string> {
+  const config = await getDecryptedWorkspaceAiConfig(workspaceId);
+  if (!config) throw badRequest("No AI provider configured for this workspace - ask a workspace owner to set one up in Settings");
 
+  await assertBudgetNotExceeded(workspaceId);
   const adapter = getProviderAdapter(config.provider);
   const result = await adapter.chat({
     apiKey: config.apiKey,
@@ -122,5 +125,6 @@ export async function generateBlockAnswer(userId: string, prompt: string, contex
     messages: [{ role: "user", content: context ? `Page context:\n${context}\n\n---\n\nPrompt: ${prompt}` : prompt }],
     tools: [],
   });
+  await recordTokenUsage(workspaceId, result.usage.promptTokens, result.usage.completionTokens);
   return result.content ?? "";
 }

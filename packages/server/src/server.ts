@@ -4,12 +4,14 @@ import { startReminderScheduler } from "./modules/push/scheduler.js";
 import { startShareInboxCleanup } from "./modules/shareTarget/cleanup.js";
 import { initScriptEngine } from "./modules/scripting/engine.js";
 import { startBackupScheduler } from "./modules/backup/scheduler.js";
+import { startAiUsageScheduler } from "./modules/ai/scheduler.js";
 
 const app = await buildApp();
 
 startReminderScheduler();
 startShareInboxCleanup();
 startBackupScheduler();
+startAiUsageScheduler();
 await initScriptEngine();
 
 app

@@ -1,9 +1,11 @@
 import { eq, and, asc } from "drizzle-orm";
-import type { AiConfigSummary, AiChatMessage, AiToolCall, SaveAiConfigInput } from "@notorious/shared";
+import type { WorkspaceAiConfigSummary, AiChatMessage, AiToolCall, SaveWorkspaceAiConfigInput, AiUsageResetInterval } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { aiConfigs, aiChatMessages } from "../../db/schema.js";
+import { workspaceAiConfigs, aiChatMessages, workspaces } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { encrypt, decrypt } from "../../lib/crypto.js";
+import { badRequest } from "../../lib/httpError.js";
+import { notifyUser } from "../push/service.js";
 
 export interface DecryptedAiConfig {
   provider: "openai" | "anthropic" | "google" | "openai-compatible";
@@ -12,41 +14,101 @@ export interface DecryptedAiConfig {
   apiKey: string;
 }
 
-export async function getAiConfigSummary(userId: string): Promise<AiConfigSummary> {
-  const rows = await db.select().from(aiConfigs).where(eq(aiConfigs.userId, userId)).limit(1);
-  const row = rows[0];
-  if (!row) return { configured: false, provider: null, model: null, baseUrl: null };
-  return { configured: true, provider: row.provider, model: row.model, baseUrl: row.baseUrl };
+function toSummary(row: typeof workspaceAiConfigs.$inferSelect | undefined): WorkspaceAiConfigSummary {
+  if (!row) return { configured: false, provider: null, model: null, baseUrl: null, maxTokenBudget: null, consumedTokens: 0, usageResetInterval: null, usageResetAt: null };
+  return {
+    configured: true,
+    provider: row.provider,
+    model: row.model,
+    baseUrl: row.baseUrl,
+    maxTokenBudget: row.maxTokenBudget,
+    consumedTokens: row.consumedTokens,
+    usageResetInterval: row.usageResetInterval,
+    usageResetAt: row.usageResetAt,
+  };
+}
+
+/** Adds one interval unit to `from` - shared by the first save (to seed `usageResetAt`) and the scheduler (each reset tick). */
+export function nextResetAt(interval: AiUsageResetInterval, from: Date): string {
+  const next = new Date(from);
+  if (interval === "hourly") next.setUTCHours(next.getUTCHours() + 1);
+  else if (interval === "daily") next.setUTCDate(next.getUTCDate() + 1);
+  else if (interval === "weekly") next.setUTCDate(next.getUTCDate() + 7);
+  else next.setUTCMonth(next.getUTCMonth() + 1);
+  return next.toISOString();
+}
+
+export async function getWorkspaceAiConfigSummary(workspaceId: string): Promise<WorkspaceAiConfigSummary> {
+  const rows = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
+  return toSummary(rows[0]);
 }
 
 /** Never exposed over HTTP - only `agent.ts` reads the decrypted key, right before calling the provider. */
-export async function getDecryptedAiConfig(userId: string): Promise<DecryptedAiConfig | null> {
-  const rows = await db.select().from(aiConfigs).where(eq(aiConfigs.userId, userId)).limit(1);
+export async function getDecryptedWorkspaceAiConfig(workspaceId: string): Promise<DecryptedAiConfig | null> {
+  const rows = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
   const row = rows[0];
   if (!row) return null;
   return { provider: row.provider, model: row.model, baseUrl: row.baseUrl, apiKey: decrypt(row.apiKey) };
 }
 
-export async function saveAiConfig(userId: string, input: SaveAiConfigInput): Promise<AiConfigSummary> {
+export async function saveWorkspaceAiConfig(workspaceId: string, input: SaveWorkspaceAiConfigInput): Promise<WorkspaceAiConfigSummary> {
   const now = nowIso();
-  const existing = await db.select({ userId: aiConfigs.userId }).from(aiConfigs).where(eq(aiConfigs.userId, userId)).limit(1);
+  const existing = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
+  const row = existing[0];
+  const intervalChanged = !row || row.usageResetInterval !== input.usageResetInterval;
+  const budgetRaisedOrCleared = row && (input.maxTokenBudget == null || (row.maxTokenBudget != null && input.maxTokenBudget > row.maxTokenBudget));
   const values = {
     provider: input.provider,
     baseUrl: input.baseUrl ?? null,
     model: input.model,
     apiKey: encrypt(input.apiKey),
+    maxTokenBudget: input.maxTokenBudget ?? null,
+    usageResetInterval: input.usageResetInterval,
+    usageResetAt: intervalChanged ? nextResetAt(input.usageResetInterval, new Date()) : row!.usageResetAt,
+    budgetNotifiedAt: budgetRaisedOrCleared ? null : (row?.budgetNotifiedAt ?? null),
     updatedAt: now,
   };
-  if (existing[0]) {
-    await db.update(aiConfigs).set(values).where(eq(aiConfigs.userId, userId));
+  if (row) {
+    await db.update(workspaceAiConfigs).set(values).where(eq(workspaceAiConfigs.workspaceId, workspaceId));
   } else {
-    await db.insert(aiConfigs).values({ userId, ...values, createdAt: now });
+    await db.insert(workspaceAiConfigs).values({ workspaceId, ...values, consumedTokens: 0, createdAt: now });
   }
-  return getAiConfigSummary(userId);
+  return getWorkspaceAiConfigSummary(workspaceId);
 }
 
-export async function deleteAiConfig(userId: string): Promise<void> {
-  await db.delete(aiConfigs).where(eq(aiConfigs.userId, userId));
+export async function deleteWorkspaceAiConfig(workspaceId: string): Promise<void> {
+  await db.delete(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId));
+}
+
+/** Throws if the workspace has a budget and has already used it up - called right before every provider request. On the first call after the budget is hit, also notifies the workspace owner. */
+export async function assertBudgetNotExceeded(workspaceId: string): Promise<void> {
+  const rows = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
+  const row = rows[0];
+  if (!row || row.maxTokenBudget == null) return;
+  if (row.consumedTokens < row.maxTokenBudget) return;
+
+  if (!row.budgetNotifiedAt) {
+    await db.update(workspaceAiConfigs).set({ budgetNotifiedAt: nowIso() }).where(eq(workspaceAiConfigs.workspaceId, workspaceId));
+    const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
+    if (workspace) {
+      await notifyUser(workspace.ownerId, {
+        title: "AI token budget reached",
+        body: `"${workspace.name}" has used its monthly AI token budget (${row.maxTokenBudget} tokens). AI requests are blocked until the budget resets or you raise it.`,
+        url: `/w/${workspaceId}/settings`,
+      });
+    }
+  }
+  throw badRequest("This workspace has reached its AI token budget - ask a workspace owner to raise it in Settings, or wait for the next reset.");
+}
+
+export async function recordTokenUsage(workspaceId: string, promptTokens: number, completionTokens: number): Promise<void> {
+  const rows = await db.select({ consumedTokens: workspaceAiConfigs.consumedTokens }).from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
+  const row = rows[0];
+  if (!row) return;
+  await db
+    .update(workspaceAiConfigs)
+    .set({ consumedTokens: row.consumedTokens + promptTokens + completionTokens })
+    .where(eq(workspaceAiConfigs.workspaceId, workspaceId));
 }
 
 function toAiChatMessage(row: typeof aiChatMessages.$inferSelect): AiChatMessage {

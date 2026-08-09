@@ -60,8 +60,8 @@ import type {
   CreatedWebhook,
   CreateWebhookInput,
   UpdateWebhookInput,
-  AiConfigSummary,
-  SaveAiConfigInput,
+  WorkspaceAiConfigSummary,
+  SaveWorkspaceAiConfigInput,
   AiChatMessage,
   RenderedBlocksResponse,
   TemplateAutocompleteSchemaResponse,
@@ -467,9 +467,10 @@ export const webhookApi = {
 };
 
 export const aiApi = {
-  getConfig: () => apiRequest<AiConfigSummary>("/api/v1/ai/config"),
-  saveConfig: (input: SaveAiConfigInput) => apiRequest<AiConfigSummary>("/api/v1/ai/config", { method: "PATCH", body: input }),
-  removeConfig: () => apiRequest<void>("/api/v1/ai/config", { method: "DELETE" }),
+  getConfig: (workspaceId: string) => apiRequest<WorkspaceAiConfigSummary>(`/api/v1/workspaces/${workspaceId}/ai/config`),
+  saveConfig: (workspaceId: string, input: SaveWorkspaceAiConfigInput) =>
+    apiRequest<WorkspaceAiConfigSummary>(`/api/v1/workspaces/${workspaceId}/ai/config`, { method: "PUT", body: input }),
+  removeConfig: (workspaceId: string) => apiRequest<void>(`/api/v1/workspaces/${workspaceId}/ai/config`, { method: "DELETE" }),
   listMessages: (workspaceId: string) => apiRequest<AiChatMessage[]>(`/api/v1/workspaces/${workspaceId}/ai/chat`),
   sendMessage: (workspaceId: string, message: string) =>
     apiRequest<AiChatMessage[]>(`/api/v1/workspaces/${workspaceId}/ai/chat`, { method: "POST", body: { message } }),

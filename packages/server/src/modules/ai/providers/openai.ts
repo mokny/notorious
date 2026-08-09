@@ -71,6 +71,7 @@ export const openAiAdapter: AiProviderAdapter = {
 
     const data = (await response.json()) as {
       choices: { message: { content: string | null; tool_calls?: OpenAiToolCallWire[] } }[];
+      usage?: { prompt_tokens: number; completion_tokens: number };
     };
     const message = data.choices[0]?.message;
     const toolCalls: ProviderToolCall[] = (message?.tool_calls ?? []).map((call) => ({
@@ -80,7 +81,11 @@ export const openAiAdapter: AiProviderAdapter = {
       signature: call.extra_content?.google.thought_signature,
     }));
 
-    return { content: message?.content ?? null, toolCalls };
+    return {
+      content: message?.content ?? null,
+      toolCalls,
+      usage: { promptTokens: data.usage?.prompt_tokens ?? 0, completionTokens: data.usage?.completion_tokens ?? 0 },
+    };
   },
 };
 

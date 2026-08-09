@@ -394,33 +394,34 @@ export async function updateVotingSettings(blockId: string, input: UpdateVotingS
 }
 
 /**
- * Runs the AI block's prompt against the acting user's configured provider
- * and writes the result (or, on failure, the error message with
- * `isError: true`) straight into the block's content - see
+ * Runs the AI block's prompt against the host object's workspace's
+ * configured AI provider and writes the result (or, on failure, the error
+ * message with `isError: true`) straight into the block's content - see
  * generateAiBlockSchema's doc comment for why this is its own endpoint
  * rather than going through `updateBlock`. Context (the host object's title
  * plus its entire block tree rendered to Markdown, independent of where this
  * block sits in it) is only assembled and sent when `includeContext` is
  * true - it's an explicit per-request opt-in (default off, confirmed once
  * client-side - see AiBlock.tsx) since it leaves the app to whatever
- * provider the acting user has configured.
+ * provider the workspace has configured.
  */
-export async function generateAiBlockAnswer(blockId: string, aiUserId: string, prompt: string, includeContext: boolean): Promise<Block> {
+export async function generateAiBlockAnswer(blockId: string, prompt: string, includeContext: boolean): Promise<Block> {
   const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
   const row = rows[0];
   if (!row) throw notFound("Block not found");
   if (row.type !== "ai") throw badRequest("Not an AI block");
 
+  const object = await getObject(row.objectId);
   let context: string | null = null;
   if (includeContext) {
-    const [object, siblingBlocks] = await Promise.all([getObject(row.objectId), listBlocks(row.objectId)]);
+    const siblingBlocks = await listBlocks(row.objectId);
     context = `# ${object.title}\n\n${blocksToMarkdown(siblingBlocks)}`;
   }
 
   let answer: string;
   let isError = false;
   try {
-    answer = await generateBlockAnswer(aiUserId, prompt, context);
+    answer = await generateBlockAnswer(object.workspaceId, prompt, context);
   } catch (error) {
     answer = error instanceof Error ? error.message : "AI request failed";
     isError = true;

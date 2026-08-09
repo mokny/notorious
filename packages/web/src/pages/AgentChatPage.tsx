@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AiChatMessage } from "@notorious/shared";
-import { aiApi } from "../lib/api/resources.js";
+import { aiApi, workspaceApi } from "../lib/api/resources.js";
+import { useAuth } from "../context/AuthContext.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
 import { Icon } from "../components/ui/Icon.js";
@@ -25,14 +26,17 @@ function MessageBubble({ message }: { message: AiChatMessage }) {
   );
 }
 
-/** Chat UI for the in-app AI agent - only usable once the user has configured a provider in Settings (see AiSettings.tsx). Shares its tool set with the MCP server (modules/ai/tools.ts on the server), so anything it can do here, an external MCP client can do too. */
+/** Chat UI for the in-app AI agent - only usable once a workspace owner has configured a shared provider in Settings (see WorkspaceAiSettings.tsx). Shares its tool set with the MCP server (modules/ai/tools.ts on the server), so anything it can do here, an external MCP client can do too. */
 export function AgentChatPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: config } = useQuery({ queryKey: ["aiConfig"], queryFn: aiApi.getConfig });
+  const { data: workspace } = useQuery({ queryKey: ["workspace", workspaceId], queryFn: () => workspaceApi.get(workspaceId!) });
+  const isOwner = workspace?.ownerId === user?.id;
+  const { data: config } = useQuery({ queryKey: ["aiConfig", workspaceId], queryFn: () => aiApi.getConfig(workspaceId!), enabled: Boolean(workspaceId) });
   const { data: messages } = useQuery({
     queryKey: ["aiChat", workspaceId],
     queryFn: () => aiApi.listMessages(workspaceId!),
@@ -71,13 +75,17 @@ export function AgentChatPage() {
         <Icon name="terminal" className="mx-auto h-8 w-8 text-ink-muted" />
         <h1 className="mt-3 text-lg font-semibold">No AI provider configured</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Set up an API key for an AI provider to chat with an agent that can create and edit objects for you.
+          {isOwner
+            ? "Set up an API key for an AI provider to chat with an agent that can create and edit objects for you."
+            : "Ask a workspace owner to configure an AI provider in Settings - it's shared by everyone in this workspace."}
         </p>
-        <Link to={`/w/${workspaceId}/settings`}>
-          <Button variant="primary" className="mt-4">
-            Go to Settings
-          </Button>
-        </Link>
+        {isOwner && (
+          <Link to={`/w/${workspaceId}/settings`}>
+            <Button variant="primary" className="mt-4">
+              Go to Settings
+            </Button>
+          </Link>
+        )}
       </div>
     );
   }

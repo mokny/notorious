@@ -35,6 +35,7 @@ export interface ProviderChatParams {
 export interface ProviderChatResult {
   content: string | null;
   toolCalls: ProviderToolCall[];
+  usage: { promptTokens: number; completionTokens: number };
 }
 
 export interface AiProviderAdapter {
