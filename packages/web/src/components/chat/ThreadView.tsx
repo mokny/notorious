@@ -28,7 +28,17 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   const call = useCall();
   const [typingUserName, setTypingUserName] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  // Mirrors the `isAtBottom` state in a ref too - the messages-effect below
+  // needs the current value without retriggering on every scroll tick, and
+  // without depending on stale state from its own closure.
+  const isAtBottomRef = useRef(true);
+  // What the previous run of the messages-effect already scrolled/counted
+  // up to, per conversation - `ThreadView` isn't remounted (no `key`) when
+  // switching conversations, so this can't just live in a plain ref keyed
+  // by conversationId alone.
+  const processedRef = useRef<{ conversationId: string | null; count: number }>({ conversationId: null, count: 0 });
 
   const { data: conversations } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
   const conversation = conversations?.find((c) => c.id === conversationId);
@@ -102,18 +112,65 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
     });
   }, [conversationId, onTyping]);
 
+  function scrollToBottom(behavior: ScrollBehavior) {
+    const el = scrollContainerRef.current;
+    el?.scrollTo({ top: el.scrollHeight, behavior });
+  }
+
+  function jumpToBottom() {
+    scrollToBottom("smooth");
+    isAtBottomRef.current = true;
+    setPendingCount(0);
+    const last = messages?.[messages.length - 1];
+    if (last) markReadMutation.mutate(last.id);
+  }
+
+  function handleScroll() {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    isAtBottomRef.current = atBottom;
+    if (atBottom && pendingCount > 0) {
+      setPendingCount(0);
+      const last = messages?.[messages.length - 1];
+      if (last) markReadMutation.mutate(last.id);
+    }
+  }
+
   // A new message (sent or received) always means whatever was being typed
   // just got sent - clear the indicator immediately instead of waiting out
   // TYPING_TIMEOUT_MS, and only show it again once a fresh "typing" event
-  // arrives for the *next* message.
+  // arrives for the *next* message. Beyond that: jump to the bottom on
+  // opening a thread or switching to it, on sending a message ourselves, or
+  // on receiving one while already at the bottom - but if a message arrives
+  // from someone else while scrolled up into history, leave the scroll
+  // position alone and just count it for the "jump to bottom" button
+  // instead (see `processedRef`'s own comment for why plain `[conversationId]`
+  // isn't enough to detect "switched thread" here).
   useEffect(() => {
-    const last = messages?.[messages.length - 1];
-    if (last) markReadMutation.mutate(last.id);
+    if (!messages) return;
     clearTimeout(typingTimeoutRef.current);
     setTypingUserName(null);
-    bottomRef.current?.scrollIntoView({ block: "end" });
+
+    const isNewThread = processedRef.current.conversationId !== conversationId;
+    const previousCount = isNewThread ? 0 : processedRef.current.count;
+    const newMessages = messages.slice(previousCount);
+    processedRef.current = { conversationId, count: messages.length };
+
+    if (newMessages.length === 0) return;
+
+    const hasOwnMessage = newMessages.some((m) => m.authorId === user?.id);
+    if (isNewThread || hasOwnMessage || isAtBottomRef.current) {
+      scrollToBottom("auto");
+      isAtBottomRef.current = true;
+      setPendingCount(0);
+      const last = messages[messages.length - 1];
+      if (last) markReadMutation.mutate(last.id);
+    } else {
+      setPendingCount((count) => count + newMessages.length);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages?.length]);
+  }, [messages?.length, conversationId]);
 
   return (
     <div className="flex h-full flex-col">
@@ -180,23 +237,34 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto py-2">
-        {messages?.map((message, index) => {
-          const previous = messages[index - 1];
-          const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
-          return (
-            <div key={message.id}>
-              {showDaySeparator && (
-                <div className="my-2 flex items-center justify-center">
-                  <span className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink-muted">{dayLabel(message.createdAt)}</span>
-                </div>
-              )}
-              <MessageBubble message={message} conversationId={conversationId} readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null} />
-            </div>
-          );
-        })}
-        {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{typingUserName} is typing…</p>}
-        <div ref={bottomRef} />
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollContainerRef} onScroll={handleScroll} className="h-full overflow-y-auto py-2">
+          {messages?.map((message, index) => {
+            const previous = messages[index - 1];
+            const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
+            return (
+              <div key={message.id}>
+                {showDaySeparator && (
+                  <div className="my-2 flex items-center justify-center">
+                    <span className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink-muted">{dayLabel(message.createdAt)}</span>
+                  </div>
+                )}
+                <MessageBubble message={message} conversationId={conversationId} readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null} />
+              </div>
+            );
+          })}
+          {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{typingUserName} is typing…</p>}
+        </div>
+
+        {pendingCount > 0 && (
+          <button
+            onClick={jumpToBottom}
+            className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-white shadow-lg hover:opacity-90"
+          >
+            <Icon name="chevron-down" className="h-4 w-4" />
+            {pendingCount}
+          </button>
+        )}
       </div>
 
       <Composer conversationId={conversationId} />
