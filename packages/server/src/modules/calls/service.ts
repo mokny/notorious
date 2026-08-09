@@ -166,6 +166,7 @@ async function handleParticipantLeft(callId: string, conversationId: string): Pr
 export async function leaveCall(callId: string, userId: string, clientId: string): Promise<void> {
   const removed = callState.removeParticipantByIds(userId, clientId, callId);
   if (!removed) return;
+  sfu.cleanupParticipantByIds(userId, clientId);
   await handleParticipantLeft(removed.callId, removed.conversationId);
 }
 

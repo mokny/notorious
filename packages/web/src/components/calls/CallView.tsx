@@ -69,7 +69,7 @@ export function CallView() {
 
       <div className="flex items-center justify-center gap-3 p-4">
         <button
-          onClick={toggleMic}
+          onClick={() => void toggleMic()}
           className={`flex h-12 w-12 items-center justify-center rounded-full ${micOn ? "bg-surface-raised text-ink" : "bg-surface-raised text-ink-muted"}`}
           title={micOn ? "Mute microphone" : "Unmute microphone"}
         >

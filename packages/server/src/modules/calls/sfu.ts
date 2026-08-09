@@ -114,6 +114,16 @@ export function getRtpCapabilities(callId: string): RtpCapabilities {
 
 function ensureParticipantEntry(socket: WebSocket, callId: string, userId: string, clientId: string, router: MediasoupTypes.Router): ParticipantSfuEntry {
   let entry = sfuBySocket.get(socket);
+  // A leftover entry from a call this same tab already left (leaveCall only
+  // closes callState's roster entry, not this one) has a stale callId - if
+  // left in place, otherProducers()/listProducers() for the *new* call would
+  // never see this participant, since both filter by entry.callId === callId
+  // (rejoining a call could silently look "empty" even with others in it).
+  if (entry && entry.callId !== callId) {
+    entry.sendTransport?.close();
+    entry.recvTransport?.close();
+    entry = undefined;
+  }
   if (!entry) {
     entry = { callId, userId, clientId, router, sendTransport: null, recvTransport: null, producers: new Map(), consumers: new Map() };
     sfuBySocket.set(socket, entry);
@@ -239,6 +249,12 @@ export async function resumeConsumer(userId: string, clientId: string, consumerI
   const consumer = entry.consumers.get(consumerId);
   if (!consumer) throw notFound("Consumer not found");
   await consumer.resume();
+}
+
+/** Same as `cleanupParticipant`, but by identity instead of socket reference - for the REST leave/hangup path (service.ts's leaveCall), which has no socket object to hand in. Without this, an explicit "leave" (as opposed to closing the tab) left the SFU entry dangling with a stale callId, causing exactly the ensureParticipantEntry situation described above on rejoin. */
+export function cleanupParticipantByIds(userId: string, clientId: string): void {
+  const socket = getSocketForClient(userId, clientId);
+  if (socket) cleanupParticipant(socket);
 }
 
 /** Closes both of this device's transports (cascades to close every producer/consumer on them) and drops its SFU entry entirely - called from the socket's own "close" handler alongside `leaveCallBySocket`, and a safe no-op if this socket was never in a call's media session. */

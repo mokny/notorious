@@ -39,7 +39,7 @@ interface CallContextValue {
   leaveCall: () => Promise<void>;
   toggleCamera: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
-  toggleMic: () => void;
+  toggleMic: () => Promise<void>;
 }
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -96,6 +96,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const callIdRef = useRef<string | null>(null);
   const ringtoneRef = useRef<{ stop: () => void } | null>(null);
+  // Bumped by leaveCall/onCallEnded and at the start of every joinCall -
+  // lets an in-flight joinCall notice it's been superseded (e.g. the user
+  // hit "leave" moments after joining) and unwind instead of finishing the
+  // handshake and overwriting already-stopped local tracks with new,
+  // never-stopped ones (the mic staying on after hangup).
+  const joinGenerationRef = useRef(0);
 
   function streamForEntry(entry: RemoteParticipantEntry): MediaStream | null {
     const tracks = [...entry.consumers.values()].map((c) => c.consumer.track);
@@ -206,6 +212,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }
 
   async function leaveCall(): Promise<void> {
+    joinGenerationRef.current += 1;
     const currentCallId = callIdRef.current;
     if (currentCallId) {
       callApi.leave(currentCallId, myClientId).catch(() => {});
@@ -220,7 +227,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }
 
   async function joinCall(newCallId: string, newConversationId: string): Promise<void> {
+    const myGeneration = (joinGenerationRef.current += 1);
+    const supersededByLeave = () => joinGenerationRef.current !== myGeneration;
+
     const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    if (supersededByLeave()) {
+      micStream.getTracks().forEach((track) => track.stop());
+      return;
+    }
     localStreamRef.current = micStream;
     setLocalStream(micStream);
 
@@ -229,6 +243,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
     // checks the server's callState roster, and `answerCall` is the only
     // thing that adds an entry to it.
     await callApi.answer(newCallId, myClientId);
+    if (supersededByLeave()) {
+      // leaveCall() already ran resetLocalTracks() before this resolved, so
+      // this join's own micStream (assigned above, now orphaned) needs its
+      // own cleanup, and the server needs to know it registered too late.
+      micStream.getTracks().forEach((track) => track.stop());
+      callApi.leave(newCallId, myClientId).catch(() => {});
+      return;
+    }
     callIdRef.current = newCallId;
 
     const routerRtpCapabilities = await callApi.rtpCapabilities(newCallId, myClientId);
@@ -258,13 +280,28 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
     const micTrack = micStream.getAudioTracks()[0];
     if (micTrack) {
-      const micProducer = await sendTransport.produce({ track: micTrack, appData: { source: "mic" satisfies ProducerSource } });
+      // stopTracks: false - toggleMic() below mutes by swapping the
+      // producer's track to null and back (see its comment for why), which
+      // would otherwise permanently kill this track on the first mute.
+      const micProducer = await sendTransport.produce({ track: micTrack, appData: { source: "mic" satisfies ProducerSource }, stopTracks: false });
       localProducersRef.current.set("mic", micProducer);
     }
 
     const existingProducers = await callApi.listProducers(newCallId, myClientId);
     for (const producer of existingProducers) {
       await consumeRemoteProducer(producer.userId, producer.clientId, producer.producerId, producer.source);
+    }
+
+    if (supersededByLeave()) {
+      // A leave that landed *after* sendTransportRef/recvTransportRef were
+      // already assigned above was already closed by that leaveCall's own
+      // resetLocalTracks() - this only catches a leave landing in the
+      // narrower window before that assignment happened.
+      sendTransport.close();
+      recvTransport.close();
+      micStream.getTracks().forEach((track) => track.stop());
+      callApi.leave(newCallId, myClientId).catch(() => {});
+      return;
     }
 
     enterActiveCall(newCallId, newConversationId);
@@ -286,11 +323,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
     stopRingtone();
   }
 
-  function toggleMic(): void {
+  async function toggleMic(): Promise<void> {
+    const micProducer = localProducersRef.current.get("mic");
     const track = localStreamRef.current?.getAudioTracks()[0];
-    if (!track) return;
-    track.enabled = !track.enabled;
-    setMicOn(track.enabled);
+    if (!micProducer || !track) return;
+    // Swap the track to/from null on the producer itself, rather than
+    // track.enabled - on some iOS Safari versions, setting enabled = false
+    // doesn't actually stop the real audio from being sent (a known WebKit
+    // bug), while removing the track from the RTCRtpSender does.
+    const nextMicOn = micProducer.track === null;
+    await micProducer.replaceTrack({ track: nextMicOn ? track : null });
+    setMicOn(nextMicOn);
   }
 
   async function toggleCamera(): Promise<void> {
@@ -421,6 +464,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     () =>
       onCallEnded((endedCallId) => {
         if (endedCallId === callIdRef.current) {
+          joinGenerationRef.current += 1;
           closeAllRemote();
           resetLocalTracks();
           callIdRef.current = null;
