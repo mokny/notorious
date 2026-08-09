@@ -2,14 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <!-- Lets the installed PWA render under the status bar/Dynamic Island
-         (paired with viewport-fit=cover above and the safe-area padding in
-         WorkspaceLayout.tsx) instead of iOS drawing its own fixed white/black
-         bar there - required for the theme-color meta below to have any
-         visible effect in standalone mode at all. -->
+    <!-- No `viewport-fit=cover` on the meta above (deliberately, see git log)
+         - it let content render under the status bar/Dynamic Island/home
+         indicator, but WKWebView's own accounting of the "safe" viewport
+         under that "cover" mode is what caused a confirmed-on-device bug
+         where window.innerHeight comes up short of the real screen after a
+         cold launch of the installed PWA, permanently losing a strip at the
+         true bottom edge with no in-page fix able to reach it. Without
+         `cover`, iOS confines the whole page to the safe area itself (no
+         env(safe-area-inset-*) values needed, they resolve to 0), which
+         trades away the edge-to-edge cover-image effect under the island for
+         a correctly-reported viewport on every page. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon-192.png" />
