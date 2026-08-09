@@ -59,14 +59,29 @@ registerRoute(
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
-  const payload = event.data.json() as { title: string; body: string; url?: string };
+  const payload = event.data.json() as { title: string; body: string; url?: string; badge?: number };
 
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: "/icons/icon-192.png",
-      data: { url: payload.url ?? "/" },
-    }),
+    Promise.all([
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: "/icons/icon-192.png",
+        data: { url: payload.url ?? "/" },
+      }),
+      // Best-effort: this is what makes the app-icon badge update while the
+      // app is backgrounded/fully closed, not just live via the WS-driven
+      // path in chatBadge.ts (which only runs while a tab/PWA instance is
+      // open). `setAppBadge`/`clearAppBadge` are part of the Badging API's
+      // WorkerNavigator mixin, so they exist on `self.navigator` here too -
+      // guarded the same way chatBadge.ts guards the foreground call, since
+      // support is inconsistent (works in Chromium and iOS 16.4+ standalone
+      // PWAs, absent in Firefox).
+      "setAppBadge" in self.navigator && typeof payload.badge === "number"
+        ? payload.badge > 0
+          ? (self.navigator as unknown as { setAppBadge(count?: number): Promise<void> }).setAppBadge(payload.badge).catch(() => {})
+          : (self.navigator as unknown as { clearAppBadge(): Promise<void> }).clearAppBadge().catch(() => {})
+        : Promise.resolve(),
+    ]),
   );
 });
 

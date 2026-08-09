@@ -401,12 +401,14 @@ async function notifyNewMessage(conversationId: string, message: Message, sender
   const recipients = allParticipantUserIds.filter((id) => id !== message.authorId);
   await Promise.all(
     recipients.map(async (userId) => {
-      sendToUserGlobal(userId, { type: "chatUnreadCount", unreadConversationCount: await countUnreadConversations(userId) });
+      const unreadConversationCount = await countUnreadConversations(userId);
+      sendToUserGlobal(userId, { type: "chatUnreadCount", unreadConversationCount });
       if (isFocused(userId, conversationId)) return;
       await notifyUser(userId, {
         title: senderName,
         body: message.body ? preview(message.body) : "Sent an attachment",
         url: `/messages/${conversationId}`,
+        badge: unreadConversationCount,
       });
     }),
   );
