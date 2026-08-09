@@ -44,6 +44,30 @@ function PeerTile({ peer, conversationId }: { peer: CallPeer; conversationId: st
   return <VideoTile stream={peer.stream} name={info.name} avatarColor={info.avatarColor} avatarUrl={info.avatarUrl} />;
 }
 
+function PeerAudioTrack({ peer }: { peer: CallPeer }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.srcObject = peer.stream;
+  }, [peer.stream]);
+  return <audio ref={audioRef} autoPlay className="sr-only" />;
+}
+
+/**
+ * The full view's VideoTile grid doubles as the audio player (each peer's
+ * non-muted <video>) - once that grid unmounts for the minimized bubble,
+ * peer audio would otherwise go silent. These invisible <audio> elements
+ * keep every peer's audio track playing while minimized.
+ */
+function PeerAudioSink({ peers }: { peers: CallPeer[] }) {
+  return (
+    <>
+      {peers.map((peer) => (
+        <PeerAudioTrack key={`${peer.userId}:${peer.clientId}`} peer={peer} />
+      ))}
+    </>
+  );
+}
+
 function useCallDuration(): string {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   useEffect(() => {
@@ -120,7 +144,14 @@ export function CallView() {
   const { phase, localStream, peers, cameraOn, screenSharing, micOn, minimized, conversationId, leaveCall, toggleCamera, toggleScreenShare, toggleMic, setMinimized } = useCall();
 
   if (phase !== "active") return null;
-  if (minimized) return <MinimizedCallBubble />;
+  if (minimized) {
+    return (
+      <>
+        <MinimizedCallBubble />
+        <PeerAudioSink peers={peers} />
+      </>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-surface" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
