@@ -1,4 +1,5 @@
 import type { ISODateString } from "./entities.js";
+import type { CallSummary } from "./calls.js";
 
 /** A minimal, denormalized participant summary - enough to render an avatar/name without a separate lookup. */
 export interface ConversationParticipantSummary {
@@ -69,6 +70,9 @@ export interface Message {
   reactions: MessageReaction[];
   /** Who has read this message and when - see message_read_receipts / chat/service.ts::markRead. */
   readBy: ReadReceipt[];
+  /** Set only for a call-outcome system row (see calls.ts's CallSummary) - MessageBubble renders these as a compact call-log row instead of a normal bubble. Null for every ordinary message. */
+  callId: string | null;
+  call: CallSummary | null;
 }
 
 /**

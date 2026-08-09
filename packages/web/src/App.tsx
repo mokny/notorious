@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./context/AuthContext.js";
 import { ChatRealtimeProvider } from "./context/ChatRealtimeContext.js";
 import { ChatOverlayProvider } from "./context/ChatOverlayContext.js";
+import { CallProvider } from "./context/CallContext.js";
 import { isSharedSession } from "./lib/api/shareMode.js";
 import { systemApi } from "./lib/api/resources.js";
 import { useDynamicViewportHeight } from "./hooks/useDynamicViewportHeight.js";
@@ -21,6 +22,8 @@ import { AgentChatPage } from "./pages/AgentChatPage.js";
 import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
 import { ChatBubble } from "./components/chat/ChatBubble.js";
 import { ChatSheet } from "./components/chat/ChatSheet.js";
+import { CallView } from "./components/calls/CallView.js";
+import { IncomingCallBanner } from "./components/calls/IncomingCallBanner.js";
 import { ChatListPage } from "./pages/ChatListPage.js";
 import { ChatThreadPage } from "./pages/ChatThreadPage.js";
 
@@ -56,11 +59,15 @@ export function App() {
   useDynamicViewportHeight();
   return (
     <ChatRealtimeProvider>
-      <ChatOverlayProvider>
-        <AppRoutes />
-        <ChatBubble />
-        <ChatSheet />
-      </ChatOverlayProvider>
+      <CallProvider>
+        <ChatOverlayProvider>
+          <AppRoutes />
+          <ChatBubble />
+          <ChatSheet />
+          <CallView />
+          <IncomingCallBanner />
+        </ChatOverlayProvider>
+      </CallProvider>
     </ChatRealtimeProvider>
   );
 }

@@ -10,6 +10,8 @@ export * from "./types/entities.js";
 export * from "./types/blockContent.js";
 export * from "./types/chat.js";
 export * from "./types/chatRealtime.js";
+export * from "./types/calls.js";
+export * from "./types/callSignal.js";
 export * from "./utils/tableDoc.js";
 
 export * from "./schemas/auth.js";
@@ -31,6 +33,7 @@ export * from "./schemas/template.js";
 export * from "./schemas/presence.js";
 export * from "./schemas/shareTarget.js";
 export * from "./schemas/chat.js";
+export * from "./schemas/calls.js";
 
 export * from "./templates/lexer.js";
 export * from "./templates/parser.js";

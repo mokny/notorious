@@ -1,9 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Message } from "@notorious/shared";
+import type { Message, CallSummary } from "@notorious/shared";
 import { chatApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { Icon } from "../ui/Icon.js";
+
+function formatCallDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+/** Compact system-style row for a call outcome (missed/declined/ended) - iMessage/WhatsApp style, replaces the normal chat bubble entirely. See `chat/calls/service.ts::writeCallHistoryMessage`. */
+function CallLogRow({ call, createdAt }: { call: CallSummary; createdAt: string }) {
+  const label =
+    call.status === "missed"
+      ? "Missed call"
+      : call.status === "declined"
+        ? "Declined call"
+        : `Call ended · ${formatCallDuration(call.durationSeconds ?? 0)}`;
+
+  return (
+    <div className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs text-ink-muted">
+      <Icon name={call.status === "missed" || call.status === "declined" ? "phone-off" : "phone"} className="h-3.5 w-3.5" />
+      <span>{label}</span>
+      <span>· {new Date(createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+    </div>
+  );
+}
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const LONG_PRESS_MS = 450;
@@ -59,6 +83,8 @@ export function MessageBubble({
     document.addEventListener("pointerdown", handleOutside);
     return () => document.removeEventListener("pointerdown", handleOutside);
   }, [showPicker]);
+
+  if (message.call) return <CallLogRow call={message.call} createdAt={message.createdAt} />;
 
   return (
     <div className={`flex flex-col gap-0.5 px-3 py-1 ${isOwn ? "items-end" : "items-start"}`}>

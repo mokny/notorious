@@ -130,18 +130,38 @@ export function sendToUser(workspaceId: string, userId: string, message: Notific
 // `realtime/routes.ts`'s separate `/ws/chat` endpoint.
 const socketsByUserId = new Map<string, Set<WebSocket>>();
 
-/** Registers a socket on the workspace-agnostic chat channel for one user and cleans up on disconnect. */
-export function joinGlobalRoom(userId: string, socket: WebSocket): void {
+// Chat itself never needed to address one specific tab (every event fans
+// out to all of a user's devices) - calls do: "stop ringing on my other
+// devices" and signaling relay both need to reach exactly one socket. Kept
+// as a separate parallel map rather than changing `socketsByUserId`'s value
+// type, so every existing call site (`sendToUserGlobal`,
+// `broadcastToConversation`) is untouched.
+const clientIdBySocket = new Map<WebSocket, string>();
+
+/** Finds the actual WebSocket for one of a user's devices by clientId - REST call endpoints (answer/leave) have no socket of their own to hand in, but calls/callState.ts is keyed by socket, so this bridges the two. Undefined if that device isn't connected right now. */
+export function getSocketForClient(userId: string, clientId: string): WebSocket | undefined {
+  const sockets = socketsByUserId.get(userId);
+  if (!sockets) return undefined;
+  for (const socket of sockets) {
+    if (clientIdBySocket.get(socket) === clientId) return socket;
+  }
+  return undefined;
+}
+
+/** Registers a socket on the workspace-agnostic chat channel for one user and cleans up on disconnect. `clientId` identifies the browser tab/device (see lib/ws/clientId.ts on the frontend) - required (not optional like the older per-workspace `joinRoom`) since calls need every `/ws/chat` socket addressable. */
+export function joinGlobalRoom(userId: string, socket: WebSocket, clientId: string): void {
   let sockets = socketsByUserId.get(userId);
   if (!sockets) {
     sockets = new Set();
     socketsByUserId.set(userId, sockets);
   }
   sockets.add(socket);
+  clientIdBySocket.set(socket, clientId);
 
   socket.on("close", () => {
     sockets?.delete(socket);
     if (sockets && sockets.size === 0) socketsByUserId.delete(userId);
+    clientIdBySocket.delete(socket);
   });
 }
 
@@ -159,4 +179,28 @@ export function sendToUserGlobal(userId: string, message: ChatRealtimeMessage): 
 /** Fans a chat payload out to a specific set of participant user ids - chat's own primitive on top of `sendToUserGlobal`, since conversations aren't a "room" concept the hub itself knows about (chat/service.ts already has the participant list from its own queries). */
 export function broadcastToConversation(participantUserIds: string[], message: ChatRealtimeMessage): void {
   for (const userId of participantUserIds) sendToUserGlobal(userId, message);
+}
+
+/** Same fan-out as `sendToUserGlobal`, but skips the one device that already knows (e.g. the device that just answered a call) - "first to answer wins, stop ringing on my other devices." */
+export function sendToUserGlobalExcept(userId: string, excludeClientId: string, message: ChatRealtimeMessage): void {
+  const sockets = socketsByUserId.get(userId);
+  if (!sockets) return;
+
+  const payload = JSON.stringify(message);
+  for (const socket of sockets) {
+    if (clientIdBySocket.get(socket) === excludeClientId) continue;
+    if (socket.readyState === socket.OPEN) socket.send(payload);
+  }
+}
+
+/** Targets exactly one of a user's devices/tabs by clientId - used for call-signaling relay (offer/answer/ICE candidate), which must reach the specific peer connection waiting for it, not every device the user has open. A no-op if that client isn't connected right now. */
+export function sendToClientGlobal(userId: string, clientId: string, message: ChatRealtimeMessage): void {
+  const sockets = socketsByUserId.get(userId);
+  if (!sockets) return;
+
+  const payload = JSON.stringify(message);
+  for (const socket of sockets) {
+    if (clientIdBySocket.get(socket) !== clientId) continue;
+    if (socket.readyState === socket.OPEN) socket.send(payload);
+  }
 }

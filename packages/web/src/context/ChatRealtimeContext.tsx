@@ -5,11 +5,7 @@ import { useGlobalRealtime } from "../lib/ws/useGlobalRealtime.js";
 import { updateAppBadge } from "../lib/chatBadge.js";
 import { useAuth } from "./AuthContext.js";
 
-interface ChatRealtimeContextValue {
-  sendTyping: (conversationId: string) => void;
-  setFocusedConversation: (conversationId: string | null) => void;
-  onTyping: (listener: (conversationId: string, userId: string, userName: string) => void) => () => void;
-}
+type ChatRealtimeContextValue = ReturnType<typeof useGlobalRealtime>;
 
 const ChatRealtimeContext = createContext<ChatRealtimeContextValue | null>(null);
 
@@ -22,10 +18,16 @@ const ChatRealtimeContext = createContext<ChatRealtimeContextValue | null>(null)
  * update path, but the very first paint (before any WS event has arrived)
  * needs *something* to set the badge from, so this derives it once from the
  * initial conversation-list fetch too.
+ *
+ * The whole `useGlobalRealtime` return value is passed through as-is
+ * (rather than re-destructured field by field) so CallContext.tsx (nested
+ * inside this provider) gets the call-signaling methods
+ * (`onCallRing`/`sendCallSignal`/...) without this file needing to know
+ * about every one of them individually.
  */
 export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const { sendTyping, setFocusedConversation, onTyping } = useGlobalRealtime(Boolean(user));
+  const realtime = useGlobalRealtime(Boolean(user));
 
   const { data: conversations } = useQuery({
     queryKey: ["chatConversations"],
@@ -38,9 +40,7 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
     updateAppBadge(conversations.filter((c) => c.unreadCount > 0).length);
   }, [conversations]);
 
-  const value: ChatRealtimeContextValue = { sendTyping, setFocusedConversation, onTyping };
-
-  return <ChatRealtimeContext.Provider value={value}>{children}</ChatRealtimeContext.Provider>;
+  return <ChatRealtimeContext.Provider value={realtime}>{children}</ChatRealtimeContext.Provider>;
 }
 
 export function useChatRealtime(): ChatRealtimeContextValue {

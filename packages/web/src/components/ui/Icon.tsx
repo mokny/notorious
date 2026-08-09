@@ -79,6 +79,14 @@ import {
   Send,
   Smile,
   Hash,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Phone,
+  PhoneOff,
+  ScreenShare,
+  ScreenShareOff,
   type LucideIcon,
 } from "lucide-react";
 
@@ -161,6 +169,14 @@ const ICONS: Record<string, LucideIcon> = {
   send: Send,
   smile: Smile,
   hash: Hash,
+  mic: Mic,
+  "mic-off": MicOff,
+  video: Video,
+  "video-off": VideoOff,
+  phone: Phone,
+  "phone-off": PhoneOff,
+  "screen-share": ScreenShare,
+  "screen-share-off": ScreenShareOff,
 };
 
 function isImageUrl(value: string): boolean {

@@ -8,6 +8,7 @@ import type {
   MessageAttachment,
   MessageReaction,
   ReadReceipt,
+  CallSummary,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import {
@@ -19,6 +20,7 @@ import {
   messageReadReceipts,
   users,
   workspaces,
+  calls,
 } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
@@ -317,12 +319,32 @@ async function receiptsForMessages(messageIds: string[]): Promise<Map<string, Re
   return map;
 }
 
+/** Resolves the inline `CallSummary` for any call-outcome messages in the batch (see calls/service.ts::writeCallHistoryMessage, which sets `messages.callId`) - keyed by message id, not call id, since that's what `toMessage` needs to attach it. */
+async function callSummariesForMessages(messages_: (typeof messages.$inferSelect)[]): Promise<Map<string, CallSummary>> {
+  const callIds = [...new Set(messages_.map((m) => m.callId).filter((id): id is string => id !== null))];
+  if (callIds.length === 0) return new Map();
+
+  const callRows = await db.select().from(calls).where(inArray(calls.id, callIds));
+  const callById = new Map(callRows.map((c) => [c.id, c]));
+
+  const map = new Map<string, CallSummary>();
+  for (const message of messages_) {
+    if (!message.callId) continue;
+    const call = callById.get(message.callId);
+    if (!call) continue;
+    const durationSeconds = call.status === "ended" && call.answeredAt && call.endedAt ? Math.round((Date.parse(call.endedAt) - Date.parse(call.answeredAt)) / 1000) : null;
+    map.set(message.id, { callId: call.id, status: call.status, startedAt: call.startedAt, durationSeconds, participantIds: JSON.parse(call.participantIds) as string[] });
+  }
+  return map;
+}
+
 function toMessage(
   row: typeof messages.$inferSelect,
   authorName: string,
   attachments: MessageAttachment[],
   reactions: MessageReaction[],
   readBy: ReadReceipt[] = [],
+  call: CallSummary | null = null,
 ): Message {
   const deleted = Boolean(row.deletedAt);
   return {
@@ -336,6 +358,8 @@ function toMessage(
     attachments: deleted ? [] : attachments,
     reactions: deleted ? [] : reactions,
     readBy,
+    callId: row.callId,
+    call,
   };
 }
 
@@ -360,10 +384,11 @@ export async function listMessages(conversationId: string, before?: string, limi
     .limit(limit);
 
   const messageIds = rows.map((r) => r.message.id);
-  const [attachmentsByMessage, reactionsByMessage, receiptsByMessage] = await Promise.all([
+  const [attachmentsByMessage, reactionsByMessage, receiptsByMessage, callSummaryByMessage] = await Promise.all([
     attachmentsForMessages(messageIds),
     reactionsForMessages(messageIds),
     receiptsForMessages(messageIds),
+    callSummariesForMessages(rows.map((r) => r.message)),
   ]);
 
   return rows
@@ -374,6 +399,7 @@ export async function listMessages(conversationId: string, before?: string, limi
         attachmentsByMessage.get(r.message.id) ?? [],
         reactionsByMessage.get(r.message.id) ?? [],
         receiptsByMessage.get(r.message.id) ?? [],
+        callSummaryByMessage.get(r.message.id) ?? null,
       ),
     )
     .reverse();
@@ -454,7 +480,12 @@ export async function sendMessage(
     .where(eq(conversationParticipants.conversationId, conversationId));
 
   const allParticipantUserIds = participantRows.map((p) => p.userId);
-  const message = toMessage({ id, conversationId, authorId: userId, body: trimmedBody, createdAt, deletedAt: null }, authorName, attachmentsByMessage.get(id) ?? [], []);
+  const message = toMessage(
+    { id, conversationId, authorId: userId, body: trimmedBody, createdAt, deletedAt: null, callId: null },
+    authorName,
+    attachmentsByMessage.get(id) ?? [],
+    [],
+  );
 
   await notifyNewMessage(conversationId, message, authorName, allParticipantUserIds);
   indexMessage(id, trimmedBody);
@@ -602,4 +633,4 @@ export async function getChatAttachment(id: string): Promise<{ row: typeof messa
   return { row: rows[0] };
 }
 
-export { toConversation };
+export { toConversation, toMessage };

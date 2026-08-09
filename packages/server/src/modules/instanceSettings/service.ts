@@ -53,3 +53,17 @@ export async function setAllowTemplateHttpRequests(enabled: boolean): Promise<vo
     .set({ allowTemplateHttpRequests: enabled })
     .where(eq(instanceSettings.id, SETTINGS_ROW_ID));
 }
+
+/** See scripts/setupCalls.ts/setCalls.ts and modules/calls/ - off by default, since calls need a self-hosted TURN server most operators haven't set up. */
+export async function getCallsEnabled(): Promise<boolean> {
+  const rows = await db
+    .select({ callsEnabled: instanceSettings.callsEnabled })
+    .from(instanceSettings)
+    .where(eq(instanceSettings.id, SETTINGS_ROW_ID))
+    .limit(1);
+  return rows[0]?.callsEnabled ?? false;
+}
+
+export async function setCallsEnabled(enabled: boolean): Promise<void> {
+  await db.update(instanceSettings).set({ callsEnabled: enabled }).where(eq(instanceSettings.id, SETTINGS_ROW_ID));
+}

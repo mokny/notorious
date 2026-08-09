@@ -493,6 +493,10 @@ export const instanceSettings = sqliteTable("instance_settings", {
   registrationEnabled: integer("registration_enabled", { mode: "boolean" }).notNull().default(false),
   require2faEnabled: integer("require_2fa_enabled", { mode: "boolean" }).notNull().default(false),
   allowTemplateHttpRequests: integer("allow_template_http_requests", { mode: "boolean" }).notNull().default(false),
+  // Off by default - calls need a self-hosted TURN server most operators
+  // haven't set up. See scripts/setupCalls.ts, which flips this on only
+  // after coturn is actually installed and running.
+  callsEnabled: integer("calls_enabled", { mode: "boolean" }).notNull().default(false),
 });
 
 export const pushSubscriptions = sqliteTable("push_subscriptions", {
@@ -648,6 +652,37 @@ export const messages = sqliteTable("messages", {
   body: text("body").notNull(),
   createdAt: text("created_at").notNull(),
   deletedAt: text("deleted_at"),
+  // Set only on a call-outcome system row (see chat/calls/service.ts) -
+  // `body` still carries a human-readable fallback ("Call ended - 3:21")
+  // for anything that renders messages without knowing about calls; the
+  // frontend special-cases callId != null into a compact call-log row
+  // instead of a normal bubble (see MessageBubble.tsx).
+  callId: text("call_id").references(() => calls.id),
+});
+
+// One row per call attempt - created when someone starts a call ("ringing"),
+// transitions to "active" on the first accept (regardless of how many more
+// people join afterward), and to "ended"/"missed"/"declined" as a terminal
+// state. participantIds is denormalized JSON (not a join table) since call
+// history is read-only display only ("Alice, Bob missed a call"), never
+// queried per-participant - a normalized table would be pure overhead for a
+// <=6-person, append-only list. See chat/calls/service.ts and
+// chat/calls/callState.ts (the actual live source of truth for "who's in
+// the call right now" while it's in progress - this row only gets written
+// at transition points, not per-heartbeat).
+export const calls = sqliteTable("calls", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  initiatorId: text("initiator_id")
+    .notNull()
+    .references(() => users.id),
+  status: text("status").notNull().$type<"ringing" | "active" | "ended" | "missed" | "declined">(),
+  startedAt: text("started_at").notNull(),
+  answeredAt: text("answered_at"),
+  endedAt: text("ended_at"),
+  participantIds: text("participant_ids").notNull().default("[]"),
 });
 
 // messageId starts null - attachments are uploaded before the message they'll

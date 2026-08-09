@@ -3,14 +3,16 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 
 const serverRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const repoRoot = path.resolve(serverRoot, "..", "..");
+export const repoRoot = path.resolve(serverRoot, "..", "..");
+/** The single `.env` file every part of this app reads from - see the dotenv.config call below. Exported so scripts that need to read-modify-write it (e.g. scripts/setupCalls.ts) resolve the exact same path instead of re-deriving it. */
+export const envFilePath = path.join(repoRoot, ".env");
 
 // Load from the repo-root .env explicitly (not dotenv's default of
 // process.cwd()) so `npm run <script> --workspace=packages/server` - which
 // npm runs with its cwd set to packages/server - still finds the same single
 // .env file documented in the README/DEPLOYMENT.md, regardless of which
 // directory the command was invoked from.
-dotenv.config({ path: path.join(repoRoot, ".env") });
+dotenv.config({ path: envFilePath });
 
 function resolveFromServerRoot(value: string): string {
   return path.isAbsolute(value) ? value : path.resolve(serverRoot, value);
@@ -35,4 +37,14 @@ export const env = {
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   vapidSubject: process.env.VAPID_SUBJECT ?? "mailto:admin@example.com",
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:5173",
+  // Calls are gated by instance_settings.calls_enabled (a DB flag, off by
+  // default), not by whether these are set - an operator flips the flag
+  // only after running `npm run setup-calls`, which writes these itself.
+  // Left unset/empty otherwise; chat/calls/turnCredentials.ts throws a
+  // clear error if calls are somehow enabled without them.
+  turnSecret: process.env.TURN_SECRET ?? "",
+  turnDomain: process.env.TURN_DOMAIN ?? "",
+  turnRealm: process.env.TURN_REALM ?? "",
+  turnMinPort: Number(process.env.TURN_MIN_PORT ?? 49160),
+  turnMaxPort: Number(process.env.TURN_MAX_PORT ?? 49200),
 };

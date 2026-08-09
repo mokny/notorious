@@ -88,6 +88,9 @@ import type {
   CreateDmInput,
   SendMessageInput,
   ReactInput,
+  Call,
+  TurnCredentials,
+  ActiveCallSummary,
 } from "@notorious/shared";
 import { apiRequest, apiUpload, apiDownload, apiUploadWithProgress } from "./client.js";
 import { randomId } from "../randomId.js";
@@ -339,6 +342,15 @@ export const chatApi = {
   search: (q: string, limit?: number) => apiRequest<MessageSearchResult[]>("/api/v1/chat/search", { query: { q, limit } }),
 };
 
+export const callApi = {
+  start: (conversationId: string) => apiRequest<Call>(`/api/v1/chat/conversations/${conversationId}/calls`, { method: "POST" }),
+  activeCall: (conversationId: string) => apiRequest<ActiveCallSummary | null>(`/api/v1/chat/conversations/${conversationId}/active-call`),
+  answer: (callId: string, clientId: string) => apiRequest<Call>(`/api/v1/calls/${callId}/answer`, { method: "POST", body: { clientId } }),
+  decline: (callId: string) => apiRequest<void>(`/api/v1/calls/${callId}/decline`, { method: "POST" }),
+  leave: (callId: string, clientId: string) => apiRequest<void>(`/api/v1/calls/${callId}/leave`, { method: "POST", body: { clientId } }),
+  turnCredentials: () => apiRequest<TurnCredentials>("/api/v1/calls/turn-credentials"),
+};
+
 export const pushApi = {
   vapidPublicKey: () => apiRequest<{ publicKey: string }>("/api/v1/push/vapid-public-key"),
   subscribe: (subscription: PushSubscriptionJSON) =>
@@ -459,6 +471,7 @@ export const systemApi = {
   version: () => apiRequest<{ version: string }>("/api/v1/version"),
   registrationStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/registration-status"),
   twoFactorRequired: () => apiRequest<{ required: boolean }>("/api/v1/system/2fa-required"),
+  callsStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/calls-status"),
 };
 
 export const presenceApi = {

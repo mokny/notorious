@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
-import { getRegistrationEnabled, getRequire2faEnabled } from "../instanceSettings/service.js";
+import { getRegistrationEnabled, getRequire2faEnabled, getCallsEnabled } from "../instanceSettings/service.js";
 
 // Same "repo root" resolution as app.ts's PACKAGE_ROOT (packages/server/src -> up three).
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
@@ -22,4 +22,9 @@ export async function registerSystemRoutes(app: FastifyInstance): Promise<void> 
   // user without 2FA set up to /setup-2fa, and that check has to work the
   // instant a session exists (including right after registering).
   app.get("/api/v1/system/2fa-required", async () => ({ required: await getRequire2faEnabled() }));
+
+  // Unauthenticated on purpose, same reasoning as the two above - lets the
+  // web client hide the call button entirely rather than showing one that
+  // 503s (the real enforcement is still server-side, on every calls route).
+  app.get("/api/v1/system/calls-status", async () => ({ enabled: await getCallsEnabled() }));
 }

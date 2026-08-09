@@ -77,6 +77,36 @@ registration/2FA above. Only turn this on for instances where every workspace me
 template-edit access is trusted; see TEMPLATES.md's Security section for exactly what's guarded
 against even when enabled.
 
+### Audio/video calls (optional)
+
+Calls (audio/video, peer-to-peer, screen sharing) are **off by default** - unlike the toggles above,
+this needs real infrastructure, not just a flag: browsers on different networks almost always need a
+[TURN server](https://webrtc.org/getting-started/turn-server) to relay media, since plain STUN fails
+behind most home internet connections (CGNAT) and mobile networks. Notorious uses a self-hosted
+[coturn](https://github.com/coturn/coturn) instance for this - no third-party relay service, no data
+leaving your own server.
+
+Set it up with the interactive wizard, run as root on the machine Notorious itself runs on:
+
+```bash
+sudo npm run setup-calls --workspace=packages/server
+```
+
+It generates a TURN shared secret, tries to auto-detect your server's public IP (asks you to
+confirm/override), writes the `TURN_*` variables into `.env` itself, installs and configures
+`coturn` via `apt`/systemd, and finally enables calls - all in one pass. The one thing it *can't* do
+for you: **forwarding UDP port 3478 and a relay port range (49160-49200 by default) from your router
+to this machine.** The wizard prints the exact ports to forward and won't enable calls until you
+confirm you've done it - without this, calls will fail (or only work between devices already on the
+same local network) no matter how correctly everything else is configured.
+
+Since `setup-calls` writes new `.env` values, restart the app afterward so it picks them up:
+`systemctl restart notorious` (or however you run it under Docker Compose).
+
+Once TURN is set up, you can toggle the feature on/off later without redoing any of that:
+`npm run enable-calls` / `npm run disable-calls` - same "database setting, takes effect immediately,
+no restart needed" pattern as registration/2FA/template-HTTP above.
+
 AI features (Agent Chat, MCP server) need no instance-wide setup - each user brings their own AI
 provider API key, configured from **Settings -> AI**, encrypted at rest the same way TOTP secrets
 are. There's nothing to enable/disable here; a user simply hasn't configured one until they choose
@@ -184,6 +214,15 @@ docker compose exec notorious node packages/server/dist/scripts/setRegistration.
 git pull
 docker compose up -d --build
 ```
+
+### Audio/video calls
+
+`npm run setup-calls` (see the bare-metal section above) installs `coturn` via `apt`/systemd, which
+doesn't make sense inside this container. If you want calls under Docker Compose, run coturn as its
+own separate service/container on the host (or anywhere reachable), then set `TURN_SECRET`/
+`TURN_DOMAIN`/`TURN_REALM`/`TURN_MIN_PORT`/`TURN_MAX_PORT` in `.env` yourself to match its config
+(same shared-secret scheme the wizard's generated `/etc/turnserver.conf` uses - see that section for
+the exact keys), then `docker compose exec notorious node packages/server/dist/scripts/setCalls.js --enable`.
 
 ## Backups
 

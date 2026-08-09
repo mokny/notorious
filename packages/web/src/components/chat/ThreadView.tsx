@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { chatApi } from "../../lib/api/resources.js";
+import { chatApi, systemApi, callApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
+import { useCall } from "../../context/CallContext.js";
 import { MessageBubble } from "./MessageBubble.js";
 import { Composer } from "./Composer.js";
 import { ChatAvatar } from "./ChatAvatar.js";
@@ -27,7 +28,8 @@ function dayLabel(iso: string): string {
 export function ThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { setFocusedConversation, onTyping } = useChatRealtime();
+  const { setFocusedConversation, onTyping, onCallRing, onCallParticipants, onCallEnded } = useChatRealtime();
+  const call = useCall();
   const [typingUserName, setTypingUserName] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -61,6 +63,31 @@ export function ThreadView({ conversationId, onBack }: { conversationId: string;
     mutationFn: (upToMessageId: string) => chatApi.markRead(conversationId, upToMessageId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chatConversations"] }),
   });
+
+  const { data: callsStatus } = useQuery({ queryKey: ["callsStatus"], queryFn: systemApi.callsStatus, staleTime: 60_000 });
+  const callsEnabled = callsStatus?.enabled ?? false;
+
+  const { data: activeCall } = useQuery({
+    queryKey: ["activeCall", conversationId],
+    queryFn: () => callApi.activeCall(conversationId),
+    enabled: callsEnabled,
+  });
+
+  // Keeps the "call in progress - join" banner live without a client-side
+  // heartbeat - refetch on any call event that could plausibly affect this
+  // conversation's active-call state (ring, roster change, ended).
+  useEffect(() => {
+    if (!callsEnabled) return;
+    const refetch = () => queryClient.invalidateQueries({ queryKey: ["activeCall", conversationId] });
+    const unsubscribers = [
+      onCallRing((_callId, ringConversationId) => ringConversationId === conversationId && refetch()),
+      onCallParticipants((_callId, participantsConversationId) => participantsConversationId === conversationId && refetch()),
+      onCallEnded((_callId, endedConversationId) => endedConversationId === conversationId && refetch()),
+    ];
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+  }, [callsEnabled, conversationId, onCallRing, onCallParticipants, onCallEnded, queryClient]);
+
+  const isInThisCall = call.phase === "active" && call.conversationId === conversationId;
 
   // Focus tracking suppresses push notifications for whoever is actively
   // looking at this conversation (see focusState.ts on the server) - set on
@@ -107,10 +134,40 @@ export function ThreadView({ conversationId, onBack }: { conversationId: string;
         ) : (
           otherParticipant && <ChatAvatar name={otherParticipant.name} avatarColor={otherParticipant.avatarColor} avatarUrl={otherParticipant.avatarUrl} size={7} />
         )}
-        <span className="truncate text-sm font-semibold text-ink">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {conversation ? (conversation.type === "workspace_channel" ? `# ${conversation.name}` : conversation.name) : "Chat"}
         </span>
+        {callsEnabled &&
+          (isInThisCall ? (
+            <button
+              onClick={() => void call.leaveCall()}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-white hover:opacity-90"
+              title="Leave call"
+            >
+              <Icon name="phone-off" className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => void (activeCall ? call.joinCall(activeCall.callId, conversationId) : call.startCall(conversationId))}
+              disabled={call.phase !== "idle"}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-40"
+              title="Call"
+            >
+              <Icon name="phone" className="h-4 w-4" />
+            </button>
+          ))}
       </div>
+
+      {activeCall && !isInThisCall && (
+        <button
+          onClick={() => void call.joinCall(activeCall.callId, conversationId)}
+          disabled={call.phase !== "idle"}
+          className="flex items-center justify-center gap-1.5 border-b border-border bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 disabled:opacity-50"
+        >
+          <Icon name="phone" className="h-3.5 w-3.5" />
+          Call in progress · {activeCall.participantUserIds.length} {activeCall.participantUserIds.length === 1 ? "participant" : "participants"} · Join
+        </button>
+      )}
 
       <div className="flex-1 overflow-y-auto py-2">
         {messages?.map((message, index) => {
