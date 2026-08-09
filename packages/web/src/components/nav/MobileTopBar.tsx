@@ -94,7 +94,8 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
   function handleBack() {
     const prevId = goBack();
     if (prevId) navigate(`/w/${workspaceId}/objects/${prevId}`);
-    else goHome();
+    else if (shareToken) goHome();
+    else navigate("/");
   }
 
   return (
