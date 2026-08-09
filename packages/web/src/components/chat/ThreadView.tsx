@@ -45,9 +45,15 @@ export function ThreadView({ conversationId, onBack }: { conversationId: string;
     });
   }, [conversationId, onTyping]);
 
+  // A new message (sent or received) always means whatever was being typed
+  // just got sent - clear the indicator immediately instead of waiting out
+  // TYPING_TIMEOUT_MS, and only show it again once a fresh "typing" event
+  // arrives for the *next* message.
   useEffect(() => {
     const last = messages?.[messages.length - 1];
     if (last) markReadMutation.mutate(last.id);
+    clearTimeout(typingTimeoutRef.current);
+    setTypingUserName(null);
     bottomRef.current?.scrollIntoView({ block: "end" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages?.length]);

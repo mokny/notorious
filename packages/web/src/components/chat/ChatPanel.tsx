@@ -6,6 +6,7 @@ import { ConversationList } from "./ConversationList.js";
 import { ThreadView } from "./ThreadView.js";
 import { NewChatDialog } from "./NewChatDialog.js";
 import { NewChannelDialog } from "./NewChannelDialog.js";
+import { BrowseChannelsDialog } from "./BrowseChannelsDialog.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
@@ -20,6 +21,7 @@ import { Icon } from "../ui/Icon.js";
 export function ChatPanel({ onClose }: { onClose?: () => void }) {
   const { conversationId, selectConversation } = useChatOverlay();
   const [newChatOpen, setNewChatOpen] = useState(false);
+  const [browseChannelsOpen, setBrowseChannelsOpen] = useState(false);
   const [newChannelOpen, setNewChannelOpen] = useState(false);
 
   return (
@@ -35,10 +37,19 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
       {conversationId ? (
         <ThreadView conversationId={conversationId} onBack={() => selectConversation(null)} />
       ) : (
-        <ConversationList onSelect={selectConversation} onNewChat={() => setNewChatOpen(true)} onNewChannel={() => setNewChannelOpen(true)} />
+        <ConversationList onSelect={selectConversation} onNewChat={() => setNewChatOpen(true)} onNewChannel={() => setBrowseChannelsOpen(true)} />
       )}
 
       <NewChatDialog open={newChatOpen} onOpenChange={setNewChatOpen} onCreated={selectConversation} />
+      <BrowseChannelsDialog
+        open={browseChannelsOpen}
+        onOpenChange={setBrowseChannelsOpen}
+        onSelect={selectConversation}
+        onCreateNew={() => {
+          setBrowseChannelsOpen(false);
+          setNewChannelOpen(true);
+        }}
+      />
       <NewChannelDialog open={newChannelOpen} onOpenChange={setNewChannelOpen} onCreated={selectConversation} />
     </div>
   );

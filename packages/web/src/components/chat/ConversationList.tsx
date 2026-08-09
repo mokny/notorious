@@ -24,7 +24,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <span className="text-sm font-semibold text-ink">Chats</span>
         <div className="flex items-center gap-1">
-          <button onClick={onNewChannel} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="New channel">
+          <button onClick={onNewChannel} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Channels">
             <Icon name="hash" className="h-4 w-4" />
           </button>
           <button onClick={onNewChat} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="New chat">
