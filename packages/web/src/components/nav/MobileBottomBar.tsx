@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi, workspaceApi, chatApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
-import { reloadIfViewportShrunk, resetViewportReloadCount } from "../../hooks/useDynamicViewportHeight.js";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
 import { useChatOverlay } from "../../context/ChatOverlayContext.js";
@@ -30,7 +30,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
   const { open: openSearch } = useSearchOverlay();
   const { open: openChat } = useChatOverlay();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const prevWorkspaceIdRef = useRef(workspaceId);
+  const keyboardInset = useKeyboardInset();
 
   // Same "parse it off the URL" approach as MobileTopBar.tsx - this is a
   // layout-level component too, so useParams() here wouldn't see a nested
@@ -78,24 +78,17 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
     },
   });
 
-  // Same iOS-viewport-shrink workaround as the old BottomTabBar - see its
-  // own comment for why this needs to live wherever the phone-only bottom
-  // chrome is rendered, and re-run per workspace switch.
-  useEffect(() => {
-    if (prevWorkspaceIdRef.current !== workspaceId) {
-      resetViewportReloadCount();
-      prevWorkspaceIdRef.current = workspaceId;
-    }
-    reloadIfViewportShrunk();
-  }, [workspaceId]);
-
   const homePath = dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`;
   const isHome = location.pathname === homePath;
 
   return (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex justify-center md:hidden"
-      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      className="pointer-events-none fixed inset-x-0 z-20 flex justify-center md:hidden"
+      // `bottom: keyboardInset` (not a plain `bottom-0`) - lifts the bar
+      // above the on-screen keyboard instead of relying on `position: fixed`
+      // staying pinned to a shrinking layout viewport, which iOS/WKWebView
+      // doesn't reliably do. See useKeyboardInset's own doc comment.
+      style={{ bottom: keyboardInset, paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
       {/* `relative` + a separate `-z-10` background layer for the pill's
           border/blur/shadow, instead of putting `backdrop-blur` directly on

@@ -189,16 +189,18 @@ function WorkspaceLayoutInner() {
   }
 
   return (
-    // `var(--app-vh)`, not `h-dvh`/`h-screen` - iOS/Android shrink the
-    // *dynamic* viewport when the on-screen keyboard opens, but leave the
-    // plain layout viewport (what `100vh` measures) unchanged, which is why
-    // this isn't `h-screen` (the bottom tab bar and sidebar footer would get
-    // pushed down behind the keyboard instead of reflowing above it). Plain
-    // `dvh` itself can still read a few pixels short right after an iOS PWA
-    // cold launch though (see useDynamicViewportHeight.ts, which owns
-    // --app-vh and keeps it in sync with the real value once the browser
-    // settles on it - --app-vh defaults to 100dvh in globals.css until then).
-    <div className="flex" style={{ height: "var(--app-vh)" }}>
+    // `position: fixed; inset: 0`, not `h-dvh`/`h-screen`/a JS-measured
+    // height - iOS WKWebView's `window.innerHeight`/`visualViewport.height`/
+    // the `dvh` unit can all misreport the real viewport (confirmed on
+    // device: several dozen px short after a cold launch, and permanently
+    // after the on-screen keyboard has opened once - see useKeyboardInset.ts
+    // for the keyboard-open case). `fixed; inset: 0` sidesteps that whole
+    // class of bug instead of trying to measure around it: the browser pins
+    // this element to the real viewport bounds directly, no JS number
+    // involved. Descendants that need to reflow above the on-screen keyboard
+    // (the phone bottom bar) use useKeyboardInset.ts instead of relying on
+    // this element's own size.
+    <div className="flex" style={{ position: "fixed", inset: 0 }}>
 
       {sidebarOpen && !sidebarPersistent && (
         <div className="fixed inset-0 z-30 bg-black/30" onClick={() => setSidebarOpen(false)} />

@@ -1,34 +1,14 @@
-import { useEffect, useState } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useAuth } from "../../context/AuthContext.js";
 import { useChatOverlay } from "../../context/ChatOverlayContext.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { ChatPanel } from "./ChatPanel.js";
 
 // Same feel as SearchSheet.tsx's own dismiss gesture.
 const DISMISS_DISTANCE = 120;
 const DISMISS_VELOCITY = 500;
-
-/** Same visualViewport-vs-innerHeight trick as SearchSheet.tsx's own `useKeyboardInset` - kept as a separate copy rather than a shared hook since each sheet's composer/input lives in a different DOM subtree and there's nothing to actually share beyond the formula. */
-function useKeyboardInset(): number {
-  const [inset, setInset] = useState(0);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    function update() {
-      setInset(Math.max(0, window.innerHeight - vv!.height - vv!.offsetTop));
-    }
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-    };
-  }, []);
-  return inset;
-}
 
 /**
  * iOS-style slide-up chat sheet for the phone breakpoint - the mobile

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset.js";
 import { SearchPanel } from "./SearchPanel.js";
 
 // How far (px) or how fast (px/s) a downward drag has to go before it counts
@@ -9,36 +9,6 @@ import { SearchPanel } from "./SearchPanel.js";
 // mirrors the rough feel of iOS's own sheet dismiss gesture.
 const DISMISS_DISTANCE = 120;
 const DISMISS_VELOCITY = 500;
-
-/**
- * How much of the layout viewport's bottom edge is currently covered by the
- * on-screen keyboard (0 when it's closed) - `window.innerHeight` doesn't
- * shrink for this on iOS Safari/PWA (that's what useDynamicViewportHeight.ts
- * works around for the app's own root height, see its doc comment), but
- * `visualViewport` does, so the gap between the two *is* the keyboard's
- * height. Local to this component rather than folded into that shared
- * `--app-vh` mechanism - this needs the *live*, keyboard-reactive value
- * (visualViewport.height), not the deliberately-more-stable one that hook
- * publishes for the rest of the app's layout.
- */
-function useKeyboardInset(): number {
-  const [inset, setInset] = useState(0);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    function update() {
-      setInset(Math.max(0, window.innerHeight - vv!.height - vv!.offsetTop));
-    }
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-    };
-  }, []);
-  return inset;
-}
 
 /**
  * iOS-style slide-up search sheet for the phone breakpoint - see
