@@ -51,7 +51,11 @@ export function ChatSheet() {
             <div className="flex shrink-0 justify-center py-2">
               <div className="h-1.5 w-10 rounded-full bg-ink-muted/30" />
             </div>
-            <div className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+            {/* Fixed 1rem, not env(safe-area-inset-bottom) - that's always 0
+                without viewport-fit=cover (see index.html), so it was
+                leaving the composer's input row right against the true
+                bottom edge, barely reachable. */}
+            <div className="min-h-0 flex-1 overflow-hidden pb-4">
               <ChatPanel />
             </div>
           </motion.div>
