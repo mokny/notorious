@@ -79,31 +79,32 @@ against even when enabled.
 
 ### Audio/video calls (optional)
 
-Calls (audio/video, peer-to-peer, screen sharing) are **off by default** - unlike the toggles above,
-this needs real infrastructure, not just a flag: browsers on different networks almost always need a
-[TURN server](https://webrtc.org/getting-started/turn-server) to relay media, since plain STUN fails
-behind most home internet connections (CGNAT) and mobile networks. Notorious uses a self-hosted
-[coturn](https://github.com/coturn/coturn) instance for this - no third-party relay service, no data
-leaving your own server.
+Calls (audio/video, screen sharing) are **off by default**. Media is relayed through Notorious's own
+embedded [mediasoup](https://mediasoup.org/) SFU (selective forwarding unit) - every participant
+connects only to the server, never to each other - reachable over a single fixed TCP port. No TURN
+server, no coturn, no third-party relay service, no UDP port range, no data leaving your own server.
+The trade-off for "one boring port to forward, nothing else to configure" is that media always goes
+over TCP, which can add a bit of latency/jitter under packet loss compared to a UDP-based setup - an
+explicit simplicity-over-quality choice.
 
-Set it up with the interactive wizard, run as root on the machine Notorious itself runs on:
+Set it up with the interactive wizard (no root needed - it only writes to `.env` and flips a database
+flag, it doesn't touch the system):
 
 ```bash
-sudo npm run setup-calls --workspace=packages/server
+npm run setup-calls --workspace=packages/server
 ```
 
-It generates a TURN shared secret, tries to auto-detect your server's public IP (asks you to
-confirm/override), writes the `TURN_*` variables into `.env` itself, installs and configures
-`coturn` via `apt`/systemd, and finally enables calls - all in one pass. The one thing it *can't* do
-for you: **forwarding UDP port 3478 and a relay port range (49160-49200 by default) from your router
-to this machine.** The wizard prints the exact ports to forward and won't enable calls until you
-confirm you've done it - without this, calls will fail (or only work between devices already on the
-same local network) no matter how correctly everything else is configured.
+It tries to auto-detect your server's public IP (asks you to confirm/override), prompts for a TCP
+port (default `4001`), writes `MEDIA_ANNOUNCED_IP`/`MEDIA_PORT` into `.env`, and finally enables
+calls. The one thing it *can't* do for you: **forwarding that one TCP port from your router to this
+machine.** The wizard prints the exact port to forward and won't enable calls until you confirm
+you've done it - without this, calls will fail (or only work between devices already on the same
+local network) no matter how correctly everything else is configured.
 
 Since `setup-calls` writes new `.env` values, restart the app afterward so it picks them up:
 `systemctl restart notorious` (or however you run it under Docker Compose).
 
-Once TURN is set up, you can toggle the feature on/off later without redoing any of that:
+Once configured, you can toggle the feature on/off later without redoing any of that:
 `npm run enable-calls` / `npm run disable-calls` - same "database setting, takes effect immediately,
 no restart needed" pattern as registration/2FA/template-HTTP above.
 
@@ -217,12 +218,12 @@ docker compose up -d --build
 
 ### Audio/video calls
 
-`npm run setup-calls` (see the bare-metal section above) installs `coturn` via `apt`/systemd, which
-doesn't make sense inside this container. If you want calls under Docker Compose, run coturn as its
-own separate service/container on the host (or anywhere reachable), then set `TURN_SECRET`/
-`TURN_DOMAIN`/`TURN_REALM`/`TURN_MIN_PORT`/`TURN_MAX_PORT` in `.env` yourself to match its config
-(same shared-secret scheme the wizard's generated `/etc/turnserver.conf` uses - see that section for
-the exact keys), then `docker compose exec notorious node packages/server/dist/scripts/setCalls.js --enable`.
+`npm run setup-calls` (see the bare-metal section above) works fine under Docker Compose too - it
+only writes `.env` and a database flag, nothing system-level. Set `MEDIA_ANNOUNCED_IP`/`MEDIA_PORT`
+in `.env` (either via the wizard run inside the container, or by hand), publish that one TCP port on
+the container (`ports: ["4001:4001/tcp"]` in `docker-compose.yml`, matching whatever `MEDIA_PORT` you
+chose) and forward it from your router, then
+`docker compose exec notorious node packages/server/dist/scripts/setCalls.js --enable`.
 
 ## Backups
 

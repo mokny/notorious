@@ -1,14 +1,14 @@
 {
   "name": "notorious",
   "private": true,
-  "version": "0.0.223",
+  "version": "0.0.224",
   "type": "module",
   "description": "Self-hosted, multi-user notes and knowledge base application",
   "workspaces": [
     "packages/*"
   ],
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",

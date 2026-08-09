@@ -35,14 +35,6 @@ export interface CallSummary {
   participantIds: string[];
 }
 
-/** `{urls, username, credential}` shape RTCPeerConnection's `iceServers` expects directly - see chat/calls/turnCredentials.ts's coturn `use-auth-secret` scheme. */
-export interface TurnCredentials {
-  urls: string[];
-  username: string;
-  credential: string;
-  ttlSeconds: number;
-}
-
 /** Backs ThreadView's "Call in progress - N participants - Join" banner - see chat/calls/service.ts::getActiveCallSummary, which is backed by in-memory call state, not the DB (which can be stale mid-call). */
 export interface ActiveCallSummary {
   callId: string;

@@ -21,8 +21,8 @@ const ChatRealtimeContext = createContext<ChatRealtimeContextValue | null>(null)
  *
  * The whole `useGlobalRealtime` return value is passed through as-is
  * (rather than re-destructured field by field) so CallContext.tsx (nested
- * inside this provider) gets the call-signaling methods
- * (`onCallRing`/`sendCallSignal`/...) without this file needing to know
+ * inside this provider) gets the call push-event listeners
+ * (`onCallRing`/`onMediaNewProducer`/...) without this file needing to know
  * about every one of them individually.
  */
 export function ChatRealtimeProvider({ children }: { children: ReactNode }) {

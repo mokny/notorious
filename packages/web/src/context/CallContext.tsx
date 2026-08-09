@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { CallSignalPayload, TurnCredentials } from "@notorious/shared";
+import { Device } from "mediasoup-client";
+import type { types as MediasoupClientTypes } from "mediasoup-client";
+import type { ProducerSource } from "@notorious/shared";
 import { callApi } from "../lib/api/resources.js";
 import { clientId as myClientId } from "../lib/ws/clientId.js";
 import { useAuth } from "./AuthContext.js";
@@ -42,10 +44,15 @@ interface CallContextValue {
 
 const CallContext = createContext<CallContextValue | null>(null);
 
-interface PeerEntry {
-  connection: RTCPeerConnection;
+interface RemoteConsumerEntry {
+  consumer: MediasoupClientTypes.Consumer;
+  source: ProducerSource;
+}
+
+interface RemoteParticipantEntry {
   userId: string;
   clientId: string;
+  consumers: Map<string, RemoteConsumerEntry>;
 }
 
 function peerKey(userId: string, clientId: string): string {
@@ -53,23 +60,21 @@ function peerKey(userId: string, clientId: string): string {
 }
 
 /**
- * The WebRTC mesh state machine - one RTCPeerConnection per remote
- * participant (no SFU, see the calls feature plan), signaling relayed over
- * the same `/ws/chat` socket chat already uses (`sendCallSignal`/`onCallX`
- * from ChatRealtimeContext). Mounted inside `ChatRealtimeProvider`, sibling
- * to `ChatOverlayProvider` (see App.tsx) - `CallView.tsx`/
- * `IncomingCallBanner.tsx` render based on `phase`, always mounted so a
- * call survives navigating elsewhere in the app.
+ * The mediasoup SFU state machine - every participant connects only to the
+ * server (one send transport + one recv transport each), never to each
+ * other; the server relays audio/video/screen-share. Mounted inside
+ * `ChatRealtimeProvider`, sibling to `ChatOverlayProvider` (see App.tsx) -
+ * `CallView.tsx`/`IncomingCallBanner.tsx` render based on `phase`, always
+ * mounted so a call survives navigating elsewhere in the app.
  *
- * Renegotiation rules (see the plan's "open risks" section for why):
- * 1. Late join - existing participants always initiate the offer to a new
- *    joiner; the joiner never initiates. Glare-free by construction.
- * 2. Camera-on toggle - the toggling peer always initiates a fresh offer to
- *    every existing peer (symmetric case, no "joiner").
+ * Late-join/toggle simplicity (vs. the old P2P mesh): a joiner just snapshots
+ * `GET .../producers` and consumes each - no "who initiates the offer" rule.
+ * A camera/screen toggle is just one more `produce()`/`close()` - never a
+ * renegotiation fan-out to every peer.
  */
 export function CallProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const { sendCallSignal, onCallRing, onCallTaken, onCallParticipants, onCallSignal, onCallEnded } = useChatRealtime();
+  const { onCallRing, onCallTaken, onCallParticipants, onMediaNewProducer, onMediaProducerClosed, onCallEnded } = useChatRealtime();
 
   const [phase, setPhase] = useState<CallPhase>("idle");
   const [callId, setCallId] = useState<string | null>(null);
@@ -81,22 +86,25 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [screenSharing, setScreenSharing] = useState(false);
   const [micOn, setMicOn] = useState(true);
 
-  const peersRef = useRef<Map<string, PeerEntry>>(new Map());
+  const deviceRef = useRef<MediasoupClientTypes.Device | null>(null);
+  const sendTransportRef = useRef<MediasoupClientTypes.Transport | null>(null);
+  const recvTransportRef = useRef<MediasoupClientTypes.Transport | null>(null);
+  const localProducersRef = useRef<Map<ProducerSource, MediasoupClientTypes.Producer>>(new Map());
+  const remoteParticipantsRef = useRef<Map<string, RemoteParticipantEntry>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const localVideoTrackRef = useRef<MediaStreamTrack | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
-  const iceServersRef = useRef<RTCIceServer[]>([]);
   const callIdRef = useRef<string | null>(null);
   const ringtoneRef = useRef<{ stop: () => void } | null>(null);
 
-  const updatePeerDisplay = useCallback(() => {
-    setPeers([...peersRef.current.values()].map((entry) => ({ userId: entry.userId, clientId: entry.clientId, stream: remoteStreamFor(entry) })));
-  }, []);
-
-  const remoteStreams = useRef<Map<string, MediaStream>>(new Map());
-  function remoteStreamFor(entry: PeerEntry): MediaStream | null {
-    return remoteStreams.current.get(peerKey(entry.userId, entry.clientId)) ?? null;
+  function streamForEntry(entry: RemoteParticipantEntry): MediaStream | null {
+    const tracks = [...entry.consumers.values()].map((c) => c.consumer.track);
+    return tracks.length > 0 ? new MediaStream(tracks) : null;
   }
+
+  const updatePeerDisplay = useCallback(() => {
+    setPeers([...remoteParticipantsRef.current.values()].map((entry) => ({ userId: entry.userId, clientId: entry.clientId, stream: streamForEntry(entry) })));
+  }, []);
 
   function playRingtone(): void {
     const AudioContextCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -132,14 +140,21 @@ export function CallProvider({ children }: { children: ReactNode }) {
     ringtoneRef.current = null;
   }
 
-  function closeAllPeers(): void {
-    for (const entry of peersRef.current.values()) entry.connection.close();
-    peersRef.current.clear();
-    remoteStreams.current.clear();
+  function closeAllRemote(): void {
+    for (const entry of remoteParticipantsRef.current.values()) {
+      for (const { consumer } of entry.consumers.values()) consumer.close();
+    }
+    remoteParticipantsRef.current.clear();
     setPeers([]);
   }
 
   function resetLocalTracks(): void {
+    sendTransportRef.current?.close();
+    recvTransportRef.current?.close();
+    sendTransportRef.current = null;
+    recvTransportRef.current = null;
+    deviceRef.current = null;
+    localProducersRef.current.clear();
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
@@ -151,56 +166,34 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setMicOn(true);
   }
 
-  function createPeerConnection(remoteUserId: string, remoteClientId: string): RTCPeerConnection {
-    const connection = new RTCPeerConnection({ iceServers: iceServersRef.current });
-    const entry: PeerEntry = { connection, userId: remoteUserId, clientId: remoteClientId };
-    peersRef.current.set(peerKey(remoteUserId, remoteClientId), entry);
-
-    if (localStreamRef.current) {
-      for (const track of localStreamRef.current.getTracks()) connection.addTrack(track, localStreamRef.current);
+  function getOrCreateRemoteEntry(remoteUserId: string, remoteClientId: string): RemoteParticipantEntry {
+    const key = peerKey(remoteUserId, remoteClientId);
+    let entry = remoteParticipantsRef.current.get(key);
+    if (!entry) {
+      entry = { userId: remoteUserId, clientId: remoteClientId, consumers: new Map() };
+      remoteParticipantsRef.current.set(key, entry);
     }
-    if (screenStreamRef.current) {
-      for (const track of screenStreamRef.current.getTracks()) connection.addTrack(track, screenStreamRef.current);
-    }
-
-    connection.onicecandidate = (event) => {
-      if (event.candidate && callIdRef.current) {
-        sendCallSignal(remoteUserId, remoteClientId, callIdRef.current, { kind: "ice-candidate", candidate: event.candidate.toJSON() });
-      }
-    };
-    connection.ontrack = (event) => {
-      remoteStreams.current.set(peerKey(remoteUserId, remoteClientId), event.streams[0] ?? new MediaStream([event.track]));
-      updatePeerDisplay();
-    };
-
-    return connection;
+    return entry;
   }
 
-  async function initiateOfferTo(remoteUserId: string, remoteClientId: string): Promise<void> {
-    if (!callIdRef.current) return;
-    const connection = createPeerConnection(remoteUserId, remoteClientId);
-    const offer = await connection.createOffer();
-    await connection.setLocalDescription(offer);
-    sendCallSignal(remoteUserId, remoteClientId, callIdRef.current, { kind: "offer", sdp: offer.sdp ?? "" });
+  async function consumeRemoteProducer(remoteUserId: string, remoteClientId: string, producerId: string, source: ProducerSource): Promise<void> {
+    const currentCallId = callIdRef.current;
+    const device = deviceRef.current;
+    const recvTransport = recvTransportRef.current;
+    if (!currentCallId || !device || !recvTransport) return;
+
+    const info = await callApi.consume(currentCallId, myClientId, recvTransport.id, producerId, device.rtpCapabilities);
+    const consumer = await recvTransport.consume({
+      id: info.id,
+      producerId,
+      kind: info.kind,
+      rtpParameters: info.rtpParameters as unknown as MediasoupClientTypes.RtpParameters,
+    });
+    await callApi.resumeConsumer(currentCallId, consumer.id, myClientId).catch(() => {});
+
+    const entry = getOrCreateRemoteEntry(remoteUserId, remoteClientId);
+    entry.consumers.set(producerId, { consumer, source });
     updatePeerDisplay();
-  }
-
-  async function renegotiateAll(): Promise<void> {
-    if (!callIdRef.current) return;
-    for (const entry of peersRef.current.values()) {
-      const offer = await entry.connection.createOffer();
-      await entry.connection.setLocalDescription(offer);
-      sendCallSignal(entry.userId, entry.clientId, callIdRef.current, { kind: "offer", sdp: offer.sdp ?? "" });
-    }
-  }
-
-  async function fetchIceServers(): Promise<void> {
-    try {
-      const creds: TurnCredentials = await callApi.turnCredentials();
-      iceServersRef.current = creds.urls.map((url) => ({ urls: url, username: creds.username, credential: creds.credential }));
-    } catch {
-      iceServersRef.current = [];
-    }
   }
 
   function enterActiveCall(newCallId: string, newConversationId: string): void {
@@ -217,7 +210,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (currentCallId) {
       callApi.leave(currentCallId, myClientId).catch(() => {});
     }
-    closeAllPeers();
+    closeAllRemote();
     resetLocalTracks();
     callIdRef.current = null;
     setCallId(null);
@@ -227,10 +220,46 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }
 
   async function joinCall(newCallId: string, newConversationId: string): Promise<void> {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    localStreamRef.current = stream;
-    setLocalStream(stream);
-    await fetchIceServers();
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    localStreamRef.current = micStream;
+    setLocalStream(micStream);
+
+    const routerRtpCapabilities = await callApi.rtpCapabilities(newCallId, myClientId);
+    const device = new Device();
+    await device.load({ routerRtpCapabilities });
+    deviceRef.current = device;
+
+    const sendInfo = await callApi.createTransport(newCallId, myClientId, "send");
+    const sendTransport = device.createSendTransport(sendInfo as unknown as MediasoupClientTypes.TransportOptions);
+    sendTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
+      callApi.connectTransport(newCallId, sendTransport.id, myClientId, dtlsParameters).then(callback).catch(errback);
+    });
+    sendTransport.on("produce", ({ kind, rtpParameters, appData }, callback, errback) => {
+      callApi
+        .produce(newCallId, sendTransport.id, myClientId, kind, rtpParameters, appData.source as ProducerSource)
+        .then(({ producerId }) => callback({ id: producerId }))
+        .catch(errback);
+    });
+    sendTransportRef.current = sendTransport;
+
+    const recvInfo = await callApi.createTransport(newCallId, myClientId, "recv");
+    const recvTransport = device.createRecvTransport(recvInfo as unknown as MediasoupClientTypes.TransportOptions);
+    recvTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
+      callApi.connectTransport(newCallId, recvTransport.id, myClientId, dtlsParameters).then(callback).catch(errback);
+    });
+    recvTransportRef.current = recvTransport;
+
+    const micTrack = micStream.getAudioTracks()[0];
+    if (micTrack) {
+      const micProducer = await sendTransport.produce({ track: micTrack, appData: { source: "mic" satisfies ProducerSource } });
+      localProducersRef.current.set("mic", micProducer);
+    }
+
+    const existingProducers = await callApi.listProducers(newCallId, myClientId);
+    for (const producer of existingProducers) {
+      await consumeRemoteProducer(producer.userId, producer.clientId, producer.producerId, producer.source);
+    }
+
     await callApi.answer(newCallId, myClientId);
     enterActiveCall(newCallId, newConversationId);
   }
@@ -259,15 +288,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }
 
   async function toggleCamera(): Promise<void> {
+    const currentCallId = callIdRef.current;
+    const sendTransport = sendTransportRef.current;
     if (!localVideoTrackRef.current) {
+      if (!currentCallId || !sendTransport) return;
       const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
       const track = camStream.getVideoTracks()[0];
       if (!track) return;
+      const producer = await sendTransport.produce({ track, appData: { source: "camera" satisfies ProducerSource } });
+      localProducersRef.current.set("camera", producer);
       localVideoTrackRef.current = track;
       localStreamRef.current?.addTrack(track);
       setLocalStream(localStreamRef.current ? new MediaStream(localStreamRef.current.getTracks()) : null);
-      for (const entry of peersRef.current.values()) entry.connection.addTrack(track, localStreamRef.current ?? new MediaStream([track]));
-      await renegotiateAll();
       setCameraOn(true);
     } else {
       const nextEnabled = !localVideoTrackRef.current.enabled;
@@ -277,27 +309,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }
 
   async function toggleScreenShare(): Promise<void> {
+    const currentCallId = callIdRef.current;
+    const sendTransport = sendTransportRef.current;
     if (!screenSharing) {
+      if (!currentCallId || !sendTransport) return;
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const track = stream.getVideoTracks()[0];
       if (!track) return;
       screenStreamRef.current = stream;
-      for (const entry of peersRef.current.values()) entry.connection.addTrack(track, stream);
-      await renegotiateAll();
+      const producer = await sendTransport.produce({ track, appData: { source: "screen" satisfies ProducerSource } });
+      localProducersRef.current.set("screen", producer);
       track.onended = () => void toggleScreenShare();
       setScreenSharing(true);
     } else {
-      const stream = screenStreamRef.current;
-      const track = stream?.getVideoTracks()[0];
-      if (track) {
-        for (const entry of peersRef.current.values()) {
-          const sender = entry.connection.getSenders().find((s) => s.track === track);
-          if (sender) entry.connection.removeTrack(sender);
-        }
+      const producer = localProducersRef.current.get("screen");
+      if (producer) {
+        producer.close();
+        localProducersRef.current.delete("screen");
+        if (currentCallId) callApi.closeProducer(currentCallId, producer.id, myClientId).catch(() => {});
       }
-      stream?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
-      await renegotiateAll();
       setScreenSharing(false);
     }
   }
@@ -328,67 +360,54 @@ export function CallProvider({ children }: { children: ReactNode }) {
     [onCallTaken],
   );
 
-  // Roster updates - existing participants initiate to a new joiner (rule
-  // #1 above); everyone reconciles the peer list against who's still there.
+  // Roster updates - prune any remote participant who's no longer in the call.
   useEffect(
     () =>
-      onCallParticipants((eventCallId, _eventConversationId, participants, joinerUserId, joinerClientId) => {
+      onCallParticipants((eventCallId, _eventConversationId, participants) => {
         if (eventCallId !== callIdRef.current) return;
 
-        const isMe = (userId: string, clientId: string) => userId === user?.id && clientId === myClientId;
-        const currentKeys = new Set(participants.filter((p) => !isMe(p.userId, p.clientId)).map((p) => peerKey(p.userId, p.clientId)));
-        for (const [key, entry] of peersRef.current) {
+        const currentKeys = new Set(participants.map((p) => peerKey(p.userId, p.clientId)));
+        for (const [key, entry] of remoteParticipantsRef.current) {
           if (!currentKeys.has(key)) {
-            entry.connection.close();
-            peersRef.current.delete(key);
-            remoteStreams.current.delete(key);
+            for (const { consumer } of entry.consumers.values()) consumer.close();
+            remoteParticipantsRef.current.delete(key);
           }
         }
         updatePeerDisplay();
-
-        if (joinerUserId && joinerClientId && !isMe(joinerUserId, joinerClientId)) {
-          void initiateOfferTo(joinerUserId, joinerClientId);
-        }
       }),
-    // `initiateOfferTo`/`updatePeerDisplay` intentionally omitted - they close
-    // over refs (peersRef/callIdRef/etc), not this render's props/state, so
-    // they never need to trigger a re-subscribe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onCallParticipants, user?.id],
+    [onCallParticipants, updatePeerDisplay],
   );
 
-  // Pure relay - route to the matching peer connection, creating one on a
-  // fresh incoming offer (a joiner receiving its first offer from an
-  // existing participant).
+  // A remote participant started producing (mic/camera/screen) - consume it.
   useEffect(
     () =>
-      onCallSignal((signalCallId, fromUserId, fromClientId, signal: CallSignalPayload) => {
-        if (signalCallId !== callIdRef.current) return;
-        const key = peerKey(fromUserId, fromClientId);
-
-        void (async () => {
-          let entry = peersRef.current.get(key);
-          if (signal.kind === "offer") {
-            if (!entry) {
-              const connection = createPeerConnection(fromUserId, fromClientId);
-              entry = { connection, userId: fromUserId, clientId: fromClientId };
-            }
-            await entry.connection.setRemoteDescription({ type: "offer", sdp: signal.sdp });
-            const answer = await entry.connection.createAnswer();
-            await entry.connection.setLocalDescription(answer);
-            if (callIdRef.current) sendCallSignal(fromUserId, fromClientId, callIdRef.current, { kind: "answer", sdp: answer.sdp ?? "" });
-            updatePeerDisplay();
-          } else if (signal.kind === "answer" && entry) {
-            await entry.connection.setRemoteDescription({ type: "answer", sdp: signal.sdp });
-          } else if (signal.kind === "ice-candidate" && entry) {
-            await entry.connection.addIceCandidate(signal.candidate).catch(() => {});
-          }
-        })();
+      onMediaNewProducer((eventCallId, producerId, remoteUserId, remoteClientId, _kind, source) => {
+        if (eventCallId !== callIdRef.current) return;
+        if (remoteUserId === user?.id && remoteClientId === myClientId) return;
+        void consumeRemoteProducer(remoteUserId, remoteClientId, producerId, source);
       }),
-    // `createPeerConnection` intentionally omitted - closes over refs, not
-    // render state, same reasoning as the callParticipants effect above.
+    // `consumeRemoteProducer` intentionally omitted - closes over refs
+    // (callIdRef/deviceRef/recvTransportRef), not this render's props/state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onCallSignal, sendCallSignal, updatePeerDisplay],
+    [onMediaNewProducer, user?.id],
+  );
+
+  // A remote participant stopped producing (camera/screen off, or they left) - drop that one consumer.
+  useEffect(
+    () =>
+      onMediaProducerClosed((eventCallId, producerId) => {
+        if (eventCallId !== callIdRef.current) return;
+        for (const entry of remoteParticipantsRef.current.values()) {
+          const consumerEntry = entry.consumers.get(producerId);
+          if (consumerEntry) {
+            consumerEntry.consumer.close();
+            entry.consumers.delete(producerId);
+            updatePeerDisplay();
+            return;
+          }
+        }
+      }),
+    [onMediaProducerClosed, updatePeerDisplay],
   );
 
   // The call ended server-side (last participant left, or nobody ever answered) - clear local state regardless of which client triggered it.
@@ -396,7 +415,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     () =>
       onCallEnded((endedCallId) => {
         if (endedCallId === callIdRef.current) {
-          closeAllPeers();
+          closeAllRemote();
           resetLocalTracks();
           callIdRef.current = null;
           setCallId(null);

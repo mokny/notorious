@@ -11,7 +11,7 @@ export * from "./types/blockContent.js";
 export * from "./types/chat.js";
 export * from "./types/chatRealtime.js";
 export * from "./types/calls.js";
-export * from "./types/callSignal.js";
+export * from "./types/media.js";
 export * from "./utils/tableDoc.js";
 
 export * from "./schemas/auth.js";

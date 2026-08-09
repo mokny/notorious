@@ -9,6 +9,7 @@ import { sendToUserGlobal, sendToClientGlobal, sendToUserGlobalExcept, getSocket
 import { notifyUser } from "../push/service.js";
 import { getParticipantUserIds, toMessage } from "../chat/service.js";
 import * as callState from "./callState.js";
+import * as sfu from "./sfu.js";
 
 const MAX_PARTICIPANTS = 6;
 const RING_TIMEOUT_MS = 60_000;
@@ -75,6 +76,7 @@ async function endCall(callId: string, status: Extract<CallStatus, "ended" | "mi
   const participantIds = [...new Set(callState.getParticipants(callId).map((p) => p.userId))];
   const endedAt = nowIso();
   await db.update(calls).set({ status, endedAt, participantIds: JSON.stringify(participantIds) }).where(eq(calls.id, callId));
+  sfu.closeRouter(callId);
 
   const updated = await getCall(callId);
   await writeCallHistoryMessage(updated);
@@ -89,6 +91,11 @@ export async function startCall(conversationId: string, initiatorId: string, ini
   if (existing) return toCall(await getCall(existing.callId));
 
   const id = newId();
+  // Fail fast, before any DB write, if the SFU can't come up (e.g.
+  // MEDIA_ANNOUNCED_IP unset) - no point creating a "ringing" call whose
+  // media could never connect anyway.
+  await sfu.getOrCreateRouter(id);
+
   const startedAt = nowIso();
   await db.insert(calls).values({ id, conversationId, initiatorId, status: "ringing", startedAt, answeredAt: null, endedAt: null, participantIds: "[]" });
 
@@ -130,14 +137,7 @@ export async function answerCall(callId: string, userId: string, clientId: strin
 
   const participants = callState.getParticipants(callId);
   for (const participant of participants) {
-    sendToClientGlobal(participant.userId, participant.clientId, {
-      type: "callParticipants",
-      callId,
-      conversationId: row.conversationId,
-      participants,
-      joinerUserId: userId,
-      joinerClientId: clientId,
-    });
+    sendToClientGlobal(participant.userId, participant.clientId, { type: "callParticipants", callId, conversationId: row.conversationId, participants });
   }
 
   return toCall(await getCall(callId));

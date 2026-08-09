@@ -40,11 +40,12 @@ export const env = {
   // Calls are gated by instance_settings.calls_enabled (a DB flag, off by
   // default), not by whether these are set - an operator flips the flag
   // only after running `npm run setup-calls`, which writes these itself.
-  // Left unset/empty otherwise; chat/calls/turnCredentials.ts throws a
-  // clear error if calls are somehow enabled without them.
-  turnSecret: process.env.TURN_SECRET ?? "",
-  turnDomain: process.env.TURN_DOMAIN ?? "",
-  turnRealm: process.env.TURN_REALM ?? "",
-  turnMinPort: Number(process.env.TURN_MIN_PORT ?? 49160),
-  turnMaxPort: Number(process.env.TURN_MAX_PORT ?? 49200),
+  // `mediaAnnouncedIp` has no safe default: it's the public IP/domain
+  // mediasoup's WebRtcServer advertises to peers, and getting this wrong
+  // (or omitting it) is exactly the "worked locally, silently dead over
+  // the internet" bug class that broke the previous coturn-based setup -
+  // see modules/calls/sfu.ts, which hard-fails rather than starting with
+  // this unset while calls are enabled.
+  mediaPort: Number(process.env.MEDIA_PORT ?? 4001),
+  mediaAnnouncedIp: process.env.MEDIA_ANNOUNCED_IP ?? "",
 };

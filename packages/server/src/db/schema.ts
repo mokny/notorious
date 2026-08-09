@@ -493,9 +493,9 @@ export const instanceSettings = sqliteTable("instance_settings", {
   registrationEnabled: integer("registration_enabled", { mode: "boolean" }).notNull().default(false),
   require2faEnabled: integer("require_2fa_enabled", { mode: "boolean" }).notNull().default(false),
   allowTemplateHttpRequests: integer("allow_template_http_requests", { mode: "boolean" }).notNull().default(false),
-  // Off by default - calls need a self-hosted TURN server most operators
-  // haven't set up. See scripts/setupCalls.ts, which flips this on only
-  // after coturn is actually installed and running.
+  // Off by default - calls need MEDIA_ANNOUNCED_IP/MEDIA_PORT configured and
+  // that port forwarded. See scripts/setupCalls.ts, which flips this on only
+  // after that's confirmed.
   callsEnabled: integer("calls_enabled", { mode: "boolean" }).notNull().default(false),
 });
 

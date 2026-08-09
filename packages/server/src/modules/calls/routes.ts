@@ -1,14 +1,21 @@
 import type { FastifyInstance } from "fastify";
-import { callClientSchema } from "@notorious/shared";
+import { callClientSchema, createTransportSchema, connectTransportSchema, produceSchema, consumeSchema } from "@notorious/shared";
 import { requireUser } from "../../plugins/session.js";
 import { requireConversationAccess } from "../chat/access.js";
 import { getCallsEnabled } from "../instanceSettings/service.js";
-import { serviceUnavailable } from "../../lib/httpError.js";
-import { getTurnCredentials } from "./turnCredentials.js";
+import { serviceUnavailable, unauthorized } from "../../lib/httpError.js";
 import * as callService from "./service.js";
+import * as callState from "./callState.js";
+import * as sfu from "./sfu.js";
 
 async function requireCallsEnabled(): Promise<void> {
   if (!(await getCallsEnabled())) throw serviceUnavailable("Calls are not enabled on this server");
+}
+
+/** Every mediasoup signaling route is scoped to a call the caller has already joined (via /answer, which registers them in callState) - this is the sole authorization boundary for all of them, mirroring how `chat/access.ts::requireConversationAccess` gates chat REST calls. */
+function requireCallParticipant(callId: string, userId: string, clientId: string): void {
+  const isParticipant = callState.getParticipants(callId).some((p) => p.userId === userId && p.clientId === clientId);
+  if (!isParticipant) throw unauthorized("You haven't joined this call");
 }
 
 export async function registerCallRoutes(app: FastifyInstance): Promise<void> {
@@ -54,11 +61,86 @@ export async function registerCallRoutes(app: FastifyInstance): Promise<void> {
     reply.code(204);
   });
 
-  // Not scoped to a specific call - TURN credentials are per-user, reusable
-  // for whichever call the client is about to join.
-  app.get("/api/v1/calls/turn-credentials", async (request) => {
+  // --- mediasoup handshake - REST request/response, see the calls feature
+  // plan for why (the /ws/chat channel is fire-and-forget broadcast only,
+  // no request/response infra exists there to reuse). Every route requires
+  // the caller to already be a registered participant of :callId (see
+  // requireCallParticipant above).
+
+  app.get("/api/v1/calls/:callId/rtp-capabilities", async (request) => {
     await requireCallsEnabled();
+    const { callId } = request.params as { callId: string };
+    const { clientId } = request.query as { clientId?: string };
     const user = requireUser(request);
-    return getTurnCredentials(user.id);
+    requireCallParticipant(callId, user.id, clientId ?? "");
+    return sfu.getRtpCapabilities(callId);
+  });
+
+  app.post("/api/v1/calls/:callId/transports", async (request) => {
+    await requireCallsEnabled();
+    const { callId } = request.params as { callId: string };
+    const user = requireUser(request);
+    const input = createTransportSchema.parse(request.body);
+    requireCallParticipant(callId, user.id, input.clientId);
+    return sfu.createTransport(user.id, input.clientId, callId, input.direction);
+  });
+
+  app.post("/api/v1/calls/:callId/transports/:transportId/connect", async (request, reply) => {
+    await requireCallsEnabled();
+    const { callId, transportId } = request.params as { callId: string; transportId: string };
+    const user = requireUser(request);
+    const input = connectTransportSchema.parse(request.body);
+    requireCallParticipant(callId, user.id, input.clientId);
+    await sfu.connectTransport(user.id, input.clientId, transportId, input.dtlsParameters);
+    reply.code(204);
+  });
+
+  app.post("/api/v1/calls/:callId/transports/:transportId/produce", async (request, reply) => {
+    await requireCallsEnabled();
+    const { callId, transportId } = request.params as { callId: string; transportId: string };
+    const user = requireUser(request);
+    const input = produceSchema.parse(request.body);
+    requireCallParticipant(callId, user.id, input.clientId);
+    const result = await sfu.produce(user.id, input.clientId, callId, transportId, input.kind, input.rtpParameters, input.source);
+    reply.code(201);
+    return result;
+  });
+
+  app.post("/api/v1/calls/:callId/producers/:producerId/close", async (request, reply) => {
+    await requireCallsEnabled();
+    const { callId, producerId } = request.params as { callId: string; producerId: string };
+    const user = requireUser(request);
+    const input = callClientSchema.parse(request.body);
+    requireCallParticipant(callId, user.id, input.clientId);
+    sfu.closeProducer(user.id, input.clientId, callId, producerId);
+    reply.code(204);
+  });
+
+  app.get("/api/v1/calls/:callId/producers", async (request) => {
+    await requireCallsEnabled();
+    const { callId } = request.params as { callId: string };
+    const { clientId } = request.query as { clientId?: string };
+    const user = requireUser(request);
+    requireCallParticipant(callId, user.id, clientId ?? "");
+    return sfu.listProducers(callId, user.id, clientId ?? "");
+  });
+
+  app.post("/api/v1/calls/:callId/consume", async (request) => {
+    await requireCallsEnabled();
+    const { callId } = request.params as { callId: string };
+    const user = requireUser(request);
+    const input = consumeSchema.parse(request.body);
+    requireCallParticipant(callId, user.id, input.clientId);
+    return sfu.consume(user.id, input.clientId, callId, input.transportId, input.producerId, input.rtpCapabilities);
+  });
+
+  app.post("/api/v1/calls/:callId/consumers/:consumerId/resume", async (request, reply) => {
+    await requireCallsEnabled();
+    const { callId, consumerId } = request.params as { callId: string; consumerId: string };
+    const user = requireUser(request);
+    const input = callClientSchema.parse(request.body);
+    requireCallParticipant(callId, user.id, input.clientId);
+    await sfu.resumeConsumer(user.id, input.clientId, consumerId);
+    reply.code(204);
   });
 }

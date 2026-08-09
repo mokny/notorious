@@ -250,22 +250,24 @@ headers (config files) or the "Websockets Support" toggle (NPM) first - that's t
 
 ---
 
-## Audio/video calls (TURN) don't go through nginx at all
+## Audio/video calls don't go through nginx at all
 
 If you've set up [calls](DEPLOYMENT.md#audiovideo-calls-optional) via `npm run setup-calls`, **no
 nginx changes are needed for them.** There are two separate traffic paths, easy to conflate:
 
-- **Call signaling** (offer/answer/ICE-candidate exchange) rides the same `/ws` WebSocket connection
-  everything else in this doc already covers - as long as the WebSocket upgrade headers above are in
-  place, signaling already works, nothing extra to configure.
+- **Call signaling** (the mediasoup handshake: RTP capabilities, transports, produce/consume) is
+  plain REST over `/api/v1/calls/...`, and the `mediaNewProducer`/`mediaProducerClosed` push events
+  ride the same `/ws` WebSocket connection everything else in this doc already covers - as long as
+  the proxy headers above are in place, signaling already works, nothing extra to configure.
 - **Call media itself** (the actual audio/video/screen-share) never touches nginx or port 4000 at
-  all - it's raw UDP traffic between browsers and the `coturn` process directly, on the port(s) the
-  setup wizard configured (UDP 3478 + a relay range, forwarded straight from your router to the
-  server - see DEPLOYMENT.md). nginx only ever proxies HTTP(S)/WebSocket traffic; it has no role in
-  relaying UDP media, and adding an nginx `stream {}` block for this is unnecessary.
+  all - it's TCP traffic between browsers and Notorious's own embedded mediasoup SFU, directly on
+  `MEDIA_PORT` (forwarded straight from your router to the server - see DEPLOYMENT.md). nginx only
+  ever proxies HTTP(S)/WebSocket traffic; it has no role in relaying call media, and adding an nginx
+  `stream {}` block for this is unnecessary.
 
-If calls aren't connecting, the nginx config is very unlikely to be the cause - check
-`systemctl status coturn` and that the TURN ports are actually forwarded on your router instead.
+If calls aren't connecting, the nginx config is very unlikely to be the cause - check that
+`MEDIA_ANNOUNCED_IP` in `.env` is actually your public IP and that `MEDIA_PORT` is really forwarded
+on your router instead.
 
 ## Troubleshooting checklist
 
@@ -276,4 +278,4 @@ If calls aren't connecting, the nginx config is very unlikely to be the cause - 
 | Everything works except other collaborators' edits never appear without a manual refresh | Missing `Upgrade`/`Connection` proxy headers, or "Websockets Support" left off in NPM |
 | `502 Bad Gateway` | Notorious isn't actually running/listening on the port nginx is forwarding to - check `systemctl status notorious` / `docker compose ps`, and that the port in the proxy config matches `PORT` in `.env` |
 | Certificate renewal seems to have stopped working | Plain nginx: check `sudo systemctl status certbot.timer` and `sudo certbot renew --dry-run`. NPM: certs auto-renew internally - check the container logs (`docker compose logs npm`) if a cert actually expired |
-| Calls ring but audio/video never connects | Not an nginx issue - see the TURN section above. Check `systemctl status coturn` and router port forwarding |
+| Calls ring but audio/video never connects | Not an nginx issue - see the calls section above. Check `MEDIA_ANNOUNCED_IP`/`MEDIA_PORT` in `.env` and router port forwarding |

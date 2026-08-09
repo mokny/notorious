@@ -89,8 +89,13 @@ import type {
   SendMessageInput,
   ReactInput,
   Call,
-  TurnCredentials,
   ActiveCallSummary,
+  RtpCapabilities,
+  TransportInfo,
+  ProducerInfo,
+  ConsumerInfo,
+  MediaKind,
+  ProducerSource,
 } from "@notorious/shared";
 import { apiRequest, apiUpload, apiDownload, apiUploadWithProgress } from "./client.js";
 import { randomId } from "../randomId.js";
@@ -348,7 +353,23 @@ export const callApi = {
   answer: (callId: string, clientId: string) => apiRequest<Call>(`/api/v1/calls/${callId}/answer`, { method: "POST", body: { clientId } }),
   decline: (callId: string) => apiRequest<void>(`/api/v1/calls/${callId}/decline`, { method: "POST" }),
   leave: (callId: string, clientId: string) => apiRequest<void>(`/api/v1/calls/${callId}/leave`, { method: "POST", body: { clientId } }),
-  turnCredentials: () => apiRequest<TurnCredentials>("/api/v1/calls/turn-credentials"),
+  // --- mediasoup handshake (see CallContext.tsx) - REST request/response,
+  // every call carries `clientId` so the server resolves which of the
+  // caller's several open /ws/chat sockets this belongs to.
+  rtpCapabilities: (callId: string, clientId: string) => apiRequest<RtpCapabilities>(`/api/v1/calls/${callId}/rtp-capabilities`, { query: { clientId } }),
+  createTransport: (callId: string, clientId: string, direction: "send" | "recv") =>
+    apiRequest<TransportInfo>(`/api/v1/calls/${callId}/transports`, { method: "POST", body: { clientId, direction } }),
+  connectTransport: (callId: string, transportId: string, clientId: string, dtlsParameters: unknown) =>
+    apiRequest<void>(`/api/v1/calls/${callId}/transports/${transportId}/connect`, { method: "POST", body: { clientId, dtlsParameters } }),
+  produce: (callId: string, transportId: string, clientId: string, kind: MediaKind, rtpParameters: unknown, source: ProducerSource) =>
+    apiRequest<{ producerId: string }>(`/api/v1/calls/${callId}/transports/${transportId}/produce`, { method: "POST", body: { clientId, kind, rtpParameters, source } }),
+  closeProducer: (callId: string, producerId: string, clientId: string) =>
+    apiRequest<void>(`/api/v1/calls/${callId}/producers/${producerId}/close`, { method: "POST", body: { clientId } }),
+  listProducers: (callId: string, clientId: string) => apiRequest<ProducerInfo[]>(`/api/v1/calls/${callId}/producers`, { query: { clientId } }),
+  consume: (callId: string, clientId: string, transportId: string, producerId: string, rtpCapabilities: unknown) =>
+    apiRequest<ConsumerInfo>(`/api/v1/calls/${callId}/consume`, { method: "POST", body: { clientId, transportId, producerId, rtpCapabilities } }),
+  resumeConsumer: (callId: string, consumerId: string, clientId: string) =>
+    apiRequest<void>(`/api/v1/calls/${callId}/consumers/${consumerId}/resume`, { method: "POST", body: { clientId } }),
 };
 
 export const pushApi = {

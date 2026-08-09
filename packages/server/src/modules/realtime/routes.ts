@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { joinRoom, joinGlobalRoom, broadcastToConversation, sendToClientGlobal } from "./hub.js";
+import { joinRoom, joinGlobalRoom, broadcastToConversation } from "./hub.js";
 import { getMemberRole } from "../workspaces/access.js";
 import { touchFocus, clearFocus } from "../chat/focusState.js";
 import { getParticipantUserIds } from "../chat/service.js";
 import { leaveCallBySocket } from "../calls/service.js";
-import type { CallSignalPayload } from "@notorious/shared";
+import { cleanupParticipant } from "../calls/sfu.js";
 
 /**
  * WebSocket endpoint clients connect to for live updates:
@@ -85,14 +85,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
 
     socket.on("message", (raw: Buffer) => {
       (async () => {
-        const data = JSON.parse(raw.toString()) as {
-          type?: string;
-          conversationId?: string;
-          toUserId?: string;
-          toClientId?: string;
-          callId?: string;
-          signal?: unknown;
-        };
+        const data = JSON.parse(raw.toString()) as { type?: string; conversationId?: string };
         if (data.type === "focus" && typeof data.conversationId === "string") {
           touchFocus(user.id, data.conversationId, socket);
         } else if (data.type === "unfocus") {
@@ -104,19 +97,6 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
             participantUserIds.filter((id) => id !== user.id),
             { type: "chatTyping", conversationId: data.conversationId, userId: user.id, userName: user.name },
           );
-        } else if (data.type === "callSignal" && data.toUserId && data.toClientId && data.callId && data.signal) {
-          // Pure relay - the server never inspects `signal` (SDP/ICE
-          // candidate), just forwards it to the exact peer connection
-          // waiting for it (see chat/calls's mesh renegotiation rules).
-          sendToClientGlobal(data.toUserId, data.toClientId, {
-            type: "callSignal",
-            callId: data.callId,
-            fromUserId: user.id,
-            fromClientId: clientId,
-            toUserId: data.toUserId,
-            toClientId: data.toClientId,
-            signal: data.signal as CallSignalPayload,
-          });
         }
       })().catch(() => {
         // Ignore malformed frames / lookup failures - this channel has no client->server message worth failing the connection over.
@@ -126,6 +106,11 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
     socket.on("close", () => {
       clearFocus(socket);
       void leaveCallBySocket(socket);
+      // A tab/device disconnecting is just another way of leaving a call's
+      // media session, same as leaveCallBySocket is for the business-state
+      // side - see chat/calls/sfu.ts's own doc comment on why this is a
+      // separate call rather than folded into leaveCallBySocket.
+      cleanupParticipant(socket);
     });
   });
 }

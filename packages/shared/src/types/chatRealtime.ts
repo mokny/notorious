@@ -1,5 +1,5 @@
 import type { Message, MessageReaction, ReadReceipt } from "./chat.js";
-import type { CallSignalPayload } from "./callSignal.js";
+import type { MediaKind, ProducerSource } from "./media.js";
 
 /**
  * All chat WebSocket payloads share the workspace-agnostic `/ws/chat`
@@ -85,35 +85,43 @@ export interface CallTakenEvent {
 /**
  * Full roster snapshot (not a join/leave delta - same "supersede, don't
  * reconcile" reasoning as PresenceSnapshotMessage in entities.ts) sent to
- * every current call participant whenever someone joins or leaves. Also the
- * signal existing participants use to know they must initiate a fresh
- * RTCPeerConnection offer to a newcomer (see CallContext.tsx's late-join
- * renegotiation rule) - `joinerUserId`/`joinerClientId` are set only on the
- * broadcast triggered by a join, letting existing participants distinguish
- * "the new person" from the rest of the roster without a separate event.
+ * every current call participant whenever someone joins or leaves - under
+ * the SFU model this is purely informational/for roster pruning (see
+ * CallContext.tsx), unlike the old mesh where it also told existing
+ * participants they had to initiate a fresh offer to a newcomer. That rule
+ * doesn't exist anymore: every relationship is client<->server, so a
+ * newcomer's own tracks are announced via `mediaNewProducer` below, not by
+ * this event.
  */
 export interface CallParticipantsEvent {
   type: "callParticipants";
   callId: string;
   conversationId: string;
   participants: { userId: string; clientId: string }[];
-  joinerUserId?: string;
-  joinerClientId?: string;
 }
 
 /**
- * Pure relay - the server never inspects `signal`, just forwards it from
- * one specific socket to another (see realtime/hub.ts::sendToClient and
- * realtime/routes.ts's `callSignal` case).
+ * Sent to every OTHER current participant of a call when someone's send
+ * transport successfully produces a new track (mic/camera/screen) - the SFU
+ * replacement for the old mesh's ontrack/renegotiation dance (see
+ * chat/calls/sfu.ts). Tells the client to call `POST .../consume` for this
+ * producerId.
  */
-export interface CallSignalEvent {
-  type: "callSignal";
+export interface CallMediaNewProducerEvent {
+  type: "mediaNewProducer";
   callId: string;
-  fromUserId: string;
-  fromClientId: string;
-  toUserId: string;
-  toClientId: string;
-  signal: CallSignalPayload;
+  producerId: string;
+  userId: string;
+  clientId: string;
+  kind: MediaKind;
+  source: ProducerSource;
+}
+
+/** Sent when a producer stops (explicit toggle-off, or the participant left the call entirely) - tells the client to tear down its local Consumer/track for this producerId. */
+export interface CallMediaProducerClosedEvent {
+  type: "mediaProducerClosed";
+  callId: string;
+  producerId: string;
 }
 
 /** The call ended (last participant left, or it was declined/missed before anyone joined) - conversationId lets `getActiveCall` state clear even for a client that isn't currently in the call. */
@@ -135,5 +143,6 @@ export type ChatRealtimeMessage =
   | CallRingEvent
   | CallTakenEvent
   | CallParticipantsEvent
-  | CallSignalEvent
+  | CallMediaNewProducerEvent
+  | CallMediaProducerClosedEvent
   | CallEndedEvent;
