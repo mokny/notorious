@@ -16,12 +16,14 @@ export function ChatListPage() {
   const [newChannelOpen, setNewChannelOpen] = useState(false);
 
   return (
-    <div className="flex flex-col" style={{ height: "var(--app-vh)" }}>
-      <ConversationList
-        onSelect={(id) => navigate(`/messages/${id}`)}
-        onNewChat={() => setNewChatOpen(true)}
-        onNewChannel={() => setNewChannelOpen(true)}
-      />
+    <div className="flex flex-col" style={{ height: "var(--app-vh)", paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="min-h-0 flex-1">
+        <ConversationList
+          onSelect={(id) => navigate(`/messages/${id}`)}
+          onNewChat={() => setNewChatOpen(true)}
+          onNewChannel={() => setNewChannelOpen(true)}
+        />
+      </div>
       <NewChatDialog open={newChatOpen} onOpenChange={setNewChatOpen} onCreated={(id) => navigate(`/messages/${id}`)} />
       <NewChannelDialog open={newChannelOpen} onOpenChange={setNewChannelOpen} onCreated={(id) => navigate(`/messages/${id}`)} />
     </div>

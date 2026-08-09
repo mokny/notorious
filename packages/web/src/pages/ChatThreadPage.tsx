@@ -9,8 +9,10 @@ export function ChatThreadPage() {
   if (!conversationId) return null;
 
   return (
-    <div className="flex flex-col" style={{ height: "var(--app-vh)" }}>
-      <ThreadView conversationId={conversationId} onBack={() => navigate("/messages")} />
+    <div className="flex flex-col" style={{ height: "var(--app-vh)", paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="min-h-0 flex-1">
+        <ThreadView conversationId={conversationId} onBack={() => navigate("/messages")} />
+      </div>
     </div>
   );
 }
