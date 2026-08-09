@@ -6,6 +6,8 @@ import { withShareToken } from "../../../lib/api/shareMode.js";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { useExportMode } from "../../../lib/export/exportMode.js";
 import { Icon } from "../../ui/Icon.js";
+import { useBlockEditor } from "../BlockEditorContext.js";
+import { HighlightedText } from "../HighlightedText.js";
 
 interface MediaProps<T> {
   content: T;
@@ -33,6 +35,13 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
   const inputRef = useRef<HTMLInputElement>(null);
   const [content, save] = useDebouncedSave(externalContent, onSave);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const { searchHighlight } = useBlockEditor();
+  const searchTerms = searchHighlight?.terms ?? [];
+  // Same "highlighted preview until clicked" idea as ChecklistBlock.tsx's
+  // `searchPreviewOverridden` - the caption is a plain `<input>`, not a
+  // TipTap instance, so it can't use SearchHighlight.ts's decorations.
+  const [captionPreviewOverridden, setCaptionPreviewOverridden] = useState(false);
+  const showCaptionPreview = searchTerms.length > 0 && !captionPreviewOverridden;
 
   if (content.url) {
     return (
@@ -95,12 +104,20 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
             <Icon name="download" className="h-4 w-4" />
           </a>
         </div>
-        <input
-          value={content.caption ?? ""}
-          onChange={(e) => save({ ...content, caption: e.target.value })}
-          placeholder="Caption"
-          className="mt-1 w-full border-none bg-transparent text-center text-xs text-ink-muted outline-none"
-        />
+        {showCaptionPreview ? (
+          <div onClick={() => setCaptionPreviewOverridden(true)} className="mt-1 w-full cursor-text text-center text-xs text-ink-muted">
+            <HighlightedText text={content.caption || "Caption"} terms={searchTerms} />
+          </div>
+        ) : (
+          <input
+            value={content.caption ?? ""}
+            onChange={(e) => save({ ...content, caption: e.target.value })}
+            onBlur={() => setCaptionPreviewOverridden(false)}
+            autoFocus={captionPreviewOverridden}
+            placeholder="Caption"
+            className="mt-1 w-full border-none bg-transparent text-center text-xs text-ink-muted outline-none"
+          />
+        )}
       </figure>
     );
   }

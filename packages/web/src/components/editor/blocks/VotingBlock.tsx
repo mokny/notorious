@@ -15,6 +15,7 @@ import { getVisitorId } from "../../../lib/visitorIdentity.js";
 import { randomId } from "../../../lib/randomId.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
+import { HighlightedText } from "../HighlightedText.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGestures.js";
 import { UndoToast } from "../UndoToast.js";
 
@@ -116,6 +117,7 @@ function VotingItemRow({
   summary,
   votingClosed,
   readOnly,
+  searchTerms,
   onVote,
   onChangeTitle,
   onChangeDescription,
@@ -126,6 +128,8 @@ function VotingItemRow({
   summary: VoteSummary;
   votingClosed: boolean;
   readOnly: boolean;
+  /** See BlockEditorContext.tsx's `searchHighlight` - option title/description aren't TipTap instances, so they can't use SearchHighlight.ts's decorations (see HighlightedText.tsx). */
+  searchTerms: string[];
   onVote: (direction: "up" | "down") => void;
   onChangeTitle: (title: string) => void;
   onChangeDescription: (description: string) => void;
@@ -135,6 +139,15 @@ function VotingItemRow({
   // Same touch-vs-hover split as BlockItem.tsx/ChecklistBlock.tsx.
   const hasHover = useHasHover();
   const [isEditingContent, setIsEditingContent] = useState(false);
+  // Shows a highlighted plain-text preview instead of the textarea/input
+  // whenever there are active search terms, until the user clicks in to
+  // actually edit that field - same idea as ChecklistBlock.tsx's
+  // `searchPreviewOverridden`, split per-field since an option has two
+  // independently editable strings.
+  const [titlePreviewOverridden, setTitlePreviewOverridden] = useState(false);
+  const [descriptionPreviewOverridden, setDescriptionPreviewOverridden] = useState(false);
+  const showTitlePreview = searchTerms.length > 0 && !titlePreviewOverridden;
+  const showDescriptionPreview = searchTerms.length > 0 && !descriptionPreviewOverridden;
   const canLongPressDrag = !hasHover && !readOnly && !isEditingContent;
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -223,32 +236,53 @@ function VotingItemRow({
         </div>
 
         <div className="min-w-0 flex-1 space-y-0.5 py-0.5">
-          <textarea
-            ref={(el) => resizeTextarea(el)}
-            value={item.title}
-            onChange={(e) => {
-              onChangeTitle(e.target.value);
-              resizeTextarea(e.target);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.preventDefault();
-            }}
-            readOnly={readOnly}
-            placeholder="Option"
-            autoComplete="off"
-            rows={1}
-            className="w-full resize-none overflow-hidden border-none bg-transparent text-sm font-medium outline-none"
-          />
-          {(item.description || !readOnly) && (
-            <input
-              value={item.description ?? ""}
-              onChange={(e) => onChangeDescription(e.target.value)}
+          {showTitlePreview ? (
+            <div
+              onClick={() => !readOnly && setTitlePreviewOverridden(true)}
+              className={`w-full text-sm font-medium ${readOnly ? "" : "cursor-text"}`}
+            >
+              <HighlightedText text={item.title || "Option"} terms={searchTerms} />
+            </div>
+          ) : (
+            <textarea
+              ref={(el) => resizeTextarea(el)}
+              value={item.title}
+              onChange={(e) => {
+                onChangeTitle(e.target.value);
+                resizeTextarea(e.target);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              onBlur={() => setTitlePreviewOverridden(false)}
+              autoFocus={titlePreviewOverridden}
               readOnly={readOnly}
-              placeholder="Description (optional)"
+              placeholder="Option"
               autoComplete="off"
-              className="w-full border-none bg-transparent text-xs text-ink-muted outline-none"
+              rows={1}
+              className="w-full resize-none overflow-hidden border-none bg-transparent text-sm font-medium outline-none"
             />
           )}
+          {(item.description || !readOnly) &&
+            (showDescriptionPreview ? (
+              <div
+                onClick={() => !readOnly && setDescriptionPreviewOverridden(true)}
+                className={`w-full text-xs text-ink-muted ${readOnly ? "" : "cursor-text"}`}
+              >
+                <HighlightedText text={item.description || "Description (optional)"} terms={searchTerms} />
+              </div>
+            ) : (
+              <input
+                value={item.description ?? ""}
+                onChange={(e) => onChangeDescription(e.target.value)}
+                onBlur={() => setDescriptionPreviewOverridden(false)}
+                autoFocus={descriptionPreviewOverridden}
+                readOnly={readOnly}
+                placeholder="Description (optional)"
+                autoComplete="off"
+                className="w-full border-none bg-transparent text-xs text-ink-muted outline-none"
+              />
+            ))}
         </div>
 
         {hasHover && (
@@ -277,7 +311,8 @@ export function VotingBlock({
   /** Owner-only, exempt from the object lock - see updateVotingSettingsSchema. */
   onUpdateSettings: (allowMultipleVotes: boolean, votingEndsAt: string | null) => Promise<void>;
 }) {
-  const { readOnly, workspaceId } = useBlockEditor();
+  const { readOnly, workspaceId, searchHighlight } = useBlockEditor();
+  const searchTerms = searchHighlight?.terms ?? [];
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [content, save] = useDebouncedSave(externalContent, onSave);
@@ -400,6 +435,7 @@ export function VotingBlock({
               summary={votes?.[item.id] ?? EMPTY_SUMMARY}
               votingClosed={votingClosed}
               readOnly={readOnly}
+              searchTerms={searchTerms}
               onVote={(direction) => handleVote(item.id, direction)}
               onChangeTitle={(title) => updateItem(index, { title })}
               onChangeDescription={(description) => updateItem(index, { description })}

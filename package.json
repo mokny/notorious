@@ -1,7 +1,7 @@
 {
   "name": "notorious",
   "private": true,
-  "version": "0.0.212",
+  "version": "0.0.213",
   "type": "module",
   "description": "Self-hosted, multi-user notes and knowledge base application",
   "workspaces": [

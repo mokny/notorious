@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { searchApi } from "../../lib/api/resources.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
-import { splitSearchTerms } from "../../lib/searchHighlight.js";
-import { HighlightedText } from "../editor/HighlightedText.js";
 import { Icon } from "../ui/Icon.js";
 import { Button } from "../ui/Button.js";
 import { TextField } from "../ui/TextField.js";
@@ -27,7 +25,6 @@ export function SearchPanel({ workspaceId, onSelect, autoFocus = true }: SearchP
   const [query, setQuery] = useState("");
   const [fuzzy, setFuzzy] = useState(true);
   const debouncedQuery = useDebouncedValue(query);
-  const searchTerms = splitSearchTerms(debouncedQuery);
 
   const { data: results } = useQuery({
     queryKey: ["search", workspaceId, debouncedQuery, fuzzy],
@@ -103,7 +100,7 @@ export function SearchPanel({ workspaceId, onSelect, autoFocus = true }: SearchP
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised"
           >
             <Icon name={object.icon ?? "file-text"} className="h-4 w-4 text-ink-muted" />
-            <HighlightedText text={object.title || "Untitled"} terms={searchTerms} />
+            <span>{object.title || "Untitled"}</span>
           </button>
         ))}
         {debouncedQuery && results?.length === 0 && <p className="p-3 text-sm text-ink-muted">No results for "{debouncedQuery}"</p>}
