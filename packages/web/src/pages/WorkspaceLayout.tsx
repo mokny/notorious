@@ -27,6 +27,7 @@ import { NotificationBell } from "../components/nav/NotificationBell.js";
 import { MobileTopBar } from "../components/nav/MobileTopBar.js";
 import { MobileBottomBar } from "../components/nav/MobileBottomBar.js";
 import { SearchSheet } from "../components/search/SearchSheet.js";
+import { ViewportDebugPanel } from "../components/ViewportDebugPanel.js";
 
 // The mobile header's own rendered height (safe-area inset + its content) -
 // exposed as a CSS var so <main>'s padding-top, the sticky action-toolbar in
@@ -414,6 +415,7 @@ function WorkspaceLayoutInner() {
           <>
             <MobileBottomBar workspaceId={workspaceId!} dashboardObjectId={workspace?.dashboardObjectId ?? undefined} />
             <SearchSheet workspaceId={workspaceId!} />
+            <ViewportDebugPanel />
           </>
         )}
       </div>
