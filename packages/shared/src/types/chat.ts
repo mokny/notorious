@@ -67,6 +67,8 @@ export interface Message {
   deletedAt: ISODateString | null;
   attachments: MessageAttachment[];
   reactions: MessageReaction[];
+  /** Who has read this message and when - see message_read_receipts / chat/service.ts::markRead. */
+  readBy: ReadReceipt[];
 }
 
 /**

@@ -7,6 +7,7 @@ import type {
   Message,
   MessageAttachment,
   MessageReaction,
+  ReadReceipt,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import {
@@ -303,11 +304,24 @@ async function reactionsForMessages(messageIds: string[]): Promise<Map<string, M
   return map;
 }
 
+async function receiptsForMessages(messageIds: string[]): Promise<Map<string, ReadReceipt[]>> {
+  if (messageIds.length === 0) return new Map();
+  const rows = await db.select().from(messageReadReceipts).where(inArray(messageReadReceipts.messageId, messageIds));
+  const map = new Map<string, ReadReceipt[]>();
+  for (const row of rows) {
+    const list = map.get(row.messageId) ?? [];
+    list.push(row);
+    map.set(row.messageId, list);
+  }
+  return map;
+}
+
 function toMessage(
   row: typeof messages.$inferSelect,
   authorName: string,
   attachments: MessageAttachment[],
   reactions: MessageReaction[],
+  readBy: ReadReceipt[] = [],
 ): Message {
   const deleted = Boolean(row.deletedAt);
   return {
@@ -320,6 +334,7 @@ function toMessage(
     deletedAt: row.deletedAt,
     attachments: deleted ? [] : attachments,
     reactions: deleted ? [] : reactions,
+    readBy,
   };
 }
 
@@ -344,10 +359,22 @@ export async function listMessages(conversationId: string, before?: string, limi
     .limit(limit);
 
   const messageIds = rows.map((r) => r.message.id);
-  const [attachmentsByMessage, reactionsByMessage] = await Promise.all([attachmentsForMessages(messageIds), reactionsForMessages(messageIds)]);
+  const [attachmentsByMessage, reactionsByMessage, receiptsByMessage] = await Promise.all([
+    attachmentsForMessages(messageIds),
+    reactionsForMessages(messageIds),
+    receiptsForMessages(messageIds),
+  ]);
 
   return rows
-    .map((r) => toMessage(r.message, r.authorName, attachmentsByMessage.get(r.message.id) ?? [], reactionsByMessage.get(r.message.id) ?? []))
+    .map((r) =>
+      toMessage(
+        r.message,
+        r.authorName,
+        attachmentsByMessage.get(r.message.id) ?? [],
+        reactionsByMessage.get(r.message.id) ?? [],
+        receiptsByMessage.get(r.message.id) ?? [],
+      ),
+    )
     .reverse();
 }
 

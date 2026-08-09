@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatApi } from "../../lib/api/resources.js";
+import { useAuth } from "../../context/AuthContext.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
 import { MessageBubble } from "./MessageBubble.js";
 import { Composer } from "./Composer.js";
@@ -10,6 +11,7 @@ const TYPING_TIMEOUT_MS = 5000;
 
 export function ThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { setFocusedConversation, onTyping } = useChatRealtime();
   const [typingUserName, setTypingUserName] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -22,6 +24,23 @@ export function ThreadView({ conversationId, onBack }: { conversationId: string;
     queryKey: ["chatMessages", conversationId],
     queryFn: () => chatApi.listMessages(conversationId),
   });
+
+  // "Read <time>" under the last message *I* sent, once the other person
+  // has read it - iMessage-style. Only shown for 1:1 DMs, not channels or
+  // groups (a receipt-per-participant list wouldn't read as one clean line).
+  const otherParticipant = conversation?.type === "dm" && conversation.otherParticipants.length === 1 ? conversation.otherParticipants[0] : null;
+  let lastOwnMessageId: string | null = null;
+  let lastOwnReadAt: string | null = null;
+  if (otherParticipant && messages) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const candidate = messages[i]!;
+      if (candidate.authorId === user?.id) {
+        lastOwnMessageId = candidate.id;
+        lastOwnReadAt = candidate.readBy.find((r) => r.userId === otherParticipant.userId)?.readAt ?? null;
+        break;
+      }
+    }
+  }
 
   const markReadMutation = useMutation({
     mutationFn: (upToMessageId: string) => chatApi.markRead(conversationId, upToMessageId),
@@ -72,7 +91,14 @@ export function ThreadView({ conversationId, onBack }: { conversationId: string;
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
-        {messages?.map((message) => <MessageBubble key={message.id} message={message} conversationId={conversationId} />)}
+        {messages?.map((message) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            conversationId={conversationId}
+            readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null}
+          />
+        ))}
         {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{typingUserName} is typing…</p>}
         <div ref={bottomRef} />
       </div>

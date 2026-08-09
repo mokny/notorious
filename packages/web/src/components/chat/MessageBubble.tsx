@@ -8,7 +8,16 @@ import { Icon } from "../ui/Icon.js";
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const LONG_PRESS_MS = 450;
 
-export function MessageBubble({ message, conversationId }: { message: Message; conversationId: string }) {
+export function MessageBubble({
+  message,
+  conversationId,
+  readAt,
+}: {
+  message: Message;
+  conversationId: string;
+  /** Set only on the last message I sent in a 1:1 DM, once the other person has read it - see ThreadView.tsx. */
+  readAt?: string | null;
+}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isOwn = message.authorId === user?.id;
@@ -122,6 +131,9 @@ export function MessageBubble({ message, conversationId }: { message: Message; c
       )}
 
       <span className="px-1 text-[11px] text-ink-muted">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+      {readAt && (
+        <span className="px-1 text-[11px] text-ink-muted">Read {new Date(readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+      )}
     </div>
   );
 }
