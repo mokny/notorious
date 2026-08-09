@@ -224,6 +224,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
     localStreamRef.current = micStream;
     setLocalStream(micStream);
 
+    // Register as a call participant *before* the mediasoup handshake - the
+    // handshake routes below are gated by `requireCallParticipant`, which
+    // checks the server's callState roster, and `answerCall` is the only
+    // thing that adds an entry to it.
+    await callApi.answer(newCallId, myClientId);
+    callIdRef.current = newCallId;
+
     const routerRtpCapabilities = await callApi.rtpCapabilities(newCallId, myClientId);
     const device = new Device();
     await device.load({ routerRtpCapabilities });
@@ -260,7 +267,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
       await consumeRemoteProducer(producer.userId, producer.clientId, producer.producerId, producer.source);
     }
 
-    await callApi.answer(newCallId, myClientId);
     enterActiveCall(newCallId, newConversationId);
   }
 
