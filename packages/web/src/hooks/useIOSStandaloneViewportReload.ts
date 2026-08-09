@@ -33,29 +33,10 @@ function expectedHeight(): number {
 export function useIOSStandaloneViewportReload(): void {
   useEffect(() => {
     if (!isIOS() || !isStandalone()) return;
-
-    function check() {
-      if (expectedHeight() - window.innerHeight <= SHRINK_THRESHOLD_PX) return;
-      const count = Number(sessionStorage.getItem(RELOAD_COUNT_KEY) ?? "0");
-      if (count >= MAX_AUTO_RELOADS) return;
-      sessionStorage.setItem(RELOAD_COUNT_KEY, String(count + 1));
-      window.location.reload();
-    }
-
-    check();
-    // Also re-checks when the app is resumed from the background - iOS
-    // usually suspends rather than fully restarts a backgrounded PWA (so a
-    // fresh `check()` on mount alone wouldn't catch a mismatch that only
-    // appears on resume), and `pageshow`/`visibilitychange` cover both the
-    // bfcache-restore and plain-tab-switch-back cases.
-    function onResume() {
-      if (document.visibilityState === "visible") check();
-    }
-    window.addEventListener("pageshow", check);
-    document.addEventListener("visibilitychange", onResume);
-    return () => {
-      window.removeEventListener("pageshow", check);
-      document.removeEventListener("visibilitychange", onResume);
-    };
+    if (expectedHeight() - window.innerHeight <= SHRINK_THRESHOLD_PX) return;
+    const count = Number(sessionStorage.getItem(RELOAD_COUNT_KEY) ?? "0");
+    if (count >= MAX_AUTO_RELOADS) return;
+    sessionStorage.setItem(RELOAD_COUNT_KEY, String(count + 1));
+    window.location.reload();
   }, []);
 }
