@@ -154,15 +154,30 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
           ))}
       </div>
 
-      {activeCall && !isInThisCall && (
-        <button
-          onClick={() => void call.joinCall(activeCall.callId, conversationId)}
-          disabled={call.phase !== "idle"}
-          className="flex items-center justify-center gap-1.5 border-b border-border bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20 disabled:opacity-50"
-        >
-          <Icon name="phone" className="h-3.5 w-3.5" />
-          Call in progress · {activeCall.participantUserIds.length} {activeCall.participantUserIds.length === 1 ? "participant" : "participants"} · Join
-        </button>
+      {activeCall && !isInThisCall && !call.isCallIgnored(activeCall.callId) && (
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-accent/10 px-3 py-1.5">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-accent">
+            <Icon name="phone" className="h-3.5 w-3.5" />
+            Call in progress · {activeCall.participantUserIds.length} {activeCall.participantUserIds.length === 1 ? "participant" : "participants"}
+          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              onClick={() => void call.joinCall(activeCall.callId, conversationId)}
+              disabled={call.phase !== "idle"}
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white hover:opacity-90 disabled:opacity-50"
+              title="Join call"
+            >
+              <Icon name="phone" className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => call.ignoreActiveCall(activeCall.callId)}
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:opacity-90"
+              title="Ignore"
+            >
+              <Icon name="phone-off" className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="flex-1 overflow-y-auto py-2">

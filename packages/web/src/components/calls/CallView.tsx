@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useCall, type CallPeer } from "../../context/CallContext.js";
 import { chatApi } from "../../lib/api/resources.js";
@@ -44,6 +44,68 @@ function PeerTile({ peer, conversationId }: { peer: CallPeer; conversationId: st
   return <VideoTile stream={peer.stream} name={info.name} avatarColor={info.avatarColor} avatarUrl={info.avatarUrl} />;
 }
 
+function useCallDuration(): string {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    setElapsedSeconds(0);
+    const interval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Floating bubble shown while a call is minimized (see the "minimize"
+ * button in CallView's control bar) - bottom-left so it never overlaps
+ * ChatBubble's bottom-right launcher. Own camera preview only, even in a
+ * group call with multiple peer cameras on, to avoid a "which peer" choice.
+ */
+function MinimizedCallBubble() {
+  const { localStream, cameraOn, micOn, setMinimized, leaveCall, toggleMic } = useCall();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const duration = useCallDuration();
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = localStream;
+  }, [localStream]);
+
+  return (
+    <button
+      onClick={() => setMinimized(false)}
+      className="fixed bottom-5 left-5 z-50 flex h-16 w-16 flex-col items-center justify-center overflow-hidden rounded-full bg-black/80 text-white shadow-2xl"
+      style={{ marginBottom: "env(safe-area-inset-bottom)", marginLeft: "env(safe-area-inset-left)" }}
+      title="Expand call"
+    >
+      {cameraOn && <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
+      <span className="relative z-10 rounded bg-black/50 px-1 text-[10px] leading-tight">{duration}</span>
+      <span
+        role="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          void toggleMic();
+        }}
+        title={micOn ? "Mute microphone" : "Unmute microphone"}
+        className="absolute -bottom-1 -left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-surface-raised text-ink shadow"
+      >
+        <Icon name={micOn ? "mic" : "mic-off"} className="h-3 w-3" />
+      </span>
+      <span
+        role="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          void leaveCall();
+        }}
+        title="Leave call"
+        className="absolute -bottom-1 -right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow"
+      >
+        <Icon name="phone-off" className="h-3 w-3" />
+      </span>
+    </button>
+  );
+}
+
 /**
  * Full-screen call overlay - mounted once in App.tsx alongside
  * ChatBubble/ChatSheet, renders null unless a call is active, so it
@@ -51,12 +113,14 @@ function PeerTile({ peer, conversationId }: { peer: CallPeer; conversationId: st
  * null" trick those two already rely on). Local self-view and every peer
  * tile share the same VideoTile: an avatar fallback when a participant has
  * no live (or enabled) video track, since camera is off by default and
- * stays optional for the whole call.
+ * stays optional for the whole call. Minimized state lives in CallContext
+ * so it survives this component unmounting/remounting.
  */
 export function CallView() {
-  const { phase, localStream, peers, cameraOn, screenSharing, micOn, conversationId, leaveCall, toggleCamera, toggleScreenShare, toggleMic } = useCall();
+  const { phase, localStream, peers, cameraOn, screenSharing, micOn, minimized, conversationId, leaveCall, toggleCamera, toggleScreenShare, toggleMic, setMinimized } = useCall();
 
   if (phase !== "active") return null;
+  if (minimized) return <MinimizedCallBubble />;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-surface" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -88,6 +152,13 @@ export function CallView() {
           title={screenSharing ? "Stop sharing screen" : "Share screen"}
         >
           <Icon name={screenSharing ? "screen-share" : "screen-share-off"} className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => setMinimized(true)}
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised text-ink"
+          title="Minimize"
+        >
+          <Icon name="minimize" className="h-5 w-5" />
         </button>
         <button
           onClick={() => void leaveCall()}

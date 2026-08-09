@@ -32,6 +32,7 @@ interface CallContextValue {
   cameraOn: boolean;
   screenSharing: boolean;
   micOn: boolean;
+  minimized: boolean;
   startCall: (conversationId: string) => Promise<void>;
   joinCall: (callId: string, conversationId: string) => Promise<void>;
   acceptIncoming: () => Promise<void>;
@@ -40,6 +41,9 @@ interface CallContextValue {
   toggleCamera: () => Promise<void>;
   toggleScreenShare: () => Promise<void>;
   toggleMic: () => Promise<void>;
+  setMinimized: (minimized: boolean) => void;
+  ignoreActiveCall: (callId: string) => void;
+  isCallIgnored: (callId: string) => boolean;
 }
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -85,6 +89,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [cameraOn, setCameraOn] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
   const [micOn, setMicOn] = useState(true);
+  const [minimized, setMinimized] = useState(false);
+  const [ignoredCallIds, setIgnoredCallIds] = useState<Set<string>>(new Set());
+
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   const deviceRef = useRef<MediasoupClientTypes.Device | null>(null);
   const sendTransportRef = useRef<MediasoupClientTypes.Transport | null>(null);
@@ -209,6 +217,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setConversationId(newConversationId);
     setPhase("active");
     setIncoming(null);
+    setMinimized(false);
     stopRingtone();
   }
 
@@ -224,6 +233,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCallId(null);
     setConversationId(null);
     setPhase("idle");
+    setMinimized(false);
     stopRingtone();
   }
 
@@ -322,6 +332,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (incoming) callApi.decline(incoming.callId).catch(() => {});
     setIncoming(null);
     stopRingtone();
+  }
+
+  // Purely local - server-side decline is a no-op once a call already has
+  // participants (see callService.declineCall), so ignoring an
+  // already-running call just hides ThreadView's join bar for this client.
+  function ignoreActiveCall(ignoredCallId: string): void {
+    setIgnoredCallIds((current) => new Set(current).add(ignoredCallId));
+  }
+
+  function isCallIgnored(checkedCallId: string): boolean {
+    return ignoredCallIds.has(checkedCallId);
   }
 
   async function toggleMic(): Promise<void> {
@@ -486,7 +507,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
           setCallId(null);
           setConversationId(null);
           setPhase("idle");
+          setMinimized(false);
         }
+        setIgnoredCallIds((current) => (current.has(endedCallId) ? new Set([...current].filter((id) => id !== endedCallId)) : current));
         setIncoming((current) => {
           if (current?.callId !== endedCallId) return current;
           stopRingtone();
@@ -496,6 +519,36 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }),
     [onCallEnded],
   );
+
+  // Keeps the screen from sleeping for the whole call (including while
+  // minimized to the floating bubble) - released as soon as the call ends.
+  // The OS releases the lock automatically whenever the tab goes into the
+  // background, so it's re-acquired on visibilitychange too.
+  useEffect(() => {
+    if (phase !== "active" || !("wakeLock" in navigator)) return;
+
+    let cancelled = false;
+    async function acquire(): Promise<void> {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+      } catch {
+        // Unsupported, permission denied, or backgrounded - fail silently.
+      }
+    }
+    void acquire();
+
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === "visible" && !cancelled) void acquire();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, [phase]);
 
   const value: CallContextValue = {
     phase,
@@ -507,6 +560,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     cameraOn,
     screenSharing,
     micOn,
+    minimized,
     startCall,
     joinCall,
     acceptIncoming,
@@ -515,6 +569,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     toggleCamera,
     toggleScreenShare,
     toggleMic,
+    setMinimized,
+    ignoreActiveCall,
+    isCallIgnored,
   };
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
