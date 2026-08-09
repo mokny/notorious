@@ -46,14 +46,16 @@ export function SearchSheet({ workspaceId }: { workspaceId: string }) {
           />
           <motion.div
             className="fixed inset-x-0 z-40 flex flex-col rounded-t-2xl bg-surface shadow-2xl md:hidden"
-            // `bottom: keyboardInset` (not a plain `bottom-0`) - if the
-            // user taps the field and the keyboard opens, this shrinks the
-            // sheet up from the bottom to fit above it, instead of keeping
-            // its full height and relying on iOS's own "scroll the focused
-            // input into view" to compensate, which can end up shifting the
-            // whole fixed sheet upward as a page-level pan. See
+            // `bottom: keyboardInset.bottom` (not a plain `bottom-0`) - if
+            // the user taps the field and the keyboard opens, this shrinks
+            // the sheet up from the bottom to fit above it, instead of
+            // keeping its full height and relying on iOS's own "scroll the
+            // focused input into view" to compensate. That native scroll
+            // still happens regardless (it pans the document, not just the
+            // sheet), so `+ keyboardInset.offsetTop` on `top` keeps the
+            // header pinned to the same on-screen position through it. See
             // useKeyboardInset's own comment.
-            style={{ top: "calc(env(safe-area-inset-top) + 2.5rem)", bottom: keyboardInset }}
+            style={{ top: `calc(env(safe-area-inset-top) + 2.5rem + ${keyboardInset.offsetTop}px)`, bottom: keyboardInset.bottom }}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}

@@ -38,7 +38,11 @@ export function ChatSheet() {
           <motion.div className="fixed inset-0 z-40 bg-black/40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close} />
           <motion.div
             className="fixed inset-x-0 z-40 flex flex-col rounded-t-2xl bg-surface shadow-2xl"
-            style={{ top: "calc(env(safe-area-inset-top) + 2.5rem)", bottom: keyboardInset }}
+            // `+ keyboardInset.offsetTop` keeps the header pinned to the
+            // same on-screen position when iOS pans the document to bring
+            // the focused composer input into view - see
+            // useKeyboardInset.ts's own comment.
+            style={{ top: `calc(env(safe-area-inset-top) + 2.5rem + ${keyboardInset.offsetTop}px)`, bottom: keyboardInset.bottom }}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
