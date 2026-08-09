@@ -16,7 +16,15 @@
          env(safe-area-inset-*) values needed, they resolve to 0), which
          trades away the edge-to-edge cover-image effect under the island for
          a correctly-reported viewport on every page. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- "default" (not "black-translucent") now that viewport-fit=cover is
+         gone above - black-translucent means the status bar is transparent
+         with page content showing through behind it, which needs cover mode
+         to have anything back there to show; without it iOS just paints an
+         opaque bar itself. "default" lets that bar's background follow the
+         theme-color meta above (kept in sync with light/dark theme by the
+         inline script below and ThemeContext.tsx), instead of a fixed color
+         that doesn't track the theme. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />

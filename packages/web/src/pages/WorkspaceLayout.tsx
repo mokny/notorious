@@ -54,10 +54,11 @@ const MOBILE_HEADER_HEIGHT = "calc(env(safe-area-inset-top) + 48px)";
 // component's own sizing (pill button height + its container padding) -
 // update these if that sizing ever changes.
 const MOBILE_TOP_BAR_HEIGHT = "calc(env(safe-area-inset-top) + 3.5rem)";
-// 3.5rem pill height + just the safe-area inset, no extra breathing-room
-// padding - the pill now sits right against the true bottom edge (matches
-// MobileBottomBar.tsx's own paddingBottom below).
-const MOBILE_BOTTOM_BAR_HEIGHT = "calc(3.5rem + env(safe-area-inset-bottom))";
+// 3.5rem pill height + a fixed 1rem of breathing room above the true bottom
+// edge - env(safe-area-inset-bottom) is always 0 without viewport-fit=cover
+// (see index.html), so a plain rem value is what actually lifts the pill now
+// (matches MobileBottomBar.tsx's own paddingBottom below).
+const MOBILE_BOTTOM_BAR_HEIGHT = "calc(3.5rem + 1rem)";
 
 // `useMobileChrome` (consumed below by the mobile header) is set from
 // ObjectDetailPage/CoverImage.tsx, a descendant rendered through <Outlet/> -
@@ -151,28 +152,6 @@ function WorkspaceLayoutInner() {
     mainRef.current?.scrollTo(0, 0);
   }, [location.pathname]);
 
-  // On phone, a cover page has no header at all sitting over the status
-  // bar/Dynamic Island (see showMobileHeader above) - intentional, so the
-  // cover itself shows through there while at the very top. But once
-  // scrolled, that same now-unmasked strip would show whatever's scrolled
-  // underneath (block text, etc.) right behind the island, which looks
-  // broken rather than deliberate. This paints it over with the plain page
-  // background as soon as there's any scroll, and lets it go transparent
-  // again at the very top - see the mask element itself, further down.
-  const [phoneCoverScrolled, setPhoneCoverScrolled] = useState(false);
-  useEffect(() => {
-    const el = mainRef.current;
-    if (!el || !isPhone || !coverActive) {
-      setPhoneCoverScrolled(false);
-      return;
-    }
-    function onScroll() {
-      setPhoneCoverScrolled((el?.scrollTop ?? 0) > 0);
-    }
-    onScroll();
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [isPhone, coverActive]);
 
   async function handleLogout() {
     const confirmed = await confirm({
@@ -367,15 +346,14 @@ function WorkspaceLayoutInner() {
           // and this just fades to transparent again like a normal top
           // scroll-fade. Rendered *before* MobileTopBar below (same z-20) so
           // the pills themselves stack visually on top of this fade rather
-          // than being dimmed by it. Without a cover, this is on
-          // unconditionally. With a cover, it only fades in once scrolled
-          // (see phoneCoverScrolled above) so the cover itself still shows
-          // through while at the very top.
+          // than being dimmed by it. Always on, even at scrollTop 0 with a
+          // cover - without viewport-fit=cover, nothing renders under the
+          // status bar/Dynamic Island anyway, so there's no true full-bleed
+          // cover shot to preserve by hiding this at the very top; leaving it
+          // off there just left a hard edge instead.
           <div
             aria-hidden
-            className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface via-surface/90 to-transparent ${coverActive ? "transition-opacity duration-150" : ""} ${
-              !coverActive || phoneCoverScrolled ? "opacity-100" : "opacity-0"
-            }`}
+            className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface via-surface/90 to-transparent"
             style={{ height: "var(--mobile-top-bar-h)" }}
           />
         )}
