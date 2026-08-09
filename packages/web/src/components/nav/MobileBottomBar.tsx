@@ -7,6 +7,7 @@ import { isSharedSession } from "../../lib/api/shareMode.js";
 import { reloadIfViewportShrunk, resetViewportReloadCount } from "../../hooks/useDynamicViewportHeight.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
+import { useChatOverlay } from "../../context/ChatOverlayContext.js";
 import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "./IOSMenu.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -27,6 +28,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
   const shareToken = isSharedSession();
   const { user } = useAuth();
   const { open: openSearch } = useSearchOverlay();
+  const { open: openChat } = useChatOverlay();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const prevWorkspaceIdRef = useRef(workspaceId);
 
@@ -161,7 +163,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
 
         {!shareToken && (
           <button
-            onClick={() => navigate("/messages")}
+            onClick={() => openChat()}
             className="relative flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
             title="Chats"
           >

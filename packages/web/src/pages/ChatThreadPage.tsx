@@ -1,18 +1,20 @@
-import { useNavigate, useParams } from "react-router-dom";
-import { ThreadView } from "../components/chat/ThreadView.js";
+import { useEffect } from "react";
+import { Navigate, useParams } from "react-router-dom";
+import { useChatOverlay } from "../context/ChatOverlayContext.js";
 
-/** Mobile full-screen thread - back navigates to the conversation list, iMessage-style. */
+/**
+ * `/messages/:conversationId` deep-link shim (see ChatListPage.tsx's doc
+ * comment) - this is what a push notification's `url` actually points at
+ * (see chat/service.ts::notifyNewMessage on the server). Opens the overlay
+ * straight to that thread, then redirects home.
+ */
 export function ChatThreadPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
-  const navigate = useNavigate();
+  const { open } = useChatOverlay();
 
-  if (!conversationId) return null;
+  useEffect(() => {
+    if (conversationId) open(conversationId);
+  }, [conversationId, open]);
 
-  return (
-    <div className="flex flex-col" style={{ height: "var(--app-vh)", paddingTop: "env(safe-area-inset-top)" }}>
-      <div className="min-h-0 flex-1">
-        <ThreadView conversationId={conversationId} onBack={() => navigate("/messages")} />
-      </div>
-    </div>
-  );
+  return <Navigate to="/" replace />;
 }

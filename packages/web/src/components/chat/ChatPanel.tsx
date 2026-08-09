@@ -1,15 +1,24 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { chatApi } from "../../lib/api/resources.js";
+import { useChatOverlay } from "../../context/ChatOverlayContext.js";
 import { ConversationList } from "./ConversationList.js";
 import { ThreadView } from "./ThreadView.js";
 import { NewChatDialog } from "./NewChatDialog.js";
 import { NewChannelDialog } from "./NewChannelDialog.js";
 import { Icon } from "../ui/Icon.js";
 
-/** The floating window's content - conversation list <-> thread, plus the two "start something new" dialogs. Shared by ChatBubble.tsx's desktop popover and the mobile full-screen pages (ChatListPage/ChatThreadPage), which each supply their own shell/chrome around these same pieces. */
+/**
+ * The overlay's content - conversation list <-> thread, plus the two "start
+ * something new" dialogs. Shared by ChatBubble.tsx's desktop floating panel
+ * and ChatSheet.tsx's mobile slide-up sheet, which each supply their own
+ * shell/chrome around these same pieces. Reads "which conversation" from
+ * ChatOverlayContext rather than owning it locally, so a push-notification
+ * deep link (ChatDeepLinkRoute.tsx) can jump straight to a thread regardless
+ * of which shell is currently mounted.
+ */
 export function ChatPanel({ onClose }: { onClose?: () => void }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { conversationId, selectConversation } = useChatOverlay();
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newChannelOpen, setNewChannelOpen] = useState(false);
 
@@ -23,14 +32,14 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
         </div>
       )}
 
-      {selectedId ? (
-        <ThreadView conversationId={selectedId} onBack={() => setSelectedId(null)} />
+      {conversationId ? (
+        <ThreadView conversationId={conversationId} onBack={() => selectConversation(null)} />
       ) : (
-        <ConversationList onSelect={setSelectedId} onNewChat={() => setNewChatOpen(true)} onNewChannel={() => setNewChannelOpen(true)} />
+        <ConversationList onSelect={selectConversation} onNewChat={() => setNewChatOpen(true)} onNewChannel={() => setNewChannelOpen(true)} />
       )}
 
-      <NewChatDialog open={newChatOpen} onOpenChange={setNewChatOpen} onCreated={setSelectedId} />
-      <NewChannelDialog open={newChannelOpen} onOpenChange={setNewChannelOpen} onCreated={setSelectedId} />
+      <NewChatDialog open={newChatOpen} onOpenChange={setNewChatOpen} onCreated={selectConversation} />
+      <NewChannelDialog open={newChannelOpen} onOpenChange={setNewChannelOpen} onCreated={selectConversation} />
     </div>
   );
 }

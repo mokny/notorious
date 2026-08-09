@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./context/AuthContext.js";
 import { ChatRealtimeProvider } from "./context/ChatRealtimeContext.js";
+import { ChatOverlayProvider } from "./context/ChatOverlayContext.js";
 import { isSharedSession } from "./lib/api/shareMode.js";
 import { systemApi } from "./lib/api/resources.js";
 import { useDynamicViewportHeight } from "./hooks/useDynamicViewportHeight.js";
@@ -19,6 +20,7 @@ import { SettingsPage } from "./pages/SettingsPage.js";
 import { AgentChatPage } from "./pages/AgentChatPage.js";
 import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
 import { ChatBubble } from "./components/chat/ChatBubble.js";
+import { ChatSheet } from "./components/chat/ChatSheet.js";
 import { ChatListPage } from "./pages/ChatListPage.js";
 import { ChatThreadPage } from "./pages/ChatThreadPage.js";
 
@@ -54,8 +56,11 @@ export function App() {
   useDynamicViewportHeight();
   return (
     <ChatRealtimeProvider>
-      <AppRoutes />
-      <ChatBubble />
+      <ChatOverlayProvider>
+        <AppRoutes />
+        <ChatBubble />
+        <ChatSheet />
+      </ChatOverlayProvider>
     </ChatRealtimeProvider>
   );
 }
