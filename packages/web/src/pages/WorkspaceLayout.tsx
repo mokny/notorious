@@ -411,6 +411,22 @@ function WorkspaceLayoutInner() {
           <Outlet />
         </main>
         {isPhone && (
+          // Mirrors the top fade above - iOS's WKWebView can settle on a
+          // render surface a bit shorter than the real screen after a cold
+          // launch (its safe-area-inset values stay correct even though the
+          // surface itself doesn't extend as far as they claim), leaving a
+          // sliver of unrendered space right at the true bottom edge that no
+          // in-page fix can reach. Fading the last bit of scrolled content
+          // into the page background instead of ending on a hard edge makes
+          // that sliver read as intentional breathing room rather than a
+          // glitch, whatever its actual size ends up being on a given device.
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-surface via-surface/90 to-transparent"
+            style={{ height: "var(--bottom-tab-bar-h)" }}
+          />
+        )}
+        {isPhone && (
           <>
             <MobileBottomBar workspaceId={workspaceId!} dashboardObjectId={workspace?.dashboardObjectId ?? undefined} />
             <SearchSheet workspaceId={workspaceId!} />
