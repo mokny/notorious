@@ -3,6 +3,7 @@ import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 import { registerRoute, NavigationRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
 import { clientsClaim } from "workbox-core";
+import type { PushNotificationPayload } from "@notorious/shared";
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -59,15 +60,48 @@ registerRoute(
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;
-  const payload = event.data.json() as { title: string; body: string; url?: string; badge?: number };
+  const payload = event.data.json() as PushNotificationPayload;
+
+  // Silent signal (no visible notification of its own) telling us to close
+  // an already-shown, same-`tag` call notification - see
+  // calls/service.ts::endCall on the server, which sends this the moment a
+  // call ends/is answered elsewhere/times out. Necessary because the call
+  // notification below is `requireInteraction: true` and would otherwise
+  // never disappear on its own.
+  if (payload.type === "call-closed") {
+    event.waitUntil(self.registration.getNotifications({ tag: payload.tag }).then((notifications) => notifications.forEach((n) => n.close())));
+    return;
+  }
+
+  const isCall = payload.type === "call";
+  const data: { type: string; url: string; callId?: string; conversationId?: string } = {
+    type: payload.type,
+    url: payload.url,
+    ...(isCall ? { callId: payload.callId, conversationId: payload.conversationId } : {}),
+  };
+
+  const options: NotificationOptions & { actions?: { action: string; title: string }[] } = {
+    body: payload.body,
+    icon: "/icons/icon-192.png",
+    data,
+    ...(isCall
+      ? {
+          tag: payload.tag,
+          // Without this, the call notification could vanish on its own
+          // before the 60s ring window is over - it's closed explicitly
+          // instead, via the `call-closed` push above.
+          requireInteraction: true,
+          actions: [
+            { action: "accept", title: "Accept" },
+            { action: "decline", title: "Decline" },
+          ],
+        }
+      : {}),
+  };
 
   event.waitUntil(
     Promise.all([
-      self.registration.showNotification(payload.title, {
-        body: payload.body,
-        icon: "/icons/icon-192.png",
-        data: { url: payload.url ?? "/" },
-      }),
+      self.registration.showNotification(payload.title, options),
       // Best-effort: this is what makes the app-icon badge update while the
       // app is backgrounded/fully closed, not just live via the WS-driven
       // path in chatBadge.ts (which only runs while a tab/PWA instance is
@@ -76,7 +110,7 @@ self.addEventListener("push", (event) => {
       // guarded the same way chatBadge.ts guards the foreground call, since
       // support is inconsistent (works in Chromium and iOS 16.4+ standalone
       // PWAs, absent in Firefox).
-      "setAppBadge" in self.navigator && typeof payload.badge === "number"
+      "setAppBadge" in self.navigator && payload.type === "chat-message" && typeof payload.badge === "number"
         ? payload.badge > 0
           ? (self.navigator as unknown as { setAppBadge(count?: number): Promise<void> }).setAppBadge(payload.badge).catch(() => {})
           : (self.navigator as unknown as { clearAppBadge(): Promise<void> }).clearAppBadge().catch(() => {})
@@ -86,13 +120,32 @@ self.addEventListener("push", (event) => {
 });
 
 self.addEventListener("notificationclick", (event) => {
+  const data = event.notification.data as { type?: string; url: string; callId?: string; conversationId?: string };
   event.notification.close();
-  const url = (event.notification.data as { url?: string })?.url ?? "/";
+
+  // "Decline" needs no window at all - the server-side effect (ending the
+  // call) is identical to declining from the in-app banner, just fired
+  // directly from here. Every platform that doesn't support notification
+  // actions (notably iOS Safari) simply never produces this `event.action`,
+  // so it falls through to the plain-tap path below instead - no separate
+  // handling needed for that.
+  if (event.action === "decline" && data.callId) {
+    event.waitUntil(fetch(`/api/v1/calls/${data.callId}/decline`, { method: "POST" }));
+    return;
+  }
+
+  // "Accept" is itself the explicit confirmation (same as tapping Accept on
+  // the in-app banner), so it jumps straight into the call instead of just
+  // opening the thread - see ChatThreadPage.tsx's `?join=` handling. A plain
+  // tap on the notification body (no action) only opens the thread, where
+  // the still-ringing call is picked up by CallContext.tsx's own state and
+  // shown as the normal accept/decline banner.
+  const url = event.action === "accept" && data.callId && data.conversationId ? `/messages/${data.conversationId}?join=${data.callId}` : data.url;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {
-      const existing = clients.find((client) => client.url.includes(url));
-      if (existing) return existing.focus();
+      const existing = clients.find((client) => client.url.includes(data.url));
+      if (existing) return existing.navigate(url).then((client) => client?.focus());
       return self.clients.openWindow(url);
     }),
   );

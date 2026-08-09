@@ -679,6 +679,7 @@ export async function runBackupNow(workspaceId: string): Promise<void> {
     const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
     if (workspace) {
       await notifyUser(workspace.ownerId, {
+        type: "backup-failed",
         title: "Backup failed",
         body: `A backup for "${workspace.name}" failed for one or more destinations.`,
         url: `/w/${workspaceId}/settings`,

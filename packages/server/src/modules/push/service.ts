@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { eq } from "drizzle-orm";
-import type { PushSubscribeInput } from "@notorious/shared";
+import type { PushSubscribeInput, PushNotificationPayload } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { pushSubscriptions } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -42,7 +42,7 @@ export async function unsubscribe(endpoint: string): Promise<void> {
  * badge while the app is backgrounded/closed (the foreground WS-driven path
  * in chatBadge.ts only runs while a tab/PWA instance is actually open).
  */
-export async function notifyUser(userId: string, payload: { title: string; body: string; url?: string; badge?: number }): Promise<void> {
+export async function notifyUser(userId: string, payload: PushNotificationPayload): Promise<void> {
   if (!ensureConfigured()) {
     console.warn("[push] Skipping notifyUser: VAPID keys are not configured (VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY)");
     return;

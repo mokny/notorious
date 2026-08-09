@@ -432,8 +432,10 @@ async function notifyNewMessage(conversationId: string, message: Message, sender
       sendToUserGlobal(userId, { type: "chatUnreadCount", unreadConversationCount });
       if (isFocused(userId, conversationId)) return;
       await notifyUser(userId, {
+        type: "chat-message",
         title: senderName,
         body: message.body ? preview(message.body) : "Sent an attachment",
+        conversationId,
         url: `/messages/${conversationId}`,
         badge: unreadConversationCount,
       });

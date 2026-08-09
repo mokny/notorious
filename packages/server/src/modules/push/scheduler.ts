@@ -6,6 +6,7 @@ import { notifyUser } from "./service.js";
 
 interface DueReminder {
   objectId: string;
+  workspaceId: string;
   propertyId: string;
   reminderValue: string;
   title: string;
@@ -17,7 +18,7 @@ async function findDueReminders(): Promise<DueReminder[]> {
   const now = nowIso();
   const rows = sqlite
     .prepare(
-      `SELECT ov.object_id AS objectId, ov.property_id AS propertyId, ov.value AS reminderValue,
+      `SELECT ov.object_id AS objectId, o.workspace_id AS workspaceId, ov.property_id AS propertyId, ov.value AS reminderValue,
               o.title AS title, o.created_by AS createdBy
        FROM object_values ov
        JOIN properties p ON p.id = ov.property_id AND p.key = 'reminder' AND p.type = 'datetime'
@@ -37,9 +38,10 @@ async function findDueReminders(): Promise<DueReminder[]> {
 
 async function sendReminder(reminder: DueReminder): Promise<void> {
   await notifyUser(reminder.createdBy, {
+    type: "reminder",
     title: "Reminder",
     body: reminder.title,
-    url: `/objects/${reminder.objectId}`,
+    url: `/w/${reminder.workspaceId}/objects/${reminder.objectId}`,
   });
 
   await db.insert(sentReminders).values({

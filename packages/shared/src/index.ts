@@ -12,6 +12,7 @@ export * from "./types/chat.js";
 export * from "./types/chatRealtime.js";
 export * from "./types/calls.js";
 export * from "./types/media.js";
+export * from "./types/push.js";
 export * from "./utils/tableDoc.js";
 
 export * from "./schemas/auth.js";

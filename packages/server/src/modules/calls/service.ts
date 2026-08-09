@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import type { WebSocket } from "@fastify/websocket";
-import type { Call, CallStatus, CallSummary, ActiveCallSummary } from "@notorious/shared";
+import type { Call, CallStatus, CallSummary, ActiveCallSummary, IncomingCallSummary } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { calls, messages, users } from "../../db/schema.js";
+import { calls, messages, users, conversationParticipants } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { notFound, conflict } from "../../lib/httpError.js";
 import { sendToUserGlobal, sendToClientGlobal, sendToUserGlobalExcept, getSocketForClient } from "../realtime/hub.js";
@@ -82,7 +82,14 @@ async function endCall(callId: string, status: Extract<CallStatus, "ended" | "mi
   await writeCallHistoryMessage(updated);
 
   const conversationParticipantIds = await getParticipantUserIds(row.conversationId);
-  for (const userId of conversationParticipantIds) sendToUserGlobal(userId, { type: "callEnded", callId, conversationId: row.conversationId, reason });
+  for (const userId of conversationParticipantIds) {
+    sendToUserGlobal(userId, { type: "callEnded", callId, conversationId: row.conversationId, reason });
+    // Silently closes the still-open, requireInteraction call notification
+    // (see push-sw.ts's `push`/`notificationclick` handlers) on every device -
+    // it only ever showed one for recipients, but sending to everyone here is
+    // harmless (no matching notification -> no-op) and keeps this loop simple.
+    if (userId !== row.initiatorId) await notifyUser(userId, { type: "call-closed", tag: callId });
+  }
 }
 
 /** Any conversation participant, any role - open/joinable by everyone in the conversation, same "open by design" spirit as workspace channels. */
@@ -102,7 +109,15 @@ export async function startCall(conversationId: string, initiatorId: string, ini
   const recipientUserIds = (await getParticipantUserIds(conversationId)).filter((userId) => userId !== initiatorId);
   for (const userId of recipientUserIds) {
     sendToUserGlobal(userId, { type: "callRing", callId: id, conversationId, initiatorId, initiatorName });
-    await notifyUser(userId, { title: `${initiatorName} is calling`, body: "Tap to join", url: `/messages/${conversationId}` });
+    await notifyUser(userId, {
+      type: "call",
+      title: `${initiatorName} is calling`,
+      body: "Tap to join",
+      callId: id,
+      conversationId,
+      tag: id,
+      url: `/messages/${conversationId}`,
+    });
   }
 
   ringTimeouts.set(
@@ -181,4 +196,26 @@ export function getActiveCallSummary(conversationId: string): ActiveCallSummary 
   const active = callState.getActiveCallForConversation(conversationId);
   if (!active) return null;
   return { callId: active.callId, conversationId, participantUserIds: active.participantUserIds };
+}
+
+/**
+ * Backs `GET /api/v1/calls/ringing` - queried from the DB rather than
+ * `callState` (unlike `getActiveCallSummary` above) because it has to answer
+ * correctly for a client that just cold-started and has no live WS/call
+ * state yet (e.g. right after a push-notification tap opened a fresh tab) -
+ * see CallContext.tsx's initial-ringing-call fetch.
+ */
+export async function getRingingCallForUser(userId: string): Promise<IncomingCallSummary | null> {
+  const rows = await db
+    .select({ call: calls, initiatorName: users.name })
+    .from(calls)
+    .innerJoin(conversationParticipants, eq(conversationParticipants.conversationId, calls.conversationId))
+    .innerJoin(users, eq(users.id, calls.initiatorId))
+    .where(and(eq(conversationParticipants.userId, userId), eq(calls.status, "ringing"), ne(calls.initiatorId, userId)))
+    .orderBy(calls.startedAt)
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+  return { callId: row.call.id, conversationId: row.call.conversationId, initiatorId: row.call.initiatorId, initiatorName: row.initiatorName };
 }

@@ -1,11 +1,15 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { chatApi } from "../lib/api/resources.js";
+import type { IncomingCallSummary } from "@notorious/shared";
+import { chatApi, callApi } from "../lib/api/resources.js";
 import { useGlobalRealtime } from "../lib/ws/useGlobalRealtime.js";
 import { updateAppBadge } from "../lib/chatBadge.js";
 import { useAuth } from "./AuthContext.js";
 
-type ChatRealtimeContextValue = ReturnType<typeof useGlobalRealtime>;
+type ChatRealtimeContextValue = ReturnType<typeof useGlobalRealtime> & {
+  /** `undefined` while loading, `null` once loaded if nothing's ringing - see CallContext.tsx's initial-ring effect, which waits for the loaded state before deciding whether to show the incoming-call banner. */
+  ringingCall: IncomingCallSummary | null | undefined;
+};
 
 const ChatRealtimeContext = createContext<ChatRealtimeContextValue | null>(null);
 
@@ -35,12 +39,21 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(user),
   });
 
+  // Covers a cold app start (e.g. a push-notification tap opening a fresh
+  // tab) where a ring already in progress never reached this device as a
+  // live `callRing` WS event - see CallContext.tsx's initial-ring effect.
+  const { data: ringingCall } = useQuery({
+    queryKey: ["ringingCall"],
+    queryFn: callApi.ringingCall,
+    enabled: Boolean(user),
+  });
+
   useEffect(() => {
     if (!conversations) return;
     updateAppBadge(conversations.filter((c) => c.unreadCount > 0).length);
   }, [conversations]);
 
-  return <ChatRealtimeContext.Provider value={realtime}>{children}</ChatRealtimeContext.Provider>;
+  return <ChatRealtimeContext.Provider value={{ ...realtime, ringingCall }}>{children}</ChatRealtimeContext.Provider>;
 }
 
 export function useChatRealtime(): ChatRealtimeContextValue {

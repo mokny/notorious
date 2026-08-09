@@ -41,3 +41,11 @@ export interface ActiveCallSummary {
   conversationId: string;
   participantUserIds: string[];
 }
+
+/** Backs `GET /api/v1/calls/ringing` - "is there a call ringing for me right now", queried from the DB (unlike `ActiveCallSummary` above) since it must survive a cold app start, before any WS event could have delivered it. */
+export interface IncomingCallSummary {
+  callId: string;
+  conversationId: string;
+  initiatorId: string;
+  initiatorName: string;
+}

@@ -74,7 +74,7 @@ function peerKey(userId: string, clientId: string): string {
  */
 export function CallProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const { onCallRing, onCallTaken, onCallParticipants, onMediaNewProducer, onMediaProducerClosed, onCallEnded } = useChatRealtime();
+  const { onCallRing, onCallTaken, onCallParticipants, onMediaNewProducer, onMediaProducerClosed, onCallEnded, ringingCall } = useChatRealtime();
 
   const [phase, setPhase] = useState<CallPhase>("idle");
   const [callId, setCallId] = useState<string | null>(null);
@@ -96,6 +96,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const callIdRef = useRef<string | null>(null);
   const ringtoneRef = useRef<{ stop: () => void } | null>(null);
+  const handledRingingCallIdRef = useRef<string | null>(null);
   // Bumped by leaveCall/onCallEnded and at the start of every joinCall -
   // lets an in-flight joinCall notice it's been superseded (e.g. the user
   // hit "leave" moments after joining) and unwind instead of finishing the
@@ -394,6 +395,20 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }),
     [onCallRing, phase],
   );
+
+  // Catches a call that was already ringing before this device connected
+  // (cold app start, or a reconnect after being offline) - `onCallRing`
+  // above only fires for a ring that happens *while* connected. Guarded by
+  // `handledRingingCallIdRef` so a stale/refetched `ringingCall` for a call
+  // already declined/answered here doesn't reopen the banner.
+  useEffect(() => {
+    if (!ringingCall || phase !== "idle") return;
+    if (handledRingingCallIdRef.current === ringingCall.callId) return;
+    handledRingingCallIdRef.current = ringingCall.callId;
+    setIncoming({ callId: ringingCall.callId, conversationId: ringingCall.conversationId, initiatorId: ringingCall.initiatorId, initiatorName: ringingCall.initiatorName });
+    setPhase("ringing-incoming");
+    playRingtone();
+  }, [ringingCall, phase]);
 
   // Another of my devices answered first - stop ringing here.
   useEffect(

@@ -132,6 +132,7 @@ export async function notifyCommentParticipants(input: {
       sendToUser(input.workspaceId, userId, { type: "notification", workspaceId: input.workspaceId, notification });
 
       await notifyUser(userId, {
+        type: "mention",
         title: `${input.actorName} commented on "${input.objectTitle}"`,
         body,
         url: `/w/${input.workspaceId}/objects/${input.objectId}`,

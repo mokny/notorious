@@ -102,7 +102,13 @@ export function useGlobalRealtime(enabled: boolean): {
 
       socket.onopen = () => {
         reconnectDelay = RECONNECT_BASE_DELAY_MS;
-        if (hasConnectedBefore) queryClient.invalidateQueries({ queryKey: ["chatConversations"] });
+        if (hasConnectedBefore) {
+          queryClient.invalidateQueries({ queryKey: ["chatConversations"] });
+          // A ring that started while this device was disconnected never
+          // reached it as a `callRing` WS event - refetch so CallContext.tsx
+          // can still pick it up (see its `ringingCall`-driven effect).
+          queryClient.invalidateQueries({ queryKey: ["ringingCall"] });
+        }
         hasConnectedBefore = true;
       };
 

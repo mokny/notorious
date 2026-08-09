@@ -91,6 +91,7 @@ import type {
   ReactInput,
   Call,
   ActiveCallSummary,
+  IncomingCallSummary,
   RtpCapabilities,
   TransportInfo,
   ProducerInfo,
@@ -351,6 +352,7 @@ export const chatApi = {
 export const callApi = {
   start: (conversationId: string) => apiRequest<Call>(`/api/v1/chat/conversations/${conversationId}/calls`, { method: "POST" }),
   activeCall: (conversationId: string) => apiRequest<ActiveCallSummary | null>(`/api/v1/chat/conversations/${conversationId}/active-call`),
+  ringingCall: () => apiRequest<IncomingCallSummary | null>("/api/v1/calls/ringing"),
   answer: (callId: string, clientId: string) => apiRequest<Call>(`/api/v1/calls/${callId}/answer`, { method: "POST", body: { clientId } }),
   decline: (callId: string) => apiRequest<void>(`/api/v1/calls/${callId}/decline`, { method: "POST" }),
   leave: (callId: string, clientId: string) => apiRequest<void>(`/api/v1/calls/${callId}/leave`, { method: "POST", body: { clientId } }),

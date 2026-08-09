@@ -102,6 +102,7 @@ export async function assertBudgetNotExceeded(workspaceId: string): Promise<void
     const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1);
     if (workspace) {
       await notifyUser(workspace.ownerId, {
+        type: "ai-budget",
         title: "AI token budget reached",
         body: `"${workspace.name}" has used its monthly AI token budget (${row.maxTokenBudget} tokens). AI requests are blocked until the budget resets or you raise it.`,
         url: `/w/${workspaceId}/settings`,

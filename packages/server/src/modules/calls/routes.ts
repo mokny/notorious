@@ -36,6 +36,13 @@ export async function registerCallRoutes(app: FastifyInstance): Promise<void> {
     return callService.getActiveCallSummary(id);
   });
 
+  /** "Is there a call ringing for me right now" - see CallContext.tsx's initial fetch on mount/reconnect, which is what lets a cold-started tab (e.g. opened by tapping a push notification) show the accept/decline banner instead of missing it. */
+  app.get("/api/v1/calls/ringing", async (request) => {
+    await requireCallsEnabled();
+    const user = requireUser(request);
+    return callService.getRingingCallForUser(user.id);
+  });
+
   app.post("/api/v1/calls/:callId/answer", async (request) => {
     await requireCallsEnabled();
     const { callId } = request.params as { callId: string };
