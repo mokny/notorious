@@ -130,16 +130,6 @@ export async function createTransport(userId: string, clientId: string, callId: 
   const entry = ensureParticipantEntry(socket, callId, userId, clientId, router);
   const transport = await router.createWebRtcTransport({ webRtcServer, enableUdp: false, enableTcp: true, preferTcp: true });
 
-  // Temporary operational visibility - ICE/DTLS failures are otherwise
-  // invisible (the REST handshake can succeed while the actual media
-  // connection never comes up), and there's no other way to see why.
-  transport.on("icestatechange", (state) => {
-    console.log(`[calls] transport ${transport.id} (${direction}, call ${callId}) ICE state: ${state}`);
-  });
-  transport.on("dtlsstatechange", (state) => {
-    console.log(`[calls] transport ${transport.id} (${direction}, call ${callId}) DTLS state: ${state}`);
-  });
-
   if (direction === "send") entry.sendTransport = transport;
   else entry.recvTransport = transport;
 

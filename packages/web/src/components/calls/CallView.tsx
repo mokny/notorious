@@ -22,11 +22,18 @@ function VideoTile({ stream, name, avatarColor, avatarUrl, muted }: { stream: Me
 
   return (
     <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-black/80">
-      {hasVideo ? (
-        <video ref={videoRef} autoPlay playsInline muted={muted} className="h-full w-full object-cover" />
-      ) : (
-        <ChatAvatar name={name} avatarColor={avatarColor} avatarUrl={avatarUrl} size={16} />
-      )}
+      {/* Always mounted (never display:none, which pauses audio in some
+          browsers), even audio-only - this is also what plays the audio
+          track, since an unattached MediaStream never plays sound. Just
+          made invisible when there's no picture, with the avatar on top. */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={muted}
+        className={`absolute inset-0 h-full w-full object-cover ${hasVideo ? "" : "opacity-0"}`}
+      />
+      {!hasVideo && <ChatAvatar name={name} avatarColor={avatarColor} avatarUrl={avatarUrl} size={16} />}
       <span className="absolute bottom-1.5 left-2 rounded bg-black/50 px-1.5 py-0.5 text-xs text-white">{name}</span>
     </div>
   );
