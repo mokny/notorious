@@ -438,7 +438,11 @@ function WorkspaceLayoutInner() {
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-surface via-surface/90 to-transparent"
-            style={{ height: "var(--bottom-tab-bar-h)" }}
+            // Shorter than `--bottom-tab-bar-h` (main's own paddingBottom
+            // reservation, untouched) on purpose - the full reservation's
+            // height read as too heavy a fade; a shorter one still covers
+            // the actual gap while looking lighter.
+            style={{ height: "calc(var(--bottom-tab-bar-h) - 1.5rem)" }}
           />
         )}
         {isPhone && (
