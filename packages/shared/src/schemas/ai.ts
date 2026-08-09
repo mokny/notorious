@@ -28,6 +28,12 @@ export interface WorkspaceAiConfigSummary {
   usageResetAt: string | null;
 }
 
+/** One entry per workspace the current user belongs to that has AI configured - see modules/ai/service.ts's `listAiConfiguredWorkspacesForUser`. */
+export interface AiConfiguredWorkspace {
+  workspaceId: string;
+  workspaceName: string;
+}
+
 export const sendChatMessageSchema = z.object({
   message: z.string().min(1).max(8000),
 });

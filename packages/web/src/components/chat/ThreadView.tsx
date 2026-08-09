@@ -7,25 +7,21 @@ import { useCall } from "../../context/CallContext.js";
 import { MessageBubble } from "./MessageBubble.js";
 import { Composer } from "./Composer.js";
 import { ChatAvatar } from "./ChatAvatar.js";
+import { AiThreadView } from "./AiThreadView.js";
+import { aiConversationWorkspaceId } from "./aiConversation.js";
+import { dayKey, dayLabel } from "../../lib/chatDayLabels.js";
 import { Icon } from "../ui/Icon.js";
 
 const TYPING_TIMEOUT_MS = 5000;
 
-function dayKey(iso: string): string {
-  return new Date(iso).toDateString();
-}
-
-function dayLabel(iso: string): string {
-  const date = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return "Today";
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
-}
-
+/** Dispatches to the "Notorious AI" thread (a different backend entirely - see aiConversation.ts) or the real, DB-backed conversation thread below. Calls no hooks itself so switching between the two never trips the rules of hooks - each branch is its own component instance. */
 export function ThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
+  const aiWorkspaceId = aiConversationWorkspaceId(conversationId);
+  if (aiWorkspaceId) return <AiThreadView workspaceId={aiWorkspaceId} onBack={onBack} />;
+  return <RealThreadView conversationId={conversationId} onBack={onBack} />;
+}
+
+function RealThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { setFocusedConversation, onTyping, onCallRing, onCallParticipants, onCallEnded } = useChatRealtime();

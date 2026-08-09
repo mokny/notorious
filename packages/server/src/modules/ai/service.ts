@@ -1,7 +1,7 @@
 import { eq, and, asc } from "drizzle-orm";
-import type { WorkspaceAiConfigSummary, AiChatMessage, AiToolCall, SaveWorkspaceAiConfigInput, AiUsageResetInterval } from "@notorious/shared";
+import type { WorkspaceAiConfigSummary, AiConfiguredWorkspace, AiChatMessage, AiToolCall, SaveWorkspaceAiConfigInput, AiUsageResetInterval } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { workspaceAiConfigs, aiChatMessages, workspaces } from "../../db/schema.js";
+import { workspaceAiConfigs, aiChatMessages, workspaces, workspaceMembers } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { encrypt, decrypt } from "../../lib/crypto.js";
 import { badRequest } from "../../lib/httpError.js";
@@ -41,6 +41,16 @@ export function nextResetAt(interval: AiUsageResetInterval, from: Date): string 
 export async function getWorkspaceAiConfigSummary(workspaceId: string): Promise<WorkspaceAiConfigSummary> {
   const rows = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
   return toSummary(rows[0]);
+}
+
+/** Every workspace this user belongs to that has AI configured - powers the pinned "Notorious AI" entry in the chat overlay (see ConversationList.tsx), one per workspace rather than a single "current workspace" concept the overlay doesn't otherwise have. */
+export async function listAiConfiguredWorkspacesForUser(userId: string): Promise<AiConfiguredWorkspace[]> {
+  return db
+    .select({ workspaceId: workspaces.id, workspaceName: workspaces.name })
+    .from(workspaceAiConfigs)
+    .innerJoin(workspaces, eq(workspaces.id, workspaceAiConfigs.workspaceId))
+    .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId)))
+    .orderBy(asc(workspaces.name));
 }
 
 /** Never exposed over HTTP - only `agent.ts` reads the decrypted key, right before calling the provider. */

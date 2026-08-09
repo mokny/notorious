@@ -62,6 +62,7 @@ import type {
   UpdateWebhookInput,
   WorkspaceAiConfigSummary,
   SaveWorkspaceAiConfigInput,
+  AiConfiguredWorkspace,
   AiChatMessage,
   RenderedBlocksResponse,
   TemplateAutocompleteSchemaResponse,
@@ -467,6 +468,7 @@ export const webhookApi = {
 };
 
 export const aiApi = {
+  listConfiguredWorkspaces: () => apiRequest<AiConfiguredWorkspace[]>("/api/v1/ai/configured-workspaces"),
   getConfig: (workspaceId: string) => apiRequest<WorkspaceAiConfigSummary>(`/api/v1/workspaces/${workspaceId}/ai/config`),
   saveConfig: (workspaceId: string, input: SaveWorkspaceAiConfigInput) =>
     apiRequest<WorkspaceAiConfigSummary>(`/api/v1/workspaces/${workspaceId}/ai/config`, { method: "PUT", body: input }),

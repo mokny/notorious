@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-rout
 import { useQuery } from "@tanstack/react-query";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { workspaceApi, authApi, aiApi } from "../lib/api/resources.js";
+import { workspaceApi, authApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useConfirm } from "../context/ConfirmContext.js";
 import { useTheme } from "../context/ThemeContext.js";
@@ -134,16 +134,6 @@ function WorkspaceLayoutInner() {
     enabled: Boolean(workspaceId),
   });
 
-  // Only relevant for a real logged-in member (see the nav link's own
-  // `!shareToken` check below) - skipped for an anonymous share visitor,
-  // whose session can't call this endpoint anyway.
-  const { data: aiConfig } = useQuery({
-    queryKey: ["aiConfig", workspaceId],
-    queryFn: () => aiApi.getConfig(workspaceId!),
-    enabled: !shareToken && Boolean(workspaceId),
-    staleTime: 60_000,
-  });
-
   // Close the mobile drawer whenever the route changes (desktop ignores this,
   // since the sidebar there is always visible regardless of this state).
   useEffect(() => setSidebarOpen(false), [location.pathname]);
@@ -249,12 +239,6 @@ function WorkspaceLayoutInner() {
           <NavLink to={`/w/${workspaceId}/search`} className={({ isActive }) => navLinkClass(isActive)}>
             <Icon name="search" className="h-4 w-4" /> Search
           </NavLink>
-          {!shareToken && aiConfig?.configured && (
-            <NavLink to={`/w/${workspaceId}/chat`} className={({ isActive }) => navLinkClass(isActive)}>
-              <Icon name="bot" className="h-4 w-4" /> Agent Chat
-            </NavLink>
-          )}
-
           {pinnedIds.length > 0 && (
             <div className="mt-3">
               <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Pinned</p>

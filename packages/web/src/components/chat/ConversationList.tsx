@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ConversationSummary } from "@notorious/shared";
-import { chatApi } from "../../lib/api/resources.js";
+import { chatApi, aiApi } from "../../lib/api/resources.js";
 import { useConfirm } from "../../context/ConfirmContext.js";
 import { ChatAvatar } from "./ChatAvatar.js";
+import { toAiConversationId } from "./aiConversation.js";
 import { Icon } from "../ui/Icon.js";
 
 function conversationInitial(conversation: ConversationSummary): { name: string; color: string; url: string | null } {
@@ -19,6 +20,11 @@ function conversationInitial(conversation: ConversationSummary): { name: string;
  */
 export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSelect: (id: string) => void; onNewChat: () => void; onNewChannel: () => void }) {
   const { data: conversations, isLoading } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
+  // One pinned "Notorious AI" row per workspace with AI configured - see
+  // modules/ai/service.ts's listAiConfiguredWorkspacesForUser. Not part of
+  // the real conversations list above (different backend entirely, see
+  // aiConversation.ts), so it's rendered separately and always first.
+  const { data: aiWorkspaces } = useQuery({ queryKey: ["aiConfiguredWorkspaces"], queryFn: aiApi.listConfiguredWorkspaces });
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
@@ -60,8 +66,26 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
 
       <div className="flex-1 overflow-y-auto">
         {isLoading && <p className="p-3 text-sm text-ink-muted">Loading…</p>}
-        {!isLoading && (!conversations || conversations.length === 0) && <p className="p-3 text-sm text-ink-muted">No conversations yet.</p>}
+        {!isLoading && (!conversations || conversations.length === 0) && (!aiWorkspaces || aiWorkspaces.length === 0) && (
+          <p className="p-3 text-sm text-ink-muted">No conversations yet.</p>
+        )}
         <ul>
+          {aiWorkspaces?.map((workspace) => (
+            <li key={workspace.workspaceId} className="flex items-center">
+              <button
+                onClick={() => onSelect(toAiConversationId(workspace.workspaceId))}
+                className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left hover:bg-surface"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white">
+                  <Icon name="bot" className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="truncate text-sm font-medium text-ink">Notorious AI</span>
+                  <div className="truncate text-xs text-ink-muted">{workspace.workspaceName}</div>
+                </div>
+              </button>
+            </li>
+          ))}
           {conversations?.map((conversation) => {
             const avatar = conversationInitial(conversation);
             return (

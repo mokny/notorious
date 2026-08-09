@@ -73,7 +73,7 @@ export const anthropicAdapter: AiProviderAdapter = {
       // refused, TLS error, ...) both throw here rather than resolving with
       // a non-ok `response` - left uncaught, this became a generic 500
       // "Internal server error" with no indication anything was even
-      // attempted, let alone why it failed (see AgentChatPage.tsx, which now
+      // attempted, let alone why it failed (see AiThreadView.tsx, which now
       // surfaces this message verbatim instead of a hardcoded string).
       const reason = error instanceof DOMException && error.name === "TimeoutError" ? "timed out after 60s" : error instanceof Error ? error.message : "network error";
       throw badRequest(`AI provider request failed: ${reason}`);

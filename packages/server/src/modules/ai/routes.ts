@@ -6,6 +6,11 @@ import * as aiService from "./service.js";
 import { sendChatMessage } from "./agent.js";
 
 export async function registerAiRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/api/v1/ai/configured-workspaces", async (request) => {
+    const user = requireUser(request);
+    return aiService.listAiConfiguredWorkspacesForUser(user.id);
+  });
+
   app.get("/api/v1/workspaces/:workspaceId/ai/config", async (request) => {
     const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
