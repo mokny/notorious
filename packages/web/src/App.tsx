@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./context/AuthContext.js";
+import { ChatRealtimeProvider } from "./context/ChatRealtimeContext.js";
 import { isSharedSession } from "./lib/api/shareMode.js";
 import { systemApi } from "./lib/api/resources.js";
 import { useDynamicViewportHeight } from "./hooks/useDynamicViewportHeight.js";
@@ -17,6 +18,9 @@ import { SearchPage } from "./pages/SearchPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { AgentChatPage } from "./pages/AgentChatPage.js";
 import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
+import { ChatBubble } from "./components/chat/ChatBubble.js";
+import { ChatListPage } from "./pages/ChatListPage.js";
+import { ChatThreadPage } from "./pages/ChatThreadPage.js";
 
 /**
  * `allowShareSession` lets an anonymous whole-workspace share visitor
@@ -49,6 +53,21 @@ function FullScreenSpinner() {
 export function App() {
   useDynamicViewportHeight();
   return (
+    <ChatRealtimeProvider>
+      <AppRoutes />
+      <ChatBubble />
+    </ChatRealtimeProvider>
+  );
+}
+
+/**
+ * Split out from `App` so `ChatRealtimeProvider` (which reads `useAuth()`
+ * itself) wraps the whole route tree - the global chat socket and unified
+ * conversation list need to work on every route, including
+ * WorkspacePickerPage, which sits outside `/w/:workspaceId` entirely.
+ */
+function AppRoutes() {
+  return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -70,6 +89,22 @@ export function App() {
         element={
           <RequireAuth>
             <WorkspacePickerPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/messages"
+        element={
+          <RequireAuth>
+            <ChatListPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/messages/:conversationId"
+        element={
+          <RequireAuth>
+            <ChatThreadPage />
           </RequireAuth>
         }
       />

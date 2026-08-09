@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { joinRoom } from "./hub.js";
+import { joinRoom, joinGlobalRoom, broadcastToConversation } from "./hub.js";
 import { getMemberRole } from "../workspaces/access.js";
+import { touchFocus, clearFocus } from "../chat/focusState.js";
+import { getParticipantUserIds } from "../chat/service.js";
 
 /**
  * WebSocket endpoint clients connect to for live updates:
@@ -45,5 +47,50 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
     }
 
     socket.close(4001, "Unauthorized");
+  });
+
+  /**
+   * Workspace-agnostic chat channel: `wss://host/ws/chat?clientId=...`. No
+   * `workspaceId`/share-token handling at all - chat has no anonymous-
+   * visitor concept, every participant is a registered user (see
+   * chat/access.ts). Kept as a second endpoint rather than relaxing `/ws`
+   * above so a workspace-scoped socket's room semantics (object-id
+   * filtering, `sendToUser`) never have to branch on a missing workspaceId -
+   * see hub.ts's doc comment on `socketsByUserId`. Also carries a small
+   * `{type:"focus", conversationId}` heartbeat used to suppress push
+   * notifications while the sender is actively looking at that conversation
+   * (see chat/focusState.ts) - cheaper than a separate HTTP heartbeat since
+   * this socket is already open.
+   */
+  app.get("/ws/chat", { websocket: true }, (socket, request) => {
+    const user = request.user;
+    if (!user) {
+      socket.close(4001, "Unauthorized");
+      return;
+    }
+
+    joinGlobalRoom(user.id, socket);
+
+    socket.on("message", (raw: Buffer) => {
+      (async () => {
+        const data = JSON.parse(raw.toString()) as { type?: string; conversationId?: string };
+        if (data.type === "focus" && typeof data.conversationId === "string") {
+          touchFocus(user.id, data.conversationId, socket);
+        } else if (data.type === "unfocus") {
+          clearFocus(socket);
+        } else if (data.type === "typing" && typeof data.conversationId === "string") {
+          // Ephemeral relay only - never persisted, see ChatTypingEvent's doc comment.
+          const participantUserIds = await getParticipantUserIds(data.conversationId);
+          broadcastToConversation(
+            participantUserIds.filter((id) => id !== user.id),
+            { type: "chatTyping", conversationId: data.conversationId, userId: user.id, userName: user.name },
+          );
+        }
+      })().catch(() => {
+        // Ignore malformed frames / lookup failures - this channel has no client->server message worth failing the connection over.
+      });
+    });
+
+    socket.on("close", () => clearFocus(socket));
   });
 }

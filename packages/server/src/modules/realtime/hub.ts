@@ -3,6 +3,7 @@ import type {
   BackupFilesChangedMessage,
   BackupProgressMessage,
   BackupScheduleChangedMessage,
+  ChatRealtimeMessage,
   NotificationMessage,
   PresenceSnapshotMessage,
   RealtimeEvent,
@@ -116,4 +117,46 @@ export function sendToUser(workspaceId: string, userId: string, message: Notific
     if (entry.userId !== userId) continue;
     if (socket.readyState === socket.OPEN) socket.send(payload);
   }
+}
+
+// Chat needs a delivery path that isn't keyed by workspace at all - a DM has
+// no workspace, and the unified conversation list must update live even for
+// a user sitting on WorkspacePickerPage with no `roomsByWorkspace` room
+// joined. Kept as a separate, additive map rather than folding a nullable
+// workspaceId into `roomsByWorkspace` - that map's entire shape (object-id
+// filtering for share links, `sendToUser`'s per-workspace room lookup)
+// assumes a workspace exists, and share-link visitors (who must never see a
+// global feed) have no `userId` to register here in the first place. See
+// `realtime/routes.ts`'s separate `/ws/chat` endpoint.
+const socketsByUserId = new Map<string, Set<WebSocket>>();
+
+/** Registers a socket on the workspace-agnostic chat channel for one user and cleans up on disconnect. */
+export function joinGlobalRoom(userId: string, socket: WebSocket): void {
+  let sockets = socketsByUserId.get(userId);
+  if (!sockets) {
+    sockets = new Set();
+    socketsByUserId.set(userId, sockets);
+  }
+  sockets.add(socket);
+
+  socket.on("close", () => {
+    sockets?.delete(socket);
+    if (sockets && sockets.size === 0) socketsByUserId.delete(userId);
+  });
+}
+
+/** Sends a chat payload to every open socket belonging to one user (all their tabs/devices), workspace-agnostic. A no-op if they have no `/ws/chat` socket open right now. */
+export function sendToUserGlobal(userId: string, message: ChatRealtimeMessage): void {
+  const sockets = socketsByUserId.get(userId);
+  if (!sockets) return;
+
+  const payload = JSON.stringify(message);
+  for (const socket of sockets) {
+    if (socket.readyState === socket.OPEN) socket.send(payload);
+  }
+}
+
+/** Fans a chat payload out to a specific set of participant user ids - chat's own primitive on top of `sendToUserGlobal`, since conversations aren't a "room" concept the hub itself knows about (chat/service.ts already has the participant list from its own queries). */
+export function broadcastToConversation(participantUserIds: string[], message: ChatRealtimeMessage): void {
+  for (const userId of participantUserIds) sendToUserGlobal(userId, message);
 }

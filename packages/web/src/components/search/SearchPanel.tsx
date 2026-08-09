@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { searchApi } from "../../lib/api/resources.js";
+import { searchApi, chatApi } from "../../lib/api/resources.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { Icon } from "../ui/Icon.js";
@@ -22,6 +23,7 @@ interface SearchPanelProps {
  */
 export function SearchPanel({ workspaceId, onSelect, autoFocus = true }: SearchPanelProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [fuzzy, setFuzzy] = useState(true);
   const debouncedQuery = useDebouncedValue(query);
@@ -30,6 +32,16 @@ export function SearchPanel({ workspaceId, onSelect, autoFocus = true }: SearchP
     queryKey: ["search", workspaceId, debouncedQuery, fuzzy],
     queryFn: () => searchApi.search(workspaceId, { q: debouncedQuery, fuzzy }),
     enabled: Boolean(workspaceId),
+  });
+
+  // Chat messages are workspace-independent (a DM has no workspaceId), so
+  // this is a separate, global query rather than folding into the
+  // workspace-scoped `searchApi.search` above - see search/service.ts's
+  // `searchMessages` on the server for why.
+  const { data: messageResults } = useQuery({
+    queryKey: ["chatSearch", debouncedQuery],
+    queryFn: () => chatApi.search(debouncedQuery),
+    enabled: Boolean(debouncedQuery) && !isSharedSession(),
   });
 
   const { data: savedSearches } = useQuery({
@@ -105,6 +117,26 @@ export function SearchPanel({ workspaceId, onSelect, autoFocus = true }: SearchP
         ))}
         {debouncedQuery && results?.length === 0 && <p className="p-3 text-sm text-ink-muted">No results for "{debouncedQuery}"</p>}
       </div>
+
+      {messageResults && messageResults.length > 0 && (
+        <div className="mt-6">
+          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">Messages</h3>
+          <div className="space-y-1">
+            {messageResults.map((result) => (
+              <button
+                key={result.messageId}
+                onClick={() => navigate(`/messages/${result.conversationId}?highlight=${result.messageId}`)}
+                className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-raised"
+              >
+                <span className="font-medium text-ink">{result.conversationName}</span>
+                <span className="truncate text-ink-muted">
+                  {result.authorName}: {result.body}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

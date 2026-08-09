@@ -1,7 +1,7 @@
-import { eq, and, isNull, or } from "drizzle-orm";
-import type { SearchQuery, ObjectRecord, CreateSavedSearchInput, SavedSearch } from "@notorious/shared";
+import { eq, and, isNull, or, inArray } from "drizzle-orm";
+import type { SearchQuery, ObjectRecord, CreateSavedSearchInput, SavedSearch, MessageSearchResult } from "@notorious/shared";
 import { sqlite, db } from "../../db/client.js";
-import { objects, objectValues, relations, savedSearches } from "../../db/schema.js";
+import { objects, objectValues, relations, savedSearches, conversationParticipants, conversations, users } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { getObject } from "../objects/service.js";
 import { fuzzyScore } from "./fuzzy.js";
@@ -103,6 +103,77 @@ export async function searchObjects(workspaceId: string, query: SearchQuery): Pr
   }
 
   return records;
+}
+
+/**
+ * Chat messages are workspace-independent (a DM has no `workspace_id`), so
+ * unlike `searchObjects` above this scopes by `conversation_participants`
+ * membership instead of a workspace id - see chat/service.ts's own doc
+ * comments for why messages live in a separate `messages_fts` table rather
+ * than folding into `objects_fts`.
+ */
+export async function searchMessages(userId: string, query: string, limit: number): Promise<MessageSearchResult[]> {
+  if (!query.trim()) return [];
+
+  const participantRows = await db.select({ conversationId: conversationParticipants.conversationId }).from(conversationParticipants).where(eq(conversationParticipants.userId, userId));
+  const conversationIds = participantRows.map((r) => r.conversationId);
+  if (conversationIds.length === 0) return [];
+
+  const escaped = query.replace(/"/g, '""');
+  const placeholders = conversationIds.map(() => "?").join(",");
+  const rows = sqlite
+    .prepare(
+      `SELECT m.id AS messageId, m.conversation_id AS conversationId, m.body AS body, m.author_id AS authorId, m.created_at AS createdAt, bm25(messages_fts) AS rank
+       FROM messages_fts
+       JOIN messages m ON m.id = messages_fts.message_id
+       WHERE messages_fts MATCH ? AND m.conversation_id IN (${placeholders}) AND m.deleted_at IS NULL
+       ORDER BY rank
+       LIMIT ?`,
+    )
+    .all(`"${escaped}"`, ...conversationIds, limit) as {
+    messageId: string;
+    conversationId: string;
+    body: string;
+    authorId: string;
+    createdAt: string;
+  }[];
+  if (rows.length === 0) return [];
+
+  const authorIds = [...new Set(rows.map((r) => r.authorId))];
+  const authorRows = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, authorIds));
+  const authorNameById = new Map(authorRows.map((u) => [u.id, u.name]));
+
+  const resultConversationIds = [...new Set(rows.map((r) => r.conversationId))];
+  const conversationRows = await db.select().from(conversations).where(inArray(conversations.id, resultConversationIds));
+  const conversationById = new Map(conversationRows.map((c) => [c.id, c]));
+
+  const otherParticipantRows = await db
+    .select({ conversationId: conversationParticipants.conversationId, userId: conversationParticipants.userId, name: users.name })
+    .from(conversationParticipants)
+    .innerJoin(users, eq(conversationParticipants.userId, users.id))
+    .where(inArray(conversationParticipants.conversationId, resultConversationIds));
+  const otherNamesByConversation = new Map<string, string[]>();
+  for (const row of otherParticipantRows) {
+    if (row.userId === userId) continue;
+    const list = otherNamesByConversation.get(row.conversationId) ?? [];
+    list.push(row.name);
+    otherNamesByConversation.set(row.conversationId, list);
+  }
+
+  return rows.map((row) => {
+    const conversation = conversationById.get(row.conversationId);
+    const conversationName =
+      conversation?.type === "workspace_channel" ? (conversation.name ?? "Channel") : (otherNamesByConversation.get(row.conversationId)?.join(", ") ?? "Direct Message");
+
+    return {
+      conversationId: row.conversationId,
+      conversationName,
+      messageId: row.messageId,
+      body: row.body,
+      authorName: authorNameById.get(row.authorId) ?? "Unknown",
+      createdAt: row.createdAt,
+    };
+  });
 }
 
 export async function listSavedSearches(workspaceId: string, userId: string): Promise<SavedSearch[]> {

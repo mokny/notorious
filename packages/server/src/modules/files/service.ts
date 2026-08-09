@@ -1,13 +1,12 @@
-import fs from "node:fs";
-import fsp from "node:fs/promises";
-import path from "node:path";
 import { eq } from "drizzle-orm";
 import type { FileAsset } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { files } from "../../db/schema.js";
-import { newId, nowIso } from "../../lib/ids.js";
+import { nowIso } from "../../lib/ids.js";
 import { notFound } from "../../lib/httpError.js";
-import { env } from "../../env.js";
+import { absoluteStoragePath, writeUploadedBytes, deleteUploadedBytes } from "../../lib/storage.js";
+
+export { absoluteStoragePath };
 
 function toFileAsset(row: typeof files.$inferSelect): FileAsset {
   return {
@@ -23,10 +22,6 @@ function toFileAsset(row: typeof files.$inferSelect): FileAsset {
   };
 }
 
-export function absoluteStoragePath(storagePath: string): string {
-  return path.join(env.filesDir, storagePath);
-}
-
 export async function saveUploadedFile(input: {
   workspaceId: string;
   objectId: string | null;
@@ -36,14 +31,7 @@ export async function saveUploadedFile(input: {
   mimeType: string;
   buffer: Buffer;
 }): Promise<FileAsset> {
-  const id = newId();
-  const safeName = input.filename.replace(/[^\w.-]+/g, "_");
-  const storagePath = path.join(input.workspaceId, `${id}-${safeName}`);
-  const fullPath = absoluteStoragePath(storagePath);
-
-  await fsp.mkdir(path.dirname(fullPath), { recursive: true });
-  await fsp.writeFile(fullPath, input.buffer);
-
+  const { id, storagePath } = await writeUploadedBytes(input.workspaceId, input.filename, input.buffer);
   const createdAt = nowIso();
   await db.insert(files).values({
     id,
@@ -89,8 +77,7 @@ export async function deleteFile(id: string): Promise<void> {
   if (!row) throw notFound("File not found");
 
   await db.delete(files).where(eq(files.id, id));
-  const fullPath = absoluteStoragePath(row.storagePath);
-  if (fs.existsSync(fullPath)) await fsp.unlink(fullPath);
+  await deleteUploadedBytes(row.storagePath);
 }
 
 /**
@@ -103,10 +90,5 @@ export async function deleteFile(id: string): Promise<void> {
  */
 export async function deleteWorkspaceFilesFromDisk(workspaceId: string): Promise<void> {
   const rows = await db.select({ storagePath: files.storagePath }).from(files).where(eq(files.workspaceId, workspaceId));
-  await Promise.all(
-    rows.map(async (row) => {
-      const fullPath = absoluteStoragePath(row.storagePath);
-      if (fs.existsSync(fullPath)) await fsp.unlink(fullPath);
-    }),
-  );
+  await Promise.all(rows.map((row) => deleteUploadedBytes(row.storagePath)));
 }

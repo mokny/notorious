@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
-import { schemaApi, objectApi, workspaceApi } from "../../lib/api/resources.js";
+import { schemaApi, objectApi, workspaceApi, chatApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { reloadIfViewportShrunk, resetViewportReloadCount } from "../../hooks/useDynamicViewportHeight.js";
 import { useAuth } from "../../context/AuthContext.js";
@@ -45,6 +45,11 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
     queryFn: () => workspaceApi.get(workspaceId),
     enabled: Boolean(routeObjectId),
   });
+  // Reuses the same ["chatConversations"] cache key ChatRealtimeContext keeps
+  // live via /ws/chat, so this is just a read - no extra polling of its own.
+  const { data: chatConversations } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations, enabled: !shareToken });
+  const chatUnreadCount = chatConversations?.filter((c) => c.unreadCount > 0).length ?? 0;
+
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
   const isLocked = Boolean(object?.lockedAt);
   // Same visibility rule as the sticky toolbar's own version of this button
@@ -152,6 +157,17 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
               )}
             </IOSMenu>
           </div>
+        )}
+
+        {!shareToken && (
+          <button
+            onClick={() => navigate("/messages")}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
+            title="Chats"
+          >
+            <Icon name="comment" className="h-5 w-5" />
+            {chatUnreadCount > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />}
+          </button>
         )}
       </div>
     </nav>

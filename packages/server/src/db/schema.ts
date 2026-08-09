@@ -597,3 +597,110 @@ export const aiChatMessages = sqliteTable("ai_chat_messages", {
   toolCallId: text("tool_call_id"),
   createdAt: text("created_at").notNull(),
 });
+
+// A chat conversation - either a workspace_channel (workspaceId set, open to
+// any workspace member) or a dm (workspaceId null, workspace-agnostic 1:1 or
+// free-form group of registered users) - see modules/chat/service.ts.
+// lastMessageAt is denormalized (bumped on every send) so the unified
+// conversation list can sort by activity without a join+aggregate.
+export const conversations = sqliteTable("conversations", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull().$type<"workspace_channel" | "dm">(),
+  workspaceId: text("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name"),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+  lastMessageAt: text("last_message_at"),
+});
+
+// lastReadMessageId is a cheap per-participant "read up to here" cursor,
+// driving both unread counts and the app-icon badge without scanning
+// messageReadReceipts. See messageReadReceipts below for why that table
+// still exists separately (per-message read-receipt UI).
+export const conversationParticipants = sqliteTable(
+  "conversation_participants",
+  {
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: text("joined_at").notNull(),
+    lastReadMessageId: text("last_read_message_id"),
+  },
+  (table) => [primaryKey({ columns: [table.conversationId, table.userId] })],
+);
+
+// deletedAt is a soft-delete (own messages only, see chat/service.ts) - the
+// row is kept for thread ordering/read-receipt integrity, the DTO mapper
+// nulls out body/attachments once set.
+export const messages = sqliteTable("messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+  deletedAt: text("deleted_at"),
+});
+
+// messageId starts null - attachments are uploaded before the message they'll
+// belong to exists (see chat/service.ts::sendMessage), then linked by id via
+// the send request's attachmentIds. conversationId is denormalized so a
+// pending (unlinked) upload can still be scoped/authorized without a message
+// row to join through.
+export const messageAttachments = sqliteTable("message_attachments", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  messageId: text("message_id").references(() => messages.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  storagePath: text("storage_path").notNull(),
+  uploadedBy: text("uploaded_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: text("created_at").notNull(),
+});
+
+export const messageReactions = sqliteTable(
+  "message_reactions",
+  {
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.messageId, table.userId, table.emoji] })],
+);
+
+// Kept separate from conversationParticipants.lastReadMessageId (which drives
+// unread counts/the badge cheaply) because per-message "who has read this"
+// (receipt avatars, iMessage-style) can't be cleanly derived from a single
+// cursor comparison across participants who may have joined at different
+// times.
+export const messageReadReceipts = sqliteTable(
+  "message_read_receipts",
+  {
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    readAt: text("read_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.messageId, table.userId] })],
+);

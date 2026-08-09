@@ -76,6 +76,18 @@ import type {
   BackupSchedule,
   BackupScheduleInput,
   WorkspaceBackupKey,
+  Conversation,
+  ConversationSummary,
+  ChannelListEntry,
+  Message,
+  MessageAttachment,
+  MessageReaction,
+  MessageSearchResult,
+  CreateChannelInput,
+  RenameChannelInput,
+  CreateDmInput,
+  SendMessageInput,
+  ReactInput,
 } from "@notorious/shared";
 import { apiRequest, apiUpload, apiDownload, apiUploadWithProgress } from "./client.js";
 import { randomId } from "../randomId.js";
@@ -296,6 +308,35 @@ export const fileApi = {
   // would double up the query param on first render.
   downloadUrl: (id: string) => `/api/v1/files/${id}`,
   remove: (id: string) => apiRequest<void>(`/api/v1/files/${id}`, { method: "DELETE" }),
+};
+
+export const chatApi = {
+  listConversations: () => apiRequest<ConversationSummary[]>("/api/v1/chat/conversations"),
+  createChannel: (workspaceId: string, input: CreateChannelInput) =>
+    apiRequest<Conversation>(`/api/v1/workspaces/${workspaceId}/chat/channels`, { method: "POST", body: input }),
+  listChannels: (workspaceId: string) => apiRequest<ChannelListEntry[]>(`/api/v1/workspaces/${workspaceId}/chat/channels`),
+  joinChannel: (workspaceId: string, id: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/chat/channels/${id}/join`, { method: "POST" }),
+  createDm: (input: CreateDmInput) => apiRequest<Conversation>("/api/v1/chat/dms", { method: "POST", body: input }),
+  rename: (id: string, input: RenameChannelInput) => apiRequest<{ id: string; name: string }>(`/api/v1/chat/conversations/${id}`, { method: "PATCH", body: input }),
+  deleteChannel: (id: string) => apiRequest<void>(`/api/v1/chat/conversations/${id}`, { method: "DELETE", query: { manage: true } }),
+  leave: (id: string) => apiRequest<void>(`/api/v1/chat/conversations/${id}`, { method: "DELETE" }),
+  listMessages: (id: string, query: { before?: string; limit?: number } = {}) =>
+    apiRequest<Message[]>(`/api/v1/chat/conversations/${id}/messages`, { query }),
+  sendMessage: (id: string, input: SendMessageInput) => apiRequest<Message>(`/api/v1/chat/conversations/${id}/messages`, { method: "POST", body: input }),
+  deleteMessage: (id: string) => apiRequest<void>(`/api/v1/chat/messages/${id}`, { method: "DELETE" }),
+  react: (messageId: string, input: ReactInput) => apiRequest<MessageReaction[]>(`/api/v1/chat/messages/${messageId}/reactions`, { method: "POST", body: input }),
+  unreact: (messageId: string, emoji: string) =>
+    apiRequest<MessageReaction[]>(`/api/v1/chat/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, { method: "DELETE" }),
+  markRead: (id: string, upToMessageId: string) =>
+    apiRequest<{ unreadConversationCount: number }>(`/api/v1/chat/conversations/${id}/read`, { method: "POST", body: { upToMessageId } }),
+  uploadAttachment: (conversationId: string, file: File, onProgress?: (info: { bytes: number; percent?: number }) => void) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiUploadWithProgress<MessageAttachment>(`/api/v1/chat/conversations/${conversationId}/attachments`, formData, onProgress);
+  },
+  attachmentUrl: (id: string) => `/api/v1/chat/attachments/${id}`,
+  search: (q: string, limit?: number) => apiRequest<MessageSearchResult[]>("/api/v1/chat/search", { query: { q, limit } }),
 };
 
 export const pushApi = {
