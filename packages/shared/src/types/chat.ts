@@ -83,6 +83,8 @@ export interface ConversationSummary {
   type: "workspace_channel" | "dm";
   workspaceId: string | null;
   workspaceName: string | null;
+  /** Lucide icon name (see components/ui/Icon.tsx) - null for a `dm`. */
+  workspaceIcon: string | null;
   /** Channel name for `workspace_channel`; for `dm`, a display name computed from `otherParticipants`. */
   name: string;
   otherParticipants: ConversationParticipantSummary[];

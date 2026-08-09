@@ -74,9 +74,9 @@ export async function listUnifiedConversations(userId: string): Promise<Conversa
 
   const workspaceIds = [...new Set(conversationRows.map((c) => c.workspaceId).filter((id): id is string => id !== null))];
   const workspaceRows = workspaceIds.length
-    ? await db.select({ id: workspaces.id, name: workspaces.name }).from(workspaces).where(inArray(workspaces.id, workspaceIds))
+    ? await db.select({ id: workspaces.id, name: workspaces.name, icon: workspaces.icon }).from(workspaces).where(inArray(workspaces.id, workspaceIds))
     : [];
-  const workspaceNameById = new Map(workspaceRows.map((w) => [w.id, w.name]));
+  const workspaceById = new Map(workspaceRows.map((w) => [w.id, w]));
 
   const allParticipantRows = await db
     .select({
@@ -132,7 +132,8 @@ export async function listUnifiedConversations(userId: string): Promise<Conversa
         id: conv.id,
         type: conv.type,
         workspaceId: conv.workspaceId,
-        workspaceName: conv.workspaceId ? (workspaceNameById.get(conv.workspaceId) ?? null) : null,
+        workspaceName: conv.workspaceId ? (workspaceById.get(conv.workspaceId)?.name ?? null) : null,
+        workspaceIcon: conv.workspaceId ? (workspaceById.get(conv.workspaceId)?.icon ?? null) : null,
         name: conv.type === "workspace_channel" ? (conv.name ?? "Channel") : displayNameForDm(others),
         otherParticipants: others,
         lastMessage: lastMessageRow

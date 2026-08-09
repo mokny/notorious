@@ -8,7 +8,7 @@ const TYPING_DEBOUNCE_MS = 2000;
 
 export function Composer({ conversationId }: { conversationId: string }) {
   const [body, setBody] = useState("");
-  const [pendingAttachmentIds, setPendingAttachmentIds] = useState<string[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<{ id: string; filename: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastTypingSentRef = useRef(0);
@@ -16,10 +16,11 @@ export function Composer({ conversationId }: { conversationId: string }) {
   const { sendTyping } = useChatRealtime();
 
   const sendMutation = useMutation({
-    mutationFn: () => chatApi.sendMessage(conversationId, { body, attachmentIds: pendingAttachmentIds.length ? pendingAttachmentIds : undefined }),
+    mutationFn: () =>
+      chatApi.sendMessage(conversationId, { body, attachmentIds: pendingAttachments.length ? pendingAttachments.map((a) => a.id) : undefined }),
     onSuccess: () => {
       setBody("");
-      setPendingAttachmentIds([]);
+      setPendingAttachments([]);
       queryClient.invalidateQueries({ queryKey: ["chatMessages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["chatConversations"] });
     },
@@ -41,7 +42,7 @@ export function Composer({ conversationId }: { conversationId: string }) {
     try {
       const { promise } = chatApi.uploadAttachment(conversationId, file);
       const attachment = await promise;
-      setPendingAttachmentIds((ids) => [...ids, attachment.id]);
+      setPendingAttachments((attachments) => [...attachments, { id: attachment.id, filename: attachment.filename }]);
     } finally {
       setUploading(false);
     }
@@ -49,29 +50,31 @@ export function Composer({ conversationId }: { conversationId: string }) {
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!body.trim() && pendingAttachmentIds.length === 0) return;
+    if (!body.trim() && pendingAttachments.length === 0) return;
     sendMutation.mutate();
   }
 
   return (
     <form onSubmit={handleSubmit} className="border-t border-border p-2">
-      {pendingAttachmentIds.length > 0 && (
+      {pendingAttachments.length > 0 && (
         <div className="mb-1.5 flex flex-wrap gap-1 px-1">
-          {pendingAttachmentIds.map((id) => (
-            <span key={id} className="rounded bg-surface px-2 py-0.5 text-xs text-ink-muted">
-              Attachment ready
+          {pendingAttachments.map((attachment) => (
+            <span key={attachment.id} className="flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-xs text-ink-muted">
+              <Icon name="paperclip" className="h-3 w-3" />
+              {attachment.filename}
             </span>
           ))}
         </div>
       )}
       <div className="flex items-end gap-1.5">
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        {/* No `accept` filter - any file type can be attached, not just images (see MessageBubble.tsx, which already renders non-image attachments as a download link). */}
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-50"
-          title="Attach an image"
+          title="Attach a file"
         >
           <Icon name="paperclip" className="h-4 w-4" />
         </button>
@@ -93,7 +96,7 @@ export function Composer({ conversationId }: { conversationId: string }) {
         />
         <button
           type="submit"
-          disabled={sendMutation.isPending || (!body.trim() && pendingAttachmentIds.length === 0)}
+          disabled={sendMutation.isPending || (!body.trim() && pendingAttachments.length === 0)}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-40"
           title="Send"
         >

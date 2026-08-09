@@ -5,9 +5,24 @@ import { useAuth } from "../../context/AuthContext.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
 import { MessageBubble } from "./MessageBubble.js";
 import { Composer } from "./Composer.js";
+import { ChatAvatar } from "./ChatAvatar.js";
 import { Icon } from "../ui/Icon.js";
 
 const TYPING_TIMEOUT_MS = 5000;
+
+function dayKey(iso: string): string {
+  return new Date(iso).toDateString();
+}
+
+function dayLabel(iso: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+}
 
 export function ThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
   const queryClient = useQueryClient();
@@ -85,20 +100,33 @@ export function ThreadView({ conversationId, onBack }: { conversationId: string;
             <Icon name="chevron-left" className="h-4 w-4" />
           </button>
         )}
+        {conversation?.type === "workspace_channel" ? (
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface">
+            <Icon name={conversation.workspaceIcon ?? "sparkles"} className="h-4 w-4 text-ink-muted" />
+          </span>
+        ) : (
+          otherParticipant && <ChatAvatar name={otherParticipant.name} avatarColor={otherParticipant.avatarColor} avatarUrl={otherParticipant.avatarUrl} size={7} />
+        )}
         <span className="truncate text-sm font-semibold text-ink">
           {conversation ? (conversation.type === "workspace_channel" ? `# ${conversation.name}` : conversation.name) : "Chat"}
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
-        {messages?.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            conversationId={conversationId}
-            readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null}
-          />
-        ))}
+        {messages?.map((message, index) => {
+          const previous = messages[index - 1];
+          const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
+          return (
+            <div key={message.id}>
+              {showDaySeparator && (
+                <div className="my-2 flex items-center justify-center">
+                  <span className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink-muted">{dayLabel(message.createdAt)}</span>
+                </div>
+              )}
+              <MessageBubble message={message} conversationId={conversationId} readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null} />
+            </div>
+          );
+        })}
         {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{typingUserName} is typing…</p>}
         <div ref={bottomRef} />
       </div>

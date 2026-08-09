@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ConversationSummary } from "@notorious/shared";
 import { chatApi } from "../../lib/api/resources.js";
+import { useConfirm } from "../../context/ConfirmContext.js";
 import { ChatAvatar } from "./ChatAvatar.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -18,6 +19,30 @@ function conversationInitial(conversation: ConversationSummary): { name: string;
  */
 export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSelect: (id: string) => void; onNewChat: () => void; onNewChannel: () => void }) {
   const { data: conversations, isLoading } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+
+  // Only ever removes *this* participant's row (see
+  // chat/service.ts::leaveConversation) - the conversation and everyone
+  // else's history are untouched, same as leaving any group chat elsewhere.
+  const leaveMutation = useMutation({
+    mutationFn: (conversationId: string) => chatApi.leave(conversationId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["chatConversations"] }),
+  });
+
+  async function handleDelete(event: React.MouseEvent, conversation: ConversationSummary) {
+    event.stopPropagation();
+    const isChannel = conversation.type === "workspace_channel";
+    const ok = await confirm({
+      title: isChannel ? `Leave #${conversation.name}?` : `Delete chat with ${conversation.name}?`,
+      description: isChannel
+        ? "You can rejoin from the channel list any time - the channel and its history stay for everyone else."
+        : "This only removes it from your list - the other participant keeps their side of the conversation.",
+      confirmLabel: isChannel ? "Leave" : "Delete",
+      danger: true,
+    });
+    if (ok) leaveMutation.mutate(conversation.id);
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -40,8 +65,8 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
           {conversations?.map((conversation) => {
             const avatar = conversationInitial(conversation);
             return (
-              <li key={conversation.id}>
-                <button onClick={() => onSelect(conversation.id)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-surface">
+              <li key={conversation.id} className="flex items-center">
+                <button onClick={() => onSelect(conversation.id)} className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left hover:bg-surface">
                   <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} size={9} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
@@ -68,6 +93,13 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
                       )}
                     </div>
                   </div>
+                </button>
+                <button
+                  onClick={(event) => handleDelete(event, conversation)}
+                  className="mr-2 shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-red-500"
+                  title={conversation.type === "workspace_channel" ? "Leave channel" : "Delete chat"}
+                >
+                  <Icon name="trash" className="h-4 w-4" />
                 </button>
               </li>
             );

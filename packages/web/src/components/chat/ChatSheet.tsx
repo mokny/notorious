@@ -72,7 +72,7 @@ export function ChatSheet() {
               <div className="h-1.5 w-10 rounded-full bg-ink-muted/30" />
             </div>
             <div className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
-              <ChatPanel onClose={close} />
+              <ChatPanel />
             </div>
           </motion.div>
         </>

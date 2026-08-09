@@ -61,13 +61,17 @@ export function MessageBubble({
   }, [showPicker]);
 
   return (
-    <div className={`group flex flex-col gap-0.5 px-3 py-1 ${isOwn ? "items-end" : "items-start"}`}>
+    <div className={`flex flex-col gap-0.5 px-3 py-1 ${isOwn ? "items-end" : "items-start"}`}>
       {!isOwn && <span className="px-1 text-xs font-medium text-ink-muted">{message.authorName}</span>}
       <div className="relative flex items-center gap-1">
-        {isOwn && !message.deletedAt && (
+        {/* Same long-press reveal as the reaction picker below - not a hover reveal, which has no touch equivalent. */}
+        {isOwn && showPicker && !message.deletedAt && (
           <button
-            onClick={() => deleteMutation.mutate()}
-            className="opacity-0 group-hover:opacity-100 rounded p-1 text-ink-muted hover:bg-surface hover:text-red-500"
+            onClick={() => {
+              setShowPicker(false);
+              deleteMutation.mutate();
+            }}
+            className="rounded p-1 text-ink-muted hover:bg-surface hover:text-red-500"
             title="Delete"
           >
             <Icon name="trash" className="h-3 w-3" />
@@ -130,10 +134,10 @@ export function MessageBubble({
         </div>
       )}
 
-      <span className="px-1 text-[11px] text-ink-muted">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-      {readAt && (
-        <span className="px-1 text-[11px] text-ink-muted">Read {new Date(readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-      )}
+      <div className="flex items-center gap-1.5 px-1 text-[11px] text-ink-muted">
+        <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        {readAt && <span>Read {new Date(readAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+      </div>
     </div>
   );
 }

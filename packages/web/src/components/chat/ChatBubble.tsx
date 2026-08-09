@@ -27,7 +27,7 @@ export function ChatBubble() {
     <>
       {isOpen && (
         <div className="fixed bottom-20 right-5 z-30 flex h-[32rem] w-96 max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-surface-raised shadow-2xl">
-          <ChatPanel onClose={close} />
+          <ChatPanel />
         </div>
       )}
       <button
