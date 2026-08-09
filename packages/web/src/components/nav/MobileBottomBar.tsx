@@ -89,7 +89,6 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
       // staying pinned to a shrinking layout viewport, which iOS/WKWebView
       // doesn't reliably do. See useKeyboardInset's own doc comment.
       style={{ bottom: keyboardInset, paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
-      data-mobile-bottom-bar="true"
     >
       {/* `relative` + a separate `-z-10` background layer for the pill's
           border/blur/shadow, instead of putting `backdrop-blur` directly on

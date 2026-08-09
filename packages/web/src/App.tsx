@@ -6,6 +6,7 @@ import { ChatOverlayProvider } from "./context/ChatOverlayContext.js";
 import { CallProvider } from "./context/CallContext.js";
 import { isSharedSession } from "./lib/api/shareMode.js";
 import { systemApi } from "./lib/api/resources.js";
+import { useIOSStandaloneViewportReload } from "./hooks/useIOSStandaloneViewportReload.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { RegisterPage } from "./pages/RegisterPage.js";
 import { SetupTwoFactorPage } from "./pages/SetupTwoFactorPage.js";
@@ -54,6 +55,7 @@ function FullScreenSpinner() {
 }
 
 export function App() {
+  useIOSStandaloneViewportReload();
   return (
     <ChatRealtimeProvider>
       <CallProvider>
