@@ -376,7 +376,14 @@ function WorkspaceLayoutInner() {
             className={`pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-surface via-surface/90 to-transparent ${coverActive ? "transition-opacity duration-150" : ""} ${
               !coverActive || phoneCoverScrolled ? "opacity-100" : "opacity-0"
             }`}
-            style={{ height: "var(--mobile-top-bar-h)" }}
+            // Taller than `--mobile-top-bar-h` (main's own paddingTop
+            // reservation, untouched) on purpose - a longer, softer fade
+            // reads visually closer in weight to the bottom fade (which
+            // covers the WKWebView cold-launch shortfall documented in
+            // useKeyboardInset.ts/MobileBottomBar.tsx), so the two edges
+            // look like a deliberate matching frame instead of an
+            // asymmetric one where only the bottom looks "faded away".
+            style={{ height: "calc(var(--mobile-top-bar-h) + 3rem)" }}
           />
         )}
         {isPhone && (
