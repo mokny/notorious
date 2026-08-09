@@ -87,7 +87,7 @@ function useCallDuration(): string {
  * group call with multiple peer cameras on, to avoid a "which peer" choice.
  */
 function MinimizedCallBubble() {
-  const { localStream, cameraOn, micOn, setMinimized, leaveCall, toggleMic } = useCall();
+  const { localStream, cameraOn, setMinimized } = useCall();
   const videoRef = useRef<HTMLVideoElement>(null);
   const duration = useCallDuration();
 
@@ -98,34 +98,12 @@ function MinimizedCallBubble() {
   return (
     <button
       onClick={() => setMinimized(false)}
-      className="fixed bottom-5 left-5 z-50 flex h-24 w-24 flex-col items-center justify-center overflow-hidden rounded-full bg-black/80 text-white shadow-2xl"
+      className="fixed bottom-5 left-5 z-50 flex h-16 w-16 flex-col items-center justify-center overflow-hidden rounded-full bg-black/80 text-white shadow-2xl"
       style={{ marginBottom: "env(safe-area-inset-bottom)", marginLeft: "env(safe-area-inset-left)" }}
       title="Expand call"
     >
       {cameraOn && <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />}
       <span className="relative z-10 rounded bg-black/50 px-1.5 py-0.5 text-xs leading-tight">{duration}</span>
-      <span
-        role="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          void toggleMic();
-        }}
-        title={micOn ? "Mute microphone" : "Unmute microphone"}
-        className="absolute -bottom-2 -left-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised text-ink shadow"
-      >
-        <Icon name={micOn ? "mic" : "mic-off"} className="h-6 w-6" />
-      </span>
-      <span
-        role="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          void leaveCall();
-        }}
-        title="Leave call"
-        className="absolute -bottom-2 -right-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white shadow"
-      >
-        <Icon name="phone-off" className="h-6 w-6" />
-      </span>
     </button>
   );
 }
