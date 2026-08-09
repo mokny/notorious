@@ -54,7 +54,10 @@ const MOBILE_HEADER_HEIGHT = "calc(env(safe-area-inset-top) + 48px)";
 // component's own sizing (pill button height + its container padding) -
 // update these if that sizing ever changes.
 const MOBILE_TOP_BAR_HEIGHT = "calc(env(safe-area-inset-top) + 3.5rem)";
-const MOBILE_BOTTOM_BAR_HEIGHT = "calc(4.25rem + env(safe-area-inset-bottom))";
+// 3.5rem pill height + just the safe-area inset, no extra breathing-room
+// padding - the pill now sits right against the true bottom edge (matches
+// MobileBottomBar.tsx's own paddingBottom below).
+const MOBILE_BOTTOM_BAR_HEIGHT = "calc(3.5rem + env(safe-area-inset-bottom))";
 
 // `useMobileChrome` (consumed below by the mobile header) is set from
 // ObjectDetailPage/CoverImage.tsx, a descendant rendered through <Outlet/> -
@@ -394,7 +397,12 @@ function WorkspaceLayoutInner() {
             first (undismissed) showing. */}
         <main
           ref={mainRef}
-          className="min-w-0 flex-1 overflow-y-auto"
+          // `overscroll-contain` - without it, iOS's rubber-band bounce past
+          // the true scroll end briefly overshoots main's own bottom edge,
+          // exposing whatever sits behind it (the fixed bottom fade/pill
+          // don't move with the bounce, so content could flash past their
+          // straight edge) instead of just resisting at the boundary.
+          className="min-w-0 flex-1 overflow-y-auto overscroll-contain"
           style={{
             ...(showMobileHeader
               ? { paddingTop: "var(--mobile-header-h)" }
