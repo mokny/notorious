@@ -24,6 +24,16 @@
   border-color: rgb(var(--border));
 }
 
+/* Kills iOS Safari's rubber-band overscroll bounce app-wide - without this,
+   scrolling any list/panel past its start/end briefly overshoots and reveals
+   whatever sits behind it (fixed headers/bars, sheet backdrops) instead of
+   just resisting at the boundary. `overscroll-behavior` only affects an
+   element that's itself scrollable, so setting it on every element is safe -
+   it's a no-op on anything that doesn't scroll. */
+* {
+  overscroll-behavior: contain;
+}
+
 body {
   @apply bg-surface text-ink antialiased;
   font-feature-settings: "cv11", "ss01";

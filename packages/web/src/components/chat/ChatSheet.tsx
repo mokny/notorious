@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useAuth } from "../../context/AuthContext.js";
 import { useChatOverlay } from "../../context/ChatOverlayContext.js";
+import { useAtScrollTop } from "../../hooks/useAtScrollTop.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
@@ -24,6 +25,12 @@ export function ChatSheet() {
   const breakpoint = useBreakpoint();
   const { isOpen, close } = useChatOverlay();
   const keyboardInset = useKeyboardInset();
+  // Gates drag-to-dismiss on the content being scrolled to its own top -
+  // otherwise a downward swipe meant to scroll the conversation list/thread
+  // back up gets eaten by the sheet's own drag gesture instead. Reset
+  // whenever the sheet opens, since content scrolled elsewhere last time
+  // doesn't emit a fresh scroll event just from remounting at the top.
+  const [contentRef, atTop] = useAtScrollTop<HTMLDivElement>(isOpen);
 
   function handleDragEnd(_event: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) {
     if (info.offset.y > DISMISS_DISTANCE || info.velocity.y > DISMISS_VELOCITY) close();
@@ -47,7 +54,7 @@ export function ChatSheet() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 32, stiffness: 320 }}
-            drag="y"
+            drag={atTop ? "y" : false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={handleDragEnd}
@@ -59,7 +66,7 @@ export function ChatSheet() {
                 without viewport-fit=cover (see index.html), so it was
                 leaving the composer's input row right against the true
                 bottom edge, barely reachable. */}
-            <div className="min-h-0 flex-1 overflow-hidden pb-4">
+            <div ref={contentRef} className="min-h-0 flex-1 overflow-hidden pb-4">
               <ChatPanel />
             </div>
           </motion.div>

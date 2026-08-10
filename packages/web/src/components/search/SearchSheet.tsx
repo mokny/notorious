@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
+import { useAtScrollTop } from "../../hooks/useAtScrollTop.js";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset.js";
 import { SearchPanel } from "./SearchPanel.js";
 
@@ -22,6 +23,9 @@ export function SearchSheet({ workspaceId }: { workspaceId: string }) {
   const { isOpen, close } = useSearchOverlay();
   const navigate = useNavigate();
   const keyboardInset = useKeyboardInset();
+  // See ChatSheet.tsx's own comment - same drag-only-when-scrolled-to-top
+  // gate, here directly on the results list's own scroll container.
+  const [contentRef, atTop] = useAtScrollTop<HTMLDivElement>(isOpen);
 
   function handleSelect(objectId: string, query: string) {
     close();
@@ -60,7 +64,7 @@ export function SearchSheet({ workspaceId }: { workspaceId: string }) {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 32, stiffness: 320 }}
-            drag="y"
+            drag={atTop ? "y" : false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={handleDragEnd}
@@ -68,7 +72,11 @@ export function SearchSheet({ workspaceId }: { workspaceId: string }) {
             <div className="flex shrink-0 justify-center py-2">
               <div className="h-1.5 w-10 rounded-full bg-ink-muted/30" />
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+            <div
+              ref={contentRef}
+              className="min-h-0 flex-1 overflow-y-auto px-4 pb-4"
+              style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+            >
               <SearchPanel workspaceId={workspaceId} onSelect={handleSelect} autoFocus={false} />
             </div>
           </motion.div>

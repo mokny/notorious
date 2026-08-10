@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { objectApi, workspaceApi } from "../../lib/api/resources.js";
 import { useObjectHistory } from "../../context/ObjectHistoryContext.js";
+import { useTheme } from "../../context/ThemeContext.js";
 import { useDeleteObject } from "../../hooks/useDeleteObject.js";
 import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
 import { useMobileChrome } from "../../context/MobileChromeContext.js";
@@ -44,6 +45,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
   const { user } = useAuth();
   const { entries, current, goBack, jumpTo } = useObjectHistory();
   const { sectionsVisible, setSectionsVisible } = useMobileChrome();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [breadcrumbOpen, setBreadcrumbOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -139,6 +141,16 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               ))}
             </IOSMenuGroup>
           )}
+          <IOSMenuGroup>
+            <IOSMenuItem
+              icon="board"
+              label="Switch workspace"
+              onClick={() => {
+                setBreadcrumbOpen(false);
+                navigate("/");
+              }}
+            />
+          </IOSMenuGroup>
         </IOSMenu>
       </div>
 
@@ -235,6 +247,14 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                 }}
               />
             )}
+            <IOSMenuItem
+              icon={theme === "dark" ? "sun" : "moon"}
+              label={theme === "dark" ? "Light mode" : "Dark mode"}
+              onClick={() => {
+                setMenuOpen(false);
+                toggleTheme();
+              }}
+            />
             <IOSMenuItem icon="refresh" label="Refresh" onClick={() => window.location.reload()} />
           </IOSMenuGroup>
         </IOSMenu>

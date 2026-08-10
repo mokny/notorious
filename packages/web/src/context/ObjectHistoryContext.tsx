@@ -51,7 +51,11 @@ export function ObjectHistoryProvider({ children }: { children: ReactNode }) {
         if (top.title === entry.title && top.icon === entry.icon) return prev;
         return [...prev.slice(0, -1), entry];
       }
-      const next = [...prev, entry];
+      // Re-visiting an object already further back in the stack moves it to
+      // the top instead of appending a second entry - keeps the breadcrumb
+      // list (and MobileTopBar's history menu) free of duplicates.
+      const deduped = prev.filter((e) => e.id !== entry.id);
+      const next = [...deduped, entry];
       return next.length > MAX_ENTRIES ? next.slice(next.length - MAX_ENTRIES) : next;
     });
   }, []);
