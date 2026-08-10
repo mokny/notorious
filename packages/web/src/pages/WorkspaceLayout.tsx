@@ -224,14 +224,6 @@ function WorkspaceLayoutInner() {
                     navigate(`/w/${workspaceId}/settings`);
                   }}
                 />
-                <IOSMenuItem
-                  icon="board"
-                  label="Switch workspace"
-                  onClick={() => {
-                    setWorkspaceMenuOpen(false);
-                    navigate("/");
-                  }}
-                />
               </IOSMenuGroup>
             </IOSMenu>
           </div>
@@ -305,6 +297,14 @@ function WorkspaceLayoutInner() {
               </button>
               <IOSMenu open={avatarMenuOpen} onClose={() => setAvatarMenuOpen(false)} side="top" align="start" widthClassName="w-56">
                 <IOSMenuGroup>
+                  <IOSMenuItem
+                    icon="board"
+                    label="Switch workspace"
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      navigate("/");
+                    }}
+                  />
                   <IOSMenuItem
                     icon="user"
                     label="Account settings"
