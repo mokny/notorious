@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { Button } from "./ui/Button.js";
 import { enablePushNotifications, disablePushNotifications, isPushSupported } from "../lib/push/subscribe.js";
+import { useLocalStorageState } from "../hooks/useLocalStorageState.js";
 
 export function NotificationSettings() {
   const [supported, setSupported] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Read by PushNotificationBanner.tsx: an explicit toggle-off here is the
+  // only thing that permanently stops the login-time auto-enable prompt -
+  // dismissing that banner itself is just a "not now" for the session.
+  const [, setOptedOut] = useLocalStorageState("notorious:push-opt-out", false);
 
   useEffect(() => {
     setSupported(isPushSupported());
@@ -22,8 +27,11 @@ export function NotificationSettings() {
       if (enabled) {
         await disablePushNotifications();
         setEnabled(false);
+        setOptedOut(true);
       } else {
-        setEnabled(await enablePushNotifications());
+        const ok = await enablePushNotifications();
+        setEnabled(ok);
+        if (ok) setOptedOut(false);
       }
     } finally {
       setBusy(false);

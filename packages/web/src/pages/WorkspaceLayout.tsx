@@ -20,6 +20,7 @@ import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
 import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
 import { InstallAppHint } from "../components/nav/InstallAppHint.js";
+import { PushNotificationBanner } from "../components/nav/PushNotificationBanner.js";
 import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
@@ -440,6 +441,7 @@ function WorkspaceLayoutInner() {
           }}
         >
           {!shareToken && !coverFullBleed && <InstallAppHint />}
+          {!shareToken && !coverFullBleed && <PushNotificationBanner />}
           <Outlet />
         </main>
         {isPhone && (
