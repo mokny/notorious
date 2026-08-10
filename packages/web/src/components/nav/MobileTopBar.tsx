@@ -69,6 +69,11 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
     queryFn: () => workspaceApi.get(workspaceId),
     enabled: Boolean(routeObjectId),
   });
+  const { data: dashboardObject } = useQuery({
+    queryKey: ["object", dashboardObjectId],
+    queryFn: () => objectApi.get(dashboardObjectId!),
+    enabled: Boolean(dashboardObjectId),
+  });
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
   const isLocked = Boolean(object?.lockedAt);
   const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
@@ -123,6 +128,19 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
         </button>
 
         <IOSMenu open={breadcrumbOpen} onClose={() => setBreadcrumbOpen(false)} align="start" widthClassName="w-64 max-h-72 overflow-y-auto">
+          {dashboardObjectId && (
+            <IOSMenuGroup>
+              <IOSMenuItem
+                icon={dashboardObject?.icon ?? "layout-dashboard"}
+                label={dashboardObject?.title || "Dashboard"}
+                onClick={() => {
+                  jumpTo(dashboardObjectId);
+                  navigate(`/w/${workspaceId}/objects/${dashboardObjectId}`);
+                  setBreadcrumbOpen(false);
+                }}
+              />
+            </IOSMenuGroup>
+          )}
           {entries.length === 0 ? (
             <p className="px-4 py-3 text-sm text-ink-muted">No objects visited yet this session.</p>
           ) : (
