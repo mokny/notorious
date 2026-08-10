@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useCall, type PreJoinRequest } from "../../context/CallContext.js";
 import { useMediaDeviceList, supportsOutputDeviceSelection } from "./useMediaDevices.js";
 import { DeviceSelect, GainSlider } from "./CallDeviceControls.js";
-import { Button } from "../ui/Button.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
@@ -152,8 +151,6 @@ export function PreJoinLobby() {
 
   if (!active) return null;
 
-  const confirmLabel = cachedRequest?.mode === "join" ? "Join call" : "Call";
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-surface p-6" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="relative flex aspect-video w-full max-w-md items-center justify-center overflow-hidden rounded-xl bg-black/80">
@@ -191,13 +188,23 @@ export function PreJoinLobby() {
         </button>
       </div>
 
-      <div className="flex w-full max-w-md items-center justify-center gap-3">
-        <Button variant="secondary" onClick={handleCancel} disabled={joining}>
-          Cancel
-        </Button>
-        <Button variant="primary" onClick={() => void handleConfirm()} disabled={joining}>
-          {joining ? "Connecting…" : confirmLabel}
-        </Button>
+      <div className="flex items-center gap-8">
+        <button
+          onClick={handleCancel}
+          disabled={joining}
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg hover:opacity-90 disabled:opacity-50"
+          title="Cancel"
+        >
+          <Icon name="phone-off" className="h-6 w-6" />
+        </button>
+        <button
+          onClick={() => void handleConfirm()}
+          disabled={joining}
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:opacity-90 disabled:opacity-50"
+          title={cachedRequest?.mode === "join" ? "Join call" : "Call"}
+        >
+          <Icon name={joining ? "refresh" : "phone"} className={`h-6 w-6 ${joining ? "animate-spin" : ""}`} />
+        </button>
       </div>
     </div>
   );
