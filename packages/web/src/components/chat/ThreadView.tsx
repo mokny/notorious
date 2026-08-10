@@ -33,6 +33,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   const scrollContentRef = useRef<HTMLDivElement>(null);
   const keyboardInset = useKeyboardInset();
   const keyboardMountedRef = useRef(false);
+  const rafCleanupRef = useRef<(() => void) | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   // Mirrors the `isAtBottom` state in a ref too - the messages-effect below
   // needs the current value without retriggering on every scroll tick, and
@@ -147,6 +148,17 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   // with the messages-effect's own initial scroll (keyboardInset.bottom
   // starts at 0 on every mount, so that first effect run isn't a real
   // keyboard change).
+  //
+  // iOS fires several `visualViewport` resize events in a row while the
+  // keyboard is still animating in, each with a still-growing inset - a
+  // single synchronous scroll here lands short because ChatSheet's own
+  // `bottom: keyboardInset.bottom` style (which is what actually shrinks
+  // this container) hasn't finished being applied by the browser's next
+  // layout/paint yet. Two nested `requestAnimationFrame`s re-issue the same
+  // scroll after that layout has definitely settled - one frame for the
+  // style to take effect, a second for iOS's own keyboard-driven reflow to
+  // catch up - on top of the immediate call, which still covers the common
+  // (non-iOS, no animation lag) case instantly.
   useEffect(() => {
     if (!keyboardMountedRef.current) {
       keyboardMountedRef.current = true;
@@ -155,7 +167,15 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
     scrollToBottom("auto");
     isAtBottomRef.current = true;
     setPendingCount(0);
-  }, [keyboardInset.bottom]);
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => scrollToBottom("auto"));
+      rafCleanupRef.current = () => cancelAnimationFrame(raf2);
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      rafCleanupRef.current?.();
+    };
+  }, [keyboardInset.bottom, keyboardInset.offsetTop]);
 
   function jumpToBottom() {
     scrollToBottom("smooth");
