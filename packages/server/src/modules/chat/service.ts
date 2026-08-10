@@ -523,7 +523,30 @@ export async function softDeleteMessage(messageId: string, userId: string): Prom
   broadcastToConversation(participantUserIds, { type: "chatMessageDeleted", conversationId: message.conversationId, messageId });
 }
 
-export async function react(messageId: string, userId: string, emoji: string): Promise<MessageReaction[]> {
+/**
+ * Push-notifies the message's author when someone else reacts to it -
+ * mirrors `notifyNewMessage`'s Web Push half (no DB-row/bell), skipped if
+ * the reactor is the author themselves or the author already has this
+ * conversation focused (see focusState.ts). Unlike a new message, a
+ * reaction isn't "unread" the way a message is, so there's no badge count
+ * and no unread-cursor bump here.
+ */
+async function notifyReaction(messageId: string, conversationId: string, reactorId: string, reactorName: string, emoji: string): Promise<void> {
+  const rows = await db.select({ authorId: messages.authorId, body: messages.body }).from(messages).where(eq(messages.id, messageId)).limit(1);
+  const message = rows[0];
+  if (!message || message.authorId === reactorId) return;
+  if (isFocused(message.authorId, conversationId)) return;
+
+  await notifyUser(message.authorId, {
+    type: "chat-reaction",
+    title: reactorName,
+    body: `reacted ${emoji} to ${message.body ? `"${preview(message.body)}"` : "your message"}`,
+    conversationId,
+    url: `/messages/${conversationId}`,
+  });
+}
+
+export async function react(messageId: string, userId: string, reactorName: string, emoji: string): Promise<MessageReaction[]> {
   await db
     .insert(messageReactions)
     .values({ messageId, userId, emoji, createdAt: nowIso() })
@@ -533,6 +556,7 @@ export async function react(messageId: string, userId: string, emoji: string): P
   const conversationId = await getMessageConversationId(messageId);
   const participantUserIds = await getParticipantUserIds(conversationId);
   broadcastToConversation(participantUserIds, { type: "chatReaction", conversationId, messageId, reactions });
+  await notifyReaction(messageId, conversationId, userId, reactorName, emoji);
 
   return reactions;
 }

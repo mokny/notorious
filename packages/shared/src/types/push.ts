@@ -13,4 +13,5 @@ export type PushNotificationPayload =
   | { type: "call"; title: string; body: string; callId: string; conversationId: string; tag: string; url: string }
   | { type: "call-closed"; tag: string }
   | { type: "chat-message"; title: string; body: string; conversationId: string; url: string; badge?: number }
+  | { type: "chat-reaction"; title: string; body: string; conversationId: string; url: string }
   | { type: "mention" | "ai-budget" | "backup-failed" | "reminder"; title: string; body: string; url: string };

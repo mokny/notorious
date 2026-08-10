@@ -4,6 +4,7 @@ import { chatApi, systemApi, callApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
 import { useCall } from "../../context/CallContext.js";
+import { useKeyboardInset } from "../../hooks/useKeyboardInset.js";
 import { MessageBubble } from "./MessageBubble.js";
 import { Composer } from "./Composer.js";
 import { ChatAvatar } from "./ChatAvatar.js";
@@ -29,6 +30,9 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   const [typingUserName, setTypingUserName] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+  const keyboardInset = useKeyboardInset();
+  const keyboardMountedRef = useRef(false);
   const [pendingCount, setPendingCount] = useState(0);
   // Mirrors the `isAtBottom` state in a ref too - the messages-effect below
   // needs the current value without retriggering on every scroll tick, and
@@ -116,6 +120,42 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
     const el = scrollContainerRef.current;
     el?.scrollTo({ top: el.scrollHeight, behavior });
   }
+
+  // The messages-effect below scrolls to bottom as soon as React commits the
+  // new message list, but avatars/images without reserved dimensions still
+  // grow the content afterwards, landing the scroll position a few px short
+  // of the true bottom. A ResizeObserver on the content wrapper (not the
+  // scroll container itself - that one's a fixed `h-full`, so its own box
+  // never resizes) re-applies the same "stick to bottom" rule as that effect
+  // (isAtBottomRef, kept up to date by both) whenever the content's actual
+  // height changes for any reason, not just on the initial open.
+  useEffect(() => {
+    const content = scrollContentRef.current;
+    if (!content) return;
+    const observer = new ResizeObserver(() => {
+      if (isAtBottomRef.current) scrollToBottom("auto");
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+
+  // Re-pins the view to the bottom whenever the on-screen keyboard's height
+  // changes (opening, closing, or resizing) - unconditionally, unlike the
+  // "only if already at the bottom" rule elsewhere, since focusing the
+  // composer is itself a strong signal the user wants to see the latest
+  // message. Skips the very first run so opening a thread doesn't double up
+  // with the messages-effect's own initial scroll (keyboardInset.bottom
+  // starts at 0 on every mount, so that first effect run isn't a real
+  // keyboard change).
+  useEffect(() => {
+    if (!keyboardMountedRef.current) {
+      keyboardMountedRef.current = true;
+      return;
+    }
+    scrollToBottom("auto");
+    isAtBottomRef.current = true;
+    setPendingCount(0);
+  }, [keyboardInset.bottom]);
 
   function jumpToBottom() {
     scrollToBottom("smooth");
@@ -239,21 +279,23 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
 
       <div className="relative min-h-0 flex-1">
         <div ref={scrollContainerRef} onScroll={handleScroll} className="h-full overflow-y-auto py-2">
-          {messages?.map((message, index) => {
-            const previous = messages[index - 1];
-            const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
-            return (
-              <div key={message.id}>
-                {showDaySeparator && (
-                  <div className="my-2 flex items-center justify-center">
-                    <span className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink-muted">{dayLabel(message.createdAt)}</span>
-                  </div>
-                )}
-                <MessageBubble message={message} conversationId={conversationId} readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null} />
-              </div>
-            );
-          })}
-          {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{typingUserName} is typing…</p>}
+          <div ref={scrollContentRef}>
+            {messages?.map((message, index) => {
+              const previous = messages[index - 1];
+              const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
+              return (
+                <div key={message.id}>
+                  {showDaySeparator && (
+                    <div className="my-2 flex items-center justify-center">
+                      <span className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink-muted">{dayLabel(message.createdAt)}</span>
+                    </div>
+                  )}
+                  <MessageBubble message={message} conversationId={conversationId} readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null} />
+                </div>
+              );
+            })}
+            {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{typingUserName} is typing…</p>}
+          </div>
         </div>
 
         {pendingCount > 0 && (

@@ -110,8 +110,9 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const conversationId = await chatService.getMessageConversationId(id);
     const access = await requireConversationAccess(request, conversationId);
+    const user = requireUser(request);
     const input = reactSchema.parse(request.body);
-    return chatService.react(id, access.userId, input.emoji);
+    return chatService.react(id, access.userId, user.name, input.emoji);
   });
 
   app.delete("/api/v1/chat/messages/:id/reactions/:emoji", async (request) => {
