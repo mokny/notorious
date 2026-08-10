@@ -16,6 +16,13 @@ export const saveWorkspaceAiConfigSchema = z.object({
 });
 export type SaveWorkspaceAiConfigInput = z.infer<typeof saveWorkspaceAiConfigSchema>;
 
+/** Updates just the usage budget/reset cadence of an existing config - see modules/ai/service.ts's `patchWorkspaceAiConfig`. */
+export const patchWorkspaceAiConfigSchema = z.object({
+  maxTokenBudget: z.number().int().positive().nullable(),
+  usageResetInterval: z.enum(AI_USAGE_RESET_INTERVALS),
+});
+export type PatchWorkspaceAiConfigInput = z.infer<typeof patchWorkspaceAiConfigSchema>;
+
 /** Never includes the API key itself - see modules/ai/service.ts's `getWorkspaceAiConfigSummary`. */
 export interface WorkspaceAiConfigSummary {
   configured: boolean;

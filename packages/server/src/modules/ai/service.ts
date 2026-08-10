@@ -43,13 +43,21 @@ export async function getWorkspaceAiConfigSummary(workspaceId: string): Promise<
   return toSummary(rows[0]);
 }
 
-/** Every workspace this user belongs to that has AI configured - powers the pinned "Notorious AI" entry in the chat overlay (see ConversationList.tsx), one per workspace rather than a single "current workspace" concept the overlay doesn't otherwise have. */
-export async function listAiConfiguredWorkspacesForUser(userId: string): Promise<AiConfiguredWorkspace[]> {
+/**
+ * Workspaces this user belongs to that have AI configured - powers the
+ * pinned "Notorious AI" entry in the chat overlay (see
+ * ConversationList.tsx). Scoped to a single `workspaceId` (the currently
+ * active workspace) when given, so the overlay shows at most one AI entry
+ * rather than one per every workspace the user is a member of.
+ */
+export async function listAiConfiguredWorkspacesForUser(userId: string, workspaceId?: string): Promise<AiConfiguredWorkspace[]> {
+  const conditions = [eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId)];
+  if (workspaceId) conditions.push(eq(workspaces.id, workspaceId));
   return db
     .select({ workspaceId: workspaces.id, workspaceName: workspaces.name })
     .from(workspaceAiConfigs)
     .innerJoin(workspaces, eq(workspaces.id, workspaceAiConfigs.workspaceId))
-    .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id), eq(workspaceMembers.userId, userId)))
+    .innerJoin(workspaceMembers, and(...conditions))
     .orderBy(asc(workspaces.name));
 }
 
@@ -83,6 +91,33 @@ export async function saveWorkspaceAiConfig(workspaceId: string, input: SaveWork
   } else {
     await db.insert(workspaceAiConfigs).values({ workspaceId, ...values, consumedTokens: 0, createdAt: now });
   }
+  return getWorkspaceAiConfigSummary(workspaceId);
+}
+
+/**
+ * Updates just the usage budget/reset cadence of an existing config, leaving
+ * provider/model/apiKey untouched - lets an owner tweak these without
+ * re-entering the API key the full `saveWorkspaceAiConfig` form requires.
+ */
+export async function patchWorkspaceAiConfig(
+  workspaceId: string,
+  input: { maxTokenBudget: number | null; usageResetInterval: AiUsageResetInterval },
+): Promise<WorkspaceAiConfigSummary> {
+  const existing = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
+  const row = existing[0];
+  if (!row) throw badRequest("This workspace has no AI configuration to update.");
+  const intervalChanged = row.usageResetInterval !== input.usageResetInterval;
+  const budgetRaisedOrCleared = input.maxTokenBudget == null || (row.maxTokenBudget != null && input.maxTokenBudget > row.maxTokenBudget);
+  await db
+    .update(workspaceAiConfigs)
+    .set({
+      maxTokenBudget: input.maxTokenBudget,
+      usageResetInterval: input.usageResetInterval,
+      usageResetAt: intervalChanged ? nextResetAt(input.usageResetInterval, new Date()) : row.usageResetAt,
+      budgetNotifiedAt: budgetRaisedOrCleared ? null : row.budgetNotifiedAt,
+      updatedAt: nowIso(),
+    })
+    .where(eq(workspaceAiConfigs.workspaceId, workspaceId));
   return getWorkspaceAiConfigSummary(workspaceId);
 }
 

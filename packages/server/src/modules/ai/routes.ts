@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { saveWorkspaceAiConfigSchema, sendChatMessageSchema } from "@notorious/shared";
+import { saveWorkspaceAiConfigSchema, patchWorkspaceAiConfigSchema, sendChatMessageSchema } from "@notorious/shared";
 import { requireUser } from "../../plugins/session.js";
 import { requireWorkspaceRole } from "../workspaces/access.js";
 import * as aiService from "./service.js";
@@ -8,7 +8,8 @@ import { sendChatMessage } from "./agent.js";
 export async function registerAiRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/ai/configured-workspaces", async (request) => {
     const user = requireUser(request);
-    return aiService.listAiConfiguredWorkspacesForUser(user.id);
+    const { workspaceId } = request.query as { workspaceId?: string };
+    return aiService.listAiConfiguredWorkspacesForUser(user.id, workspaceId);
   });
 
   app.get("/api/v1/workspaces/:workspaceId/ai/config", async (request) => {
@@ -24,6 +25,14 @@ export async function registerAiRoutes(app: FastifyInstance): Promise<void> {
     await requireWorkspaceRole(workspaceId, user.id, "owner");
     const input = saveWorkspaceAiConfigSchema.parse(request.body);
     return aiService.saveWorkspaceAiConfig(workspaceId, input);
+  });
+
+  app.patch("/api/v1/workspaces/:workspaceId/ai/config", async (request) => {
+    const user = requireUser(request);
+    const { workspaceId } = request.params as { workspaceId: string };
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const input = patchWorkspaceAiConfigSchema.parse(request.body);
+    return aiService.patchWorkspaceAiConfig(workspaceId, input);
   });
 
   app.delete("/api/v1/workspaces/:workspaceId/ai/config", async (request, reply) => {

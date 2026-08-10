@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AI_PROVIDERS, AI_USAGE_RESET_INTERVALS, type AiProvider, type AiUsageResetInterval } from "@notorious/shared";
 import { aiApi } from "../lib/api/resources.js";
@@ -43,6 +43,11 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
   const queryKey = ["aiConfig", workspaceId];
   const { data: config } = useQuery({ queryKey, queryFn: () => aiApi.getConfig(workspaceId) });
 
+  // "quick" (reset interval + token limit only, no API key needed) is the
+  // common case once a config already exists - "replace" carries the full
+  // form including the API key, for the rarer case of swapping provider/key.
+  const [mode, setMode] = useState<"quick" | "replace">("quick");
+
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -50,6 +55,22 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
   const [maxTokenBudget, setMaxTokenBudget] = useState("");
   const [usageResetInterval, setUsageResetInterval] = useState<AiUsageResetInterval>("monthly");
   const [error, setError] = useState<string | null>(null);
+
+  const [quickMaxTokenBudget, setQuickMaxTokenBudget] = useState("");
+  const [quickInterval, setQuickInterval] = useState<AiUsageResetInterval>("monthly");
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickInitialized, setQuickInitialized] = useState(false);
+
+  // Seeds the quick-edit fields from the loaded config exactly once - after
+  // that, the fields are the user's to edit and shouldn't get clobbered by a
+  // background refetch (e.g. after the mutation's own invalidate).
+  useEffect(() => {
+    if (config?.configured && !quickInitialized) {
+      setQuickMaxTokenBudget(config.maxTokenBudget != null ? String(config.maxTokenBudget) : "");
+      setQuickInterval(config.usageResetInterval ?? "monthly");
+      setQuickInitialized(true);
+    }
+  }, [config, quickInitialized]);
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -64,9 +85,24 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
     onSuccess: () => {
       setApiKey("");
       setError(null);
+      setMode("quick");
+      setQuickInitialized(false);
       void queryClient.invalidateQueries({ queryKey });
     },
     onError: () => setError("Could not save this AI configuration - check the values and try again."),
+  });
+
+  const patchMutation = useMutation({
+    mutationFn: () =>
+      aiApi.patchConfig(workspaceId, {
+        maxTokenBudget: quickMaxTokenBudget ? Number(quickMaxTokenBudget) : null,
+        usageResetInterval: quickInterval,
+      }),
+    onSuccess: () => {
+      setQuickError(null);
+      void queryClient.invalidateQueries({ queryKey });
+    },
+    onError: () => setQuickError("Could not save - check the values and try again."),
   });
 
   const removeMutation = useMutation({
@@ -79,7 +115,85 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
     saveMutation.mutate();
   }
 
+  function handleQuickSubmit(event: FormEvent) {
+    event.preventDefault();
+    patchMutation.mutate();
+  }
+
   const budgetPercent = config?.maxTokenBudget ? Math.min(100, Math.round((config.consumedTokens / config.maxTokenBudget) * 100)) : null;
+
+  const fullForm: ReactNode = (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <p className="text-xs text-ink-muted">
+        {config?.configured ? "Replace the current configuration:" : "Set up an AI provider to share with everyone in this workspace:"}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={provider}
+          onChange={(e) => setProvider(e.target.value as AiProvider)}
+          className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+        >
+          {AI_PROVIDERS.map((p) => (
+            <option key={p} value={p}>
+              {PROVIDER_LABELS[p]}
+            </option>
+          ))}
+        </select>
+        <TextField
+          placeholder={provider === "google" ? "Model (e.g. gemini-3.5-flash-lite)" : "Model (e.g. gpt-4o, claude-sonnet-5)"}
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          className="max-w-xs"
+          list={provider === "google" ? "gemini-model-suggestions" : undefined}
+          required
+        />
+        {provider === "google" && (
+          <datalist id="gemini-model-suggestions">
+            {GEMINI_MODEL_SUGGESTIONS.map((suggestion) => (
+              <option key={suggestion} value={suggestion} />
+            ))}
+          </datalist>
+        )}
+      </div>
+      {provider === "openai-compatible" && (
+        <TextField
+          type="url"
+          placeholder="Base URL (e.g. http://localhost:11434/v1)"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          required
+        />
+      )}
+      <TextField type="password" placeholder="API key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} required />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <TextField
+          type="number"
+          min={1}
+          placeholder="Max tokens per period (blank = unlimited)"
+          value={maxTokenBudget}
+          onChange={(e) => setMaxTokenBudget(e.target.value)}
+          className="max-w-xs"
+        />
+        <select
+          value={usageResetInterval}
+          onChange={(e) => setUsageResetInterval(e.target.value as AiUsageResetInterval)}
+          className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+        >
+          {AI_USAGE_RESET_INTERVALS.map((interval) => (
+            <option key={interval} value={interval}>
+              {INTERVAL_LABELS[interval]} reset
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      <Button type="submit" variant="primary" disabled={saveMutation.isPending}>
+        Save
+      </Button>
+    </form>
+  );
 
   return (
     <div className="mt-3 space-y-3">
@@ -123,76 +237,61 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-2 rounded-lg border border-dashed border-border p-3">
-        <p className="text-xs text-ink-muted">
-          {config?.configured ? "Replace the current configuration:" : "Set up an AI provider to share with everyone in this workspace:"}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as AiProvider)}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
-          >
-            {AI_PROVIDERS.map((p) => (
-              <option key={p} value={p}>
-                {PROVIDER_LABELS[p]}
-              </option>
-            ))}
-          </select>
-          <TextField
-            placeholder={provider === "google" ? "Model (e.g. gemini-3.5-flash-lite)" : "Model (e.g. gpt-4o, claude-sonnet-5)"}
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="max-w-xs"
-            list={provider === "google" ? "gemini-model-suggestions" : undefined}
-            required
-          />
-          {provider === "google" && (
-            <datalist id="gemini-model-suggestions">
-              {GEMINI_MODEL_SUGGESTIONS.map((suggestion) => (
-                <option key={suggestion} value={suggestion} />
-              ))}
-            </datalist>
+      {config?.configured ? (
+        <div className="rounded-lg border border-dashed border-border p-3">
+          <div className="mb-3 flex gap-1 rounded-lg bg-surface-muted p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setMode("quick")}
+              className={`flex-1 rounded-md px-2 py-1 ${mode === "quick" ? "bg-surface-raised font-medium text-ink shadow-sm" : "text-ink-muted"}`}
+            >
+              Quick edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("replace")}
+              className={`flex-1 rounded-md px-2 py-1 ${mode === "replace" ? "bg-surface-raised font-medium text-ink shadow-sm" : "text-ink-muted"}`}
+            >
+              Replace configuration
+            </button>
+          </div>
+
+          {mode === "quick" ? (
+            <form onSubmit={handleQuickSubmit} className="space-y-2">
+              <p className="text-xs text-ink-muted">Adjust the token limit and reset cadence without touching the API key:</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <TextField
+                  type="number"
+                  min={1}
+                  placeholder="Max tokens per period (blank = unlimited)"
+                  value={quickMaxTokenBudget}
+                  onChange={(e) => setQuickMaxTokenBudget(e.target.value)}
+                  className="max-w-xs"
+                />
+                <select
+                  value={quickInterval}
+                  onChange={(e) => setQuickInterval(e.target.value as AiUsageResetInterval)}
+                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+                >
+                  {AI_USAGE_RESET_INTERVALS.map((interval) => (
+                    <option key={interval} value={interval}>
+                      {INTERVAL_LABELS[interval]} reset
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {quickError && <p className="text-sm text-red-500">{quickError}</p>}
+              <Button type="submit" variant="primary" disabled={patchMutation.isPending}>
+                Save
+              </Button>
+            </form>
+          ) : (
+            fullForm
           )}
         </div>
-        {provider === "openai-compatible" && (
-          <TextField
-            type="url"
-            placeholder="Base URL (e.g. http://localhost:11434/v1)"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            required
-          />
-        )}
-        <TextField type="password" placeholder="API key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} required />
-
-        <div className="flex flex-wrap items-center gap-2">
-          <TextField
-            type="number"
-            min={1}
-            placeholder="Max tokens per period (blank = unlimited)"
-            value={maxTokenBudget}
-            onChange={(e) => setMaxTokenBudget(e.target.value)}
-            className="max-w-xs"
-          />
-          <select
-            value={usageResetInterval}
-            onChange={(e) => setUsageResetInterval(e.target.value as AiUsageResetInterval)}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
-          >
-            {AI_USAGE_RESET_INTERVALS.map((interval) => (
-              <option key={interval} value={interval}>
-                {INTERVAL_LABELS[interval]} reset
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {error && <p className="text-sm text-red-500">{error}</p>}
-        <Button type="submit" variant="primary" disabled={saveMutation.isPending}>
-          Save
-        </Button>
-      </form>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border p-3">{fullForm}</div>
+      )}
     </div>
   );
 }

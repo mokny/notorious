@@ -1,10 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import type { ConversationSummary } from "@notorious/shared";
 import { chatApi, aiApi } from "../../lib/api/resources.js";
 import { useConfirm } from "../../context/ConfirmContext.js";
 import { ChatAvatar } from "./ChatAvatar.js";
 import { toAiConversationId } from "./aiConversation.js";
 import { Icon } from "../ui/Icon.js";
+
+/**
+ * ConversationList is mounted once in App.tsx above the route tree (see
+ * ChatBubble.tsx's doc comment), so it has no route param to read the active
+ * workspace from - pulled out of the URL instead. `null` outside any
+ * workspace (e.g. WorkspacePickerPage), which correctly hides the pinned AI
+ * row there - there's no "current workspace" to scope it to.
+ */
+function useCurrentWorkspaceId(): string | null {
+  const location = useLocation();
+  return location.pathname.match(/^\/w\/([^/]+)/)?.[1] ?? null;
+}
 
 function conversationInitial(conversation: ConversationSummary): { name: string; color: string; url: string | null } {
   if (conversation.type === "workspace_channel") return { name: conversation.name, color: "#6366f1", url: null };
@@ -20,11 +33,18 @@ function conversationInitial(conversation: ConversationSummary): { name: string;
  */
 export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSelect: (id: string) => void; onNewChat: () => void; onNewChannel: () => void }) {
   const { data: conversations, isLoading } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
-  // One pinned "Notorious AI" row per workspace with AI configured - see
-  // modules/ai/service.ts's listAiConfiguredWorkspacesForUser. Not part of
-  // the real conversations list above (different backend entirely, see
-  // aiConversation.ts), so it's rendered separately and always first.
-  const { data: aiWorkspaces } = useQuery({ queryKey: ["aiConfiguredWorkspaces"], queryFn: aiApi.listConfiguredWorkspaces });
+  const currentWorkspaceId = useCurrentWorkspaceId();
+  // Pinned "Notorious AI" row for the active workspace, if it has AI
+  // configured - see modules/ai/service.ts's listAiConfiguredWorkspacesForUser.
+  // Not part of the real conversations list above (different backend
+  // entirely, see aiConversation.ts), so it's rendered separately and always
+  // first. Scoped to `currentWorkspaceId` so switching workspaces doesn't
+  // keep showing every other workspace's AI agent too.
+  const { data: aiWorkspaces } = useQuery({
+    queryKey: ["aiConfiguredWorkspaces", currentWorkspaceId],
+    queryFn: () => aiApi.listConfiguredWorkspaces(currentWorkspaceId!),
+    enabled: !!currentWorkspaceId,
+  });
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
@@ -76,37 +96,37 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
             <li key={workspace.workspaceId} className="relative flex items-center">
               <button
                 onClick={() => onSelect(toAiConversationId(workspace.workspaceId))}
-                className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left hover:bg-surface"
+                className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-3 text-left hover:bg-surface"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white">
-                  <Icon name="bot" className="h-4 w-4" />
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white">
+                  <Icon name="bot" className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <span className="truncate text-sm font-medium text-ink">Notorious AI</span>
-                  <div className="truncate text-xs text-ink-muted">{workspace.workspaceName}</div>
+                  <span className="truncate text-base font-medium text-ink">Notorious AI</span>
+                  <div className="truncate text-sm text-ink-muted">{workspace.workspaceName}</div>
                 </div>
               </button>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 left-[58px] border-b border-border" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 left-[66px] border-b border-border" />
             </li>
           ))}
           {conversations?.map((conversation) => {
             const avatar = conversationInitial(conversation);
             return (
               <li key={conversation.id} className="relative flex items-center">
-                <button onClick={() => onSelect(conversation.id)} className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left hover:bg-surface">
-                  <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} size={9} />
+                <button onClick={() => onSelect(conversation.id)} className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-3 text-left hover:bg-surface">
+                  <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} size={11} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-medium text-ink">
+                      <span className="truncate text-base font-medium text-ink">
                         {conversation.type === "workspace_channel" && "# "}
                         {conversation.name}
                       </span>
                       {conversation.lastMessageAt && (
-                        <span className="shrink-0 text-[11px] text-ink-muted">{new Date(conversation.lastMessageAt).toLocaleDateString()}</span>
+                        <span className="shrink-0 text-xs text-ink-muted">{new Date(conversation.lastMessageAt).toLocaleDateString()}</span>
                       )}
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-xs text-ink-muted">
+                      <span className="truncate text-sm text-ink-muted">
                         {conversation.lastMessage
                           ? `${conversation.lastMessage.authorName}: ${conversation.lastMessage.body ?? "Message deleted"}`
                           : conversation.workspaceName
@@ -128,7 +148,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
                 >
                   <Icon name="trash" className="h-4 w-4" />
                 </button>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 left-[58px] border-b border-border" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 left-[66px] border-b border-border" />
               </li>
             );
           })}
