@@ -57,6 +57,20 @@ export interface ReadReceipt {
   readAt: ISODateString;
 }
 
+/**
+ * The quoted-message snippet shown above a reply, in `MessageBubble.tsx` and
+ * the composer's reply preview. Deliberately not a full `Message` - avoids
+ * unbounded nesting (a reply to a reply to a reply...) since a quote only
+ * ever needs to render one line of context, never its own quote.
+ */
+export interface MessageReplyPreview {
+  id: string;
+  authorName: string;
+  /** Null if the original was soft-deleted or attachment-only - renderers fall back to "Message deleted"/"Attachment" text. */
+  body: string | null;
+  deleted: boolean;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -73,6 +87,9 @@ export interface Message {
   /** Set only for a call-outcome system row (see calls.ts's CallSummary) - MessageBubble renders these as a compact call-log row instead of a normal bubble. Null for every ordinary message. */
   callId: string | null;
   call: CallSummary | null;
+  /** Set when this message was sent as a reply - see `replyTo` for the quoted content. */
+  replyToId: string | null;
+  replyTo: MessageReplyPreview | null;
 }
 
 /**

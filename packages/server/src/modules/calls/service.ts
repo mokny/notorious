@@ -60,7 +60,14 @@ async function writeCallHistoryMessage(row: typeof calls.$inferSelect): Promise<
   await db.insert(messages).values({ id, conversationId: row.conversationId, authorId: row.initiatorId, body: fallbackBody, createdAt, deletedAt: null, callId: row.id });
 
   const call: CallSummary = { callId: row.id, status: row.status, startedAt: row.startedAt, durationSeconds, participantIds: JSON.parse(row.participantIds) as string[] };
-  const message = toMessage({ id, conversationId: row.conversationId, authorId: row.initiatorId, body: fallbackBody, createdAt, deletedAt: null, callId: row.id }, authorName, [], [], [], call);
+  const message = toMessage(
+    { id, conversationId: row.conversationId, authorId: row.initiatorId, body: fallbackBody, createdAt, deletedAt: null, callId: row.id, replyToId: null },
+    authorName,
+    [],
+    [],
+    [],
+    call,
+  );
 
   const participantUserIds = await getParticipantUserIds(row.conversationId);
   for (const userId of participantUserIds) sendToUserGlobal(userId, { type: "chatMessage", conversationId: row.conversationId, message });

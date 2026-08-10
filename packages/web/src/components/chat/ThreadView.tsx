@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Message } from "@notorious/shared";
 import { chatApi, systemApi, callApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
@@ -35,6 +36,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   const keyboardMountedRef = useRef(false);
   const rafCleanupRef = useRef<(() => void) | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   // Mirrors the `isAtBottom` state in a ref too - the messages-effect below
   // needs the current value without retriggering on every scroll tick, and
   // without depending on stale state from its own closure.
@@ -304,13 +306,19 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
               const previous = messages[index - 1];
               const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
               return (
-                <div key={message.id}>
+                <div key={message.id} id={`chat-message-${message.id}`}>
                   {showDaySeparator && (
                     <div className="my-2 flex items-center justify-center">
                       <span className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink-muted">{dayLabel(message.createdAt)}</span>
                     </div>
                   )}
-                  <MessageBubble message={message} conversationId={conversationId} readAt={message.id === lastOwnMessageId ? lastOwnReadAt : null} />
+                  <MessageBubble
+                    message={message}
+                    conversationId={conversationId}
+                    isDm={conversation?.type === "dm"}
+                    deliveryStatus={message.id === lastOwnMessageId ? { readAt: lastOwnReadAt } : null}
+                    onReply={setReplyTarget}
+                  />
                 </div>
               );
             })}
@@ -329,7 +337,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
         )}
       </div>
 
-      <Composer conversationId={conversationId} />
+      <Composer conversationId={conversationId} replyTarget={replyTarget} onCancelReply={() => setReplyTarget(null)} />
     </div>
   );
 }

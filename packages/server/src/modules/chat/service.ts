@@ -9,6 +9,7 @@ import type {
   MessageReaction,
   ReadReceipt,
   CallSummary,
+  MessageReplyPreview,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import {
@@ -338,6 +339,31 @@ async function callSummariesForMessages(messages_: (typeof messages.$inferSelect
   return map;
 }
 
+/** Resolves the quoted preview for any replies in the batch - keyed by the *replying* message's id, not the original's, since that's what `toMessage` needs to attach it. Missing/soft-deleted originals collapse to `deleted: true` rather than being omitted, so the UI can still render a "Message deleted" placeholder instead of silently dropping the quote. */
+async function repliesForMessages(messages_: (typeof messages.$inferSelect)[]): Promise<Map<string, MessageReplyPreview>> {
+  const replyToIds = [...new Set(messages_.map((m) => m.replyToId).filter((id): id is string => id !== null))];
+  if (replyToIds.length === 0) return new Map();
+
+  const originalRows = await db
+    .select({ message: messages, authorName: users.name })
+    .from(messages)
+    .innerJoin(users, eq(messages.authorId, users.id))
+    .where(inArray(messages.id, replyToIds));
+  const originalById = new Map(originalRows.map((r) => [r.message.id, r]));
+
+  const map = new Map<string, MessageReplyPreview>();
+  for (const message of messages_) {
+    if (!message.replyToId) continue;
+    const original = originalById.get(message.replyToId);
+    if (!original || original.message.deletedAt) {
+      map.set(message.id, { id: message.replyToId, authorName: original?.authorName ?? "", body: null, deleted: true });
+    } else {
+      map.set(message.id, { id: original.message.id, authorName: original.authorName, body: original.message.body, deleted: false });
+    }
+  }
+  return map;
+}
+
 function toMessage(
   row: typeof messages.$inferSelect,
   authorName: string,
@@ -345,6 +371,7 @@ function toMessage(
   reactions: MessageReaction[],
   readBy: ReadReceipt[] = [],
   call: CallSummary | null = null,
+  replyTo: MessageReplyPreview | null = null,
 ): Message {
   const deleted = Boolean(row.deletedAt);
   return {
@@ -360,6 +387,8 @@ function toMessage(
     readBy,
     callId: row.callId,
     call,
+    replyToId: row.replyToId,
+    replyTo,
   };
 }
 
@@ -384,11 +413,12 @@ export async function listMessages(conversationId: string, before?: string, limi
     .limit(limit);
 
   const messageIds = rows.map((r) => r.message.id);
-  const [attachmentsByMessage, reactionsByMessage, receiptsByMessage, callSummaryByMessage] = await Promise.all([
+  const [attachmentsByMessage, reactionsByMessage, receiptsByMessage, callSummaryByMessage, replyByMessage] = await Promise.all([
     attachmentsForMessages(messageIds),
     reactionsForMessages(messageIds),
     receiptsForMessages(messageIds),
     callSummariesForMessages(rows.map((r) => r.message)),
+    repliesForMessages(rows.map((r) => r.message)),
   ]);
 
   return rows
@@ -400,6 +430,7 @@ export async function listMessages(conversationId: string, before?: string, limi
         reactionsByMessage.get(r.message.id) ?? [],
         receiptsByMessage.get(r.message.id) ?? [],
         callSummaryByMessage.get(r.message.id) ?? null,
+        replyByMessage.get(r.message.id) ?? null,
       ),
     )
     .reverse();
@@ -448,16 +479,29 @@ export async function sendMessage(
   conversationId: string,
   userId: string,
   authorName: string,
-  input: { body: string; attachmentIds?: string[] },
+  input: { body: string; attachmentIds?: string[]; replyToId?: string },
 ): Promise<Message> {
   const trimmedBody = input.body.trim();
   const attachmentIds = input.attachmentIds ?? [];
   if (!trimmedBody && attachmentIds.length === 0) throw badRequest("Message cannot be empty");
 
+  let replyToId: string | null = null;
+  if (input.replyToId) {
+    // Must belong to this conversation - otherwise a reply could quote a
+    // message from a conversation the sender has no access to.
+    const originalRows = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.id, input.replyToId), eq(messages.conversationId, conversationId)))
+      .limit(1);
+    if (originalRows.length === 0) throw badRequest("Cannot reply to that message");
+    replyToId = input.replyToId;
+  }
+
   const id = newId();
   const createdAt = nowIso();
 
-  await db.insert(messages).values({ id, conversationId, authorId: userId, body: trimmedBody, createdAt, deletedAt: null });
+  await db.insert(messages).values({ id, conversationId, authorId: userId, body: trimmedBody, createdAt, deletedAt: null, replyToId });
   await db.update(conversations).set({ lastMessageAt: createdAt }).where(eq(conversations.id, conversationId));
 
   if (attachmentIds.length > 0) {
@@ -475,6 +519,7 @@ export async function sendMessage(
   }
 
   const attachmentsByMessage = await attachmentsForMessages([id]);
+  const replyByMessage = await repliesForMessages([{ id, conversationId, authorId: userId, body: trimmedBody, createdAt, deletedAt: null, callId: null, replyToId }]);
 
   const participantRows = await db
     .select({ userId: conversationParticipants.userId })
@@ -483,10 +528,13 @@ export async function sendMessage(
 
   const allParticipantUserIds = participantRows.map((p) => p.userId);
   const message = toMessage(
-    { id, conversationId, authorId: userId, body: trimmedBody, createdAt, deletedAt: null, callId: null },
+    { id, conversationId, authorId: userId, body: trimmedBody, createdAt, deletedAt: null, callId: null, replyToId },
     authorName,
     attachmentsByMessage.get(id) ?? [],
     [],
+    [],
+    null,
+    replyByMessage.get(id) ?? null,
   );
 
   await notifyNewMessage(conversationId, message, authorName, allParticipantUserIds);

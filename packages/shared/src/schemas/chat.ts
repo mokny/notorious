@@ -19,6 +19,7 @@ export type CreateDmInput = z.infer<typeof createDmSchema>;
 export const sendMessageSchema = z.object({
   body: z.string().max(8000, "Message is too long"),
   attachmentIds: z.array(z.string()).max(10, "Too many attachments").optional(),
+  replyToId: z.string().optional(),
 });
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 

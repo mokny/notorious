@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, primaryKey, unique } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey, unique, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -668,6 +668,9 @@ export const messages = sqliteTable("messages", {
   // frontend special-cases callId != null into a compact call-log row
   // instead of a normal bubble (see MessageBubble.tsx).
   callId: text("call_id").references(() => calls.id),
+  // No onDelete cascade - deleting the original must not cascade-delete the
+  // reply, it should just lose its quoted preview (see chat/service.ts).
+  replyToId: text("reply_to_id").references((): AnySQLiteColumn => messages.id),
 });
 
 // One row per call attempt - created when someone starts a call ("ringing"),
