@@ -238,14 +238,24 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               }}
             />
             {!shareToken && (
-              <IOSMenuItem
-                icon="settings"
-                label="Settings"
-                onClick={() => {
-                  setMenuOpen(false);
-                  navigate(`/w/${workspaceId}/settings`);
-                }}
-              />
+              <>
+                <IOSMenuItem
+                  icon="user"
+                  label="Account settings"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate("/settings");
+                  }}
+                />
+                <IOSMenuItem
+                  icon="settings"
+                  label="Workspace settings"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate(`/w/${workspaceId}/settings`);
+                  }}
+                />
+              </>
             )}
             <IOSMenuItem
               icon={theme === "dark" ? "sun" : "moon"}

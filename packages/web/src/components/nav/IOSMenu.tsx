@@ -12,11 +12,11 @@ interface IOSMenuProps {
 }
 
 /**
- * Native-iOS-context-menu-styled dropdown shell, phone only - shared by
- * MobileTopBar.tsx's breadcrumb/"…" menus and MobileBottomBar.tsx's "new
- * object" picker, so every phone dropdown looks and behaves the same:
- * rounded, blurred, grouped by IOSMenuGroup with thin dividers, scale+fade
- * in from the trigger's corner.
+ * Native-iOS-context-menu-styled dropdown shell - shared by MobileTopBar.tsx's
+ * breadcrumb/"…" menus, MobileBottomBar.tsx's "new object" picker, and
+ * WorkspaceLayout.tsx's desktop sidebar menus, so every dropdown in the app
+ * looks and behaves the same: rounded, blurred, grouped by IOSMenuGroup with
+ * thin dividers, scale+fade in from the trigger's corner.
  *
  * The backdrop is the *only* mechanism for "tap outside closes this,
  * without also activating whatever was under the tap" - it's a full-screen

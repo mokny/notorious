@@ -24,6 +24,7 @@ import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 import { NotificationBell } from "../components/nav/NotificationBell.js";
+import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "../components/nav/IOSMenu.js";
 import { MobileTopBar } from "../components/nav/MobileTopBar.js";
 import { MobileBottomBar } from "../components/nav/MobileBottomBar.js";
 import { SearchSheet } from "../components/search/SearchSheet.js";
@@ -84,6 +85,8 @@ function WorkspaceLayoutInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const shareToken = getShareToken();
   const breakpoint = useBreakpoint();
   const isLandscape = useIsLandscape();
@@ -203,14 +206,35 @@ function WorkspaceLayoutInner() {
             <span className="ml-auto shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs text-ink-muted">Shared</span>
           </div>
         ) : (
-          <button
-            onClick={() => navigate("/")}
-            className="flex items-center gap-2 border-b border-border px-4 pb-4 text-left hover:bg-surface"
-            style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}
-          >
-            <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
-            <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
-          </button>
+          <div className="relative border-b border-border" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
+            <button
+              onClick={() => setWorkspaceMenuOpen((v) => !v)}
+              className="flex w-full items-center gap-2 px-4 pb-4 text-left hover:bg-surface"
+            >
+              <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
+              <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
+            </button>
+            <IOSMenu open={workspaceMenuOpen} onClose={() => setWorkspaceMenuOpen(false)} align="start" widthClassName="w-56">
+              <IOSMenuGroup>
+                <IOSMenuItem
+                  icon="settings"
+                  label="Workspace settings"
+                  onClick={() => {
+                    setWorkspaceMenuOpen(false);
+                    navigate(`/w/${workspaceId}/settings`);
+                  }}
+                />
+                <IOSMenuItem
+                  icon="board"
+                  label="Switch workspace"
+                  onClick={() => {
+                    setWorkspaceMenuOpen(false);
+                    navigate("/");
+                  }}
+                />
+              </IOSMenuGroup>
+            </IOSMenu>
+          </div>
         )}
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
@@ -259,36 +283,54 @@ function WorkspaceLayoutInner() {
           {shareToken ? (
             <span className="truncate text-sm text-ink-muted">Viewing via a shared link</span>
           ) : (
-            <button
-              onClick={() => navigate(`/w/${workspaceId}/settings`)}
-              className="flex items-center gap-2 overflow-hidden rounded-lg p-1 -m-1 text-left hover:bg-surface"
-              title="Settings"
-            >
-              {isPWA ? (
-                <Icon name="settings" className="h-5 w-5 shrink-0 text-ink-muted" />
-              ) : user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
-              ) : (
-                <span
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                  style={{ backgroundColor: user?.avatarColor }}
-                >
-                  {user?.name?.[0]}
-                </span>
-              )}
-              <span className="truncate text-sm">{isPWA ? "Settings" : user?.name}</span>
-            </button>
+            <div className="relative min-w-0">
+              <button
+                onClick={() => setAvatarMenuOpen((v) => !v)}
+                className="flex items-center gap-2 overflow-hidden rounded-lg p-1 -m-1 text-left hover:bg-surface"
+                title="Account"
+              >
+                {isPWA ? (
+                  <Icon name="settings" className="h-5 w-5 shrink-0 text-ink-muted" />
+                ) : user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                ) : (
+                  <span
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+                    style={{ backgroundColor: user?.avatarColor }}
+                  >
+                    {user?.name?.[0]}
+                  </span>
+                )}
+                <span className="truncate text-sm">{isPWA ? "Settings" : user?.name}</span>
+              </button>
+              <IOSMenu open={avatarMenuOpen} onClose={() => setAvatarMenuOpen(false)} side="top" align="start" widthClassName="w-56">
+                <IOSMenuGroup>
+                  <IOSMenuItem
+                    icon="user"
+                    label="Account settings"
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      navigate("/settings");
+                    }}
+                  />
+                  <IOSMenuItem
+                    icon="close"
+                    label="Log out"
+                    destructive
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      void handleLogout();
+                    }}
+                  />
+                </IOSMenuGroup>
+              </IOSMenu>
+            </div>
           )}
           <div className="flex items-center gap-1">
             {!shareToken && workspaceId && <NotificationBell workspaceId={workspaceId} />}
             <button onClick={toggle} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Toggle theme">
               <Icon name={theme === "dark" ? "sun" : "moon"} />
             </button>
-            {!shareToken && (
-              <button onClick={handleLogout} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Log out">
-                <Icon name="close" />
-              </button>
-            )}
           </div>
         </div>
       </aside>

@@ -16,8 +16,21 @@ import { WorkspaceHome } from "./pages/WorkspaceHome.js";
 import { ObjectTypePage } from "./pages/ObjectTypePage.js";
 import { ObjectDetailPage } from "./pages/ObjectDetailPage.js";
 import { SearchPage } from "./pages/SearchPage.js";
-import { SettingsPage } from "./pages/SettingsPage.js";
+import { AccountSettingsPage } from "./pages/AccountSettingsPage.js";
+import { WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage.js";
 import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
+import { ProfileSettings } from "./components/settings/ProfileSettings.js";
+import { SecuritySettings } from "./components/settings/SecuritySettings.js";
+import { NotificationSettingsTab } from "./components/settings/NotificationSettingsTab.js";
+import { ApiKeysSettingsTab } from "./components/settings/ApiKeysSettingsTab.js";
+import { IntegrationsSettings } from "./components/settings/IntegrationsSettings.js";
+import { WorkspaceGeneralSettings } from "./components/settings/WorkspaceGeneralSettings.js";
+import { WorkspaceMembersSettings } from "./components/settings/WorkspaceMembersSettings.js";
+import { WorkspaceSharingSettings } from "./components/settings/WorkspaceSharingSettings.js";
+import { WorkspaceAiSettingsTab } from "./components/settings/WorkspaceAiSettingsTab.js";
+import { WorkspaceWebhooksSettingsTab } from "./components/settings/WorkspaceWebhooksSettingsTab.js";
+import { WorkspaceBackupSettingsTab } from "./components/settings/WorkspaceBackupSettingsTab.js";
+import { WorkspaceDangerZoneSettings } from "./components/settings/WorkspaceDangerZoneSettings.js";
 import { ChatBubble } from "./components/chat/ChatBubble.js";
 import { ChatSheet } from "./components/chat/ChatSheet.js";
 import { CallView } from "./components/calls/CallView.js";
@@ -102,6 +115,21 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/settings"
+        element={
+          <RequireAuth>
+            <AccountSettingsPage />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Navigate to="profile" replace />} />
+        <Route path="profile" element={<ProfileSettings />} />
+        <Route path="security" element={<SecuritySettings />} />
+        <Route path="notifications" element={<NotificationSettingsTab />} />
+        <Route path="api-keys" element={<ApiKeysSettingsTab />} />
+        <Route path="integrations" element={<IntegrationsSettings />} />
+      </Route>
+      <Route
         path="/messages"
         element={
           <RequireAuth>
@@ -129,7 +157,16 @@ function AppRoutes() {
         <Route path="types/:objectTypeKey" element={<ObjectTypePage />} />
         <Route path="objects/:objectId" element={<ObjectDetailPage />} />
         <Route path="search" element={<SearchPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings" element={<WorkspaceSettingsPage />}>
+          <Route index element={<Navigate to="general" replace />} />
+          <Route path="general" element={<WorkspaceGeneralSettings />} />
+          <Route path="members" element={<WorkspaceMembersSettings />} />
+          <Route path="sharing" element={<WorkspaceSharingSettings />} />
+          <Route path="ai" element={<WorkspaceAiSettingsTab />} />
+          <Route path="webhooks" element={<WorkspaceWebhooksSettingsTab />} />
+          <Route path="backup" element={<WorkspaceBackupSettingsTab />} />
+          <Route path="danger-zone" element={<WorkspaceDangerZoneSettings />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
