@@ -375,12 +375,16 @@ function WorkspaceLayoutInner() {
             first (undismissed) showing. */}
         <main
           ref={mainRef}
-          // `overscroll-contain` - without it, iOS's rubber-band bounce past
-          // the true scroll end briefly overshoots main's own bottom edge,
-          // exposing whatever sits behind it (the fixed bottom fade/pill
-          // don't move with the bounce, so content could flash past their
-          // straight edge) instead of just resisting at the boundary.
-          className="min-w-0 flex-1 overflow-y-auto overscroll-contain"
+          // `overscroll-none` (not just `-contain`) - without it, iOS's
+          // rubber-band bounce past the true scroll end briefly overshoots
+          // main's own bottom edge, exposing whatever sits behind it (the
+          // fixed bottom fade/pill don't move with the bounce, so content
+          // could flash past their straight edge) instead of just resisting
+          // at the boundary. Also a class here, not just globals.css's
+          // app-wide `*` rule, since a class selector otherwise wins the
+          // specificity fight against that universal one and would silently
+          // downgrade this element back to `contain`.
+          className="min-w-0 flex-1 overflow-y-auto overscroll-none"
           style={{
             ...(showMobileHeader
               ? { paddingTop: "var(--mobile-header-h)" }
