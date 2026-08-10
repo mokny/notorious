@@ -53,6 +53,10 @@ function clampTranslate(scale: number, x: number, y: number, container: HTMLElem
  */
 export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProps) {
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
+  // Only the double-tap/double-click snap should animate - pan/pinch/wheel
+  // already fire one update per input event, so transitioning each of those
+  // too makes the image visibly lag a step behind the finger/cursor.
+  const [smooth, setSmooth] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinchStartRef = useRef<{ dist: number; scale: number } | null>(null);
@@ -78,6 +82,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
   }, [index, images.length, hasMultiple, onIndexChange]);
 
   function toggleZoom(clientX: number, clientY: number) {
+    setSmooth(true);
     setTransform((t) => {
       if (t.scale > 1) return { scale: 1, x: 0, y: 0 };
       const rect = containerRef.current?.getBoundingClientRect();
@@ -90,6 +95,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
   function onPointerDown(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture?.(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    setSmooth(false);
 
     if (pointers.current.size === 2) {
       swipeStartXRef.current = null;
@@ -149,6 +155,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
 
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
+    setSmooth(false);
     const rect = containerRef.current?.getBoundingClientRect();
     const cx = rect ? e.clientX - rect.left - rect.width / 2 : 0;
     const cy = rect ? e.clientY - rect.top - rect.height / 2 : 0;
@@ -193,7 +200,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
             onWheel={onWheel}
             onDoubleClick={onDoubleClick}
             style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}
-            className={`max-h-full max-w-full touch-none rounded-lg object-contain transition-transform duration-100 ${
+            className={`max-h-full max-w-full touch-none rounded-lg object-contain ${smooth ? "transition-transform duration-150" : ""} ${
               transform.scale > 1 ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
             }`}
           />
