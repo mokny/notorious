@@ -33,12 +33,25 @@ export function useKeyboardInset(): KeyboardInset {
         offsetTop: vv!.offsetTop,
       });
     }
+    // visualViewport's own resize/scroll events don't fire on app
+    // relaunch, so if the app was last backgrounded with the keyboard open,
+    // `bottom` can stay stuck at that stale non-zero value after resume -
+    // the bottom pill then renders mid-screen instead of at the true
+    // bottom. Recompute on resume too; a rAF delay gives the OS a tick to
+    // settle visualViewport before trusting it.
+    function onResume() {
+      requestAnimationFrame(update);
+    }
     update();
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("pageshow", onResume);
     return () => {
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("pageshow", onResume);
     };
   }, []);
   return state;

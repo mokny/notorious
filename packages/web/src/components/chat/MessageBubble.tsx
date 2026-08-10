@@ -4,6 +4,7 @@ import type { Message, CallSummary } from "@notorious/shared";
 import { chatApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { Icon } from "../ui/Icon.js";
+import { Lightbox } from "../ui/Lightbox.js";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -57,8 +58,11 @@ export function MessageBubble({
   const isOwn = message.authorId === user?.id;
 
   const [showPicker, setShowPicker] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  const imageAttachments = message.attachments.filter((a) => a.mimeType.startsWith("image/"));
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["chatMessages", conversationId] });
 
@@ -153,7 +157,16 @@ export function MessageBubble({
               {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
               {message.attachments.map((attachment) =>
                 attachment.mimeType.startsWith("image/") ? (
-                  <img key={attachment.id} src={chatApi.attachmentUrl(attachment.id)} alt={attachment.filename} className="mt-1 max-h-64 rounded-lg" />
+                  <button
+                    key={attachment.id}
+                    type="button"
+                    onClick={() =>
+                      setLightboxIndex(imageAttachments.findIndex((a) => a.id === attachment.id))
+                    }
+                    className="mt-1 block cursor-zoom-in"
+                  >
+                    <img src={chatApi.attachmentUrl(attachment.id)} alt={attachment.filename} className="max-h-64 rounded-lg" />
+                  </button>
                 ) : (
                   <a
                     key={attachment.id}
@@ -166,6 +179,14 @@ export function MessageBubble({
                     {attachment.filename}
                   </a>
                 ),
+              )}
+              {lightboxIndex !== null && (
+                <Lightbox
+                  images={imageAttachments.map((a) => ({ src: chatApi.attachmentUrl(a.id), alt: a.filename, downloadName: a.filename }))}
+                  index={lightboxIndex}
+                  onIndexChange={setLightboxIndex}
+                  onClose={() => setLightboxIndex(null)}
+                />
               )}
             </>
           )}

@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
 import type { ImageContent, VideoContent, EmbedContent } from "@notorious/shared";
 import { fileApi } from "../../../lib/api/resources.js";
 import { withShareToken } from "../../../lib/api/shareMode.js";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { useExportMode } from "../../../lib/export/exportMode.js";
 import { Icon } from "../../ui/Icon.js";
+import { Lightbox } from "../../ui/Lightbox.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 import { HighlightedText } from "../HighlightedText.js";
 
@@ -47,43 +47,26 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
     return (
       <figure>
         <div className="group relative">
-          <Dialog.Root open={lightboxOpen} onOpenChange={setLightboxOpen}>
-            <Dialog.Trigger asChild>
-              <button
-                type="button"
-                title="Click to enlarge"
-                // A view action, not an edit - stays clickable even while the
-                // object is locked (see readOnlyContent.ts's blanket
-                // `button:not([data-view-toggle])` rule).
-                data-view-toggle
-                className="block w-full cursor-zoom-in"
-              >
-                <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
-              </button>
-            </Dialog.Trigger>
-            <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-40 bg-black/80" />
-              {/* Clicking anywhere (including the image itself) closes it again, matching the trigger's "click to enlarge" - a second, explicit close button covers anyone who'd rather not guess. */}
-              <Dialog.Content
-                onClick={() => setLightboxOpen(false)}
-                className="fixed inset-0 z-50 flex items-center justify-center p-8 outline-none"
-              >
-                <Dialog.Title className="sr-only">{content.caption || "Image"}</Dialog.Title>
-                <img
-                  src={withShareToken(content.url)}
-                  alt={content.caption ?? ""}
-                  className="max-h-full max-w-full cursor-zoom-out rounded-lg object-contain"
-                />
-                <Dialog.Close
-                  title="Close"
-                  data-view-toggle
-                  className="fixed right-4 top-4 rounded-md bg-black/40 p-2 text-white hover:bg-black/60"
-                >
-                  <Icon name="close" className="h-5 w-5" />
-                </Dialog.Close>
-              </Dialog.Content>
-            </Dialog.Portal>
-          </Dialog.Root>
+          <button
+            type="button"
+            title="Click to enlarge"
+            // A view action, not an edit - stays clickable even while the
+            // object is locked (see readOnlyContent.ts's blanket
+            // `button:not([data-view-toggle])` rule).
+            data-view-toggle
+            onClick={() => setLightboxOpen(true)}
+            className="block w-full cursor-zoom-in"
+          >
+            <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
+          </button>
+          {lightboxOpen && (
+            <Lightbox
+              images={[{ src: withShareToken(content.url), alt: content.caption ?? "" }]}
+              index={0}
+              onIndexChange={() => {}}
+              onClose={() => setLightboxOpen(false)}
+            />
+          )}
           {/* A view action, not an edit - stays reachable while the object
               is locked. readOnlyContent.ts's lock only disables input/
               textarea/select/button/contenteditable/canvas, so an `<a>`
