@@ -13,6 +13,35 @@ rather let people sign themselves up.
 Want to run it yourself? Follow [Quick start](#quick-start-local-development) below for local
 development, or [Installing on your own Linux server](#installing-on-your-own-linux-server) to deploy it.
 
+## Features
+
+- **Objects & data model** - ten built-in object types (Note, Project, Task, Person, Book, Meeting,
+  Company, File, Database, Collection) plus custom types; 20 property kinds (Text, Number, Date,
+  Tag/MultiTag, Select, Rating, Relation, Formula, Rollup, ...); relations with automatic backlinks;
+  sub-objects and archiving
+- **Block editor** - paragraphs, headings, quotes, callouts, toggles, checklists, tables, code blocks,
+  math, Mermaid diagrams, columns, bookmarks, maps, whiteboard, polls, and embedded image/video/audio/PDF
+  blocks; markdown import/export; "linked database" blocks embedding a live saved view
+- **Six view types** - Table, Board (Kanban), Calendar, Timeline, Gallery and List over the same
+  object data, each with filters and sorts
+- **Templating & scripting** - a templating language for text fields with live queries over other
+  objects, plus sandboxed per-object JavaScript for custom calculations and change-triggered automations
+- **Full-text & fuzzy search** - SQLite FTS5 search with typo-tolerant fallback matching
+- **Live sync & collaboration** - multi-user workspaces with viewer/commenter/editor/owner roles,
+  WebSocket-based live sync, presence indicators, comments, and workspace channels plus 1:1 chat with
+  reactions, replies, typing indicators and read receipts
+- **Audio/video calls** - WebRTC calling with mic/camera/speaker device switching, gain controls, a
+  pre-join lobby, and a minimizable in-call window
+- **Sharing & API access** - shareable public links per object with configurable access level, and
+  personal API keys for programmatic access
+- **AI agent & MCP server** - an in-app chat agent that can search, create, update and archive objects
+  using your own OpenAI/Anthropic/Gemini-compatible key, plus a built-in MCP server for external MCP
+  clients (Claude Desktop, Claude Code, ...)
+- **Installable PWA** - responsive install on desktop and mobile, with Web Push notifications and
+  deep links
+- **Security & ops** - two-factor authentication, session/API-key auth with per-workspace role checks,
+  per-workspace ZIP backups, and webhooks for outbound events
+
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - how the system is put together and why
