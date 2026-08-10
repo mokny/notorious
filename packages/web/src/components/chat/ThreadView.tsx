@@ -263,7 +263,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
             </button>
           ) : (
             <button
-              onClick={() => void (activeCall ? call.joinCall(activeCall.callId, conversationId) : call.startCall(conversationId))}
+              onClick={() => (activeCall ? call.requestJoinCall(activeCall.callId, conversationId) : call.requestStartCall(conversationId))}
               disabled={call.phase !== "idle"}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-40"
               title="Call"
@@ -281,7 +281,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
           </span>
           <div className="flex shrink-0 items-center gap-2">
             <button
-              onClick={() => void call.joinCall(activeCall.callId, conversationId)}
+              onClick={() => call.requestJoinCall(activeCall.callId, conversationId)}
               disabled={call.phase !== "idle"}
               className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white hover:opacity-90 disabled:opacity-50"
               title="Join call"

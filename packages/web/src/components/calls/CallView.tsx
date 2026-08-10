@@ -4,6 +4,7 @@ import { useCall, type CallPeer } from "../../context/CallContext.js";
 import { chatApi } from "../../lib/api/resources.js";
 import { ChatAvatar } from "../chat/ChatAvatar.js";
 import { Icon } from "../ui/Icon.js";
+import { CallSettingsPanel } from "./CallSettingsPanel.js";
 
 function useParticipantInfo(conversationId: string | null, userId: string): { name: string; avatarColor: string; avatarUrl?: string | null } {
   const { data: conversations } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations, enabled: Boolean(conversationId) });
@@ -41,31 +42,98 @@ function VideoTile({ stream, name, avatarColor, avatarUrl, muted }: { stream: Me
 
 function PeerTile({ peer, conversationId }: { peer: CallPeer; conversationId: string | null }) {
   const info = useParticipantInfo(conversationId, peer.userId);
-  return <VideoTile stream={peer.stream} name={info.name} avatarColor={info.avatarColor} avatarUrl={info.avatarUrl} />;
+  // Muted - all peer audio plays through the single shared CallAudioSink
+  // below instead of per-tile <video> playback, so the output-volume slider
+  // (a single global control, not per-peer) and speaker-device switching
+  // only ever have one audio element to manage.
+  return <VideoTile stream={peer.stream} name={info.name} avatarColor={info.avatarColor} avatarUrl={info.avatarUrl} muted />;
 }
 
-function PeerAudioTrack({ peer }: { peer: CallPeer }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.srcObject = peer.stream;
-  }, [peer.stream]);
-  return <audio ref={audioRef} autoPlay className="sr-only" />;
+function peerKey(peer: CallPeer): string {
+  return `${peer.userId}:${peer.clientId}`;
 }
 
 /**
- * The full view's VideoTile grid doubles as the audio player (each peer's
- * non-muted <video>) - once that grid unmounts for the minimized bubble,
- * peer audio would otherwise go silent. These invisible <audio> elements
- * keep every peer's audio track playing while minimized.
+ * The one and only place peer audio actually plays back - every peer's
+ * MediaStream is mixed into a single shared Web Audio graph (each peer's own
+ * MediaStreamAudioSourceNode -> one shared GainNode -> one
+ * MediaStreamAudioDestinationNode), whose combined output plays through this
+ * single hidden <audio> element. That keeps the output-volume slider genuinely
+ * global (one GainNode, not one per peer) and boostable above 100% (native
+ * HTMLMediaElement.volume clamps to 1, a GainNode doesn't), and means
+ * speaker-device switching (`setSinkId`) only ever needs to touch this one
+ * element instead of every peer's video tile. Always mounted (not just while
+ * minimized, unlike the old PeerAudioSink) since VideoTile no longer plays
+ * peer audio itself.
  */
-function PeerAudioSink({ peers }: { peers: CallPeer[] }) {
-  return (
-    <>
-      {peers.map((peer) => (
-        <PeerAudioTrack key={`${peer.userId}:${peer.clientId}`} peer={peer} />
-      ))}
-    </>
-  );
+function CallAudioSink({ peers }: { peers: CallPeer[] }) {
+  const { outputVolume, speakerDeviceId } = useCall();
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const contextRef = useRef<AudioContext | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const sourcesRef = useRef<Map<string, { stream: MediaStream; node: MediaStreamAudioSourceNode }>>(new Map());
+
+  useEffect(() => {
+    const AudioContextCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const context = new AudioContextCtor();
+    const gain = context.createGain();
+    const destination = context.createMediaStreamDestination();
+    gain.connect(destination);
+    contextRef.current = context;
+    gainRef.current = gain;
+    if (audioRef.current) audioRef.current.srcObject = destination.stream;
+    const sources = sourcesRef.current;
+    return () => {
+      for (const { node } of sources.values()) node.disconnect();
+      sources.clear();
+      gain.disconnect();
+      destination.disconnect();
+      void context.close().catch(() => {});
+    };
+  }, []);
+
+  useEffect(() => {
+    if (gainRef.current) gainRef.current.gain.value = outputVolume;
+  }, [outputVolume]);
+
+  useEffect(() => {
+    const context = contextRef.current;
+    const gain = gainRef.current;
+    if (!context || !gain) return;
+
+    const currentKeys = new Set(peers.map(peerKey));
+    for (const [key, entry] of sourcesRef.current) {
+      if (!currentKeys.has(key)) {
+        entry.node.disconnect();
+        sourcesRef.current.delete(key);
+      }
+    }
+
+    for (const peer of peers) {
+      const key = peerKey(peer);
+      const existing = sourcesRef.current.get(key);
+      if (!peer.stream || peer.stream.getAudioTracks().length === 0) {
+        if (existing) {
+          existing.node.disconnect();
+          sourcesRef.current.delete(key);
+        }
+        continue;
+      }
+      if (existing?.stream === peer.stream) continue;
+      existing?.node.disconnect();
+      const node = context.createMediaStreamSource(peer.stream);
+      node.connect(gain);
+      sourcesRef.current.set(key, { stream: peer.stream, node });
+    }
+  }, [peers]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || typeof el.setSinkId !== "function" || !speakerDeviceId) return;
+    el.setSinkId(speakerDeviceId).catch(() => {});
+  }, [speakerDeviceId]);
+
+  return <audio ref={audioRef} autoPlay className="sr-only" />;
 }
 
 function useCallDuration(): string {
@@ -120,13 +188,14 @@ function MinimizedCallBubble() {
  */
 export function CallView() {
   const { phase, localStream, peers, cameraOn, screenSharing, micOn, minimized, conversationId, leaveCall, toggleCamera, toggleScreenShare, toggleMic, setMinimized } = useCall();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (phase !== "active") return null;
   if (minimized) {
     return (
       <>
         <MinimizedCallBubble />
-        <PeerAudioSink peers={peers} />
+        <CallAudioSink peers={peers} />
       </>
     );
   }
@@ -140,7 +209,10 @@ export function CallView() {
         ))}
       </div>
 
-      <div className="flex items-center justify-center gap-3 p-4">
+      <CallAudioSink peers={peers} />
+
+      <div className="relative flex items-center justify-center gap-3 p-4">
+        {settingsOpen && <CallSettingsPanel onClose={() => setSettingsOpen(false)} />}
         <button
           onClick={() => void toggleMic()}
           className={`flex h-12 w-12 items-center justify-center rounded-full ${micOn ? "bg-surface-raised text-ink" : "bg-surface-raised text-ink-muted"}`}
@@ -161,6 +233,13 @@ export function CallView() {
           title={screenSharing ? "Stop sharing screen" : "Share screen"}
         >
           <Icon name={screenSharing ? "screen-share" : "screen-share-off"} className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => setSettingsOpen((open) => !open)}
+          className={`flex h-12 w-12 items-center justify-center rounded-full ${settingsOpen ? "bg-accent text-white" : "bg-surface-raised text-ink-muted"}`}
+          title="Call settings"
+        >
+          <Icon name="settings" className="h-5 w-5" />
         </button>
         <button
           onClick={() => setMinimized(true)}

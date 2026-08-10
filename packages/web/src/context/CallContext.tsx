@@ -4,10 +4,11 @@ import type { types as MediasoupClientTypes } from "mediasoup-client";
 import type { ProducerSource } from "@notorious/shared";
 import { callApi } from "../lib/api/resources.js";
 import { clientId as myClientId } from "../lib/ws/clientId.js";
+import { getCallPreferences, setCallPreferences } from "../lib/callPreferences.js";
 import { useAuth } from "./AuthContext.js";
 import { useChatRealtime } from "./ChatRealtimeContext.js";
 
-export type CallPhase = "idle" | "ringing-incoming" | "active";
+export type CallPhase = "idle" | "pre-join" | "ringing-incoming" | "active";
 
 export interface IncomingCall {
   callId: string;
@@ -16,10 +17,22 @@ export interface IncomingCall {
   initiatorName: string;
 }
 
+export interface PreJoinRequest {
+  mode: "start" | "join";
+  conversationId: string;
+  /** Only set for `mode: "join"` - an already-active call being joined. */
+  callId?: string;
+}
+
 export interface CallPeer {
   userId: string;
   clientId: string;
   stream: MediaStream | null;
+}
+
+interface JoinOptions {
+  /** Set when the pre-join lobby had the camera on at confirm time - see PreJoinLobby.tsx. Ignored by the immediate-connect paths (acceptIncoming, the push deep-link). */
+  cameraOn?: boolean;
 }
 
 interface CallContextValue {
@@ -27,14 +40,15 @@ interface CallContextValue {
   callId: string | null;
   conversationId: string | null;
   incoming: IncomingCall | null;
+  preJoin: PreJoinRequest | null;
   localStream: MediaStream | null;
   peers: CallPeer[];
   cameraOn: boolean;
   screenSharing: boolean;
   micOn: boolean;
   minimized: boolean;
-  startCall: (conversationId: string) => Promise<void>;
-  joinCall: (callId: string, conversationId: string) => Promise<void>;
+  startCall: (conversationId: string, options?: JoinOptions) => Promise<void>;
+  joinCall: (callId: string, conversationId: string, options?: JoinOptions) => Promise<void>;
   acceptIncoming: () => Promise<void>;
   declineIncoming: () => void;
   leaveCall: () => Promise<void>;
@@ -44,6 +58,26 @@ interface CallContextValue {
   setMinimized: (minimized: boolean) => void;
   ignoreActiveCall: (callId: string) => void;
   isCallIgnored: (callId: string) => boolean;
+  // Pre-join lobby (see PreJoinLobby.tsx) - the phone button in ThreadView
+  // routes through these instead of calling startCall/joinCall directly, so
+  // the callee isn't rung (and no producers are created) until the user
+  // confirms device choices in the lobby.
+  requestStartCall: (conversationId: string) => void;
+  requestJoinCall: (callId: string, conversationId: string) => void;
+  cancelPreJoin: () => void;
+  confirmPreJoin: (options?: JoinOptions) => Promise<void>;
+  // Device selection + volume, all persisted via callPreferences.ts and
+  // applied live if a call is currently active (see switchMicDevice etc.).
+  micDeviceId: string | undefined;
+  cameraDeviceId: string | undefined;
+  speakerDeviceId: string | undefined;
+  micGain: number;
+  outputVolume: number;
+  setMicDevice: (deviceId: string) => Promise<void>;
+  setCameraDevice: (deviceId: string) => Promise<void>;
+  setSpeakerDevice: (deviceId: string) => void;
+  setMicGain: (gain: number) => void;
+  setOutputVolume: (volume: number) => void;
 }
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -91,6 +125,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [micOn, setMicOn] = useState(true);
   const [minimized, setMinimized] = useState(false);
   const [ignoredCallIds, setIgnoredCallIds] = useState<Set<string>>(new Set());
+  const [preJoin, setPreJoin] = useState<PreJoinRequest | null>(null);
+
+  const initialPrefs = useRef(getCallPreferences()).current;
+  const [micDeviceId, setMicDeviceId] = useState<string | undefined>(initialPrefs.micDeviceId);
+  const [cameraDeviceId, setCameraDeviceId] = useState<string | undefined>(initialPrefs.cameraDeviceId);
+  const [speakerDeviceId, setSpeakerDeviceId] = useState<string | undefined>(initialPrefs.speakerDeviceId);
+  const [micGain, setMicGainState] = useState(initialPrefs.micGain);
+  const [outputVolume, setOutputVolumeState] = useState(initialPrefs.outputVolume);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -104,6 +146,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const callIdRef = useRef<string | null>(null);
   const ringtoneRef = useRef<{ stop: () => void } | null>(null);
+  const preJoinRef = useRef<PreJoinRequest | null>(null);
+  const micDeviceIdRef = useRef<string | undefined>(initialPrefs.micDeviceId);
+  const cameraDeviceIdRef = useRef<string | undefined>(initialPrefs.cameraDeviceId);
+  const micGainRef = useRef(initialPrefs.micGain);
+  // The outgoing gain pipeline (AudioContext -> MediaStreamAudioSourceNode
+  // from the raw mic track -> GainNode -> MediaStreamAudioDestinationNode) -
+  // the producer sends the *destination* node's track, so gain is baked into
+  // what peers receive rather than being a local-only monitoring effect.
+  // Rebuilt from scratch whenever the mic device is switched.
+  const micPipelineRef = useRef<{ context: AudioContext; source: MediaStreamAudioSourceNode; gain: GainNode; destination: MediaStreamAudioDestinationNode; rawTrack: MediaStreamTrack } | null>(null);
+  const micProcessedTrackRef = useRef<MediaStreamTrack | null>(null);
   const handledRingingCallIdRef = useRef<string | null>(null);
   // Bumped by leaveCall/onCallEnded and at the start of every joinCall -
   // lets an in-flight joinCall notice it's been superseded (e.g. the user
@@ -163,6 +216,34 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setPeers([]);
   }
 
+  function disposeMicPipeline(): void {
+    const pipeline = micPipelineRef.current;
+    if (!pipeline) return;
+    pipeline.source.disconnect();
+    pipeline.gain.disconnect();
+    pipeline.destination.disconnect();
+    pipeline.destination.stream.getTracks().forEach((track) => track.stop());
+    void pipeline.context.close().catch(() => {});
+    micPipelineRef.current = null;
+    micProcessedTrackRef.current = null;
+  }
+
+  /** (Re)builds the outgoing gain pipeline from whichever raw mic track is currently active - see `micPipelineRef`'s doc comment. Returns the processed track the producer should actually send. */
+  function buildMicPipeline(rawTrack: MediaStreamTrack, gainValue: number): MediaStreamTrack {
+    disposeMicPipeline();
+    const AudioContextCtor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const context = new AudioContextCtor();
+    const source = context.createMediaStreamSource(new MediaStream([rawTrack]));
+    const gain = context.createGain();
+    gain.gain.value = gainValue;
+    const destination = context.createMediaStreamDestination();
+    source.connect(gain).connect(destination);
+    micPipelineRef.current = { context, source, gain, destination, rawTrack };
+    const processedTrack = destination.stream.getAudioTracks()[0]!;
+    micProcessedTrackRef.current = processedTrack;
+    return processedTrack;
+  }
+
   function resetLocalTracks(): void {
     sendTransportRef.current?.close();
     recvTransportRef.current?.close();
@@ -170,6 +251,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     recvTransportRef.current = null;
     deviceRef.current = null;
     localProducersRef.current.clear();
+    disposeMicPipeline();
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
@@ -237,11 +319,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
     stopRingtone();
   }
 
-  async function joinCall(newCallId: string, newConversationId: string): Promise<void> {
+  async function joinCall(newCallId: string, newConversationId: string, options?: JoinOptions): Promise<void> {
     const myGeneration = (joinGenerationRef.current += 1);
     const supersededByLeave = () => joinGenerationRef.current !== myGeneration;
 
-    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const preferredMicDeviceId = micDeviceIdRef.current;
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: preferredMicDeviceId ? { deviceId: { exact: preferredMicDeviceId } } : true,
+      video: false,
+    });
     if (supersededByLeave()) {
       micStream.getTracks().forEach((track) => track.stop());
       return;
@@ -291,11 +377,30 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
     const micTrack = micStream.getAudioTracks()[0];
     if (micTrack) {
+      const processedTrack = buildMicPipeline(micTrack, micGainRef.current);
       // stopTracks: false - toggleMic() below mutes by swapping the
       // producer's track to null and back (see its comment for why), which
       // would otherwise permanently kill this track on the first mute.
-      const micProducer = await sendTransport.produce({ track: micTrack, appData: { source: "mic" satisfies ProducerSource }, stopTracks: false });
+      const micProducer = await sendTransport.produce({ track: processedTrack, appData: { source: "mic" satisfies ProducerSource }, stopTracks: false });
       localProducersRef.current.set("mic", micProducer);
+    }
+
+    if (options?.cameraOn) {
+      const preferredCameraDeviceId = cameraDeviceIdRef.current;
+      const camStream = await navigator.mediaDevices.getUserMedia({
+        video: preferredCameraDeviceId ? { deviceId: { exact: preferredCameraDeviceId } } : true,
+      });
+      const camTrack = camStream.getVideoTracks()[0];
+      if (camTrack && !supersededByLeave()) {
+        const cameraProducer = await sendTransport.produce({ track: camTrack, appData: { source: "camera" satisfies ProducerSource } });
+        localProducersRef.current.set("camera", cameraProducer);
+        localVideoTrackRef.current = camTrack;
+        localStreamRef.current?.addTrack(camTrack);
+        setLocalStream(localStreamRef.current ? new MediaStream(localStreamRef.current.getTracks()) : null);
+        setCameraOn(true);
+      } else {
+        camStream.getTracks().forEach((track) => track.stop());
+      }
     }
 
     const existingProducers = await callApi.listProducers(newCallId, myClientId);
@@ -318,9 +423,43 @@ export function CallProvider({ children }: { children: ReactNode }) {
     enterActiveCall(newCallId, newConversationId);
   }
 
-  async function startCall(newConversationId: string): Promise<void> {
+  async function startCall(newConversationId: string, options?: JoinOptions): Promise<void> {
     const call = await callApi.start(newConversationId);
-    await joinCall(call.id, newConversationId);
+    await joinCall(call.id, newConversationId, options);
+  }
+
+  function requestStartCall(newConversationId: string): void {
+    if (phase !== "idle") return;
+    const request: PreJoinRequest = { mode: "start", conversationId: newConversationId };
+    preJoinRef.current = request;
+    setPreJoin(request);
+    setPhase("pre-join");
+  }
+
+  function requestJoinCall(newCallId: string, newConversationId: string): void {
+    if (phase !== "idle") return;
+    const request: PreJoinRequest = { mode: "join", conversationId: newConversationId, callId: newCallId };
+    preJoinRef.current = request;
+    setPreJoin(request);
+    setPhase("pre-join");
+  }
+
+  function cancelPreJoin(): void {
+    preJoinRef.current = null;
+    setPreJoin(null);
+    setPhase("idle");
+  }
+
+  async function confirmPreJoin(options?: JoinOptions): Promise<void> {
+    const request = preJoinRef.current;
+    if (!request) return;
+    preJoinRef.current = null;
+    setPreJoin(null);
+    if (request.mode === "start") {
+      await startCall(request.conversationId, options);
+    } else if (request.callId) {
+      await joinCall(request.callId, request.conversationId, options);
+    }
   }
 
   async function acceptIncoming(): Promise<void> {
@@ -347,7 +486,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   async function toggleMic(): Promise<void> {
     const micProducer = localProducersRef.current.get("mic");
-    const track = localStreamRef.current?.getAudioTracks()[0];
+    const track = micProcessedTrackRef.current;
     if (!micProducer || !track) return;
     // Swap the track to/from null on the producer itself, rather than
     // track.enabled - on some iOS Safari versions, setting enabled = false
@@ -358,12 +497,77 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setMicOn(nextMicOn);
   }
 
+  /** Acquires a fresh mic track from `deviceId` and swaps it into the existing producer via `replaceTrack` - no renegotiation, no leaving/rejoining. A no-op on device id (just persisted) if no call is active yet, e.g. chosen from the pre-join lobby. */
+  async function setMicDevice(deviceId: string): Promise<void> {
+    micDeviceIdRef.current = deviceId;
+    setMicDeviceId(deviceId);
+    setCallPreferences({ micDeviceId: deviceId });
+
+    const micProducer = localProducersRef.current.get("mic");
+    if (!micProducer) return;
+    const newStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } }, video: false });
+    const newRawTrack = newStream.getAudioTracks()[0];
+    if (!newRawTrack) return;
+
+    const oldRawTrack = localStreamRef.current?.getAudioTracks()[0];
+    if (oldRawTrack) {
+      localStreamRef.current?.removeTrack(oldRawTrack);
+      oldRawTrack.stop();
+    }
+    localStreamRef.current?.addTrack(newRawTrack);
+    setLocalStream(localStreamRef.current ? new MediaStream(localStreamRef.current.getTracks()) : null);
+
+    const processedTrack = buildMicPipeline(newRawTrack, micGainRef.current);
+    if (micOn) await micProducer.replaceTrack({ track: processedTrack });
+  }
+
+  /** Acquires a fresh camera track from `deviceId` and swaps it into the existing producer via `replaceTrack`, same idea as `setMicDevice`. A no-op beyond persisting the id if the camera is currently off - the next `toggleCamera` picks it up. */
+  async function setCameraDevice(deviceId: string): Promise<void> {
+    cameraDeviceIdRef.current = deviceId;
+    setCameraDeviceId(deviceId);
+    setCallPreferences({ cameraDeviceId: deviceId });
+
+    const cameraProducer = localProducersRef.current.get("camera");
+    if (!cameraProducer || !localVideoTrackRef.current) return;
+    const newStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } } });
+    const newTrack = newStream.getVideoTracks()[0];
+    if (!newTrack) return;
+
+    const oldTrack = localVideoTrackRef.current;
+    localStreamRef.current?.removeTrack(oldTrack);
+    oldTrack.stop();
+    localStreamRef.current?.addTrack(newTrack);
+    localVideoTrackRef.current = newTrack;
+    setLocalStream(localStreamRef.current ? new MediaStream(localStreamRef.current.getTracks()) : null);
+    await cameraProducer.replaceTrack({ track: newTrack });
+  }
+
+  function setSpeakerDevice(deviceId: string): void {
+    setSpeakerDeviceId(deviceId);
+    setCallPreferences({ speakerDeviceId: deviceId });
+  }
+
+  function setMicGain(gain: number): void {
+    micGainRef.current = gain;
+    setMicGainState(gain);
+    setCallPreferences({ micGain: gain });
+    if (micPipelineRef.current) micPipelineRef.current.gain.gain.value = gain;
+  }
+
+  function setOutputVolume(volume: number): void {
+    setOutputVolumeState(volume);
+    setCallPreferences({ outputVolume: volume });
+  }
+
   async function toggleCamera(): Promise<void> {
     const currentCallId = callIdRef.current;
     const sendTransport = sendTransportRef.current;
     if (!localVideoTrackRef.current) {
       if (!currentCallId || !sendTransport) return;
-      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const preferredCameraDeviceId = cameraDeviceIdRef.current;
+      const camStream = await navigator.mediaDevices.getUserMedia({
+        video: preferredCameraDeviceId ? { deviceId: { exact: preferredCameraDeviceId } } : true,
+      });
       const track = camStream.getVideoTracks()[0];
       if (!track) return;
       const producer = await sendTransport.produce({ track, appData: { source: "camera" satisfies ProducerSource } });
@@ -517,6 +721,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
           return null;
         });
       }),
+    // `closeAllRemote`/`resetLocalTracks` intentionally omitted - like
+    // `consumeRemoteProducer` above, these close over refs/setState setters,
+    // not this render's props/state, and including them would just
+    // resubscribe this listener on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [onCallEnded],
   );
 
@@ -555,6 +764,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callId,
     conversationId,
     incoming,
+    preJoin,
     localStream,
     peers,
     cameraOn,
@@ -572,6 +782,20 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setMinimized,
     ignoreActiveCall,
     isCallIgnored,
+    requestStartCall,
+    requestJoinCall,
+    cancelPreJoin,
+    confirmPreJoin,
+    micDeviceId,
+    cameraDeviceId,
+    speakerDeviceId,
+    micGain,
+    outputVolume,
+    setMicDevice,
+    setCameraDevice,
+    setSpeakerDevice,
+    setMicGain,
+    setOutputVolume,
   };
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;

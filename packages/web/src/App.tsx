@@ -35,6 +35,7 @@ import { ChatBubble } from "./components/chat/ChatBubble.js";
 import { ChatSheet } from "./components/chat/ChatSheet.js";
 import { CallView } from "./components/calls/CallView.js";
 import { IncomingCallBanner } from "./components/calls/IncomingCallBanner.js";
+import { PreJoinLobby } from "./components/calls/PreJoinLobby.js";
 import { ChatListPage } from "./pages/ChatListPage.js";
 import { ChatThreadPage } from "./pages/ChatThreadPage.js";
 
@@ -76,6 +77,7 @@ export function App() {
           <ChatSheet />
           <CallView />
           <IncomingCallBanner />
+          <PreJoinLobby />
         </ChatOverlayProvider>
       </CallProvider>
     </ChatRealtimeProvider>
