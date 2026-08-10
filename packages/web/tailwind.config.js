@@ -30,6 +30,7 @@ export default {
           DEFAULT: "rgb(var(--accent) / <alpha-value>)",
         },
         border: "rgb(var(--border) / <alpha-value>)",
+        "chat-bubble": "rgb(var(--chat-bubble) / <alpha-value>)",
       },
       borderRadius: {
         xl: "0.875rem",

@@ -9,6 +9,10 @@
   --ink-muted: 100 116 139;
   --accent: 99 102 241;
   --border: 226 232 240;
+  /* Real iMessage received-bubble gray - deliberately its own token, not
+     `surface-raised`, since that's already used for popovers/menus and
+     needs to stay free to change independently of chat bubble color. */
+  --chat-bubble: 233 233 235;
 }
 
 .dark {
@@ -18,6 +22,7 @@
   --ink-muted: 148 163 184;
   --accent: 129 140 248;
   --border: 39 43 60;
+  --chat-bubble: 38 37 42;
 }
 
 * {

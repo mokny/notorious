@@ -107,7 +107,8 @@ export function Composer({
         >
           <Icon name="plus" className="h-5 w-5" />
         </button>
-        <div className="relative flex-1">
+        {/* The button sits inside the pill as a flex child (not absolutely positioned) so it's always comfortably inset from the pill's own right-side curve, however tall the pill grows with a multi-line message - `items-end` keeps it pinned to the bottom-right corner as the textarea grows, matching iMessage/WhatsApp. */}
+        <div className="flex flex-1 items-end gap-1 rounded-full border border-border bg-surface py-1 pl-3 pr-1 focus-within:border-accent">
           <textarea
             value={body}
             onChange={(event) => {
@@ -122,27 +123,18 @@ export function Composer({
             }}
             rows={1}
             placeholder="Message"
-            className="max-h-32 w-full resize-none rounded-full border border-border bg-surface py-2 pl-3 pr-10 text-sm text-ink outline-none focus:border-accent"
+            className="min-w-0 max-h-32 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none"
           />
-          {hasContent ? (
-            <button
-              type="submit"
-              disabled={sendMutation.isPending}
-              className="absolute bottom-1 right-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-40"
-              title="Send"
-            >
-              <Icon name="arrow-up" className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="absolute bottom-1 right-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-muted hover:text-ink"
-              title="Voice message"
-              disabled
-            >
-              <Icon name="mic" className="h-4 w-4" />
-            </button>
-          )}
+          <button
+            type="submit"
+            disabled={!hasContent || sendMutation.isPending}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+              hasContent ? "bg-accent text-white hover:opacity-90" : "text-ink-muted"
+            } disabled:opacity-40`}
+            title="Send"
+          >
+            <Icon name="arrow-up" className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </form>

@@ -71,7 +71,9 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
         )}
         <ul>
           {aiWorkspaces?.map((workspace) => (
-            <li key={workspace.workspaceId} className="flex items-center">
+            // The inset border-b (starting after the avatar, not the row's own left edge) is the
+            // iMessage list-divider look - a plain `border-b` on the `<li>` would run full-width instead.
+            <li key={workspace.workspaceId} className="relative flex items-center">
               <button
                 onClick={() => onSelect(toAiConversationId(workspace.workspaceId))}
                 className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left hover:bg-surface"
@@ -84,12 +86,13 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
                   <div className="truncate text-xs text-ink-muted">{workspace.workspaceName}</div>
                 </div>
               </button>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 left-[58px] border-b border-border" />
             </li>
           ))}
           {conversations?.map((conversation) => {
             const avatar = conversationInitial(conversation);
             return (
-              <li key={conversation.id} className="flex items-center">
+              <li key={conversation.id} className="relative flex items-center">
                 <button onClick={() => onSelect(conversation.id)} className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left hover:bg-surface">
                   <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} size={9} />
                   <div className="min-w-0 flex-1">
@@ -125,6 +128,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
                 >
                   <Icon name="trash" className="h-4 w-4" />
                 </button>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 left-[58px] border-b border-border" />
               </li>
             );
           })}
