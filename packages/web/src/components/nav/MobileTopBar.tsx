@@ -147,7 +147,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               label="Switch workspace"
               onClick={() => {
                 setBreadcrumbOpen(false);
-                navigate("/");
+                navigate("/workspaces");
               }}
             />
           </IOSMenuGroup>

@@ -302,7 +302,7 @@ function WorkspaceLayoutInner() {
                     label="Switch workspace"
                     onClick={() => {
                       setAvatarMenuOpen(false);
-                      navigate("/");
+                      navigate("/workspaces");
                     }}
                   />
                   <IOSMenuItem

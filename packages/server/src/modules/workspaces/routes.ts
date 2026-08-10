@@ -144,6 +144,15 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     reply.code(204);
   });
 
+  // Drives the web app's "land back where I left off" redirect at "/" - the newest
+  // recently-viewed row across ALL of this user's workspaces, or null if there isn't one
+  // (new user, or their last object/workspace is gone). See getLastVisitedObject's doc
+  // comment for why no separate access/existence check is needed here.
+  app.get("/api/v1/workspaces/last-visited", async (request) => {
+    const user = requireUser(request);
+    return workspaceService.getLastVisitedObject(user.id);
+  });
+
   app.patch("/api/v1/workspaces/:id", async (request) => {
     const user = requireUser(request);
     const { id } = request.params as { id: string };

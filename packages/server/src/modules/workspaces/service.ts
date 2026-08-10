@@ -314,3 +314,24 @@ export async function touchRecentlyViewed(workspaceId: string, userId: string, o
       set: { viewedAt: nowIso() },
     });
 }
+
+/**
+ * This user's single most recently viewed object across all their workspaces - drives the
+ * "land back where I left off" redirect at the web app's "/" root. The joins double as the
+ * existence/access check: a hard-deleted object or a workspace the user is no longer a member
+ * of simply won't match, so the caller doesn't need a separate check.
+ */
+export async function getLastVisitedObject(userId: string): Promise<{ workspaceId: string; objectId: string } | null> {
+  const [row] = await db
+    .select({ workspaceId: recentlyViewed.workspaceId, objectId: recentlyViewed.objectId })
+    .from(recentlyViewed)
+    .innerJoin(
+      workspaceMembers,
+      and(eq(workspaceMembers.workspaceId, recentlyViewed.workspaceId), eq(workspaceMembers.userId, recentlyViewed.userId)),
+    )
+    .innerJoin(objects, eq(objects.id, recentlyViewed.objectId))
+    .where(eq(recentlyViewed.userId, userId))
+    .orderBy(desc(recentlyViewed.viewedAt))
+    .limit(1);
+  return row ?? null;
+}
