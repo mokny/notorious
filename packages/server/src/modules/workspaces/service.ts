@@ -316,22 +316,25 @@ export async function touchRecentlyViewed(workspaceId: string, userId: string, o
 }
 
 /**
- * This user's single most recently viewed object across all their workspaces - drives the
- * "land back where I left off" redirect at the web app's "/" root. The joins double as the
- * existence/access check: a hard-deleted object or a workspace the user is no longer a member
- * of simply won't match, so the caller doesn't need a separate check.
+ * This user's most recently active workspace (by their newest recently-viewed row across all
+ * workspaces) - drives the "land on my dashboard" redirect at the web app's "/" root. Returns
+ * that workspace's dashboard object, or null if the workspace has none (dashboardObjectId is
+ * ON DELETE SET NULL, so a deleted dashboard object naturally reads as "none" here) - the caller
+ * falls back to the workspace picker in that case. The workspaceMembers join doubles as the
+ * access check: a workspace the user is no longer a member of simply won't match.
  */
-export async function getLastVisitedObject(userId: string): Promise<{ workspaceId: string; objectId: string } | null> {
+export async function getLastVisitedWorkspace(userId: string): Promise<{ workspaceId: string; objectId: string } | null> {
   const [row] = await db
-    .select({ workspaceId: recentlyViewed.workspaceId, objectId: recentlyViewed.objectId })
+    .select({ workspaceId: recentlyViewed.workspaceId, dashboardObjectId: workspaces.dashboardObjectId })
     .from(recentlyViewed)
     .innerJoin(
       workspaceMembers,
       and(eq(workspaceMembers.workspaceId, recentlyViewed.workspaceId), eq(workspaceMembers.userId, recentlyViewed.userId)),
     )
-    .innerJoin(objects, eq(objects.id, recentlyViewed.objectId))
+    .innerJoin(workspaces, eq(workspaces.id, recentlyViewed.workspaceId))
     .where(eq(recentlyViewed.userId, userId))
     .orderBy(desc(recentlyViewed.viewedAt))
     .limit(1);
-  return row ?? null;
+  if (!row?.dashboardObjectId) return null;
+  return { workspaceId: row.workspaceId, objectId: row.dashboardObjectId };
 }

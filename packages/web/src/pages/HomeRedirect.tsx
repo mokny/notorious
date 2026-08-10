@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { workspaceApi } from "../lib/api/resources.js";
 
 /**
- * Sits at "/" - lands the user back on whatever object they had open last (any
- * workspace), or /workspaces if there isn't one (new user, or that object/workspace
- * is gone). Push notification taps never go through here: push-sw.ts deep-links
- * straight to a concrete URL. /workspaces is the explicit "show me the picker"
- * route (see the "Switch workspace" menu items).
+ * Sits at "/" - lands the user on the dashboard of whatever workspace they were
+ * active in last, or /workspaces if that workspace has no dashboard (or there's no
+ * last-active workspace at all, e.g. a new user). Push notification taps never go
+ * through here: push-sw.ts deep-links straight to a concrete URL. /workspaces is
+ * the explicit "show me the picker" route (see the "Switch workspace" menu items).
  */
 export function HomeRedirect() {
   const { data, isLoading } = useQuery({
