@@ -47,7 +47,26 @@ export interface Workspace {
   weekStartsOn: "sunday" | "monday";
   /** Max height (px, 50-300) object cover banners are cropped to in this workspace - see CoverImage.tsx. */
   coverHeight: number;
+  /** Max pixel dimensions normal (non-cover) image uploads are downscaled to, null = no limit (default, off) - see modules/files/imageResize.ts. */
+  imageMaxWidth: number | null;
+  imageMaxHeight: number | null;
+  /** Same as imageMaxWidth/imageMaxHeight but for cover-image uploads specifically. */
+  coverMaxWidth: number | null;
+  coverMaxHeight: number | null;
+  /** WebP re-encode quality (1-100) applied whenever a resize above actually triggers - not used otherwise. */
+  imageQuality: number;
   createdAt: ISODateString;
+}
+
+/** One logged-in device/browser for the current account - see plugins/session.ts's `listSessions`, shown in Settings > Security. */
+export interface Session {
+  id: string;
+  userAgent: string | null;
+  ip: string | null;
+  createdAt: ISODateString;
+  lastSeenAt: ISODateString | null;
+  /** Whether this is the session the request listing it was itself made with. */
+  isCurrent: boolean;
 }
 
 export interface WorkspaceMember {

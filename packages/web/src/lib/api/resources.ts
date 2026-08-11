@@ -1,5 +1,6 @@
 import type {
   User,
+  Session,
   Workspace,
   WorkspaceMember,
   WorkspaceInvite,
@@ -115,6 +116,9 @@ export const authApi = {
   logout: () => apiRequest<void>("/api/v1/auth/logout", { method: "POST" }),
   changePassword: (input: ChangePasswordInput) => apiRequest<void>("/api/v1/auth/password", { method: "PATCH", body: input }),
   changeEmail: (input: ChangeEmailInput) => apiRequest<User>("/api/v1/auth/email", { method: "PATCH", body: input }),
+  sessions: () => apiRequest<Session[]>("/api/v1/auth/sessions"),
+  revokeSession: (id: string) => apiRequest<void>(`/api/v1/auth/sessions/${id}`, { method: "DELETE" }),
+  revokeOtherSessions: () => apiRequest<void>("/api/v1/auth/sessions", { method: "DELETE" }),
 };
 
 export const twoFactorApi = {
@@ -304,11 +308,12 @@ export const searchApi = {
 
 export const fileApi = {
   listForObject: (objectId: string) => apiRequest<FileAsset[]>(`/api/v1/objects/${objectId}/files`),
-  upload: (workspaceId: string, file: File, objectId?: string, blockId?: string) => {
+  upload: (workspaceId: string, file: File, objectId?: string, blockId?: string, kind?: "image" | "cover") => {
     const formData = new FormData();
     formData.append("file", file);
     if (objectId) formData.append("objectId", objectId);
     if (blockId) formData.append("blockId", blockId);
+    if (kind) formData.append("kind", kind);
     return apiUpload<FileAsset>(`/api/v1/workspaces/${workspaceId}/files`, formData);
   },
   // Deliberately plain (no share token appended here) - this value gets

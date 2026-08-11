@@ -40,6 +40,7 @@ export async function registerFileRoutes(app: FastifyInstance): Promise<void> {
     const buffer = await data.toBuffer();
     const objectId = readTextField(data.fields.objectId);
     const blockId = readTextField(data.fields.blockId);
+    const kind = readTextField(data.fields.kind) === "cover" ? "cover" : "image";
 
     const scopeObjectId = await resolveFileScopeObjectId(objectId, blockId);
     const { actorId } = await requireAccess(request, workspaceId, "editor", { objectId: scopeObjectId });
@@ -54,6 +55,7 @@ export async function registerFileRoutes(app: FastifyInstance): Promise<void> {
       filename: data.filename,
       mimeType: data.mimetype,
       buffer,
+      kind,
     });
 
     reply.code(201);

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { joinRoom, joinGlobalRoom, broadcastToConversation } from "./hub.js";
+import { getSessionId } from "../../plugins/session.js";
 import { getMemberRole } from "../workspaces/access.js";
 import { touchFocus, clearFocus } from "../chat/focusState.js";
 import { getParticipantUserIds } from "../chat/service.js";
@@ -81,7 +82,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
       return;
     }
 
-    joinGlobalRoom(user.id, socket, clientId);
+    joinGlobalRoom(user.id, socket, clientId, getSessionId(request));
 
     socket.on("message", (raw: Buffer) => {
       (async () => {

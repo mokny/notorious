@@ -142,6 +142,10 @@ function renderBlock(block: Block, byParent: Map<string | null, Block[]>): strin
       return `[Video: ${content.caption ?? content.url ?? ""}](${content.url ?? ""})`;
     case "embed":
       return `[Embed](${content.url ?? ""})`;
+    case "pdf":
+    case "audio":
+    case "file":
+      return `[${content.filename ?? "File"}](${content.url ?? ""})`;
     case "divider":
       return "---";
     case "toggle": {

@@ -132,6 +132,20 @@ export interface CallEndedEvent {
   reason: "hangup" | "declined" | "missed";
 }
 
+/**
+ * Sent to exactly the device(s) connected under one specific login session
+ * when that session is revoked from Settings > Security's device list (see
+ * `sendToSession` in realtime/hub.ts, plugins/session.ts's `revokeSession`)
+ * - tells that device its session is gone right now, rather than it only
+ * finding out on its next REST call. Carries no payload beyond the type: the
+ * client doesn't need to know *which* session was revoked, only that its own
+ * was (it never learns its own session id in the first place - the cookie is
+ * httpOnly).
+ */
+export interface SessionRevokedEvent {
+  type: "sessionRevoked";
+}
+
 export type ChatRealtimeMessage =
   | ChatMessageEvent
   | ChatMessageDeletedEvent
@@ -145,4 +159,5 @@ export type ChatRealtimeMessage =
   | CallParticipantsEvent
   | CallMediaNewProducerEvent
   | CallMediaProducerClosedEvent
-  | CallEndedEvent;
+  | CallEndedEvent
+  | SessionRevokedEvent;

@@ -1,12 +1,110 @@
 import { useState, type FormEvent } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi, twoFactorApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { ApiError } from "../../lib/api/client.js";
 import { Button } from "../ui/Button.js";
 import { TextField } from "../ui/TextField.js";
 import { Modal } from "../ui/Modal.js";
+import { Icon } from "../ui/Icon.js";
 import { TwoFactorSetupFlow } from "../TwoFactorSetupFlow.js";
+
+/** Very rough user-agent -> "Browser on OS" label - good enough for a device list, no need for a full UA-parsing dependency. */
+function describeUserAgent(userAgent: string | null): string {
+  if (!userAgent) return "Unknown device";
+  const os = /iPhone|iPad/.test(userAgent)
+    ? "iOS"
+    : /Android/.test(userAgent)
+      ? "Android"
+      : /Mac OS X/.test(userAgent)
+        ? "macOS"
+        : /Windows/.test(userAgent)
+          ? "Windows"
+          : /Linux/.test(userAgent)
+            ? "Linux"
+            : "Unknown OS";
+  const browser = /Edg\//.test(userAgent)
+    ? "Edge"
+    : /OPR\//.test(userAgent)
+      ? "Opera"
+      : /Chrome\//.test(userAgent)
+        ? "Chrome"
+        : /CriOS\//.test(userAgent)
+          ? "Chrome"
+          : /Firefox\//.test(userAgent)
+            ? "Firefox"
+            : /Safari\//.test(userAgent)
+              ? "Safari"
+              : "Unknown browser";
+  return `${browser} on ${os}`;
+}
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return "Unknown";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.round(diffMs / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
+
+/** The device list backing "log out other devices" (see plugins/session.ts's `listSessions` server-side) - sessions now stay valid indefinitely for an actively-used device (rolling renewal), so this is the only way to end one deliberately short of a password change. */
+function SessionsList() {
+  const queryClient = useQueryClient();
+  const { data: sessions } = useQuery({ queryKey: ["sessions"], queryFn: authApi.sessions });
+
+  const revokeMutation = useMutation({
+    mutationFn: (id: string) => authApi.revokeSession(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sessions"] }),
+  });
+  const revokeOthersMutation = useMutation({
+    mutationFn: () => authApi.revokeOtherSessions(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sessions"] }),
+  });
+
+  const otherCount = sessions?.filter((s) => !s.isCurrent).length ?? 0;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-ink-muted">Devices</p>
+        {otherCount > 0 && (
+          <Button variant="secondary" onClick={() => revokeOthersMutation.mutate()} disabled={revokeOthersMutation.isPending}>
+            Log out all other devices
+          </Button>
+        )}
+      </div>
+      <div className="divide-y divide-border rounded-lg border border-border">
+        {sessions?.map((session) => (
+          <div key={session.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+            <div className="min-w-0">
+              <p className="truncate">
+                {describeUserAgent(session.userAgent)}
+                {session.isCurrent && <span className="ml-2 text-xs text-accent">This device</span>}
+              </p>
+              <p className="truncate text-xs text-ink-muted">
+                {session.ip ?? "Unknown IP"} · Active {relativeTime(session.lastSeenAt)}
+              </p>
+            </div>
+            {!session.isCurrent && (
+              <button
+                onClick={() => revokeMutation.mutate(session.id)}
+                disabled={revokeMutation.isPending}
+                className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
+                title="Log out this device"
+              >
+                <Icon name="trash" className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** Lets the current user change their own password or enable/disable 2FA. */
 export function SecuritySettings() {
@@ -126,6 +224,8 @@ export function SecuritySettings() {
           }}
         />
       </Modal>
+
+      <SessionsList />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { registerSchema, loginSchema, changePasswordSchema, changeEmailSchema } from "@notorious/shared";
 import { registerUser, verifyCredentials, getUserById, canRegisterEmail, changePassword, changeEmail } from "./service.js";
-import { createSession, destroySession, requireUser, invalidateOtherSessions } from "../../plugins/session.js";
+import { createSession, destroySession, requireUser, invalidateOtherSessions, listSessions, revokeSession } from "../../plugins/session.js";
+import { sendToSession } from "../realtime/hub.js";
 import { forbidden } from "../../lib/httpError.js";
 import { env } from "../../env.js";
 import { createPendingChallenge, PENDING_TOTP_COOKIE } from "../twoFactor/service.js";
@@ -79,6 +80,30 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     // the moment the password changes - see invalidateOtherSessions's doc
     // comment. This tab's own session is left alone.
     await invalidateOtherSessions(request, user.id);
+    reply.code(204);
+  });
+
+  app.get("/api/v1/auth/sessions", async (request) => {
+    const user = requireUser(request);
+    return listSessions(request, user.id);
+  });
+
+  app.delete("/api/v1/auth/sessions", async (request, reply) => {
+    const user = requireUser(request);
+    const revokedIds = await invalidateOtherSessions(request, user.id);
+    for (const id of revokedIds) sendToSession(id, { type: "sessionRevoked" });
+    reply.code(204);
+  });
+
+  app.delete("/api/v1/auth/sessions/:id", async (request, reply) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    const { wasCurrent } = await revokeSession(request, user.id, id);
+    if (wasCurrent) {
+      await destroySession(request, reply);
+    } else {
+      sendToSession(id, { type: "sessionRevoked" });
+    }
     reply.code(204);
   });
 

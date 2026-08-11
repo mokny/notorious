@@ -36,6 +36,13 @@ function handleChatMessage(payload: ChatRealtimeMessage, queryClient: QueryClien
     case "chatUnreadCount":
       updateAppBadge(payload.unreadConversationCount);
       break;
+    case "sessionRevoked":
+      // Refetching ["me"] hits GET /api/v1/auth/me with the now-deleted
+      // session cookie, which 401s - AuthContext.tsx already treats that as
+      // "no user", and RequireAuth (App.tsx) redirects to /login the moment
+      // `user` goes null. No separate "force logout" UI path needed.
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      break;
     case "chatTyping":
     case "callRing":
     case "callTaken":

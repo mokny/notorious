@@ -15,6 +15,12 @@ export const updateWorkspaceSchema = z.object({
   dashboardObjectId: z.string().nullable().optional(),
   weekStartsOn: z.enum(["sunday", "monday"]).optional(),
   coverHeight: z.number().int().min(50).max(300).optional(),
+  // Null clears the limit (no resizing) - see modules/files/imageResize.ts.
+  imageMaxWidth: z.number().int().min(1).max(20000).nullable().optional(),
+  imageMaxHeight: z.number().int().min(1).max(20000).nullable().optional(),
+  coverMaxWidth: z.number().int().min(1).max(20000).nullable().optional(),
+  coverMaxHeight: z.number().int().min(1).max(20000).nullable().optional(),
+  imageQuality: z.number().int().min(1).max(100).optional(),
 });
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Workspace } from "@notorious/shared";
 import { workspaceApi, fileApi } from "../../lib/api/resources.js";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave.js";
 import { TextField } from "../ui/TextField.js";
@@ -50,7 +51,21 @@ export function WorkspaceGeneralSettings() {
   });
   const coverHeight = coverHeightDraft ?? workspace?.coverHeight ?? 300;
 
+  const updateImageLimitsMutation = useMutation({
+    mutationFn: (
+      values: Partial<Pick<Workspace, "imageMaxWidth" | "imageMaxHeight" | "coverMaxWidth" | "coverMaxHeight" | "imageQuality">>,
+    ) => workspaceApi.update(workspaceId!, values),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
+  });
+
   if (!workspace) return null;
+
+  /** Empty input clears the limit (null = no resizing) - see workspaceApi's updateWorkspaceSchema. */
+  function parseLimitInput(value: string): number | null {
+    if (value.trim() === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  }
 
   return (
     <div className="space-y-4">
@@ -98,6 +113,78 @@ export function WorkspaceGeneralSettings() {
         >
           <Icon name="image" className="h-5 w-5" />
         </div>
+      </div>
+
+      <div className="max-w-sm space-y-3 border-t border-border pt-4">
+        <p className="text-sm text-ink-muted">
+          Automatically downscale uploaded images that exceed these pixel dimensions, re-encoding them as WebP. Leave a field empty for no
+          limit (disabled by default).
+        </p>
+        <div className="space-y-1.5">
+          <span className="text-sm font-medium">Normal images (max size)</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              placeholder="Width"
+              defaultValue={workspace.imageMaxWidth ?? ""}
+              onBlur={(e) => updateImageLimitsMutation.mutate({ imageMaxWidth: parseLimitInput(e.target.value) })}
+              className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+              aria-label="Max image width"
+            />
+            <span className="text-ink-muted">×</span>
+            <input
+              type="number"
+              min={1}
+              placeholder="Height"
+              defaultValue={workspace.imageMaxHeight ?? ""}
+              onBlur={(e) => updateImageLimitsMutation.mutate({ imageMaxHeight: parseLimitInput(e.target.value) })}
+              className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+              aria-label="Max image height"
+            />
+            <span className="text-ink-muted">px</span>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <span className="text-sm font-medium">Cover images (max size)</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              placeholder="Width"
+              defaultValue={workspace.coverMaxWidth ?? ""}
+              onBlur={(e) => updateImageLimitsMutation.mutate({ coverMaxWidth: parseLimitInput(e.target.value) })}
+              className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+              aria-label="Max cover width"
+            />
+            <span className="text-ink-muted">×</span>
+            <input
+              type="number"
+              min={1}
+              placeholder="Height"
+              defaultValue={workspace.coverMaxHeight ?? ""}
+              onBlur={(e) => updateImageLimitsMutation.mutate({ coverMaxHeight: parseLimitInput(e.target.value) })}
+              className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+              aria-label="Max cover height"
+            />
+            <span className="text-ink-muted">px</span>
+          </div>
+        </div>
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span>WebP quality when resizing</span>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            defaultValue={workspace.imageQuality}
+            onBlur={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isFinite(n) && n >= 1 && n <= 100) updateImageLimitsMutation.mutate({ imageQuality: Math.round(n) });
+            }}
+            className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+            aria-label="WebP quality"
+          />
+        </label>
       </div>
     </div>
   );

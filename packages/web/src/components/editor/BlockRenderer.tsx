@@ -12,6 +12,9 @@ import type {
   ImageContent,
   VideoContent,
   EmbedContent,
+  PdfContent,
+  AudioContent,
+  FileContent,
   MathContent,
   MermaidContent,
   ToggleContent,
@@ -33,7 +36,7 @@ import { CalloutBlock } from "./blocks/CalloutBlock.js";
 import { ChecklistBlock } from "./blocks/ChecklistBlock.js";
 import { TableBlock } from "./blocks/TableBlock.js";
 import { CodeBlock } from "./blocks/CodeBlock.js";
-import { ImageBlock, VideoBlock, EmbedBlock } from "./blocks/MediaBlocks.js";
+import { ImageBlock, VideoBlock, EmbedBlock, PdfBlock, AudioBlock, FileBlock } from "./blocks/MediaBlocks.js";
 import { MathBlock } from "./blocks/MathBlock.js";
 import { MermaidBlock } from "./blocks/MermaidBlock.js";
 import { ToggleBlock } from "./blocks/ToggleBlock.js";
@@ -136,6 +139,12 @@ export function BlockRenderer({
       return <VideoBlock content={content<VideoContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
     case "embed":
       return <EmbedBlock content={content<EmbedContent>()} onSave={save} />;
+    case "pdf":
+      return <PdfBlock content={content<PdfContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
+    case "audio":
+      return <AudioBlock content={content<AudioContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
+    case "file":
+      return <FileBlock content={content<FileContent>()} workspaceId={workspaceId} objectId={objectId} onSave={save} />;
     case "math":
       return <MathBlock content={content<MathContent>()} onSave={save} />;
     case "mermaid":

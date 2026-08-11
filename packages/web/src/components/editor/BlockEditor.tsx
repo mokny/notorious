@@ -445,6 +445,11 @@ export function BlockEditor({
         return { objectId: null };
       case "bookmark":
         return { url: "" };
+      case "pdf":
+      case "audio":
+        return { url: "", filename: "", size: 0, fileId: "" };
+      case "file":
+        return { url: "", filename: "", size: 0, mimeType: "", fileId: "" };
       case "whiteboard":
         return {};
       case "calendar":
@@ -543,7 +548,7 @@ export function BlockEditor({
       let afterBlockId = tree[tree.length - 1]?.id ?? null;
       for (const file of files) {
         const asset = await fileApi.upload(workspaceId, file, objectId);
-        const { type, content } = blockContentForFile(file.type, file.name, fileApi.downloadUrl(asset.id), asset.id);
+        const { type, content } = blockContentForFile(file.type, file.name, fileApi.downloadUrl(asset.id), asset.id, asset.size);
         const created = await createMutation.mutateAsync({ parentBlockId: null, afterBlockId, type, content });
         afterBlockId = created.id;
       }

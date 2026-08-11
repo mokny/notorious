@@ -5,6 +5,8 @@ import { objectApi, fileApi } from "../lib/api/resources.js";
 import { withShareToken } from "../lib/api/shareMode.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 import { useFitText } from "../hooks/useFitText.js";
+import { useHasHover } from "../hooks/useHasHover.js";
+import { useTouchReveal } from "../hooks/useTouchReveal.js";
 import { HighlightableTitle } from "./editor/HighlightableTitle.js";
 import { HighlightedText } from "./editor/HighlightedText.js";
 import { useBreakpoint } from "../hooks/useBreakpoint.js";
@@ -77,6 +79,15 @@ export function CoverImage({
   const { theme } = useTheme();
   const { setCoverActive } = useMobileChrome();
   const isPhone = useBreakpoint() === "phone";
+  // Change/Remove/style-picker were only ever reachable via mouse hover -
+  // unreachable by touch, since a touch device never fires
+  // mouseenter/mouseleave (see useHasHover.ts). Swaps to the same
+  // tap-to-reveal pattern PinnedNavItem.tsx uses for its own hover-only
+  // controls on touch devices, while leaving real-hover devices on the
+  // existing mouseenter/mouseleave-driven `hover` state.
+  const hasHover = useHasHover();
+  const { touched, containerRef, onTouchStart } = useTouchReveal<HTMLDivElement>();
+  const controlsVisible = hasHover ? hover : touched;
 
   // Tells WorkspaceLayout's mobile header to switch to its transparent
   // overlay style while this cover is on screen, and restores the Dynamic
@@ -161,7 +172,7 @@ export function CoverImage({
   }
 
   async function handleUpload(file: File) {
-    const asset = await fileApi.upload(workspaceId, file, objectId);
+    const asset = await fileApi.upload(workspaceId, file, objectId, undefined, "cover");
     await applyCover(fileApi.downloadUrl(asset.id));
   }
 
@@ -208,6 +219,8 @@ export function CoverImage({
       style={{ marginTop: "calc(-1 * var(--mobile-header-h, 0px))" }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      ref={containerRef}
+      onTouchStart={onTouchStart}
     >
       <img
         src={withShareToken(cover)}
@@ -273,7 +286,7 @@ export function CoverImage({
         </div>
       </div>
 
-      {hover && canEdit && (
+      {controlsVisible && canEdit && (
         <div className="absolute right-3 top-3 flex gap-1.5">
           <button
             onClick={() => setStyleEditorOpen((v) => !v)}

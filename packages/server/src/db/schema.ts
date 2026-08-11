@@ -23,6 +23,14 @@ export const sessions = sqliteTable("sessions", {
     .references(() => users.id, { onDelete: "cascade" }),
   expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
+  // Device-list fields (see plugins/session.ts's `listSessions`/`revokeSession`) - all backfilled
+  // by migrations/0037_session_devices.sql for rows created before this existed.
+  userAgent: text("user_agent"),
+  ip: text("ip"),
+  // Bumped (throttled, see RENEWAL_THROTTLE_MS in plugins/session.ts) on every authenticated
+  // request - what makes a session "infinite" for an actively-used device: expiresAt keeps
+  // rolling forward from this instead of counting down from a fixed login time.
+  lastSeenAt: text("last_seen_at"),
 });
 
 export const pendingTotpChallenges = sqliteTable("pending_totp_challenges", {
@@ -60,6 +68,15 @@ export const workspaces = sqliteTable("workspaces", {
   dashboardObjectId: text("dashboard_object_id"),
   weekStartsOn: text("week_starts_on").notNull().default("monday").$type<"sunday" | "monday">(),
   coverHeight: integer("cover_height").notNull().default(300),
+  // Auto-resize settings for uploaded images (see modules/files/imageResize.ts) - null means no
+  // limit (the default, off until an admin opts in). Separate width/height pairs for normal
+  // image uploads vs. cover images since they serve different purposes; imageQuality is a single
+  // shared WebP re-encode quality applied whenever either pair actually triggers a resize.
+  imageMaxWidth: integer("image_max_width"),
+  imageMaxHeight: integer("image_max_height"),
+  coverMaxWidth: integer("cover_max_width"),
+  coverMaxHeight: integer("cover_max_height"),
+  imageQuality: integer("image_quality").notNull().default(80),
   createdAt: text("created_at").notNull(),
 });
 

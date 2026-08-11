@@ -35,6 +35,10 @@ function previewTextFor(block: Block): string {
       return truncate(String(content.caption ?? ""));
     case "embed":
       return truncate(String(content.url ?? ""));
+    case "pdf":
+    case "audio":
+    case "file":
+      return truncate(String(content.filename ?? content.url ?? ""));
     case "bookmark":
       return truncate(String(content.title ?? content.url ?? ""));
     case "voting": {

@@ -93,6 +93,11 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
 
   const title = onObjectPage && current ? current.title || "Untitled" : workspaceName;
   const icon = onObjectPage && current ? current.icon ?? "file-text" : workspaceIcon;
+  // The dashboard object is already shown as its own pinned row above (see
+  // the `dashboardObjectId &&` block below) - filtered back out here so it
+  // doesn't also show up a second time whenever it's the current object or
+  // anywhere else in the visited-history stack.
+  const historyEntries = [...entries].reverse().filter((entry) => entry.id !== dashboardObjectId);
 
   function goHome() {
     navigate(dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`);
@@ -141,11 +146,11 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               />
             </IOSMenuGroup>
           )}
-          {entries.length === 0 ? (
+          {historyEntries.length === 0 ? (
             <p className="px-4 py-3 text-sm text-ink-muted">No objects visited yet this session.</p>
           ) : (
             <IOSMenuGroup>
-              {[...entries].reverse().map((entry) => (
+              {historyEntries.map((entry) => (
                 <IOSMenuItem
                   key={entry.id}
                   icon={entry.icon ?? "file-text"}

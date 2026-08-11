@@ -184,7 +184,7 @@ export async function commitInboxItem(
         mimeType: file.mimeType,
         buffer,
       });
-      const { type, content } = blockContentForFile(file.mimeType, file.filename, `/api/v1/files/${asset.id}`, asset.id);
+      const { type, content } = blockContentForFile(file.mimeType, file.filename, `/api/v1/files/${asset.id}`, asset.id, asset.size);
       const block = await blockService.createBlock({ objectId, parentBlockId: null, afterBlockId, type, content });
       afterBlockId = block.id;
     }

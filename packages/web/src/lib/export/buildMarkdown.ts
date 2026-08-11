@@ -156,6 +156,10 @@ async function blockToMarkdown(
       return content.url ? `[${content.caption || "Video"}](${content.url})` : "";
     case "embed":
       return content.url ? `[Embed](${content.url})` : "";
+    case "pdf":
+    case "audio":
+    case "file":
+      return content.url ? `[${content.filename || "File"}](${content.url})` : "";
     case "bookmark":
       return content.url ? `[${content.title || content.url}](${content.url})` : "";
     case "maps":

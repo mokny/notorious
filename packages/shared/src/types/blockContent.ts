@@ -69,6 +69,28 @@ export interface VideoContent {
 export interface EmbedContent {
   url: string;
 }
+/** A dropped/uploaded PDF, rendered as a collapsible card (see PdfBlock.tsx) - the PDF itself is loaded into an iframe lazily, only once expanded, rather than up front like EmbedContent. */
+export interface PdfContent {
+  url: string;
+  filename: string;
+  size: number;
+  fileId: string;
+}
+/** A dropped/uploaded audio file, rendered with a native HTML5 player (see AudioBlock.tsx). */
+export interface AudioContent {
+  url: string;
+  filename: string;
+  size: number;
+  fileId: string;
+}
+/** Catch-all for a dropped/uploaded file that isn't an image/video/pdf/audio - rendered as a plain icon+name+size download card (see FileBlock.tsx). */
+export interface FileContent {
+  url: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  fileId: string;
+}
 export interface MathContent {
   latex: string;
 }
@@ -222,9 +244,11 @@ export function blockContentForFile(
   filename: string,
   url: string,
   fileId: string,
-): { type: "image" | "video" | "embed" | "paragraph"; content: Record<string, unknown> } {
+  size: number,
+): { type: "image" | "video" | "pdf" | "audio" | "file"; content: Record<string, unknown> } {
   if (mimeType.startsWith("image/")) return { type: "image", content: { url, caption: filename, fileId } };
   if (mimeType.startsWith("video/")) return { type: "video", content: { url, caption: filename, fileId } };
-  if (mimeType.startsWith("audio/") || mimeType === "application/pdf") return { type: "embed", content: { url } };
-  return { type: "paragraph", content: { markdown: `[${filename}](${url})` } };
+  if (mimeType === "application/pdf") return { type: "pdf", content: { url, filename, size, fileId } };
+  if (mimeType.startsWith("audio/")) return { type: "audio", content: { url, filename, size, fileId } };
+  return { type: "file", content: { url, filename, size, mimeType, fileId } };
 }

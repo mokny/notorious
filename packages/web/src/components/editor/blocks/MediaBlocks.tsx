@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { ImageContent, VideoContent, EmbedContent } from "@notorious/shared";
+import type { ImageContent, VideoContent, EmbedContent, PdfContent, AudioContent, FileContent } from "@notorious/shared";
 import { fileApi } from "../../../lib/api/resources.js";
 import { withShareToken } from "../../../lib/api/shareMode.js";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
@@ -192,4 +192,146 @@ export function EmbedBlock({ content, onSave }: { content: EmbedContent; onSave:
     );
   }
   return <UrlPrompt label="page to embed" onSave={(url) => onSave({ ...content, url })} />;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unitIndex]}`;
+}
+
+/** Generic "upload a file, no URL-paste option" prompt - unlike UrlPrompt, pdf/audio/file blocks have no meaningful remote-URL use case (the whole point is a locally uploaded file), so this only ever shows the upload button. */
+function UploadPrompt({ label, accept, onUpload }: { label: string; accept: string; onUpload: (file: File) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 text-sm text-ink-muted">
+      <Icon name="upload" className="h-4 w-4 shrink-0" />
+      <button onClick={() => inputRef.current?.click()} className="text-accent hover:underline">
+        Upload {label}…
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onUpload(file);
+        }}
+      />
+    </div>
+  );
+}
+
+/** A dropped/uploaded PDF (see PdfContent) - shown as a collapsible card rather than loading the PDF up front like EmbedBlock's iframe does for a pasted embed URL: the iframe only mounts once expanded, so a document-heavy object doesn't pay to load every PDF in it just to render the page. */
+export function PdfBlock({ content, workspaceId, objectId, onSave }: MediaProps<PdfContent>) {
+  const [open, setOpen] = useState(false);
+
+  if (!content.url) {
+    return (
+      <UploadPrompt
+        label="a PDF"
+        accept="application/pdf"
+        onUpload={async (file) => {
+          const asset = await fileApi.upload(workspaceId, file, objectId);
+          await onSave({ url: fileApi.downloadUrl(asset.id), filename: file.name, size: file.size, fileId: asset.id });
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border">
+      <div className="flex items-center gap-2 p-2">
+        <button
+          type="button"
+          data-view-toggle
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left hover:bg-surface-raised"
+        >
+          <Icon name={open ? "chevron-down" : "chevron-right"} className="h-4 w-4 shrink-0 text-ink-muted" />
+          <Icon name="file-text" className="h-4 w-4 shrink-0 text-ink-muted" />
+          <span className="min-w-0 flex-1 truncate text-sm">{content.filename}</span>
+          <span className="shrink-0 text-xs text-ink-muted">{formatFileSize(content.size)}</span>
+        </button>
+        <a
+          href={withShareToken(content.url)}
+          download={content.filename}
+          title="Download"
+          data-view-toggle
+          className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
+        >
+          <Icon name="download" className="h-4 w-4" />
+        </a>
+      </div>
+      {open && (
+        // Only mounted once expanded - the whole point of the collapsed
+        // state above (see this block's own doc comment).
+        <iframe src={withShareToken(content.url)} className="h-96 w-full border-t border-border" />
+      )}
+    </div>
+  );
+}
+
+/** A dropped/uploaded audio file (see AudioContent) - a native HTML5 player, unlike EmbedBlock's iframe which audio used to fall back to. */
+export function AudioBlock({ content, workspaceId, objectId, onSave }: MediaProps<AudioContent>) {
+  if (!content.url) {
+    return (
+      <UploadPrompt
+        label="audio"
+        accept="audio/*"
+        onUpload={async (file) => {
+          const asset = await fileApi.upload(workspaceId, file, objectId);
+          await onSave({ url: fileApi.downloadUrl(asset.id), filename: file.name, size: file.size, fileId: asset.id });
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border p-3">
+      <div className="flex items-center gap-2 text-sm">
+        <Icon name="mic" className="h-4 w-4 shrink-0 text-ink-muted" />
+        <span className="min-w-0 flex-1 truncate">{content.filename}</span>
+        <span className="shrink-0 text-xs text-ink-muted">{formatFileSize(content.size)}</span>
+      </div>
+      <audio src={withShareToken(content.url)} controls className="w-full" />
+    </div>
+  );
+}
+
+/** Catch-all for a dropped/uploaded file that isn't an image/video/pdf/audio (see FileContent) - just an icon+name+size download card, no inline preview. */
+export function FileBlock({ content, workspaceId, objectId, onSave }: MediaProps<FileContent>) {
+  if (!content.url) {
+    return (
+      <UploadPrompt
+        label="a file"
+        accept="*/*"
+        onUpload={async (file) => {
+          const asset = await fileApi.upload(workspaceId, file, objectId);
+          await onSave({ url: fileApi.downloadUrl(asset.id), filename: file.name, size: file.size, mimeType: file.type, fileId: asset.id });
+        }}
+      />
+    );
+  }
+
+  return (
+    <a
+      href={withShareToken(content.url)}
+      download={content.filename}
+      data-view-toggle
+      className="flex items-center gap-2 rounded-lg border border-border p-2 hover:bg-surface-raised"
+    >
+      <Icon name="file-text" className="h-5 w-5 shrink-0 text-ink-muted" />
+      <span className="min-w-0 flex-1 truncate text-sm">{content.filename}</span>
+      <span className="shrink-0 text-xs text-ink-muted">{formatFileSize(content.size)}</span>
+      <Icon name="download" className="h-4 w-4 shrink-0 text-ink-muted" />
+    </a>
+  );
 }

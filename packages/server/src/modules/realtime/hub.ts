@@ -138,6 +138,15 @@ const socketsByUserId = new Map<string, Set<WebSocket>>();
 // `broadcastToConversation`) is untouched.
 const clientIdBySocket = new Map<WebSocket, string>();
 
+// Targets a forced logout (see `sendToSession`/auth/routes.ts's revoke-
+// session endpoints) at exactly the device(s) that authenticated with one
+// specific login session - unlike every other targeting map here, this is
+// deliberately NOT scoped to a userId lookup first: the caller already knows
+// the session belongs to that account (see plugins/session.ts's
+// `revokeSession`), and a session id is unguessable enough that a flat map
+// keyed on it directly is no less safe, just simpler.
+const socketsBySessionId = new Map<string, Set<WebSocket>>();
+
 /** Finds the actual WebSocket for one of a user's devices by clientId - REST call endpoints (answer/leave) have no socket of their own to hand in, but calls/callState.ts is keyed by socket, so this bridges the two. Undefined if that device isn't connected right now. */
 export function getSocketForClient(userId: string, clientId: string): WebSocket | undefined {
   const sockets = socketsByUserId.get(userId);
@@ -148,8 +157,8 @@ export function getSocketForClient(userId: string, clientId: string): WebSocket 
   return undefined;
 }
 
-/** Registers a socket on the workspace-agnostic chat channel for one user and cleans up on disconnect. `clientId` identifies the browser tab/device (see lib/ws/clientId.ts on the frontend) - required (not optional like the older per-workspace `joinRoom`) since calls need every `/ws/chat` socket addressable. */
-export function joinGlobalRoom(userId: string, socket: WebSocket, clientId: string): void {
+/** Registers a socket on the workspace-agnostic chat channel for one user and cleans up on disconnect. `clientId` identifies the browser tab/device (see lib/ws/clientId.ts on the frontend) - required (not optional like the older per-workspace `joinRoom`) since calls need every `/ws/chat` socket addressable. `sessionId` (the login session backing this connection, see plugins/session.ts's `getSessionId`) is optional only because a socket could theoretically authenticate some other way in the future - every real login always has one. */
+export function joinGlobalRoom(userId: string, socket: WebSocket, clientId: string, sessionId?: string): void {
   let sockets = socketsByUserId.get(userId);
   if (!sockets) {
     sockets = new Set();
@@ -158,11 +167,36 @@ export function joinGlobalRoom(userId: string, socket: WebSocket, clientId: stri
   sockets.add(socket);
   clientIdBySocket.set(socket, clientId);
 
+  let sessionSockets: Set<WebSocket> | undefined;
+  if (sessionId) {
+    sessionSockets = socketsBySessionId.get(sessionId);
+    if (!sessionSockets) {
+      sessionSockets = new Set();
+      socketsBySessionId.set(sessionId, sessionSockets);
+    }
+    sessionSockets.add(socket);
+  }
+
   socket.on("close", () => {
     sockets?.delete(socket);
     if (sockets && sockets.size === 0) socketsByUserId.delete(userId);
     clientIdBySocket.delete(socket);
+    if (sessionId && sessionSockets) {
+      sessionSockets.delete(socket);
+      if (sessionSockets.size === 0) socketsBySessionId.delete(sessionId);
+    }
   });
+}
+
+/** Forces a logout on exactly the device(s) currently connected under one specific login session - see auth/routes.ts's revoke-session endpoints. A no-op if that session has no open `/ws/chat` socket right now; the device still finds out its session is gone on its next REST request either way, this is purely the instant-logout path. */
+export function sendToSession(sessionId: string, message: ChatRealtimeMessage): void {
+  const sockets = socketsBySessionId.get(sessionId);
+  if (!sockets) return;
+
+  const payload = JSON.stringify(message);
+  for (const socket of sockets) {
+    if (socket.readyState === socket.OPEN) socket.send(payload);
+  }
 }
 
 /** Sends a chat payload to every open socket belonging to one user (all their tabs/devices), workspace-agnostic. A no-op if they have no `/ws/chat` socket open right now. */
