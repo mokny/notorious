@@ -366,6 +366,14 @@ export function ChecklistBlock({
     }
   }
 
+  /** Blurs whatever's still focused inside an item's row (almost always its own checkbox, left focused by the click that checked it off) right before that row moves - React reorders by key rather than remounting the DOM node, so a still-focused control would otherwise still be focused after the move, and desktop Chrome scrolls a focused element into view the instant its layout position changes. `overflow-anchor: none` on the list only suppresses *scroll-anchoring*, a different browser mechanism, so it doesn't stop this. */
+  function blurFocusWithinRow(itemId: string): void {
+    const row = listRef.current?.querySelector<HTMLElement>(`[data-flip-id="${itemId}"]`);
+    if (row && document.activeElement instanceof HTMLElement && row.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+  }
+
   function scheduleMoveToBottom(itemId: string): void {
     clearMoveTimer(itemId);
     moveTimersRef.current.set(
@@ -377,6 +385,7 @@ export function ChecklistBlock({
         const target = current[index];
         if (!target) return;
         movedToBottomRef.current.add(itemId);
+        blurFocusWithinRow(itemId);
         flipPrevRectsRef.current = captureRowRects();
         save({ ...content, items: [...current.slice(0, index), ...current.slice(index + 1), target] });
         flushSave();
@@ -397,6 +406,7 @@ export function ChecklistBlock({
     const index = current.findIndex((item) => item.id === itemId);
     const target = current[index];
     if (index <= 0 || !target) return;
+    blurFocusWithinRow(itemId);
     flipPrevRectsRef.current = captureRowRects();
     save({ ...content, items: [target, ...current.slice(0, index), ...current.slice(index + 1)] });
     flushSave();
