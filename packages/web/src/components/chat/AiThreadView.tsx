@@ -5,19 +5,35 @@ import { aiApi } from "../../lib/api/resources.js";
 import { dayKey, dayLabel } from "../../lib/chatDayLabels.js";
 import { Icon } from "../ui/Icon.js";
 
-/** Same bubble shape/colors as MessageBubble.tsx (max-w-xs, rounded-2xl, accent-vs-surface) for visual parity with real DM threads, plus a tool-call chip row - see AgentChatPage.tsx (now removed) for the tool-call display this was ported from. */
+/**
+ * Same bubble shape as MessageBubble.tsx (max-w-xs, rounded-2xl) for layout parity with real DM
+ * threads, but assistant replies use a distinct accent-tinted bubble (not the plain `bg-surface`
+ * real received DMs use) plus a small bot-icon chip, so an AI reply can't be mistaken for a
+ * message from a real workspace member at a glance.
+ */
 function AiMessageBubble({ message }: { message: AiChatMessage }) {
   if (message.role === "tool") return null; // raw tool results are implementation detail - the assistant's own reply summarizes what happened
   const isUser = message.role === "user";
   return (
     <div className={`flex flex-col gap-0.5 px-3 py-1 ${isUser ? "items-end" : "items-start"}`}>
-      <div className={`max-w-xs rounded-2xl px-3 py-2 text-sm ${isUser ? "bg-accent text-white" : "bg-surface text-ink"}`}>
-        {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
-        {message.toolCalls?.map((call) => (
-          <p key={call.id} className={`mt-1 flex items-center gap-1 text-xs ${isUser ? "text-white/80" : "text-ink-muted"}`}>
-            <Icon name="terminal" className="h-3 w-3" /> Called <code>{call.name}</code>
-          </p>
-        ))}
+      <div
+        className={`flex max-w-xs items-start gap-1.5 rounded-2xl px-3 py-2 text-sm ${
+          isUser ? "bg-accent text-white" : "border border-accent/25 bg-accent/10 text-ink"
+        }`}
+      >
+        {!isUser && (
+          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent text-white">
+            <Icon name="bot" className="h-2.5 w-2.5" />
+          </span>
+        )}
+        <div className="min-w-0">
+          {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+          {message.toolCalls?.map((call) => (
+            <p key={call.id} className={`mt-1 flex items-center gap-1 text-xs ${isUser ? "text-white/80" : "text-ink-muted"}`}>
+              <Icon name="terminal" className="h-3 w-3" /> Called <code>{call.name}</code>
+            </p>
+          ))}
+        </div>
       </div>
       <span className="px-1 text-[11px] text-ink-muted">{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
     </div>

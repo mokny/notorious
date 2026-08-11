@@ -93,10 +93,10 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
           {aiWorkspaces?.map((workspace) => (
             // The inset border-b (starting after the avatar, not the row's own left edge) is the
             // iMessage list-divider look - a plain `border-b` on the `<li>` would run full-width instead.
-            <li key={workspace.workspaceId} className="relative flex items-center">
+            <li key={workspace.workspaceId} className="relative flex items-center bg-accent/[0.06]">
               <button
                 onClick={() => onSelect(toAiConversationId(workspace.workspaceId))}
-                className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-3 text-left hover:bg-surface"
+                className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-3 text-left hover:bg-accent/10"
               >
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-white">
                   <Icon name="bot" className="h-5 w-5" />

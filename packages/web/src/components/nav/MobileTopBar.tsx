@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { objectApi, workspaceApi } from "../../lib/api/resources.js";
+import { objectApi, schemaApi, workspaceApi } from "../../lib/api/resources.js";
 import { useObjectHistory } from "../../context/ObjectHistoryContext.js";
 import { useTheme } from "../../context/ThemeContext.js";
 import { useDeleteObject } from "../../hooks/useDeleteObject.js";
@@ -74,6 +74,14 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
     queryFn: () => objectApi.get(dashboardObjectId!),
     enabled: Boolean(dashboardObjectId),
   });
+  // Only needed to figure out where `goHome()` lands when there's no
+  // dashboard object set, so `handleBack` can tell whether it's already
+  // there (see homePath below).
+  const { data: homeObjectTypes } = useQuery({
+    queryKey: ["objectTypes", workspaceId],
+    queryFn: () => schemaApi.objectTypes(workspaceId),
+    enabled: !dashboardObjectId,
+  });
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
   const isLocked = Boolean(object?.lockedAt);
   const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
@@ -103,11 +111,32 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
     navigate(dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`);
   }
 
+  // Mirrors WorkspaceHome.tsx's own redirect target, so handleBack can tell
+  // whether we're already home (in which case the next back press should go
+  // to workspace selection rather than bounce in place).
+  const homePath = (() => {
+    if (dashboardObjectId) return `/w/${workspaceId}/objects/${dashboardObjectId}`;
+    if (!homeObjectTypes) return null;
+    const defaultType = homeObjectTypes.find((t) => t.key === "task") ?? homeObjectTypes[0];
+    return defaultType ? `/w/${workspaceId}/types/${defaultType.key}` : `/w/${workspaceId}/search`;
+  })();
+  const isAtHome = homePath !== null && location.pathname === homePath;
+
   function handleBack() {
     const prevId = goBack();
-    if (prevId) navigate(`/w/${workspaceId}/objects/${prevId}`);
-    else if (shareToken) goHome();
-    else navigate("/");
+    if (prevId) {
+      navigate(`/w/${workspaceId}/objects/${prevId}`);
+      return;
+    }
+    if (shareToken) {
+      goHome();
+      return;
+    }
+    if (isAtHome) {
+      navigate("/workspaces");
+      return;
+    }
+    goHome();
   }
 
   return (

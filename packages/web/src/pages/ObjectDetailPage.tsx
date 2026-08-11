@@ -24,6 +24,7 @@ import { ExportMenu } from "../components/ExportMenu.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
 import { PresencePanel } from "../components/PresencePanel.js";
 import { useAuth } from "../context/AuthContext.js";
+import { useConfirm } from "../context/ConfirmContext.js";
 import { useMobileChrome } from "../context/MobileChromeContext.js";
 import { Button } from "../components/ui/Button.js";
 import { Icon } from "../components/ui/Icon.js";
@@ -184,6 +185,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const { addRecent } = useRecentObjects(workspaceId);
   const { visit: visitObjectHistory } = useObjectHistory();
   const { user } = useAuth();
+  const confirm = useConfirm();
 
   const { data: workspace } = useQuery({
     queryKey: ["workspace", workspaceId],
@@ -208,6 +210,24 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     mutationFn: (requiresReverify: boolean) => objectApi.setRequiresReverify(objectId!, { requiresReverify }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
   });
+
+  async function handleToggleRequiresReverify(nextValue: boolean) {
+    const ok = await confirm(
+      nextValue
+        ? {
+            title: "Require re-verification?",
+            description: "Anyone opening this object - including you - will need to re-verify (password or passkey) before viewing or editing it.",
+            confirmLabel: "Require reverify",
+          }
+        : {
+            title: "Remove reverify protection?",
+            description: "This object will become accessible without re-verification, same as any other object.",
+            confirmLabel: "Remove protection",
+            danger: true,
+          },
+    );
+    if (ok) requiresReverifyMutation.mutate(nextValue);
+  }
 
   const commentsDisabledMutation = useMutation({
     mutationFn: (disabled: boolean) => objectApi.setCommentsDisabled(objectId!, { disabled }),
@@ -408,7 +428,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 unprotecting always stays reachable regardless of the object's own current state. */}
             {isOwner && (
               <button
-                onClick={() => requiresReverifyMutation.mutate(!object.requiresReverify)}
+                onClick={() => void handleToggleRequiresReverify(!object.requiresReverify)}
                 disabled={requiresReverifyMutation.isPending}
                 title={object.requiresReverify ? "Remove reverify protection" : "Require re-authentication to view or edit this object"}
                 className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.requiresReverify ? "text-accent" : "text-ink-muted"}`}
