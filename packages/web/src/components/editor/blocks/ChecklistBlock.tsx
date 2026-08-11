@@ -315,6 +315,12 @@ export function ChecklistBlock({
   // handleDragEnd) clears an item out of this set, since it's no longer in
   // the "parked at the bottom by auto-sort" state that jump should undo.
   const movedToBottomRef = useRef<Set<string>>(new Set());
+  // New items added while `sortCheckedToBottom` is on, waiting to jump above
+  // the first checked item once the user is done editing them (see
+  // `finishEditingNewItem`) - kept separate from `movedToBottomRef` since a
+  // brand-new item hasn't been auto-moved *to the bottom* at all, it starts
+  // there and is due to move *up*.
+  const pendingNewItemsRef = useRef<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
   // Set right before an auto-sort reorder's `save()` call, to the rows'
   // pre-reorder positions - the layout effect below diffs against the
@@ -396,11 +402,27 @@ export function ChecklistBlock({
     flushSave();
   }
 
+  /** Called when a new item's textarea loses focus - moves it above the first checked item if it's still waiting on that from `addItem` (a no-op for every other blur). Deliberately not tied to the check/uncheck timer above: a brand-new item should wait for the user to actually finish typing it, not jump out from under them mid-edit. */
+  function finishEditingNewItem(itemId: string | undefined): void {
+    if (!itemId || !pendingNewItemsRef.current.delete(itemId) || !sortCheckedToBottom) return;
+    const current = itemsRef.current;
+    const index = current.findIndex((item) => item.id === itemId);
+    const firstCheckedIndex = current.findIndex((item) => item.checked);
+    if (index === -1 || firstCheckedIndex === -1 || firstCheckedIndex >= index) return;
+    const target = current[index];
+    if (!target) return;
+    flipPrevRectsRef.current = captureRowRects();
+    const without = [...current.slice(0, index), ...current.slice(index + 1)];
+    save({ ...content, items: [...without.slice(0, firstCheckedIndex), target, ...without.slice(firstCheckedIndex)] });
+    flushSave();
+  }
+
   function updateSettings(nextEnabled: boolean): void {
     if (!nextEnabled) {
       moveTimersRef.current.forEach((t) => clearTimeout(t));
       moveTimersRef.current.clear();
       movedToBottomRef.current.clear();
+      pendingNewItemsRef.current.clear();
       save({ ...content, sortCheckedToBottom: nextEnabled });
     } else {
       // Turning it on immediately parks every already-checked item at the
@@ -444,20 +466,17 @@ export function ChecklistBlock({
 
   function addItem() {
     const newItem: ChecklistItem = { id: randomId(), markdown: "", checked: false };
-    // With sortCheckedToBottom on, a brand-new item belongs with the other
-    // open items, not appended after ones already checked off - land it
-    // right above the first checked item instead of at the very end.
-    const firstCheckedIndex = sortCheckedToBottom ? items.findIndex((item) => item.checked) : -1;
-    if (firstCheckedIndex !== -1) {
-      save({ ...content, items: [...items.slice(0, firstCheckedIndex), newItem, ...items.slice(firstCheckedIndex)] });
-      setPendingFocusIndex(firstCheckedIndex);
-      return;
-    }
+    // Starts at the bottom like any new item - `finishEditingNewItem` moves
+    // it above the first checked item once the user is done editing it, so
+    // it doesn't jump out from under them while they're still typing.
+    if (sortCheckedToBottom) pendingNewItemsRef.current.add(newItem.id!);
     save({ ...content, items: [...items, newItem] });
     setPendingFocusIndex(items.length);
   }
 
   function removeItem(index: number) {
+    const removedId = items[index]?.id;
+    if (removedId) pendingNewItemsRef.current.delete(removedId);
     save({ ...content, items: items.filter((_, i) => i !== index) });
   }
 
@@ -563,7 +582,10 @@ export function ChecklistBlock({
                 onChangeText={(markdown) => updateItem(index, { markdown })}
                 onEnter={addItem}
                 onRemove={() => removeItem(index)}
-                onFlush={flushSave}
+                onFlush={() => {
+                  flushSave();
+                  finishEditingNewItem(item.id);
+                }}
                 readOnly={readOnly}
                 registerInputRef={(el) => {
                   inputRefs.current[index] = el;
