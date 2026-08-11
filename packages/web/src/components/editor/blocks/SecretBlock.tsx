@@ -83,6 +83,11 @@ export function SecretBlock({
       ) : (
         <button
           type="button"
+          // Copying doesn't mutate content, just reveals it via the clipboard -
+          // stays reachable while the object is locked, same as the "view, not
+          // edit" download button in MediaBlocks.tsx (see READ_ONLY_CONTENT_CLASS's
+          // own doc comment).
+          data-view-toggle
           onClick={() => void handleCopy()}
           disabled={!content.text}
           title={content.text ? "Click to copy" : "No text set yet"}
