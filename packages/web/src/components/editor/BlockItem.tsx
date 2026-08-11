@@ -22,6 +22,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
     createBlockAfter,
     updateBlockContent,
     toggleChecklistItem,
+    reorderChecklistItems,
     toggleWhiteboardPresenting,
     updateVotingSettings,
     deleteBlock,
@@ -148,6 +149,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
             objectId={objectId}
             onSave={(content) => updateBlockContent(block.id, content)}
             onToggleChecklistItem={(itemId, checked) => toggleChecklistItem(block.id, itemId, checked)}
+            onReorderChecklistItems={(itemIds) => reorderChecklistItems(block.id, itemIds)}
             onToggleWhiteboardPresenting={(presenting) => toggleWhiteboardPresenting(block.id, presenting)}
             onUpdateVotingSettings={(allowMultipleVotes, votingEndsAt) => updateVotingSettings(block.id, allowMultipleVotes, votingEndsAt)}
             onEnter={() => createBlockAfter(block.parentBlockId, block.id, "paragraph")}

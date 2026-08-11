@@ -38,6 +38,20 @@ export const toggleChecklistItemSchema = z.object({
 export type ToggleChecklistItemInput = z.infer<typeof toggleChecklistItemSchema>;
 
 /**
+ * Persists a checklist's item *order* only (see blocks/service.ts's
+ * `reorderChecklistItems`, which rejects anything that isn't a pure
+ * permutation of the existing item ids) - same lock-exemption reasoning as
+ * `toggleChecklistItemSchema` above: the client's `sortCheckedToBottom`
+ * auto-sort is a direct, automatic consequence of checking an item off, so
+ * it needs to reach a locked object too, but only for reordering, never for
+ * adding/removing/editing an item's text.
+ */
+export const reorderChecklistItemsSchema = z.object({
+  itemIds: z.array(z.string()),
+});
+export type ReorderChecklistItemsInput = z.infer<typeof reorderChecklistItemsSchema>;
+
+/**
  * Starting/stopping a whiteboard presentation is deliberately exempt from
  * the object-lock, but only for the workspace owner (see
  * workspaces/access.ts's `allowWhenLocked` and blocks/routes.ts) - the owner

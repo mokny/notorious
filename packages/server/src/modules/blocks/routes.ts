@@ -6,6 +6,7 @@ import {
   importMarkdownSchema,
   restoreBlockSchema,
   toggleChecklistItemSchema,
+  reorderChecklistItemsSchema,
   toggleWhiteboardPresentingSchema,
   castVoteSchema,
   updateVotingSettingsSchema,
@@ -134,6 +135,39 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
       clientId: getClientId(request),
       action: "updated",
       summary: `${actor.actorName} ${input.checked ? "checked off" : "unchecked"} a checklist item`,
+      entity: "block",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return block;
+  });
+
+  // The client's `sortCheckedToBottom` auto-sort (checking an item moves it
+  // to the bottom, unchecking a previously auto-moved one jumps it back) is
+  // an automatic consequence of the exempt toggle above and needs the same
+  // lock exemption - see reorderChecklistItemsSchema's doc comment for why
+  // this is a separate narrow endpoint instead of going through the generic
+  // PATCH above (which is *not* exempt and would otherwise 423 on a locked
+  // object, leaving the checkbox state persisted but the reorder silently
+  // lost).
+  app.patch("/api/v1/blocks/:id/checklist-reorder", async (request) => {
+    const { id } = request.params as { id: string };
+    const objectId = await blockService.getBlockObjectId(id);
+    const workspaceId = await getObjectWorkspaceId(objectId);
+    const access = await requireAccess(request, workspaceId, "editor", { objectId, allowWhenLocked: true });
+    const input = reorderChecklistItemsSchema.parse(request.body);
+    const block = await blockService.reorderChecklistItems(id, input.itemIds);
+
+    const actor = resolveActor(request, access);
+    await recordAndBroadcast({
+      workspaceId,
+      objectId,
+      actorId: actor.actorId,
+      actorName: actor.actorName,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: `${actor.actorName} reordered a checklist`,
       entity: "block",
       entityId: id,
       realtimeAction: "updated",

@@ -276,6 +276,40 @@ export async function toggleChecklistItem(blockId: string, itemId: string, check
 }
 
 /**
+ * Reorders a checklist's items to the given `itemIds` order - and nothing
+ * else: rejected unless `itemIds` is an exact permutation of the block's
+ * current item ids, so this can never be used to sneak in an add/remove/text
+ * edit under the same lock exemption as `toggleChecklistItem` above. Exists
+ * because the client's `sortCheckedToBottom` auto-sort (moving a checked
+ * item to the bottom, or a just-unchecked one back to where it was) is a
+ * direct, automatic consequence of toggling a checkbox and needs the same
+ * lock exemption that toggling itself already has - the generic `updateBlock`
+ * content save it would otherwise go through is not exempt, so on a locked
+ * object the checkbox state would persist but the reorder silently wouldn't,
+ * leaving client and server order out of sync.
+ */
+export async function reorderChecklistItems(blockId: string, itemIds: string[]): Promise<Block> {
+  const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
+  const row = rows[0];
+  if (!row) throw notFound("Block not found");
+  if (row.type !== "checklist") throw badRequest("Not a checklist block");
+
+  const parsed = JSON.parse(row.content) as { items?: Array<{ id?: string; checked: boolean }> };
+  const items = parsed.items ?? [];
+  const byId = new Map(items.map((item) => [item.id, item]));
+  if (itemIds.length !== items.length || !itemIds.every((id) => byId.has(id)) || new Set(itemIds).size !== itemIds.length) {
+    throw badRequest("itemIds must be a permutation of the checklist's current item ids");
+  }
+
+  const updatedAt = nowIso();
+  const content = JSON.stringify({ ...parsed, items: itemIds.map((id) => byId.get(id)) });
+  await db.update(blocks).set({ content, updatedAt }).where(eq(blocks.id, blockId));
+  await touchObject(row.objectId);
+
+  return toBlock({ ...row, content, updatedAt });
+}
+
+/**
  * Flips a whiteboard block's `presenting` field, leaving `sceneJson` and
  * everything else untouched. Deliberately separate from `updateBlock` -
  * callers use it specifically because it's exempt from the object-lock check

@@ -254,6 +254,17 @@ export function BlockEditor({
     onSuccess: invalidate,
   });
 
+  // Own mutation, not routed through `updateMutation` - the client's
+  // `sortCheckedToBottom` auto-sort reorder is a direct consequence of the
+  // toggle above and needs the same lock exemption (see
+  // reorderChecklistItemsSchema): the generic content-edit path isn't
+  // exempt, and would leave a locked object's checkbox state persisted but
+  // its reorder silently lost.
+  const reorderChecklistItemsMutation = useMutation({
+    mutationFn: (input: { blockId: string; itemIds: string[] }) => blockApi.reorderChecklistItems(input.blockId, { itemIds: input.itemIds }),
+    onSuccess: invalidate,
+  });
+
   // Own mutation, not routed through `updateMutation` - same reasoning as
   // `toggleChecklistItemMutation` above: this hits a dedicated endpoint
   // that's exempt from the object lock (owner-only), so it needs to stay a
@@ -596,6 +607,8 @@ export function BlockEditor({
         updateBlockContent: (blockId, content) => performUpdate(blockId, content),
         toggleChecklistItem: (blockId, itemId, checked) =>
           toggleChecklistItemMutation.mutateAsync({ blockId, itemId, checked }).then(() => undefined),
+        reorderChecklistItems: (blockId, itemIds) =>
+          reorderChecklistItemsMutation.mutateAsync({ blockId, itemIds }).then(() => undefined),
         toggleWhiteboardPresenting: (blockId, presenting) =>
           toggleWhiteboardPresentingMutation.mutateAsync({ blockId, presenting }).then(() => undefined),
         updateVotingSettings: (blockId, allowMultipleVotes, votingEndsAt) =>

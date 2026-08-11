@@ -60,6 +60,8 @@ export interface BlockRendererProps {
   onSave: (content: Record<string, unknown>) => Promise<void>;
   /** Exempt from the object lock - see ChecklistBlock.tsx and toggleChecklistItemSchema. Only relevant for `checklist` blocks. */
   onToggleChecklistItem: (itemId: string, checked: boolean) => Promise<void>;
+  /** Exempt from the object lock - see ChecklistBlock.tsx and reorderChecklistItemsSchema. Only relevant for `checklist` blocks. */
+  onReorderChecklistItems: (itemIds: string[]) => Promise<void>;
   /** Owner-only, exempt from the object lock - see WhiteboardBlock.tsx and toggleWhiteboardPresentingSchema. Only relevant for `whiteboard` blocks. */
   onToggleWhiteboardPresenting: (presenting: boolean) => Promise<void>;
   /** Owner-only, exempt from the object lock - see VotingBlock.tsx and updateVotingSettingsSchema. Only relevant for `voting` blocks. */
@@ -83,6 +85,7 @@ export function BlockRenderer({
   objectId,
   onSave,
   onToggleChecklistItem,
+  onReorderChecklistItems,
   onToggleWhiteboardPresenting,
   onUpdateVotingSettings,
   onSlashSelect,
@@ -130,7 +133,15 @@ export function BlockRenderer({
     case "callout":
       return <CalloutBlock blockId={block.id} content={content<CalloutContent>()} onSave={save} onEnter={onEnter} />;
     case "checklist":
-      return <ChecklistBlock blockId={block.id} content={content<ChecklistContent>()} onSave={save} onToggleItem={onToggleChecklistItem} />;
+      return (
+        <ChecklistBlock
+          blockId={block.id}
+          content={content<ChecklistContent>()}
+          onSave={save}
+          onToggleItem={onToggleChecklistItem}
+          onReorderItems={onReorderChecklistItems}
+        />
+      );
     case "table":
       return <TableBlock blockId={block.id} content={content<TableContent>()} onSave={save} />;
     case "code":

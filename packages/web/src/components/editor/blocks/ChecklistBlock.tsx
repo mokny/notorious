@@ -273,12 +273,15 @@ export function ChecklistBlock({
   content: externalContent,
   onSave,
   onToggleItem,
+  onReorderItems,
 }: {
   blockId: string;
   content: ChecklistContent;
   onSave: (c: ChecklistContent) => Promise<void>;
   /** Exempt-from-lock path for checking an item off - see toggleChecklistItemSchema. */
   onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
+  /** Exempt-from-lock path for the `sortCheckedToBottom` auto-sort reorder below - see reorderChecklistItemsSchema. `save()`'s own generic PATCH isn't exempt, so on a locked object it would otherwise persist the checkbox toggle but silently lose the reorder that's supposed to follow it - this is called alongside `save()` (not instead of it) so the common unlocked case keeps its single normal write, and the locked case still gets the reorder committed by this one when the other 423s. */
+  onReorderItems?: (itemIds: string[]) => Promise<void>;
 }) {
   const { readOnly, searchHighlight } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
@@ -374,6 +377,14 @@ export function ChecklistBlock({
     }
   }
 
+  /** Persists a reordered `items` array via the normal debounced `save()` *and*, if every item already has a stable id, the lock-exempt `onReorderItems` - see that prop's own doc comment for why both. */
+  function persistReorder(nextItems: ChecklistItem[]): void {
+    save({ ...content, items: nextItems });
+    flushSave();
+    const itemIds = nextItems.map((item) => item.id).filter((id): id is string => Boolean(id));
+    if (itemIds.length === nextItems.length) onReorderItems?.(itemIds).catch(() => {});
+  }
+
   function scheduleMoveToBottom(itemId: string): void {
     clearMoveTimer(itemId);
     moveTimersRef.current.set(
@@ -387,8 +398,7 @@ export function ChecklistBlock({
         movedToBottomRef.current.add(itemId);
         blurFocusWithinRow(itemId);
         flipPrevRectsRef.current = captureRowRects();
-        save({ ...content, items: [...current.slice(0, index), ...current.slice(index + 1), target] });
-        flushSave();
+        persistReorder([...current.slice(0, index), ...current.slice(index + 1), target]);
       }, CHECKED_MOVE_DELAY_MS),
     );
   }
@@ -408,8 +418,7 @@ export function ChecklistBlock({
     if (index <= 0 || !target) return;
     blurFocusWithinRow(itemId);
     flipPrevRectsRef.current = captureRowRects();
-    save({ ...content, items: [target, ...current.slice(0, index), ...current.slice(index + 1)] });
-    flushSave();
+    persistReorder([target, ...current.slice(0, index), ...current.slice(index + 1)]);
   }
 
   /** Called when a new item's textarea loses focus - moves it above the first checked item if it's still waiting on that from `addItem` (a no-op for every other blur). Deliberately not tied to the check/uncheck timer above: a brand-new item should wait for the user to actually finish typing it, not jump out from under them mid-edit. */

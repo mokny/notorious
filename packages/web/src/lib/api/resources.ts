@@ -37,6 +37,7 @@ import type {
   CreateBlockInput,
   UpdateBlockInput,
   ToggleChecklistItemInput,
+  ReorderChecklistItemsInput,
   ToggleWhiteboardPresentingInput,
   GenerateAiBlockInput,
   CastVoteInput,
@@ -266,6 +267,9 @@ export const blockApi = {
   /** Exempt from the object lock - see toggleChecklistItemSchema. */
   toggleChecklistItem: (id: string, input: ToggleChecklistItemInput) =>
     apiRequest<Block>(`/api/v1/blocks/${id}/checklist-item`, { method: "PATCH", body: input }),
+  /** Exempt from the object lock - see reorderChecklistItemsSchema. */
+  reorderChecklistItems: (id: string, input: ReorderChecklistItemsInput) =>
+    apiRequest<Block>(`/api/v1/blocks/${id}/checklist-reorder`, { method: "PATCH", body: input }),
   /** Owner-only, exempt from the object lock - see toggleWhiteboardPresentingSchema. */
   toggleWhiteboardPresenting: (id: string, input: ToggleWhiteboardPresentingInput) =>
     apiRequest<Block>(`/api/v1/blocks/${id}/whiteboard-presenting`, { method: "PATCH", body: input }),
