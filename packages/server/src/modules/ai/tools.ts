@@ -4,11 +4,66 @@ import { requireWorkspaceRole } from "../workspaces/access.js";
 import { listWorkspacesForUser } from "../workspaces/service.js";
 import { listObjectTypes } from "../schema/service.js";
 import { searchObjects } from "../search/service.js";
+import { getUserById } from "../auth/service.js";
+import { recordAndBroadcast } from "../realtime/activity.js";
+import type { ActivityEntry, RealtimeEvent } from "@notorious/shared";
 import * as objectService from "../objects/service.js";
 import * as blockService from "../blocks/service.js";
 
 export interface AiToolContext {
   userId: string;
+}
+
+/** No real browser tab originates an AI-tool write, so a fixed sentinel (never a real `getClientId()` value) is used as `recordAndBroadcast`'s `clientId` - every connected tab, including the one the acting user has open, then treats the resulting event as a genuine remote change instead of echo-skipping it. */
+const AI_TOOL_CLIENT_ID = "ai-agent";
+
+/** Attributes an AI-tool write to the user who's actually driving the agent (chat or MCP caller) - see AI_TOOLS's own doc comment for why every tool re-resolves access itself; this mirrors that same actor for activity log/webhook/realtime purposes instead of introducing a separate synthetic "AI" identity. */
+async function resolveActorName(userId: string): Promise<string> {
+  const user = await getUserById(userId);
+  return user?.name ?? "AI agent";
+}
+
+async function broadcastObjectChange(
+  workspaceId: string,
+  objectId: string,
+  actorId: string,
+  action: ActivityEntry["action"],
+  summary: string,
+): Promise<void> {
+  await recordAndBroadcast({
+    workspaceId,
+    objectId,
+    actorId,
+    clientId: AI_TOOL_CLIENT_ID,
+    action,
+    summary,
+    entity: "object",
+    entityId: objectId,
+    realtimeAction: action === "created" ? "created" : "updated",
+  });
+}
+
+async function broadcastBlockChange(
+  workspaceId: string,
+  objectId: string,
+  actorId: string,
+  actorName: string,
+  blockId: string,
+  summary: string,
+  realtimeAction: RealtimeEvent["action"],
+): Promise<void> {
+  await recordAndBroadcast({
+    workspaceId,
+    objectId,
+    actorId,
+    actorName,
+    clientId: AI_TOOL_CLIENT_ID,
+    action: "updated",
+    summary,
+    entity: "block",
+    entityId: blockId,
+    realtimeAction,
+  });
 }
 
 export interface AiTool<Shape extends ZodRawShape = ZodRawShape> {
@@ -105,6 +160,8 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
         title: args.title,
         values: args.values ?? {},
       });
+      const actorName = await resolveActorName(ctx.userId);
+      await broadcastObjectChange(args.workspaceId, object.id, ctx.userId, "created", `${actorName} created "${object.title}"`);
       return { id: object.id, title: object.title };
     },
   },
@@ -117,8 +174,10 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
       values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()])).optional(),
     },
     execute: async (args, ctx) => {
-      await requireEditorForObject(ctx.userId, args.objectId);
+      const workspaceId = await requireEditorForObject(ctx.userId, args.objectId);
       const object = await objectService.updateObject(args.objectId, { title: args.title, values: args.values });
+      const actorName = await resolveActorName(ctx.userId);
+      await broadcastObjectChange(workspaceId, args.objectId, ctx.userId, "updated", `${actorName} updated "${object.title}"`);
       return { id: object.id, title: object.title };
     },
   },
@@ -127,8 +186,10 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
     description: "Archive an object (soft delete - it can be restored later).",
     shape: { objectId: z.string() },
     execute: async (args, ctx) => {
-      await requireEditorForObject(ctx.userId, args.objectId);
+      const workspaceId = await requireEditorForObject(ctx.userId, args.objectId);
       await objectService.archiveObject(args.objectId);
+      const actorName = await resolveActorName(ctx.userId);
+      await broadcastObjectChange(workspaceId, args.objectId, ctx.userId, "archived", `${actorName} archived an object`);
       return { ok: true };
     },
   },
@@ -137,7 +198,7 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
     description: "Append a paragraph of text to the end of an object's content.",
     shape: { objectId: z.string(), markdown: z.string().describe("The paragraph's text, as Markdown") },
     execute: async (args, ctx) => {
-      await requireEditorForObject(ctx.userId, args.objectId);
+      const workspaceId = await requireEditorForObject(ctx.userId, args.objectId);
       const block = await blockService.createBlock({
         objectId: args.objectId,
         parentBlockId: null,
@@ -145,6 +206,8 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
         type: "paragraph",
         content: { markdown: args.markdown },
       });
+      const actorName = await resolveActorName(ctx.userId);
+      await broadcastBlockChange(workspaceId, args.objectId, ctx.userId, actorName, block.id, `${actorName} added a block`, "created");
       return { id: block.id };
     },
   },
@@ -156,7 +219,7 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
       items: z.array(z.string()).describe("The checklist item texts, unchecked"),
     },
     execute: async (args, ctx) => {
-      await requireEditorForObject(ctx.userId, args.objectId);
+      const workspaceId = await requireEditorForObject(ctx.userId, args.objectId);
       const block = await blockService.createBlock({
         objectId: args.objectId,
         parentBlockId: null,
@@ -164,6 +227,8 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
         type: "checklist",
         content: { items: args.items.map((markdown: string) => ({ markdown, checked: false })) },
       });
+      const actorName = await resolveActorName(ctx.userId);
+      await broadcastBlockChange(workspaceId, args.objectId, ctx.userId, actorName, block.id, `${actorName} added a block`, "created");
       return { id: block.id };
     },
   },

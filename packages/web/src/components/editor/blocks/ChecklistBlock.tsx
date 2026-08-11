@@ -443,7 +443,17 @@ export function ChecklistBlock({
   }
 
   function addItem() {
-    save({ ...content, items: [...items, { id: randomId(), markdown: "", checked: false }] });
+    const newItem: ChecklistItem = { id: randomId(), markdown: "", checked: false };
+    // With sortCheckedToBottom on, a brand-new item belongs with the other
+    // open items, not appended after ones already checked off - land it
+    // right above the first checked item instead of at the very end.
+    const firstCheckedIndex = sortCheckedToBottom ? items.findIndex((item) => item.checked) : -1;
+    if (firstCheckedIndex !== -1) {
+      save({ ...content, items: [...items.slice(0, firstCheckedIndex), newItem, ...items.slice(firstCheckedIndex)] });
+      setPendingFocusIndex(firstCheckedIndex);
+      return;
+    }
+    save({ ...content, items: [...items, newItem] });
     setPendingFocusIndex(items.length);
   }
 
