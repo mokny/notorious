@@ -4,6 +4,7 @@ import type { AiChatMessage } from "@notorious/shared";
 import { aiApi } from "../../lib/api/resources.js";
 import { dayKey, dayLabel } from "../../lib/chatDayLabels.js";
 import { Icon } from "../ui/Icon.js";
+import { useSpeechToText, speechToTextSupported } from "../../hooks/useSpeechToText.js";
 
 /**
  * Same bubble shape as MessageBubble.tsx (max-w-xs, rounded-2xl) for layout parity with real DM
@@ -46,6 +47,7 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
   const queryKey = ["aiChat", workspaceId];
   const bottomRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
+  const { isListening, toggleListening } = useSpeechToText(setInput);
 
   const { data: messages } = useQuery({ queryKey, queryFn: () => aiApi.listMessages(workspaceId) });
 
@@ -137,14 +139,38 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
           disabled={sendMutation.isPending}
           className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
         />
-        <button
-          type="submit"
-          disabled={sendMutation.isPending || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-40"
-          title="Send"
-        >
-          <Icon name="send" className="h-4 w-4" />
-        </button>
+        {/* Same icon-swap rule as Composer.tsx: while listening, the pulsing
+            stop control stays put even once dictated text starts filling the
+            field, only falling back to the input-driven send/mic logic once
+            recording ends. */}
+        {isListening ? (
+          <button
+            type="button"
+            onClick={toggleListening}
+            className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-red-500 text-white"
+            title="Stop dictation"
+          >
+            <Icon name="mic" className="h-4 w-4" />
+          </button>
+        ) : !input.trim() && speechToTextSupported ? (
+          <button
+            type="button"
+            onClick={toggleListening}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
+            title="Dictate"
+          >
+            <Icon name="mic" className="h-4 w-4" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={sendMutation.isPending || !input.trim()}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-40"
+            title="Send"
+          >
+            <Icon name="send" className="h-4 w-4" />
+          </button>
+        )}
       </form>
     </div>
   );

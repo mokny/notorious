@@ -1,37 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Message } from "@notorious/shared";
 import { chatApi } from "../../lib/api/resources.js";
 import { Icon } from "../ui/Icon.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
+import { useSpeechToText, speechToTextSupported } from "../../hooks/useSpeechToText.js";
 
 const TYPING_DEBOUNCE_MS = 2000;
-
-interface SpeechRecognitionResultLike {
-  isFinal: boolean;
-  0: { transcript: string };
-}
-interface SpeechRecognitionEventLike extends Event {
-  resultIndex: number;
-  results: ArrayLike<SpeechRecognitionResultLike>;
-}
-interface SpeechRecognitionLike extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-}
-
-// Chrome/Safari/Edge only - not implemented in Firefox. Read once at module
-// scope (not per-render): the mic button in the composer below is simply
-// omitted entirely when this is undefined, falling back to today's
-// always-visible send button.
-const SpeechRecognitionCtor = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ??
-  (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
 
 export function Composer({
   conversationId,
@@ -46,45 +21,11 @@ export function Composer({
   const [body, setBody] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{ id: string; filename: string }[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastTypingSentRef = useRef(0);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const finalTranscriptRef = useRef("");
   const queryClient = useQueryClient();
   const { sendTyping } = useChatRealtime();
-
-  useEffect(() => () => recognitionRef.current?.stop(), []);
-
-  function toggleListening() {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-    if (!SpeechRecognitionCtor) return;
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = navigator.language;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    finalTranscriptRef.current = "";
-    recognition.onresult = (event) => {
-      let interimTranscript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (!result) continue;
-        if (result.isFinal) finalTranscriptRef.current += result[0].transcript;
-        else interimTranscript += result[0].transcript;
-      }
-      setBody(finalTranscriptRef.current + interimTranscript);
-    };
-    // Fails silently (permission denied, no mic, etc.) - matches the rest of
-    // the app's getUserMedia error handling, see CallContext.tsx/PreJoinLobby.tsx.
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-  }
+  const { isListening, toggleListening } = useSpeechToText(setBody);
 
   const sendMutation = useMutation({
     mutationFn: () =>
@@ -200,7 +141,7 @@ export function Composer({
             >
               <Icon name="mic" className="h-4 w-4" />
             </button>
-          ) : !hasContent && SpeechRecognitionCtor ? (
+          ) : !hasContent && speechToTextSupported ? (
             <button
               type="button"
               onClick={toggleListening}
