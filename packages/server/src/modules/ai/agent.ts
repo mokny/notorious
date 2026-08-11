@@ -27,21 +27,22 @@ function systemPrompt(workspaceId: string, options: { purposeInstructions: strin
 }
 
 /**
- * Keeps only the most recent `limit` visible (user/assistant) chat turns
- * plus the message just sent, cutting at a clean turn boundary so a `tool`
- * row is never left dangling without the assistant call that produced it
- * (tool rows always follow their assistant call in `messages`, oldest-first,
- * never precede it). `limit <= 0` keeps just the message just sent.
+ * Keeps only the most recent `limit` user turns (each with its assistant
+ * reply and any tool calls/results in between) plus the message just sent.
+ * Must cut exactly at a `user` message - some providers (Gemini) reject a
+ * history that doesn't start with a user turn, e.g. one starting on an
+ * assistant message that has pending tool calls. `limit <= 0` keeps just the
+ * message just sent (always the last row, always role "user").
  */
 function limitHistory(messages: AiChatMessage[], limit: number): AiChatMessage[] {
   if (limit <= 0) return messages.slice(-1);
-  const visibleIndices: number[] = [];
+  const userIndices: number[] = [];
   messages.forEach((message, index) => {
-    if (message.role !== "tool") visibleIndices.push(index);
+    if (message.role === "user") userIndices.push(index);
   });
   const keep = limit + 1; // +1 for the message just sent, on top of `limit` prior turns
-  if (visibleIndices.length <= keep) return messages;
-  return messages.slice(visibleIndices[visibleIndices.length - keep]);
+  if (userIndices.length <= keep) return messages;
+  return messages.slice(userIndices[userIndices.length - keep]);
 }
 
 function toChatMessage(message: AiChatMessage): ChatMessage {
