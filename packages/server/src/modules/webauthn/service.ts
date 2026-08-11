@@ -115,7 +115,7 @@ export async function generateRegistrationOptionsForUser(
     userDisplayName: name,
     attestationType: "none",
     excludeCredentials: existing.map((c) => ({ id: c.credentialId, transports: parseTransports(c.transports) })),
-    authenticatorSelection: { residentKey: "required", userVerification: "preferred" },
+    authenticatorSelection: { residentKey: "required", userVerification: "required" },
   });
 
   await storeChallenge(reply, userId, options.challenge, "register");
@@ -163,7 +163,7 @@ export async function verifyRegistration(
 export async function generateLoginOptions(reply: FastifyReply): Promise<PublicKeyCredentialRequestOptionsJSON> {
   const options = await generateAuthenticationOptions({
     rpID: getRpId(),
-    userVerification: "preferred",
+    userVerification: "required",
   });
   await storeChallenge(reply, null, options.challenge, "login");
   return options;
@@ -192,7 +192,7 @@ export async function generateReverifyOptions(reply: FastifyReply, userId: strin
 
   const options = await generateAuthenticationOptions({
     rpID: getRpId(),
-    userVerification: "preferred",
+    userVerification: "required",
     allowCredentials: rows.map((row) => ({ id: row.credentialId, transports: parseTransports(row.transports) })),
   });
   await storeChallenge(reply, userId, options.challenge, "reverify");
