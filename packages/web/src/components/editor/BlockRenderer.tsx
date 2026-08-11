@@ -18,6 +18,7 @@ import type {
   MathContent,
   MermaidContent,
   ToggleContent,
+  SecretContent,
   ColumnsContent,
   DatabaseViewContent,
   SubObjectContent,
@@ -40,6 +41,7 @@ import { ImageBlock, VideoBlock, EmbedBlock, PdfBlock, AudioBlock, FileBlock } f
 import { MathBlock } from "./blocks/MathBlock.js";
 import { MermaidBlock } from "./blocks/MermaidBlock.js";
 import { ToggleBlock } from "./blocks/ToggleBlock.js";
+import { SecretBlock } from "./blocks/SecretBlock.js";
 import { DividerBlock } from "./blocks/DividerBlock.js";
 import { ColumnsBlock } from "./blocks/ColumnsBlock.js";
 import { DatabaseViewBlock } from "./blocks/DatabaseViewBlock.js";
@@ -155,6 +157,8 @@ export function BlockRenderer({
           {toggleChildren}
         </ToggleBlock>
       );
+    case "secret":
+      return <SecretBlock content={content<SecretContent>()} onSave={save} />;
     case "divider":
       return <DividerBlock />;
     case "columns":

@@ -8,6 +8,7 @@ import { useDeleteObject } from "../../hooks/useDeleteObject.js";
 import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
 import { useMobileChrome } from "../../context/MobileChromeContext.js";
 import { useAuth } from "../../context/AuthContext.js";
+import { useConfirm } from "../../context/ConfirmContext.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { ShareDialog } from "../ShareDialog.js";
 import { ExportMenu } from "../ExportMenu.js";
@@ -46,6 +47,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
   const { entries, current, goBack, jumpTo } = useObjectHistory();
   const { sectionsVisible, setSectionsVisible } = useMobileChrome();
   const { theme, toggle: toggleTheme } = useTheme();
+  const confirm = useConfirm();
   const [breadcrumbOpen, setBreadcrumbOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -96,6 +98,30 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
     mutationFn: (disabled: boolean) => objectApi.setCommentsDisabled(routeObjectId!, { disabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", routeObjectId] }),
   });
+  const requiresReverifyMutation = useMutation({
+    mutationFn: (requiresReverify: boolean) => objectApi.setRequiresReverify(routeObjectId!, { requiresReverify }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", routeObjectId] }),
+  });
+
+  // Mirrors ObjectDetailPage.tsx's identical handler (desktop toolbar shield toggle) - same
+  // confirm copy, same mutation - just reachable from the "…" menu instead on phone.
+  async function handleToggleRequiresReverify(nextValue: boolean) {
+    const ok = await confirm(
+      nextValue
+        ? {
+            title: "Require re-verification?",
+            description: "Anyone opening this object - including you - will need to re-verify (password or passkey) before viewing or editing it.",
+            confirmLabel: "Require reverify",
+          }
+        : {
+            title: "Remove reverify protection?",
+            description: "This object will become accessible without re-verification, same as any other object.",
+            confirmLabel: "Remove protection",
+            danger: true,
+          },
+    );
+    if (ok) requiresReverifyMutation.mutate(nextValue);
+  }
 
   const { deleteObject } = useDeleteObject(workspaceId, onObjectPage ? routeObjectId : undefined);
 
@@ -216,6 +242,18 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
         </button>
 
         <IOSMenu open={menuOpen} onClose={() => setMenuOpen(false)}>
+          {onObjectPage && object && !shareToken && isOwner && (
+            <IOSMenuGroup>
+              <IOSMenuItem
+                icon="shield"
+                label={object.requiresReverify ? "Disable reverification" : "Require reverification"}
+                onClick={() => {
+                  setMenuOpen(false);
+                  void handleToggleRequiresReverify(!object.requiresReverify);
+                }}
+              />
+            </IOSMenuGroup>
+          )}
           {onObjectPage && object && (
             <IOSMenuGroup>
               <IOSMenuItem

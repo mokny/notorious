@@ -107,6 +107,10 @@ export interface DatabaseViewContent {
 export interface ToggleContent {
   summaryMarkdown: string;
 }
+/** Masked-until-clicked short text (see SecretBlock.tsx) - shown as a fixed-width dot mask; clicking copies `text` to the clipboard instead of revealing it on screen. Stored as plain text like every other block, not encrypted. */
+export interface SecretContent {
+  text: string;
+}
 /** Embeds a link to another object inline in the document, expandable to that object's own sub-objects (recursively). `objectId` is null until a target has been picked. */
 export interface SubObjectContent {
   objectId: string | null;

@@ -441,6 +441,8 @@ export function BlockEditor({
         return { columnCount: 2 };
       case "toggle":
         return { summaryMarkdown: "" };
+      case "secret":
+        return { text: "" };
       case "sub_object":
         return { objectId: null };
       case "bookmark":

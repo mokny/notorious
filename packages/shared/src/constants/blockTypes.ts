@@ -16,6 +16,7 @@ export const BLOCK_TYPES = [
   "math",
   "mermaid",
   "toggle",
+  "secret",
   "divider",
   "columns",
   "database_view",
@@ -42,6 +43,7 @@ export const RICH_TEXT_BLOCK_TYPES: readonly BlockType[] = [
 
 /** Block types that cannot contain child blocks. */
 export const LEAF_BLOCK_TYPES: readonly BlockType[] = [
+  "secret",
   "image",
   "video",
   "embed",

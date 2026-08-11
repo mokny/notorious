@@ -531,7 +531,13 @@ export function ChecklistBlock({
         }}
       >
         <SortableContext items={items.map((item, index) => item.id ?? `unindexed-${index}`)} strategy={verticalListSortingStrategy}>
-          <div ref={listRef}>
+          {/* `overflowAnchor: none` opts every row out of the browser's scroll-anchoring - without
+              it, Chrome compensates the page's scroll position to keep whatever row is currently
+              its anchor node visually still whenever the auto-sort reorder above moves items in the
+              DOM, fighting with (and undoing) the FLIP animation's own "stay visually put" transform
+              and making the whole page jump. The FLIP effect above already keeps rows visually
+              stable, so scroll-anchoring's compensation is pure interference here. */}
+          <div ref={listRef} style={{ overflowAnchor: "none" }}>
             {items.map((item, index) => (
               <ChecklistItemRow
                 key={item.id ?? index}

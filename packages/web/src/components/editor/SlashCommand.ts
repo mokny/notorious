@@ -37,6 +37,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "math", label: "Math", description: "LaTeX formula" },
   { type: "mermaid", label: "Mermaid diagram", description: "Flowcharts and diagrams" },
   { type: "toggle", label: "Toggle", description: "Collapsible section" },
+  { type: "secret", label: "Secret", description: "Hidden text, revealed only by copying to the clipboard" },
   { type: "divider", label: "Divider", description: "Horizontal rule" },
   { type: "columns", label: "Columns", description: "Side-by-side layout" },
   { type: "database_view", label: "Linked view", description: "Embed a saved view of objects" },
