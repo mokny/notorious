@@ -16,6 +16,8 @@ export interface User {
   createdAt: ISODateString;
   /** Whether TOTP two-factor authentication is set up and confirmed for this account (see modules/twoFactor/) - never exposes the secret itself, just this flag. */
   totpEnabled: boolean;
+  /** Whether Web Push should still show an OS notification while the user already has a tab focused/visible (see push/service.ts::notifyUser and push-sw.ts). Defaults to true. */
+  pushShowWhenOpen: boolean;
 }
 
 /**

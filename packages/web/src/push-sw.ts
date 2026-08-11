@@ -58,10 +58,30 @@ registerRoute(
   }),
 );
 
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
-  const payload = event.data.json() as PushNotificationPayload;
+// Whether any of the user's tabs/PWA windows is currently focused and
+// visible - used to hold back an OS notification for `suppressWhenFocused`
+// payloads (see push.ts's doc comment). `call` never carries that flag, so
+// this is never consulted for a ringing call.
+async function anyWindowFocused(): Promise<boolean> {
+  const windowClients = (await self.clients.matchAll({ type: "window", includeUncontrolled: true })) as WindowClient[];
+  return windowClients.some((client) => client.focused && client.visibilityState === "visible");
+}
 
+async function updateBadge(payload: PushNotificationPayload): Promise<void> {
+  // Best-effort: this is what makes the app-icon badge update while the app
+  // is backgrounded/fully closed, not just live via the WS-driven path in
+  // chatBadge.ts (which only runs while a tab/PWA instance is open).
+  // `setAppBadge`/`clearAppBadge` are part of the Badging API's
+  // WorkerNavigator mixin, so they exist on `self.navigator` here too -
+  // guarded the same way chatBadge.ts guards the foreground call, since
+  // support is inconsistent (works in Chromium and iOS 16.4+ standalone
+  // PWAs, absent in Firefox).
+  if (!("setAppBadge" in self.navigator) || payload.type !== "chat-message" || typeof payload.badge !== "number") return;
+  const badging = self.navigator as unknown as { setAppBadge(count?: number): Promise<void>; clearAppBadge(): Promise<void> };
+  await (payload.badge > 0 ? badging.setAppBadge(payload.badge) : badging.clearAppBadge()).catch(() => {});
+}
+
+async function handlePush(payload: PushNotificationPayload): Promise<void> {
   // Silent signal (no visible notification of its own) telling us to close
   // an already-shown, same-`tag` call notification - see
   // calls/service.ts::endCall on the server, which sends this the moment a
@@ -69,7 +89,16 @@ self.addEventListener("push", (event) => {
   // notification below is `requireInteraction: true` and would otherwise
   // never disappear on its own.
   if (payload.type === "call-closed") {
-    event.waitUntil(self.registration.getNotifications({ tag: payload.tag }).then((notifications) => notifications.forEach((n) => n.close())));
+    const notifications = await self.registration.getNotifications({ tag: payload.tag });
+    notifications.forEach((n) => n.close());
+    return;
+  }
+
+  // The recipient's "also notify me while the app is open" setting (see
+  // AuthContext's `User.pushShowWhenOpen`) - `notifyUser` on the server only
+  // sets this for types other than `call`, which always rings.
+  if (payload.type !== "call" && payload.suppressWhenFocused && (await anyWindowFocused())) {
+    await updateBadge(payload);
     return;
   }
 
@@ -99,24 +128,13 @@ self.addEventListener("push", (event) => {
       : {}),
   };
 
-  event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(payload.title, options),
-      // Best-effort: this is what makes the app-icon badge update while the
-      // app is backgrounded/fully closed, not just live via the WS-driven
-      // path in chatBadge.ts (which only runs while a tab/PWA instance is
-      // open). `setAppBadge`/`clearAppBadge` are part of the Badging API's
-      // WorkerNavigator mixin, so they exist on `self.navigator` here too -
-      // guarded the same way chatBadge.ts guards the foreground call, since
-      // support is inconsistent (works in Chromium and iOS 16.4+ standalone
-      // PWAs, absent in Firefox).
-      "setAppBadge" in self.navigator && payload.type === "chat-message" && typeof payload.badge === "number"
-        ? payload.badge > 0
-          ? (self.navigator as unknown as { setAppBadge(count?: number): Promise<void> }).setAppBadge(payload.badge).catch(() => {})
-          : (self.navigator as unknown as { clearAppBadge(): Promise<void> }).clearAppBadge().catch(() => {})
-        : Promise.resolve(),
-    ]),
-  );
+  await Promise.all([self.registration.showNotification(payload.title, options), updateBadge(payload)]);
+}
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  const payload = event.data.json() as PushNotificationPayload;
+  event.waitUntil(handlePush(payload));
 });
 
 self.addEventListener("notificationclick", (event) => {

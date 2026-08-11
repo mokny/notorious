@@ -128,6 +128,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       avatarUrl: users.avatarUrl,
       createdAt: users.createdAt,
       totpEnabled: users.totpEnabled,
+      pushShowWhenOpen: users.pushShowWhenOpen,
     })
     .from(workspaceMembers)
     .innerJoin(users, eq(workspaceMembers.userId, users.id))
@@ -146,6 +147,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       avatarUrl: row.avatarUrl,
       createdAt: row.createdAt,
       totpEnabled: row.totpEnabled,
+      pushShowWhenOpen: row.pushShowWhenOpen,
     },
   }));
 }

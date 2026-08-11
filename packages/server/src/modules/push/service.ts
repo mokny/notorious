@@ -2,7 +2,7 @@ import webpush from "web-push";
 import { eq } from "drizzle-orm";
 import type { PushSubscribeInput, PushNotificationPayload } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { pushSubscriptions } from "../../db/schema.js";
+import { pushSubscriptions, users } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { env } from "../../env.js";
 
@@ -49,7 +49,16 @@ export async function notifyUser(userId: string, payload: PushNotificationPayloa
   }
 
   const subscriptions = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
-  const body = JSON.stringify(payload);
+  if (subscriptions.length === 0) return;
+
+  // `call` always rings regardless of the setting - only attach the flag to
+  // types push-sw.ts is willing to suppress.
+  let finalPayload = payload;
+  if (payload.type !== "call" && payload.type !== "call-closed") {
+    const [user] = await db.select({ pushShowWhenOpen: users.pushShowWhenOpen }).from(users).where(eq(users.id, userId)).limit(1);
+    finalPayload = { ...payload, suppressWhenFocused: user ? !user.pushShowWhenOpen : false };
+  }
+  const body = JSON.stringify(finalPayload);
 
   await Promise.all(
     subscriptions.map(async (sub) => {

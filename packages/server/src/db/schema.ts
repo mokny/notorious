@@ -14,6 +14,10 @@ export const users = sqliteTable("users", {
   totpSecret: text("totp_secret"),
   totpEnabled: integer("totp_enabled", { mode: "boolean" }).notNull().default(false),
   totpBackupCodes: text("totp_backup_codes"),
+  // Whether Web Push should still show an OS notification when the user
+  // already has a tab focused/visible - see push/service.ts::notifyUser and
+  // push-sw.ts. Defaults to showing them anyway.
+  pushShowWhenOpen: integer("push_show_when_open", { mode: "boolean" }).notNull().default(true),
 });
 
 export const sessions = sqliteTable("sessions", {

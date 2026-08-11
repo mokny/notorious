@@ -48,6 +48,11 @@ export const verifyTwoFactorSchema = z
   });
 export type VerifyTwoFactorInput = z.infer<typeof verifyTwoFactorSchema>;
 
+export const updatePushPreferencesSchema = z.object({
+  pushShowWhenOpen: z.boolean(),
+});
+export type UpdatePushPreferencesInput = z.infer<typeof updatePushPreferencesSchema>;
+
 /** POST /api/v1/auth/reverify's password branch - see modules/reverify/service.ts. The passkey branch (POST /api/v1/webauthn/reverify/verify) carries a WebAuthn assertion instead, not a plain JSON body validated by zod. */
 export const reverifyPasswordSchema = z.object({
   password: z.string().min(1).max(200),

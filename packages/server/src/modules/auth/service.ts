@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import { eq, and } from "drizzle-orm";
-import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, User } from "@notorious/shared";
+import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, UpdatePushPreferencesInput, User } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { users, workspaceInvites, workspaceMembers } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -19,6 +19,7 @@ function toUser(row: typeof users.$inferSelect): User {
     avatarUrl: row.avatarUrl,
     createdAt: row.createdAt,
     totpEnabled: row.totpEnabled,
+    pushShowWhenOpen: row.pushShowWhenOpen,
   };
 }
 
@@ -45,7 +46,7 @@ export async function registerUser(input: RegisterInput): Promise<User> {
   await createWorkspace(id, { name: `${input.name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, input.email);
 
-  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false };
+  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true };
 }
 
 /**
@@ -126,4 +127,11 @@ export async function changeEmail(userId: string, input: ChangeEmailInput): Prom
 
   await db.update(users).set({ email: input.newEmail }).where(eq(users.id, userId));
   return toUser({ ...row, email: input.newEmail });
+}
+
+export async function updatePushPreferences(userId: string, input: UpdatePushPreferencesInput): Promise<User> {
+  await db.update(users).set({ pushShowWhenOpen: input.pushShowWhenOpen }).where(eq(users.id, userId));
+  const user = await getUserById(userId);
+  if (!user) throw unauthorized();
+  return user;
 }

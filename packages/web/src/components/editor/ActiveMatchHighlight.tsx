@@ -63,8 +63,8 @@ export function ActiveMatchHighlight({ blockId, occurrenceIndex }: { blockId: st
   if (!rect) return null;
   return createPortal(
     <div
-      className="pointer-events-none fixed z-40 rounded-sm shadow-[0_0_0_2px_rgb(234_88_12),0_0_0_4px_rgb(234_88_12/0.35)]"
-      style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }}
+      className="pointer-events-none fixed top-0 left-0 z-40 rounded-sm shadow-[0_0_0_2px_rgb(234_88_12),0_0_0_4px_rgb(234_88_12/0.35)]"
+      style={{ transform: `translate3d(${rect.left}px, ${rect.top}px, 0)`, width: rect.width, height: rect.height }}
     />,
     document.body,
   );
