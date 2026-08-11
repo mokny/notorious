@@ -604,6 +604,7 @@ export function ChecklistBlock({
                 onFlush={() => {
                   flushSave();
                   finishEditingNewItem(item.id);
+                  if (item.markdown.trim() === "" && items.length > 1) removeItem(index);
                 }}
                 readOnly={readOnly}
                 registerInputRef={(el) => {

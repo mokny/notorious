@@ -163,6 +163,29 @@ export function WhiteboardBlock({
 
   useEffect(() => () => clearTimeout(saveTimeout.current), []);
 
+  // Excalidraw caches its canvas's bounding rect and only recomputes it on a
+  // `window resize` event (its own `onResize`) - it doesn't re-measure just
+  // because this block's container moved/resized without one, e.g. a class
+  // toggle like the inline/fullscreen switch below, or (the actual bug this
+  // works around) iOS PWA standalone mode still settling `env(safe-area-*)`-
+  // driven layout (the top bar's height in WorkspaceLayout.tsx) a frame or
+  // two after Excalidraw's own first measurement - which left a stale rect
+  // offset by exactly that bar's height, so every pointer/touch coordinate
+  // Excalidraw translated into scene space landed that far below the actual
+  // cursor. `refresh()` forces the re-measurement `App.updateDOMRect` does
+  // internally; the double rAF gives the safe-area layout a full paint cycle
+  // to settle before that happens.
+  useEffect(() => {
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => excalidrawApiRef.current?.refresh());
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [isFullscreen]);
+
   function flush(): void {
     if (isSavingRef.current || pendingRef.current === null) return;
     const value = pendingRef.current;
