@@ -1,7 +1,9 @@
 import { useRef } from "react";
 import { fileApi } from "../../lib/api/resources.js";
 import { withShareToken } from "../../lib/api/shareMode.js";
+import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { Icon } from "../ui/Icon.js";
+import { ImageLoadError } from "../ui/ImageLoadError.js";
 
 interface FilePropertyFieldProps {
   workspaceId: string;
@@ -14,6 +16,7 @@ interface FilePropertyFieldProps {
 /** File/Image property: stores a single uploaded file's id as the property value. */
 export function FilePropertyField({ workspaceId, objectId, value, isImage, onChange }: FilePropertyFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const image = useRobustImage(isImage && value ? withShareToken(fileApi.downloadUrl(value)) : null);
 
   async function handleFile(file: File) {
     const asset = await fileApi.upload(workspaceId, file, objectId ?? undefined);
@@ -24,7 +27,11 @@ export function FilePropertyField({ workspaceId, objectId, value, isImage, onCha
     return (
       <div className="flex items-center gap-2">
         {isImage ? (
-          <img src={withShareToken(fileApi.downloadUrl(value))} alt="" className="h-10 w-10 rounded-md object-cover" />
+          image.failed ? (
+            <ImageLoadError onRetry={image.retry} className="h-10 w-10 rounded-md" />
+          ) : (
+            <img src={image.src} onError={image.onError} alt="" className="h-10 w-10 rounded-md object-cover" />
+          )
         ) : (
           <a
             href={withShareToken(fileApi.downloadUrl(value))}

@@ -4,6 +4,7 @@ import Cropper, { type Area } from "react-easy-crop";
 import { authApi, usersApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { ApiError } from "../../lib/api/client.js";
+import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { Button } from "../ui/Button.js";
 import { TextField } from "../ui/TextField.js";
 import { Modal } from "../ui/Modal.js";
@@ -93,6 +94,8 @@ export function ProfileSettings() {
     },
   });
 
+  const avatarImage = useRobustImage(user?.avatarUrl ?? null);
+
   const emailMutation = useMutation({
     mutationFn: () => authApi.changeEmail({ newEmail, currentPassword: emailPassword }),
     onSuccess: async () => {
@@ -118,8 +121,8 @@ export function ProfileSettings() {
       <div className="space-y-2">
         <p className="text-xs font-medium text-ink-muted">Avatar</p>
         <div className="flex items-center gap-3">
-          {user?.avatarUrl ? (
-            <img src={user.avatarUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
+          {user?.avatarUrl && !avatarImage.failed ? (
+            <img src={avatarImage.src} onError={avatarImage.onError} alt="" className="h-14 w-14 rounded-full object-cover" />
           ) : (
             <span
               className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold text-white"

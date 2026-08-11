@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { usePresence } from "../hooks/usePresence.js";
+import { useRobustImage } from "../hooks/useRobustImage.js";
 
 /**
  * Who's currently viewing this object - see hooks/usePresence.ts for the
@@ -13,6 +14,13 @@ import { usePresence } from "../hooks/usePresence.js";
  * its own - see the rename handling below, which only ever lets a viewer
  * edit the word *after* that prefix, never remove it).
  */
+/** Own component (not inlined in the .map below) so useRobustImage's hook call stays valid per-viewer. Falls back to the initial letter, same as the "no avatar url at all" case, once retries are exhausted. */
+function ViewerAvatarImage({ src, fallbackLetter }: { src: string; fallbackLetter: string }) {
+  const image = useRobustImage(src);
+  if (image.failed) return <>{fallbackLetter}</>;
+  return <img src={image.src} onError={image.onError} alt="" className="h-full w-full object-cover" />;
+}
+
 export function PresencePanel({ objectId }: { objectId: string }) {
   const { viewers, self, rename, currentWord } = usePresence(objectId);
   const [editing, setEditing] = useState(false);
@@ -67,7 +75,7 @@ export function PresencePanel({ objectId }: { objectId: string }) {
               } ${clickToRename ? "cursor-pointer hover:ring-2 hover:ring-accent/40" : "cursor-default"}`}
               style={hasAvatarImage || viewer.isAnonymous ? undefined : { backgroundColor: viewer.avatarColor }}
             >
-              {hasAvatarImage ? <img src={viewer.avatarUrl!} alt="" className="h-full w-full object-cover" /> : viewer.avatarLetter}
+              {hasAvatarImage ? <ViewerAvatarImage src={viewer.avatarUrl!} fallbackLetter={viewer.avatarLetter} /> : viewer.avatarLetter}
             </button>
           );
         })}

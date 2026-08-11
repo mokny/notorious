@@ -1,6 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import type { ObjectRecord, Property } from "@notorious/shared";
+import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { Icon } from "../ui/Icon.js";
+import { ImageLoadError } from "../ui/ImageLoadError.js";
+
+function GalleryCover({ cover }: { cover: string }) {
+  const image = useRobustImage(cover);
+  if (image.failed) return <ImageLoadError onRetry={image.retry} className="h-28 w-full" />;
+  return <img src={image.src} onError={image.onError} alt="" className="h-28 w-full object-cover" />;
+}
 
 interface GalleryViewProps {
   workspaceId: string;
@@ -24,7 +32,7 @@ export function GalleryView({ workspaceId, items, properties, visiblePropertyIds
           className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface-raised text-left transition hover:ring-2 hover:ring-accent/30"
         >
           {object.cover ? (
-            <img src={object.cover} alt="" className="h-28 w-full object-cover" />
+            <GalleryCover cover={object.cover} />
           ) : (
             <div className="flex h-28 w-full items-center justify-center bg-accent/5">
               <Icon name={object.icon ?? "file-text"} className="h-8 w-8 text-accent/50" />

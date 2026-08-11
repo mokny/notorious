@@ -3,11 +3,28 @@ import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { workspaceApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
+import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { ApiError } from "../../lib/api/client.js";
 import { Button } from "../ui/Button.js";
 import { TextField } from "../ui/TextField.js";
 
 const ROLES = ["viewer", "commenter", "editor"] as const;
+
+/** Own component (not inlined in the members .map below) so useRobustImage's hook call stays valid per-member. */
+function MemberAvatar({ avatarUrl, avatarColor, initial }: { avatarUrl: string; avatarColor: string; initial: string }) {
+  const image = useRobustImage(avatarUrl);
+  if (image.failed) {
+    return (
+      <span
+        className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
+        style={{ backgroundColor: avatarColor }}
+      >
+        {initial}
+      </span>
+    );
+  }
+  return <img src={image.src} onError={image.onError} alt="" className="h-7 w-7 rounded-full object-cover" />;
+}
 
 export function WorkspaceMembersSettings() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -55,7 +72,7 @@ export function WorkspaceMembersSettings() {
           <div key={member.userId} className="flex items-center justify-between rounded-lg border border-border p-3">
             <div className="flex items-center gap-2">
               {member.user.avatarUrl ? (
-                <img src={member.user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                <MemberAvatar avatarUrl={member.user.avatarUrl} avatarColor={member.user.avatarColor} initial={member.user.name[0] ?? "?"} />
               ) : (
                 <span
                   className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"

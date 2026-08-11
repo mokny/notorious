@@ -1,5 +1,6 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { withShareToken } from "../../lib/api/shareMode.js";
+import { useRobustImage } from "../../hooks/useRobustImage.js";
 import {
   FileText,
   FolderKanban,
@@ -203,23 +204,25 @@ function isImageUrl(value: string): boolean {
  */
 export function Icon({ name, className, style }: { name: string; className?: string; style?: CSSProperties }) {
   // A URL (e.g. a bookmark's auto-detected favicon, or a since-deleted
-  // uploaded file) can 404/fail to load - falls back to the generic file
-  // icon instead of a broken-image glyph. Reset whenever `name` itself
-  // changes, so a later, different, working URL gets a fresh attempt.
-  const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => setImageFailed(false), [name]);
+  // uploaded file) can 404/fail to load, or - the transient case
+  // useRobustImage.ts retries for - just have its response cut short. Falls
+  // back to the generic file icon instead of a broken-image glyph once
+  // retries are exhausted; a later, different, working URL (a new `name`)
+  // gets a fresh attempt automatically, since the hook keys its state off
+  // the resolved src.
+  const image = useRobustImage(isImageUrl(name) ? withShareToken(name) : null);
 
   if (!name) return <FileText className={className ?? "h-4 w-4"} style={style} />;
 
   if (isImageUrl(name)) {
-    if (imageFailed) return <FileText className={className ?? "h-4 w-4"} style={style} />;
+    if (image.failed) return <FileText className={className ?? "h-4 w-4"} style={style} />;
     return (
       <img
-        src={withShareToken(name)}
+        src={image.src}
         alt=""
         className={`${className ?? "h-4 w-4"} shrink-0 rounded object-cover`}
         style={style}
-        onError={() => setImageFailed(true)}
+        onError={image.onError}
       />
     );
   }

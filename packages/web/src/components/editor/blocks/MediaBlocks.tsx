@@ -4,7 +4,9 @@ import { fileApi } from "../../../lib/api/resources.js";
 import { withShareToken } from "../../../lib/api/shareMode.js";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { useExportMode } from "../../../lib/export/exportMode.js";
+import { useRobustImage } from "../../../hooks/useRobustImage.js";
 import { Icon } from "../../ui/Icon.js";
+import { ImageLoadError } from "../../ui/ImageLoadError.js";
 import { Lightbox } from "../../ui/Lightbox.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 import { HighlightedText } from "../HighlightedText.js";
@@ -42,23 +44,33 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
   // TipTap instance, so it can't use SearchHighlight.ts's decorations.
   const [captionPreviewOverridden, setCaptionPreviewOverridden] = useState(false);
   const showCaptionPreview = searchTerms.length > 0 && !captionPreviewOverridden;
+  const image = useRobustImage(content.url ? withShareToken(content.url) : null);
 
   if (content.url) {
     return (
       <figure>
         <div className="group relative">
-          <button
-            type="button"
-            title="Click to enlarge"
-            // A view action, not an edit - stays clickable even while the
-            // object is locked (see readOnlyContent.ts's blanket
-            // `button:not([data-view-toggle])` rule).
-            data-view-toggle
-            onClick={() => setLightboxOpen(true)}
-            className="block w-full cursor-zoom-in"
-          >
-            <img src={withShareToken(content.url)} alt={content.caption ?? ""} className="max-h-96 w-full rounded-lg object-cover" />
-          </button>
+          {image.failed ? (
+            <ImageLoadError onRetry={image.retry} className="h-28 w-full rounded-lg" />
+          ) : (
+            <button
+              type="button"
+              title="Click to enlarge"
+              // A view action, not an edit - stays clickable even while the
+              // object is locked (see readOnlyContent.ts's blanket
+              // `button:not([data-view-toggle])` rule).
+              data-view-toggle
+              onClick={() => setLightboxOpen(true)}
+              className="block w-full cursor-zoom-in"
+            >
+              <img
+                src={image.src}
+                onError={image.onError}
+                alt={content.caption ?? ""}
+                className="max-h-96 w-full rounded-lg object-cover"
+              />
+            </button>
+          )}
           {lightboxOpen && (
             <Lightbox
               images={[{ src: withShareToken(content.url), alt: content.caption ?? "" }]}

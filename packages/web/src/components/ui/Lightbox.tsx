@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { Icon } from "./Icon.js";
+import { ImageLoadError } from "./ImageLoadError.js";
 
 export interface LightboxImage {
   src: string;
@@ -66,6 +68,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
 
   const image = images[index];
   const hasMultiple = images.length > 1;
+  const robustImage = useRobustImage(image?.src ?? null);
 
   // Zoom/pan resets whenever the visible image changes (nav or reopen).
   useEffect(() => {
@@ -189,21 +192,26 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
           className="fixed inset-0 z-50 flex touch-none select-none items-center justify-center overflow-hidden p-8 outline-none"
         >
           <Dialog.Title className="sr-only">{image.alt || "Image"}</Dialog.Title>
-          <img
-            src={image.src}
-            alt={image.alt ?? ""}
-            draggable={false}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onWheel={onWheel}
-            onDoubleClick={onDoubleClick}
-            style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}
-            className={`max-h-full max-w-full touch-none rounded-lg object-contain ${smooth ? "transition-transform duration-150" : ""} ${
-              transform.scale > 1 ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
-            }`}
-          />
+          {robustImage.failed ? (
+            <ImageLoadError onRetry={robustImage.retry} className="h-40 w-64 rounded-lg" />
+          ) : (
+            <img
+              src={robustImage.src}
+              onError={robustImage.onError}
+              alt={image.alt ?? ""}
+              draggable={false}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              onWheel={onWheel}
+              onDoubleClick={onDoubleClick}
+              style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}
+              className={`max-h-full max-w-full touch-none rounded-lg object-contain ${smooth ? "transition-transform duration-150" : ""} ${
+                transform.scale > 1 ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
+              }`}
+            />
+          )}
 
           {hasMultiple && index > 0 && (
             <button

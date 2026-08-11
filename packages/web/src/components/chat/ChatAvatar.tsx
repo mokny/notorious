@@ -1,3 +1,5 @@
+import { useRobustImage } from "../../hooks/useRobustImage.js";
+
 /** Colored-circle-with-initial avatar, same convention as WorkspaceLayout.tsx's user menu - reused here for chat participants. */
 export function ChatAvatar({
   name,
@@ -11,8 +13,17 @@ export function ChatAvatar({
   size?: number;
 }) {
   const dimension = `${size * 0.25}rem`;
-  if (avatarUrl) {
-    return <img src={avatarUrl} alt="" className="shrink-0 rounded-full object-cover" style={{ width: dimension, height: dimension }} />;
+  const image = useRobustImage(avatarUrl ?? null);
+  if (avatarUrl && !image.failed) {
+    return (
+      <img
+        src={image.src}
+        onError={image.onError}
+        alt=""
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: dimension, height: dimension }}
+      />
+    );
   }
   return (
     <span

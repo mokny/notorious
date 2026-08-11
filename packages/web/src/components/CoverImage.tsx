@@ -6,6 +6,7 @@ import { withShareToken } from "../lib/api/shareMode.js";
 import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
 import { useFitText } from "../hooks/useFitText.js";
 import { useHasHover } from "../hooks/useHasHover.js";
+import { useRobustImage } from "../hooks/useRobustImage.js";
 import { useTouchReveal } from "../hooks/useTouchReveal.js";
 import { HighlightableTitle } from "./editor/HighlightableTitle.js";
 import { HighlightedText } from "./editor/HighlightedText.js";
@@ -13,6 +14,7 @@ import { useBreakpoint } from "../hooks/useBreakpoint.js";
 import { DEFAULT_COVER_TEXT_STYLE, coverTextCss } from "../lib/coverTextStyle.js";
 import { CoverTextStyleEditor } from "./CoverTextStyleEditor.js";
 import { Icon } from "./ui/Icon.js";
+import { ImageLoadError } from "./ui/ImageLoadError.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useMobileChrome } from "../context/MobileChromeContext.js";
 import { THEME_COLORS } from "../lib/themeColors.js";
@@ -149,6 +151,8 @@ export function CoverImage({
     objectApi.update(objectId, { coverTextStyle: value }).then(() => undefined),
   );
 
+  const robustCover = useRobustImage(cover ? withShareToken(cover) : null);
+
   const displayTitle = title || "Untitled";
   const iconRef = useRef<HTMLDivElement>(null);
   const { fontSize, measureRef, containerRef: rowRef } = useFitText({
@@ -222,13 +226,24 @@ export function CoverImage({
       ref={containerRef}
       onTouchStart={onTouchStart}
     >
-      <img
-        src={withShareToken(cover)}
-        alt=""
-        className="w-full object-cover"
-        style={isPhone ? { height: `max(${coverHeight}px, ${PHONE_MIN_COVER_HEIGHT})` } : { maxHeight: coverHeight }}
-        onLoad={handleImageLoad}
-      />
+      {robustCover.failed ? (
+        <ImageLoadError
+          onRetry={robustCover.retry}
+          className="w-full"
+          {...(isPhone
+            ? { style: { height: `max(${coverHeight}px, ${PHONE_MIN_COVER_HEIGHT})` } }
+            : { style: { maxHeight: coverHeight, height: coverHeight } })}
+        />
+      ) : (
+        <img
+          src={robustCover.src}
+          onError={robustCover.onError}
+          alt=""
+          className="w-full object-cover"
+          style={isPhone ? { height: `max(${coverHeight}px, ${PHONE_MIN_COVER_HEIGHT})` } : { maxHeight: coverHeight }}
+          onLoad={handleImageLoad}
+        />
+      )}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6">
         <div ref={rowRef} className="pointer-events-auto mx-auto flex max-w-full items-center justify-center gap-2">

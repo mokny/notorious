@@ -13,6 +13,7 @@ import { SearchOverlayProvider } from "../context/SearchOverlayContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
+import { useRobustImage } from "../hooks/useRobustImage.js";
 import { useDragSelectGuard } from "../hooks/useDragSelectGuard.js";
 import { useBreakpoint, useIsLandscape } from "../hooks/useBreakpoint.js";
 import { isStandalone } from "../lib/platform.js";
@@ -88,6 +89,7 @@ function WorkspaceLayoutInner() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const sidebarAvatarImage = useRobustImage(user?.avatarUrl ?? null);
   const shareToken = getShareToken();
   const breakpoint = useBreakpoint();
   const isLandscape = useIsLandscape();
@@ -284,8 +286,13 @@ function WorkspaceLayoutInner() {
               >
                 {isPWA ? (
                   <Icon name="settings" className="h-5 w-5 shrink-0 text-ink-muted" />
-                ) : user?.avatarUrl ? (
-                  <img src={user.avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+                ) : user?.avatarUrl && !sidebarAvatarImage.failed ? (
+                  <img
+                    src={sidebarAvatarImage.src}
+                    onError={sidebarAvatarImage.onError}
+                    alt=""
+                    className="h-7 w-7 shrink-0 rounded-full object-cover"
+                  />
                 ) : (
                   <span
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
