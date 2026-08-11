@@ -215,12 +215,13 @@ export function SecuritySettings() {
   const [disableError, setDisableError] = useState<string | null>(null);
 
   const passwordMutation = useMutation({
-    mutationFn: () => authApi.changePassword({ currentPassword, newPassword }),
-    onSuccess: () => {
+    mutationFn: () => authApi.changePassword({ currentPassword: user?.hasPassword ? currentPassword : undefined, newPassword }),
+    onSuccess: async () => {
       setCurrentPassword("");
       setNewPassword("");
       setPasswordError(null);
       setPasswordSuccess(true);
+      await refetch();
     },
     onError: (err) => {
       setPasswordSuccess(false);
@@ -235,7 +236,7 @@ export function SecuritySettings() {
   }
 
   const disableMutation = useMutation({
-    mutationFn: () => twoFactorApi.disable({ currentPassword: disablePassword }),
+    mutationFn: () => twoFactorApi.disable({ currentPassword: user?.hasPassword ? disablePassword : undefined }),
     onSuccess: async () => {
       setDisablePassword("");
       setDisableError(null);
@@ -255,15 +256,20 @@ export function SecuritySettings() {
     <div className="space-y-6">
       <form onSubmit={handlePasswordSubmit} className="space-y-2">
         <p className="text-xs font-medium text-ink-muted">Password</p>
+        {!user?.hasPassword && (
+          <p className="text-sm text-ink-muted">This account was created with a passkey and has no password yet - set one below as a backup sign-in option.</p>
+        )}
         <div className="flex flex-wrap gap-2">
-          <TextField
-            type="password"
-            placeholder="Current password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="max-w-xs"
-            required
-          />
+          {user?.hasPassword && (
+            <TextField
+              type="password"
+              placeholder="Current password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="max-w-xs"
+              required
+            />
+          )}
           <TextField
             type="password"
             placeholder="New password"
@@ -274,11 +280,15 @@ export function SecuritySettings() {
             required
           />
           <Button type="submit" variant="secondary" disabled={passwordMutation.isPending}>
-            Update password
+            {user?.hasPassword ? "Update password" : "Set password"}
           </Button>
         </div>
         {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
-        {passwordSuccess && <p className="text-sm text-green-600">Password updated. Your other sessions have been signed out.</p>}
+        {passwordSuccess && (
+          <p className="text-sm text-green-600">
+            {user?.hasPassword ? "Password updated. Your other sessions have been signed out." : "Password set."}
+          </p>
+        )}
       </form>
 
       <div className="space-y-2">
@@ -287,14 +297,16 @@ export function SecuritySettings() {
           <form onSubmit={handleDisableSubmit} className="space-y-2">
             <p className="text-sm text-ink-muted">Two-factor authentication is enabled on your account.</p>
             <div className="flex flex-wrap gap-2">
-              <TextField
-                type="password"
-                placeholder="Current password"
-                value={disablePassword}
-                onChange={(e) => setDisablePassword(e.target.value)}
-                className="max-w-xs"
-                required
-              />
+              {user?.hasPassword && (
+                <TextField
+                  type="password"
+                  placeholder="Current password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  className="max-w-xs"
+                  required
+                />
+              )}
               <Button type="submit" variant="danger" disabled={disableMutation.isPending}>
                 Disable 2FA
               </Button>

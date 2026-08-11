@@ -1,4 +1,4 @@
-import { eq, and, ne, isNotNull, desc, max } from "drizzle-orm";
+import { eq, and, ne, isNotNull, inArray, desc, max } from "drizzle-orm";
 import type {
   CreateWorkspaceInput,
   UpdateWorkspaceInput,
@@ -17,6 +17,7 @@ import {
   objects,
   workspacePins,
   recentlyViewed,
+  webauthnCredentials,
 } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
@@ -129,10 +130,19 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       createdAt: users.createdAt,
       totpEnabled: users.totpEnabled,
       pushShowWhenOpen: users.pushShowWhenOpen,
+      passwordHash: users.passwordHash,
     })
     .from(workspaceMembers)
     .innerJoin(users, eq(workspaceMembers.userId, users.id))
     .where(eq(workspaceMembers.workspaceId, workspaceId));
+
+  // One extra query instead of per-row - avoids an N+1 for `hasPasskey` (see
+  // modules/auth/service.ts's `toUser`, which this mirrors for the member list).
+  const userIds = rows.map((row) => row.userId);
+  const credentialRows = userIds.length
+    ? await db.select({ userId: webauthnCredentials.userId }).from(webauthnCredentials).where(inArray(webauthnCredentials.userId, userIds))
+    : [];
+  const userIdsWithPasskey = new Set(credentialRows.map((row) => row.userId));
 
   return rows.map((row) => ({
     workspaceId: row.workspaceId,
@@ -148,6 +158,8 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       createdAt: row.createdAt,
       totpEnabled: row.totpEnabled,
       pushShowWhenOpen: row.pushShowWhenOpen,
+      hasPassword: row.passwordHash !== null,
+      hasPasskey: userIdsWithPasskey.has(row.userId),
     },
   }));
 }

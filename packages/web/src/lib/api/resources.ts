@@ -17,6 +17,7 @@ import type {
   SavedSearch,
   FileAsset,
   RegisterInput,
+  RegisterPasskeyOptionsInput,
   LoginInput,
   ChangePasswordInput,
   ChangeEmailInput,
@@ -144,6 +145,10 @@ export const webauthnApi = {
   rename: (id: string, input: RenameWebauthnCredentialInput) =>
     apiRequest<void>(`/api/v1/webauthn/credentials/${id}`, { method: "PATCH", body: input }),
   remove: (id: string) => apiRequest<void>(`/api/v1/webauthn/credentials/${id}`, { method: "DELETE" }),
+  registerAccountOptions: (input: RegisterPasskeyOptionsInput) =>
+    apiRequest<PublicKeyCredentialCreationOptionsJSON>("/api/v1/webauthn/register-account/options", { method: "POST", body: input }),
+  registerAccountVerify: (response: RegistrationResponseJSON) =>
+    apiRequest<User>("/api/v1/webauthn/register-account/verify", { method: "POST", body: { response } }),
   loginOptions: () => apiRequest<PublicKeyCredentialRequestOptionsJSON>("/api/v1/webauthn/login/options", { method: "POST" }),
   loginVerify: (response: AuthenticationResponseJSON) => apiRequest<User>("/api/v1/webauthn/login/verify", { method: "POST", body: { response } }),
   reverifyOptions: () => apiRequest<PublicKeyCredentialRequestOptionsJSON>("/api/v1/webauthn/reverify/options", { method: "POST" }),

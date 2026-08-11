@@ -7,20 +7,29 @@ export const registerSchema = z.object({
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
+/** POST /api/v1/webauthn/register-account/options - step 1 of passkey-only registration (see modules/webauthn/service.ts's `generateRegistrationOptionsForNewAccount`). No password: the passkey ceremony that follows is the account's only credential. */
+export const registerPasskeyOptionsSchema = z.object({
+  email: z.string().email().max(254),
+  name: z.string().min(1).max(120),
+});
+export type RegisterPasskeyOptionsInput = z.infer<typeof registerPasskeyOptionsSchema>;
+
 export const loginSchema = z.object({
   email: z.string().email().max(254),
   password: z.string().min(1).max(200),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+/** `currentPassword` is only required when the account already has a password - omitted entirely for a passkey-only account's first "Set password" (see modules/auth/service.ts's `changePassword`). */
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1).max(200),
+  currentPassword: z.string().max(200).optional(),
   newPassword: z.string().min(8).max(200),
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
+/** Same "only required if the account has a password" rule as `changePasswordSchema` - see modules/auth/service.ts's `changeEmail`. */
 export const changeEmailSchema = z.object({
-  currentPassword: z.string().min(1).max(200),
+  currentPassword: z.string().max(200).optional(),
   newEmail: z.string().email().max(254),
 });
 export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
@@ -32,8 +41,9 @@ export const confirmTwoFactorSchema = z.object({
 });
 export type ConfirmTwoFactorInput = z.infer<typeof confirmTwoFactorSchema>;
 
+/** Same "only required if the account has a password" rule as `changePasswordSchema` - see modules/twoFactor/routes.ts's disable handler. */
 export const disableTwoFactorSchema = z.object({
-  currentPassword: z.string().min(1).max(200),
+  currentPassword: z.string().max(200).optional(),
 });
 export type DisableTwoFactorInput = z.infer<typeof disableTwoFactorSchema>;
 

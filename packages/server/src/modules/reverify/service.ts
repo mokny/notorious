@@ -50,6 +50,7 @@ export async function reverifyWithPassword(userId: string, password: string): Pr
   const rows = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);
   const row = rows[0];
   if (!row) throw unauthorized();
+  if (row.passwordHash === null) throw badRequest("This account doesn't have a password - use passkey reverification instead");
 
   const valid = await argon2.verify(row.passwordHash, password);
   if (!valid) throw badRequest("Incorrect password");

@@ -56,7 +56,9 @@ function RequireAuth({ children, allowShareSession = false }: { children: React.
   });
   if (isLoading) return <FullScreenSpinner />;
   if (!user && !(allowShareSession && isSharedSession())) return <Navigate to="/login" replace />;
-  if (user && twoFactor?.required && !user.totpEnabled) return <Navigate to="/setup-2fa" replace />;
+  // A passkey is already a strong-enough factor on its own - exempt from the instance-wide
+  // require2faEnabled mandate (see @notorious/shared's User.hasPasskey doc comment).
+  if (user && twoFactor?.required && !user.totpEnabled && !user.hasPasskey) return <Navigate to="/setup-2fa" replace />;
   return <>{children}</>;
 }
 

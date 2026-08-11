@@ -55,13 +55,21 @@ function toSimpleWebAuthnCredential(row: typeof webauthnCredentials.$inferSelect
   };
 }
 
-async function storeChallenge(reply: FastifyReply, userId: string | null, challenge: string, purpose: "register" | "login" | "reverify"): Promise<void> {
+async function storeChallenge(
+  reply: FastifyReply,
+  userId: string | null,
+  challenge: string,
+  purpose: "register" | "login" | "reverify" | "register-account",
+  pending?: { email: string; name: string },
+): Promise<void> {
   const id = newId();
   await db.insert(webauthnChallenges).values({
     id,
     userId,
     challenge,
     purpose,
+    pendingEmail: pending?.email ?? null,
+    pendingName: pending?.name ?? null,
     expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString(),
     createdAt: nowIso(),
   });
@@ -78,8 +86,8 @@ async function storeChallenge(reply: FastifyReply, userId: string | null, challe
 async function consumeChallenge(
   request: FastifyRequest,
   reply: FastifyReply,
-  purpose: "register" | "login" | "reverify",
-): Promise<{ challenge: string; userId: string | null }> {
+  purpose: "register" | "login" | "reverify" | "register-account",
+): Promise<{ challenge: string; userId: string | null; pendingEmail: string | null; pendingName: string | null }> {
   const id = request.cookies[CHALLENGE_COOKIE];
   reply.clearCookie(CHALLENGE_COOKIE, { path: "/" });
   if (!id) throw badRequest("Passkey challenge expired - try again");
@@ -93,7 +101,7 @@ async function consumeChallenge(
 
   const row = rows[0];
   if (!row) throw badRequest("Passkey challenge expired - try again");
-  return { challenge: row.challenge, userId: row.userId };
+  return { challenge: row.challenge, userId: row.userId, pendingEmail: row.pendingEmail, pendingName: row.pendingName };
 }
 
 /** Step 1 of adding a new passkey to an already-logged-in account. `residentKey: "required"` is what makes the credential *discoverable* - necessary for the usernameless/conditional-UI login flow (see `generateLoginOptions` below) to ever find it without an email first. */
@@ -157,6 +165,64 @@ export async function verifyRegistration(
   });
 
   return { id, name: credentialName?.trim() || "Passkey", createdAt, lastUsedAt: null };
+}
+
+/**
+ * Step 1 of registering a brand-new, passkey-only account (no password) - see
+ * auth/service.ts's `registerUserWithPasskey`. Unlike `generateRegistrationOptionsForUser`
+ * there's no existing account to exclude credentials for or to attach the challenge to, so
+ * `email`/`name` (already validated by the caller - see webauthn/routes.ts) are carried
+ * forward on the challenge row itself instead (see `storeChallenge`'s `pending` param).
+ */
+export async function generateRegistrationOptionsForNewAccount(
+  reply: FastifyReply,
+  email: string,
+  name: string,
+): Promise<PublicKeyCredentialCreationOptionsJSON> {
+  const options = await generateRegistrationOptions({
+    rpName: RP_NAME,
+    rpID: getRpId(),
+    userName: email,
+    userDisplayName: name,
+    attestationType: "none",
+    authenticatorSelection: { residentKey: "required", userVerification: "required" },
+  });
+
+  await storeChallenge(reply, null, options.challenge, "register-account", { email, name });
+  return options;
+}
+
+/**
+ * Step 2 - verifies the attestation and hands back the raw credential fields plus the
+ * `email`/`name` carried on the challenge. Deliberately doesn't touch `users`/`webauthnCredentials`
+ * itself - `auth/service.ts`'s `registerUserWithPasskey` owns creating the account (duplicate-email
+ * check, workspace, invite redemption) and persists this credential alongside it.
+ */
+export async function verifyRegistrationForNewAccount(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  response: RegistrationResponseJSON,
+): Promise<{ email: string; name: string; credentialId: string; publicKey: string; counter: number; transports: string | null }> {
+  const { challenge, pendingEmail, pendingName } = await consumeChallenge(request, reply, "register-account");
+  if (!pendingEmail || !pendingName) throw badRequest("Passkey registration challenge expired - try again");
+
+  const verification = await verifyRegistrationResponse({
+    response,
+    expectedChallenge: challenge,
+    expectedOrigin: getAppOrigin(),
+    expectedRPID: getRpId(),
+  });
+  if (!verification.verified || !verification.registrationInfo) throw badRequest("Passkey registration failed");
+
+  const { credential } = verification.registrationInfo;
+  return {
+    email: pendingEmail,
+    name: pendingName,
+    credentialId: credential.id,
+    publicKey: Buffer.from(credential.publicKey).toString("base64url"),
+    counter: credential.counter,
+    transports: credential.transports ? JSON.stringify(credential.transports) : null,
+  };
 }
 
 /** Step 1 of passkey login - deliberately usernameless: no `allowCredentials`, so the browser's conditional-UI autofill (see @simplewebauthn/browser's `startAuthentication({ useBrowserAutofill: true })` on the frontend) offers every discoverable passkey it has for this origin, and the credential itself (not a prior email step) identifies the account in `verifyLoginAuthentication`. */

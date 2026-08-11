@@ -3,7 +3,10 @@ import { sqliteTable, text, integer, real, primaryKey, unique, type AnySQLiteCol
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  // Null for a passkey-only account (see modules/auth/service.ts's `registerUserWithPasskey`) -
+  // every password-checking code path (login, changePassword, changeEmail, reverifyWithPassword,
+  // 2FA disable) explicitly branches on this being null instead of assuming a password exists.
+  passwordHash: text("password_hash"),
   name: text("name").notNull(),
   avatarColor: text("avatar_color").notNull().default("#6366f1"),
   // Set once the user uploads a profile picture (see modules/users/) - a
@@ -71,11 +74,17 @@ export const webauthnCredentials = sqliteTable("webauthn_credentials", {
 // usernameless (conditional UI) login challenge, where the credential itself - not a prior login
 // step - identifies the account; `purpose` distinguishes a normal login challenge from a reverify
 // ("sudo mode") one, so a reverify ceremony can never be replayed to complete a full login instead.
+// `pendingEmail`/`pendingName` are only set for a `"register-account"` challenge (brand-new,
+// passkey-only signup, see modules/webauthn/service.ts's `generateRegistrationOptionsForNewAccount`)
+// - there's no user row yet for `userId` to point at, so the challenge itself has to carry the
+// email/name forward to the verify step instead.
 export const webauthnChallenges = sqliteTable("webauthn_challenges", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   challenge: text("challenge").notNull(),
-  purpose: text("purpose").notNull().$type<"register" | "login" | "reverify">(),
+  purpose: text("purpose").notNull().$type<"register" | "login" | "reverify" | "register-account">(),
+  pendingEmail: text("pending_email"),
+  pendingName: text("pending_name"),
   expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
 });

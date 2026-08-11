@@ -2,15 +2,16 @@ import argon2 from "argon2";
 import { eq, and } from "drizzle-orm";
 import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, UpdatePushPreferencesInput, User } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { users, workspaceInvites, workspaceMembers } from "../../db/schema.js";
+import { users, workspaceInvites, workspaceMembers, webauthnCredentials } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, unauthorized } from "../../lib/httpError.js";
 import { createWorkspace } from "../workspaces/service.js";
 import { getRegistrationEnabled } from "../instanceSettings/service.js";
+import { hasAnyCredential } from "../webauthn/service.js";
 
 const AVATAR_COLORS = ["#6366f1", "#22c55e", "#f97316", "#ec4899", "#0ea5e9", "#eab308"];
 
-function toUser(row: typeof users.$inferSelect): User {
+async function toUser(row: typeof users.$inferSelect): Promise<User> {
   return {
     id: row.id,
     email: row.email,
@@ -20,6 +21,8 @@ function toUser(row: typeof users.$inferSelect): User {
     createdAt: row.createdAt,
     totpEnabled: row.totpEnabled,
     pushShowWhenOpen: row.pushShowWhenOpen,
+    hasPassword: row.passwordHash !== null,
+    hasPasskey: await hasAnyCredential(row.id),
   };
 }
 
@@ -46,7 +49,46 @@ export async function registerUser(input: RegisterInput): Promise<User> {
   await createWorkspace(id, { name: `${input.name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, input.email);
 
-  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true };
+  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: true, hasPasskey: false };
+}
+
+/**
+ * The passkey-only counterpart to `registerUser` - same workspace-creation/invite-redemption
+ * behavior, but the account has no password at all (`passwordHash` stays null) and its one
+ * credential is the passkey verified by `modules/webauthn/service.ts`'s
+ * `verifyRegistrationForNewAccount`, which is why `credential` arrives pre-verified here rather
+ * than as a raw WebAuthn response. Also NOT gated on the self-registration setting for the same
+ * reason as `registerUser` - the public endpoint (webauthn/routes.ts) checks `canRegisterEmail`
+ * itself before ever starting the ceremony.
+ */
+export async function registerUserWithPasskey(
+  email: string,
+  name: string,
+  credential: { credentialId: string; publicKey: string; counter: number; transports: string | null },
+): Promise<User> {
+  const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  if (existing[0]) throw badRequest("An account with this email already exists");
+
+  const id = newId();
+  const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)] ?? "#6366f1";
+  const createdAt = nowIso();
+
+  await db.insert(users).values({ id, email, passwordHash: null, name, avatarColor, createdAt });
+  await db.insert(webauthnCredentials).values({
+    id: newId(),
+    userId: id,
+    credentialId: credential.credentialId,
+    publicKey: credential.publicKey,
+    counter: credential.counter,
+    transports: credential.transports,
+    name: "Passkey",
+    createdAt,
+    lastUsedAt: null,
+  });
+  await createWorkspace(id, { name: `${name}'s Workspace`, icon: "sparkles" });
+  await redeemPendingInvites(id, email);
+
+  return { id, email, name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: false, hasPasskey: true };
 }
 
 /**
@@ -89,6 +131,7 @@ export async function verifyCredentials(input: LoginInput): Promise<User> {
   const rows = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
   const row = rows[0];
   if (!row) throw unauthorized("Invalid email or password");
+  if (row.passwordHash === null) throw unauthorized("This account doesn't have a password - sign in with a passkey instead");
 
   const valid = await argon2.verify(row.passwordHash, input.password);
   if (!valid) throw unauthorized("Invalid email or password");
@@ -101,26 +144,38 @@ export async function getUserById(id: string): Promise<User | null> {
   return rows[0] ? toUser(rows[0]) : null;
 }
 
-/** Requires the current password, same as `changeEmail` - this changes how the account is authenticated, not a profile detail. */
+/**
+ * Requires the current password, same as `changeEmail` - this changes how the account is
+ * authenticated, not a profile detail. Skips that check entirely for a passkey-only account
+ * (`passwordHash === null`) - being logged in is already the gate there (same reasoning
+ * `changeEmail` uses), and this doubles as "Set password" for such an account in Settings.
+ */
 export async function changePassword(userId: string, input: ChangePasswordInput): Promise<void> {
   const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const row = rows[0];
   if (!row) throw unauthorized();
 
-  const valid = await argon2.verify(row.passwordHash, input.currentPassword);
-  if (!valid) throw badRequest("Current password is incorrect");
+  if (row.passwordHash !== null) {
+    if (!input.currentPassword) throw badRequest("Current password is required");
+    const valid = await argon2.verify(row.passwordHash, input.currentPassword);
+    if (!valid) throw badRequest("Current password is incorrect");
+  }
 
   const passwordHash = await argon2.hash(input.newPassword);
   await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
 }
 
+/** Skips the current-password check for a passkey-only account - see `changePassword`'s doc comment. */
 export async function changeEmail(userId: string, input: ChangeEmailInput): Promise<User> {
   const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const row = rows[0];
   if (!row) throw unauthorized();
 
-  const valid = await argon2.verify(row.passwordHash, input.currentPassword);
-  if (!valid) throw badRequest("Current password is incorrect");
+  if (row.passwordHash !== null) {
+    if (!input.currentPassword) throw badRequest("Current password is required");
+    const valid = await argon2.verify(row.passwordHash, input.currentPassword);
+    if (!valid) throw badRequest("Current password is incorrect");
+  }
 
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, input.newEmail)).limit(1);
   if (existing[0] && existing[0].id !== userId) throw badRequest("An account with this email already exists");

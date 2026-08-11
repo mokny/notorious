@@ -28,8 +28,14 @@ export async function registerTwoFactorRoutes(app: FastifyInstance): Promise<voi
 
     const rows = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, user.id)).limit(1);
     const row = rows[0];
-    if (!row || !(await argon2.verify(row.passwordHash, input.currentPassword))) {
-      throw badRequest("Current password is incorrect");
+    if (!row) throw badRequest("Current password is incorrect");
+    // A passkey-only account has no password to check - being logged in is already the gate,
+    // same reasoning as auth/service.ts's `changePassword`/`changeEmail`.
+    if (row.passwordHash !== null) {
+      if (!input.currentPassword) throw badRequest("Current password is required");
+      if (!(await argon2.verify(row.passwordHash, input.currentPassword))) {
+        throw badRequest("Current password is incorrect");
+      }
     }
 
     await twoFactorService.disable(user.id);

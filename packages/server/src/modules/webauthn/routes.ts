@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from "@simplewebauthn/server";
-import { renameWebauthnCredentialSchema } from "@notorious/shared";
+import { renameWebauthnCredentialSchema, registerPasskeyOptionsSchema } from "@notorious/shared";
 import { requireUser, createSession } from "../../plugins/session.js";
-import { getUserById } from "../auth/service.js";
-import { badRequest, notFound } from "../../lib/httpError.js";
+import { getUserById, canRegisterEmail, registerUserWithPasskey } from "../auth/service.js";
+import { badRequest, notFound, forbidden } from "../../lib/httpError.js";
 import * as webauthnService from "./service.js";
 
 /** Registration/authentication response bodies are the full JSON shape @simplewebauthn/browser's startRegistration/startAuthentication produce - not worth hand-writing a zod schema for (see @simplewebauthn/server's own verify functions, which already validate their structure and throw a clear error on anything malformed). */
@@ -58,6 +58,43 @@ function registerWebauthnHandlers(app: FastifyInstance): void {
     await webauthnService.deleteCredential(user.id, id);
     reply.code(204);
   });
+
+  // Passkey-only registration (email + name + passkey, no password) - see auth/service.ts's
+  // `registerUserWithPasskey`. Public (no requireUser): this *is* the registration. Rate-limited
+  // (unlike the password register endpoint) since generating WebAuthn options is more expensive
+  // than a password hash check and this is reachable by anyone, not just an invited email.
+  app.post(
+    "/api/v1/webauthn/register-account/options",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const input = registerPasskeyOptionsSchema.parse(request.body);
+      // Same self-registration gate as POST /api/v1/auth/register - see its doc comment in
+      // auth/routes.ts for why this only blocks unsolicited sign-ups, not redeeming an invite.
+      if (!(await canRegisterEmail(input.email))) {
+        throw forbidden(
+          "Registration is currently disabled on this instance. If you were invited to a workspace, make sure you're using the email address the invite was sent to.",
+        );
+      }
+      return webauthnService.generateRegistrationOptionsForNewAccount(reply, input.email, input.name);
+    },
+  );
+
+  app.post(
+    "/api/v1/webauthn/register-account/verify",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const body = requireResponseBody<{ response: RegistrationResponseJSON }>(request.body);
+      const { email, name, credentialId, publicKey, counter, transports } = await webauthnService.verifyRegistrationForNewAccount(
+        request,
+        reply,
+        body.response,
+      );
+      const user = await registerUserWithPasskey(email, name, { credentialId, publicKey, counter, transports });
+      await createSession(reply, user.id);
+      reply.code(201);
+      return user;
+    },
+  );
 
   // Passwordless login - usernameless/conditional-UI, see generateLoginOptions's doc comment.
   // Public (no requireUser): this *is* the login.

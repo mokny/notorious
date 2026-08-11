@@ -18,6 +18,10 @@ export interface User {
   totpEnabled: boolean;
   /** Whether Web Push should still show an OS notification while the user already has a tab focused/visible (see push/service.ts::notifyUser and push-sw.ts). Defaults to true. */
   pushShowWhenOpen: boolean;
+  /** Whether this account has a password set - false for an account registered passkey-only (see modules/auth/service.ts's `registerUserWithPasskey`). Settings shows "Set password" instead of "Update password" when this is false, and login/reverify/email-change routes skip the password check entirely. */
+  hasPassword: boolean;
+  /** Whether this account has at least one registered passkey (see modules/webauthn/). Exempts the account from an instance-wide `require2faEnabled` mandate (App.tsx's `RequireAuth`) - a passkey is already considered a strong-enough factor on its own. */
+  hasPasskey: boolean;
 }
 
 /**
