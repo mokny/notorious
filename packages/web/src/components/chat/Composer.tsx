@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Message } from "@notorious/shared";
 import { chatApi } from "../../lib/api/resources.js";
@@ -6,6 +6,32 @@ import { Icon } from "../ui/Icon.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
 
 const TYPING_DEBOUNCE_MS = 2000;
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+interface SpeechRecognitionLike extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+// Chrome/Safari/Edge only - not implemented in Firefox. Read once at module
+// scope (not per-render): the mic button in the composer below is simply
+// omitted entirely when this is undefined, falling back to today's
+// always-visible send button.
+const SpeechRecognitionCtor = (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ??
+  (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
 
 export function Composer({
   conversationId,
@@ -20,10 +46,45 @@ export function Composer({
   const [body, setBody] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{ id: string; filename: string }[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastTypingSentRef = useRef(0);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const finalTranscriptRef = useRef("");
   const queryClient = useQueryClient();
   const { sendTyping } = useChatRealtime();
+
+  useEffect(() => () => recognitionRef.current?.stop(), []);
+
+  function toggleListening() {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    if (!SpeechRecognitionCtor) return;
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = navigator.language;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    finalTranscriptRef.current = "";
+    recognition.onresult = (event) => {
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (!result) continue;
+        if (result.isFinal) finalTranscriptRef.current += result[0].transcript;
+        else interimTranscript += result[0].transcript;
+      }
+      setBody(finalTranscriptRef.current + interimTranscript);
+    };
+    // Fails silently (permission denied, no mic, etc.) - matches the rest of
+    // the app's getUserMedia error handling, see CallContext.tsx/PreJoinLobby.tsx.
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  }
 
   const sendMutation = useMutation({
     mutationFn: () =>
@@ -125,16 +186,41 @@ export function Composer({
             placeholder="Message"
             className="min-w-0 max-h-32 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none"
           />
-          <button
-            type="submit"
-            disabled={!hasContent || sendMutation.isPending}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
-              hasContent ? "bg-accent text-white hover:opacity-90" : "text-ink-muted"
-            } disabled:opacity-40`}
-            title="Send"
-          >
-            <Icon name="arrow-up" className="h-4 w-4" />
-          </button>
+          {/* While listening, this stays the (pulsing) stop control even once
+              dictated text starts filling the field - it only falls back to
+              the hasContent-driven send/mic logic below once recording ends,
+              otherwise the button would swap out from under the user mid-dictation
+              with no way to stop it. */}
+          {isListening ? (
+            <button
+              type="button"
+              onClick={toggleListening}
+              className="flex h-8 w-8 shrink-0 animate-pulse items-center justify-center rounded-full bg-red-500 text-white"
+              title="Stop dictation"
+            >
+              <Icon name="mic" className="h-4 w-4" />
+            </button>
+          ) : !hasContent && SpeechRecognitionCtor ? (
+            <button
+              type="button"
+              onClick={toggleListening}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-border hover:text-ink"
+              title="Dictate"
+            >
+              <Icon name="mic" className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!hasContent || sendMutation.isPending}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                hasContent ? "bg-accent text-white hover:opacity-90" : "text-ink-muted"
+              } disabled:opacity-40`}
+              title="Send"
+            >
+              <Icon name="arrow-up" className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </form>
