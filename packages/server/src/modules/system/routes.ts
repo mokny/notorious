@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
 import { getRegistrationEnabled, getRequire2faEnabled, getCallsEnabled } from "../instanceSettings/service.js";
+import { passkeysEnabled } from "../../env.js";
 
 // Same "repo root" resolution as app.ts's PACKAGE_ROOT (packages/server/src -> up three).
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
@@ -27,4 +28,9 @@ export async function registerSystemRoutes(app: FastifyInstance): Promise<void> 
   // web client hide the call button entirely rather than showing one that
   // 503s (the real enforcement is still server-side, on every calls route).
   app.get("/api/v1/system/calls-status", async () => ({ enabled: await getCallsEnabled() }));
+
+  // Unauthenticated on purpose, same reasoning as the other status endpoints above - lets
+  // LoginPage.tsx/SecuritySettings.tsx hide passkey UI entirely instead of showing one that
+  // always 400s (see env.ts's `passkeysEnabled` - off until APP_ORIGIN is set in `.env`).
+  app.get("/api/v1/system/passkeys-status", async () => ({ enabled: passkeysEnabled }));
 }

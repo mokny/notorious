@@ -536,6 +536,7 @@ export const systemApi = {
   registrationStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/registration-status"),
   twoFactorRequired: () => apiRequest<{ required: boolean }>("/api/v1/system/2fa-required"),
   callsStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/calls-status"),
+  passkeysStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/passkeys-status"),
 };
 
 export const presenceApi = {

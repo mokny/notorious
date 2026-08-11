@@ -40,12 +40,13 @@ export const env = {
   // The exact public origin (scheme + hostname + optional port, no trailing
   // slash) this instance is reachable at - required for WebAuthn/passkeys
   // (see modules/webauthn/service.ts), which cryptographically bind a
-  // credential to the origin it was registered from. Unlike `webOrigin`
-  // (dev-only CORS convenience, irrelevant in production since CORS is wide
-  // open there - see app.ts), this has no safe default for a real
-  // self-hosted deployment: falling back to localhost would silently break
-  // passkeys on any real domain. Set it in `.env` (see docs/DEPLOYMENT.md).
-  appOrigin: process.env.APP_ORIGIN ?? process.env.WEB_ORIGIN ?? "http://localhost:5173",
+  // credential to the origin it was registered from. Deliberately no
+  // fallback to `webOrigin`/localhost: a passkey registered under the wrong
+  // origin would silently stop working the moment the operator points a
+  // real domain at the app, so instead the whole feature stays off
+  // (`passkeysEnabled` below) until this is explicitly set in `.env` (see
+  // docs/DEPLOYMENT.md).
+  appOrigin: process.env.APP_ORIGIN ?? null,
   // Calls are gated by instance_settings.calls_enabled (a DB flag, off by
   // default), not by whether these are set - an operator flips the flag
   // only after running `npm run setup-calls`, which writes these itself.
@@ -58,3 +59,6 @@ export const env = {
   mediaPort: Number(process.env.MEDIA_PORT ?? 4001),
   mediaAnnouncedIp: process.env.MEDIA_ANNOUNCED_IP ?? "",
 };
+
+/** Whether passkeys can be used at all on this instance - see `env.appOrigin`'s doc comment. Checked by every modules/webauthn/ route (registerWebauthnRoutes throws before doing anything else if this is false) and exposed unauthenticated via GET /api/v1/system/passkeys-status so the frontend can hide the passkey UI instead of showing one that always errors. */
+export const passkeysEnabled = env.appOrigin !== null;

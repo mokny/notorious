@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
-import { authApi, twoFactorApi, webauthnApi } from "../../lib/api/resources.js";
+import { authApi, twoFactorApi, webauthnApi, systemApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { ApiError } from "../../lib/api/client.js";
 import { Button } from "../ui/Button.js";
@@ -203,6 +203,7 @@ function PasskeysList() {
 /** Lets the current user change their own password or enable/disable 2FA. */
 export function SecuritySettings() {
   const { user, refetch } = useAuth();
+  const { data: passkeysStatus } = useQuery({ queryKey: ["passkeysStatus"], queryFn: systemApi.passkeysStatus });
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -319,7 +320,7 @@ export function SecuritySettings() {
         />
       </Modal>
 
-      <PasskeysList />
+      {passkeysStatus?.enabled && <PasskeysList />}
       <SessionsList />
     </div>
   );

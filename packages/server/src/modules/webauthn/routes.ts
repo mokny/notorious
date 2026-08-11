@@ -12,7 +12,20 @@ function requireResponseBody<T>(body: unknown): T {
   return body as T;
 }
 
-export async function registerWebauthnRoutes(app: FastifyInstance): Promise<void> {
+export async function registerWebauthnRoutes(rootApp: FastifyInstance): Promise<void> {
+  // Registered in its own scope (rather than adding routes to `rootApp` directly, like every
+  // other `register*Routes` in this codebase does) specifically so the `onRequest` hook below is
+  // scoped to just these routes - `rootApp.addHook` would otherwise apply to the entire app.
+  await rootApp.register(async (app) => {
+    // Every route below 400s immediately if APP_ORIGIN isn't set (see env.ts's `passkeysEnabled`
+    // doc comment) - one hook instead of repeating the check in each handler.
+    app.addHook("onRequest", async () => webauthnService.assertPasskeysEnabled());
+
+    registerWebauthnHandlers(app);
+  });
+}
+
+function registerWebauthnHandlers(app: FastifyInstance): void {
   // Add a new passkey to the current (already logged-in) account.
   app.post("/api/v1/webauthn/register/options", async (request, reply) => {
     const user = requireUser(request);

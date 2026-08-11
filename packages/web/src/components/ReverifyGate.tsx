@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { authApi, webauthnApi } from "../lib/api/resources.js";
+import { authApi, webauthnApi, systemApi } from "../lib/api/resources.js";
 import { ApiError } from "../lib/api/client.js";
 import { Button } from "./ui/Button.js";
 import { TextField } from "./ui/TextField.js";
@@ -17,6 +18,7 @@ import { Icon } from "./ui/Icon.js";
  * withholds even that).
  */
 export function ReverifyGate({ onVerified }: { onVerified: () => void }) {
+  const { data: passkeysStatus } = useQuery({ queryKey: ["passkeysStatus"], queryFn: systemApi.passkeysStatus });
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
@@ -72,9 +74,11 @@ export function ReverifyGate({ onVerified }: { onVerified: () => void }) {
             {isSubmitting ? "Verifying…" : "Unlock"}
           </Button>
         </form>
-        <Button variant="secondary" className="w-full" onClick={handlePasskey} disabled={isSubmitting}>
-          Use a passkey instead
-        </Button>
+        {passkeysStatus?.enabled && (
+          <Button variant="secondary" className="w-full" onClick={handlePasskey} disabled={isSubmitting}>
+            Use a passkey instead
+          </Button>
+        )}
       </div>
     </div>
   );

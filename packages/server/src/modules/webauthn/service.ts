@@ -20,7 +20,7 @@ import { db } from "../../db/client.js";
 import { webauthnCredentials, webauthnChallenges } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, unauthorized } from "../../lib/httpError.js";
-import { env } from "../../env.js";
+import { env, passkeysEnabled } from "../../env.js";
 import { markSudoVerified } from "../reverify/service.js";
 
 const RP_NAME = "Notorious";
@@ -28,8 +28,18 @@ const RP_NAME = "Notorious";
 const CHALLENGE_COOKIE = "notorious_webauthn_challenge";
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
+/** Every exported function in this module is only ever reached through routes.ts, which calls this first - see its own doc comment on `passkeysEnabled` for why there's no origin fallback to fall back on instead. */
+export function assertPasskeysEnabled(): void {
+  if (!passkeysEnabled) throw badRequest("Passkeys aren't configured on this server - set APP_ORIGIN and restart (see docs/DEPLOYMENT.md)");
+}
+
+/** `env.appOrigin` is only ever null when passkeys are disabled - safe to assert non-null here since every caller already went through `assertPasskeysEnabled()` first. */
+function getAppOrigin(): string {
+  return env.appOrigin as string;
+}
+
 function getRpId(): string {
-  return new URL(env.appOrigin).hostname;
+  return new URL(getAppOrigin()).hostname;
 }
 
 function parseTransports(json: string | null): AuthenticatorTransportFuture[] | undefined {
@@ -126,7 +136,7 @@ export async function verifyRegistration(
   const verification = await verifyRegistrationResponse({
     response,
     expectedChallenge: challenge,
-    expectedOrigin: env.appOrigin,
+    expectedOrigin: getAppOrigin(),
     expectedRPID: getRpId(),
   });
   if (!verification.verified || !verification.registrationInfo) throw badRequest("Passkey registration failed");
@@ -219,7 +229,7 @@ async function verifyAssertion(
   const verification = await verifyAuthenticationResponse({
     response,
     expectedChallenge: challenge,
-    expectedOrigin: env.appOrigin,
+    expectedOrigin: getAppOrigin(),
     expectedRPID: getRpId(),
     credential: toSimpleWebAuthnCredential(credRow),
   });

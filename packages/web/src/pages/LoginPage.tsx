@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { startAuthentication, browserSupportsWebAuthnAutofill } from "@simplewebauthn/browser";
-import { authApi, twoFactorApi, webauthnApi } from "../lib/api/resources.js";
+import { authApi, twoFactorApi, webauthnApi, systemApi } from "../lib/api/resources.js";
 import { ApiError } from "../lib/api/client.js";
 import { setShareMode } from "../lib/api/shareMode.js";
 import { useAuth } from "../context/AuthContext.js";
@@ -33,6 +33,10 @@ export function LoginPage() {
     let cancelled = false;
     async function setupAutofill() {
       if (user) return;
+      // Passkeys are off entirely until the server has APP_ORIGIN configured (see
+      // env.ts's `passkeysEnabled`) - webauthnApi.loginOptions() would just 400 otherwise.
+      const { enabled } = await systemApi.passkeysStatus();
+      if (!enabled) return;
       if (!(await browserSupportsWebAuthnAutofill())) return;
       const optionsJSON = await webauthnApi.loginOptions();
       try {

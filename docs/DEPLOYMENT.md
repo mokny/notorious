@@ -183,11 +183,11 @@ Once HTTPS is actually in place, set `COOKIE_SECURE=true` in `.env` and restart.
 breaks login, not just push notifications.
 
 Also set `APP_ORIGIN` to the exact public URL you're serving the app on (e.g.
-`https://notes.example.com`, no trailing slash) once you're on a real domain - passkeys
-(Settings > Security) cryptographically bind a credential to the origin it was registered from, so
-this must match the URL users actually visit before anyone registers one. Without it, `WEB_ORIGIN`/
-`localhost` is used instead, which works for local dev but will make passkeys registered under it
-stop working the moment you move to a real domain.
+`https://notes.example.com`, no trailing slash) if you want passkeys (Settings > Security)
+available - they're off entirely until this is set, with no fallback to `WEB_ORIGIN`/localhost:
+a passkey cryptographically binds to the origin it was registered under, so silently falling back
+to the wrong one would just mean passkeys stop working the moment you move to a real domain.
+Restart the app after setting it.
 
 ## Option B: Docker Compose
 
