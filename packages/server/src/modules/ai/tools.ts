@@ -67,12 +67,15 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
     },
     execute: async (args, ctx) => {
       await requireEditor(ctx.userId, args.workspaceId);
+      // `hasSudo: false` - the AI chat tool call has no interactive session of its own to
+      // reverify with, so a `requiresReverify` ("vault") object is never searchable here,
+      // same exclusion as API keys/MCP (see workspaces/access.ts's `assertReverifyAccess`).
       const results = await searchObjects(args.workspaceId, {
         q: args.query,
         objectTypeId: args.objectTypeId,
         fuzzy: true,
         limit: 20,
-      });
+      }, false);
       return results.map((o) => ({ id: o.id, title: o.title, objectTypeId: o.objectTypeId }));
     },
   },

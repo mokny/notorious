@@ -6,12 +6,14 @@ import {
   createRelationSchema,
   setObjectLockedSchema,
   setCommentsDisabledSchema,
+  setObjectRequiresReverifySchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess, resolveActor } from "../workspaces/access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
 import * as objectService from "./service.js";
 import { completeRecurringTask } from "./recurrence.js";
+import { isSudoActive } from "../reverify/service.js";
 
 export async function registerObjectRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/workspaces/:workspaceId/objects", async (request, reply) => {
@@ -47,8 +49,9 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       cursor: query.cursor,
       limit: query.limit,
     });
-    if (!request.shareAccess) return result;
-    return { ...result, items: result.items.map(objectService.redactScriptForShare) };
+    const hasSudo = await isSudoActive(request);
+    const items = result.items.map((item) => objectService.redactForReverify(request.shareAccess ? objectService.redactScriptForShare(item) : item, hasSudo));
+    return { ...result, items };
   });
 
   app.get("/api/v1/objects/:id", async (request) => {
@@ -130,6 +133,37 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
       clientId: getClientId(request),
       action: "updated",
       summary: input.disabled ? `${user.name} disabled comments on "${object.title}"` : `${user.name} enabled comments on "${object.title}"`,
+      entity: "object",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return object;
+  });
+
+  // Owner-only, and - like the lock/comments-disabled endpoints above -
+  // deliberately NOT routed through `requireAccess`, which would otherwise
+  // refuse this very request the moment the object is already protected
+  // (assertReverifyAccess has no exception for "the request that's about to
+  // turn the protection back off"), making it impossible to ever unprotect
+  // an object without reverifying first - not the intended UX for the owner
+  // who just set it up. Reads (GET /api/v1/objects/:id) still enforce it
+  // normally.
+  app.post("/api/v1/objects/:id/requires-reverify", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    const workspaceId = await objectService.getObjectWorkspaceId(id);
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const input = setObjectRequiresReverifySchema.parse(request.body);
+    const object = await objectService.setObjectRequiresReverify(id, input.requiresReverify);
+
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: input.requiresReverify ? `${user.name} protected "${object.title}"` : `${user.name} unprotected "${object.title}"`,
       entity: "object",
       entityId: id,
       realtimeAction: "updated",

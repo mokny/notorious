@@ -52,6 +52,12 @@ export const setObjectLockedSchema = z.object({
 });
 export type SetObjectLockedInput = z.infer<typeof setObjectLockedSchema>;
 
+/** Toggles the "vault" reverify protection on an object (see modules/reverify/) - any editor may set this, same permission tier as the lock toggle above. */
+export const setObjectRequiresReverifySchema = z.object({
+  requiresReverify: z.boolean(),
+});
+export type SetObjectRequiresReverifyInput = z.infer<typeof setObjectRequiresReverifySchema>;
+
 /**
  * Deliberately its own endpoint/schema, not folded into `updateObjectSchema` -
  * script mutations go through a stricter "real workspace member only" auth

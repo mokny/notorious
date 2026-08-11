@@ -37,6 +37,16 @@ declare module "fastify" {
     user: AuthenticatedUser | null;
     /** Set when the request carries a valid `X-Share-Token` header - an anonymous visitor following a share link, see `modules/shareLinks`. */
     shareAccess: ResolvedShare | null;
+    /**
+     * How `request.user` was resolved, if at all - "session" (cookie) or
+     * "apiKey" (Bearer header, also covers MCP - see modules/mcp/routes.ts,
+     * which authenticates the same way). Both produce an identically-shaped
+     * `user`, so this is the only way downstream code can tell them apart -
+     * needed by modules/reverify/service.ts's `isSudoActive`, since "sudo
+     * mode" is a cookie-session concept only (see that module's doc comment
+     * for why API keys/MCP can never satisfy a reverify-protected object).
+     */
+    authMethod: "session" | "apiKey" | null;
   }
 }
 
@@ -56,11 +66,13 @@ declare module "fastify" {
 export const sessionPlugin = fp(async (app: FastifyInstance) => {
   app.decorateRequest("user", null);
   app.decorateRequest("shareAccess", null);
+  app.decorateRequest("authMethod", null);
 
   app.addHook("onRequest", async (request, reply) => {
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
       request.user = await authenticateApiKey(authHeader.slice("Bearer ".length));
+      request.authMethod = request.user ? "apiKey" : null;
       return;
     }
 
@@ -83,6 +95,7 @@ export const sessionPlugin = fp(async (app: FastifyInstance) => {
       const row = rows[0];
       if (row) {
         request.user = { id: row.userId, email: row.email, name: row.name, avatarColor: row.avatarColor, avatarUrl: row.avatarUrl };
+        request.authMethod = "session";
         await maybeRenewSession(sid, row.lastSeenAt, reply);
         return;
       }

@@ -143,7 +143,35 @@ export interface ObjectRecord {
   slug: string | null;
   /** Owner-only kill-switch for the comments feature on this object (see modules/comments/) - independent of `lockedAt`: comments stay postable on a locked object unless this is also set. */
   commentsDisabled: boolean;
+  /**
+   * "Vault" protection (see modules/reverify/) - while set, every read and
+   * write on this object requires the requesting session to have completed
+   * a recent password/passkey re-authentication (see `POST /api/v1/auth/reverify`
+   * and `POST /api/v1/webauthn/reverify/verify`); anonymous share links and
+   * API-key/MCP requests are refused entirely, with no exceptions. Any
+   * editor may toggle it, same permission tier as `lockedAt`.
+   */
+  requiresReverify: boolean;
   values: Record<string, PropertyValue>;
+}
+
+/** Returned by `GET /api/v1/objects/:id` instead of a full `ObjectRecord` when the object requires reverify and the caller hasn't recently re-authenticated - just enough to render a locked placeholder (title, icon) plus the reverify prompt, never the object's actual content. */
+export interface ReverifyProtectedObjectStub {
+  id: string;
+  workspaceId: string;
+  objectTypeId: string;
+  title: string;
+  icon: string | null;
+  requiresReverify: true;
+}
+
+/** One registered WebAuthn credential (passkey) for a user account - see modules/webauthn/. `publicKey`/`counter` never leave the server. */
+export interface WebauthnCredential {
+  id: string;
+  /** User-editable label ("MacBook Touch ID", "YubiKey", ...) - defaults to a generic name at registration time. */
+  name: string;
+  createdAt: ISODateString;
+  lastUsedAt: ISODateString | null;
 }
 
 /** Styling for the object title text overlaid on its cover image - see CoverImage.tsx and CoverTextStyleEditor.tsx. */

@@ -3,7 +3,7 @@ import type { SearchQuery, ObjectRecord, CreateSavedSearchInput, SavedSearch, Me
 import { sqlite, db } from "../../db/client.js";
 import { objects, objectValues, relations, savedSearches, conversationParticipants, conversations, users } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
-import { getObject } from "../objects/service.js";
+import { getObject, redactForReverify } from "../objects/service.js";
 import { fuzzyScore } from "./fuzzy.js";
 
 async function objectsByIds(ids: string[]): Promise<ObjectRecord[]> {
@@ -75,7 +75,16 @@ async function relationSearch(objectId: string): Promise<string[]> {
   return [...new Set(rows.map((row) => (row.sourceObjectId === objectId ? row.targetObjectId : row.sourceObjectId)))];
 }
 
-export async function searchObjects(workspaceId: string, query: SearchQuery): Promise<ObjectRecord[]> {
+/**
+ * `hasSudo` - whether the requesting session is currently reverified (see
+ * modules/reverify/service.ts's `isSudoActive`). Without it, a
+ * `requiresReverify` object's *content* must never surface through search -
+ * neither in a snippet nor by being findable through a content match at all
+ * (only a title match still finds it) - matching the same "title only until
+ * reverified" rule the sidebar/object-list applies (see
+ * objects/service.ts's `redactForReverify`).
+ */
+export async function searchObjects(workspaceId: string, query: SearchQuery, hasSudo: boolean): Promise<ObjectRecord[]> {
   let ids: string[];
 
   if (query.tagPropertyId && query.tagValue) {
@@ -102,7 +111,16 @@ export async function searchObjects(workspaceId: string, query: SearchQuery): Pr
     records = records.filter((record) => record.objectTypeId === query.objectTypeId);
   }
 
-  return records;
+  const trimmedQuery = query.q.trim().toLowerCase();
+  if (!hasSudo && trimmedQuery) {
+    // A protected object may only surface here via its *title* - if the
+    // match came from block content (full-text/fuzzy both search bodies,
+    // see fullTextSearch/fuzzyTitleSearch... titles above), drop it rather
+    // than let its existence-plus-content-match leak through search.
+    records = records.filter((record) => !record.requiresReverify || record.title.toLowerCase().includes(trimmedQuery));
+  }
+
+  return records.map((record) => redactForReverify(record, hasSudo));
 }
 
 /**

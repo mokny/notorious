@@ -31,6 +31,49 @@ export const sessions = sqliteTable("sessions", {
   // request - what makes a session "infinite" for an actively-used device: expiresAt keeps
   // rolling forward from this instead of counting down from a fixed login time.
   lastSeenAt: text("last_seen_at"),
+  // Set to "now" by a successful POST /api/v1/auth/reverify (password or passkey) - see
+  // modules/reverify/service.ts. Null (or older than SUDO_TTL_MS) means this session isn't
+  // currently allowed to read/write a `requiresReverify` object; only ever set for a real
+  // cookie session (see plugins/session.ts's `authMethod`), never for an API key.
+  sudoVerifiedAt: text("sudo_verified_at"),
+});
+
+// One row per registered WebAuthn credential (passkey) - see modules/webauthn/. `credentialId` is
+// the base64url authenticator credential id used to look up the row on login (unique - the same
+// physical authenticator can never be registered against two accounts). `publicKey`/`counter` are
+// exactly what @simplewebauthn/server's `verifyAuthenticationResponse` needs; `counter` guards
+// against a cloned authenticator (bumped on every successful login, must only ever increase).
+export const webauthnCredentials = sqliteTable("webauthn_credentials", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  credentialId: text("credential_id").notNull().unique(),
+  publicKey: text("public_key").notNull(),
+  counter: integer("counter").notNull().default(0),
+  // JSON array of AuthenticatorTransportFuture strings ("usb" | "nfc" | "ble" | "internal" | "hybrid"),
+  // as reported at registration - passed back to the browser on login so it knows which transports
+  // to try first. Optional per the WebAuthn spec, hence nullable.
+  transports: text("transports"),
+  // User-editable label ("MacBook Touch ID"), defaults to a generic name at registration time.
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull(),
+  lastUsedAt: text("last_used_at"),
+});
+
+// Short-lived WebAuthn ceremony state (see @simplewebauthn/server's `generateRegistrationOptions`/
+// `generateAuthenticationOptions`) - the `challenge` a browser's authenticator must sign, matched
+// back up in `verifyRegistrationResponse`/`verifyAuthenticationResponse`. `userId` is null for a
+// usernameless (conditional UI) login challenge, where the credential itself - not a prior login
+// step - identifies the account; `purpose` distinguishes a normal login challenge from a reverify
+// ("sudo mode") one, so a reverify ceremony can never be replayed to complete a full login instead.
+export const webauthnChallenges = sqliteTable("webauthn_challenges", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  challenge: text("challenge").notNull(),
+  purpose: text("purpose").notNull().$type<"register" | "login" | "reverify">(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull(),
 });
 
 export const pendingTotpChallenges = sqliteTable("pending_totp_challenges", {
@@ -184,6 +227,10 @@ export const objects = sqliteTable("objects", {
   // than relying on the column's own SQL default (still `0` at the SQL
   // level for historical reasons, see migrations/0030_notifications.sql).
   commentsDisabled: integer("comments_disabled", { mode: "boolean" }).notNull().default(true),
+  // "Vault" reverify protection (see modules/reverify/) - the enforcement side lives in
+  // workspaces/access.ts's `requireAccess`, checked for every object-scoped request
+  // regardless of role (unlike `lockedAt`, which only ever blocks editor+ requests).
+  requiresReverify: integer("requires_reverify", { mode: "boolean" }).notNull().default(false),
 });
 
 export const objectValues = sqliteTable(

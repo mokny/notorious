@@ -29,6 +29,10 @@ import type {
   CreateObjectInput,
   UpdateObjectInput,
   SetObjectLockedInput,
+  SetObjectRequiresReverifyInput,
+  ReverifyPasswordInput,
+  WebauthnCredential,
+  RenameWebauthnCredentialInput,
   CreateRelationInput,
   CreateBlockInput,
   UpdateBlockInput,
@@ -101,6 +105,12 @@ import type {
   MediaKind,
   ProducerSource,
 } from "@notorious/shared";
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from "@simplewebauthn/browser";
 import { apiRequest, apiUpload, apiDownload, apiUploadWithProgress } from "./client.js";
 import { randomId } from "../randomId.js";
 
@@ -119,6 +129,22 @@ export const authApi = {
   sessions: () => apiRequest<Session[]>("/api/v1/auth/sessions"),
   revokeSession: (id: string) => apiRequest<void>(`/api/v1/auth/sessions/${id}`, { method: "DELETE" }),
   revokeOtherSessions: () => apiRequest<void>("/api/v1/auth/sessions", { method: "DELETE" }),
+  reverify: (input: ReverifyPasswordInput) => apiRequest<void>("/api/v1/auth/reverify", { method: "POST", body: input }),
+};
+
+export const webauthnApi = {
+  registerOptions: () => apiRequest<PublicKeyCredentialCreationOptionsJSON>("/api/v1/webauthn/register/options", { method: "POST" }),
+  registerVerify: (response: RegistrationResponseJSON, name?: string) =>
+    apiRequest<WebauthnCredential>("/api/v1/webauthn/register/verify", { method: "POST", body: { response, name } }),
+  credentials: () => apiRequest<WebauthnCredential[]>("/api/v1/webauthn/credentials"),
+  rename: (id: string, input: RenameWebauthnCredentialInput) =>
+    apiRequest<void>(`/api/v1/webauthn/credentials/${id}`, { method: "PATCH", body: input }),
+  remove: (id: string) => apiRequest<void>(`/api/v1/webauthn/credentials/${id}`, { method: "DELETE" }),
+  loginOptions: () => apiRequest<PublicKeyCredentialRequestOptionsJSON>("/api/v1/webauthn/login/options", { method: "POST" }),
+  loginVerify: (response: AuthenticationResponseJSON) => apiRequest<User>("/api/v1/webauthn/login/verify", { method: "POST", body: { response } }),
+  reverifyOptions: () => apiRequest<PublicKeyCredentialRequestOptionsJSON>("/api/v1/webauthn/reverify/options", { method: "POST" }),
+  reverifyVerify: (response: AuthenticationResponseJSON) =>
+    apiRequest<void>("/api/v1/webauthn/reverify/verify", { method: "POST", body: { response } }),
 };
 
 export const twoFactorApi = {
@@ -198,6 +224,8 @@ export const objectApi = {
   setLocked: (id: string, input: SetObjectLockedInput) => apiRequest<ObjectRecord>(`/api/v1/objects/${id}/lock`, { method: "POST", body: input }),
   setCommentsDisabled: (id: string, input: SetCommentsDisabledInput) =>
     apiRequest<ObjectRecord>(`/api/v1/objects/${id}/comments-disabled`, { method: "POST", body: input }),
+  setRequiresReverify: (id: string, input: SetObjectRequiresReverifyInput) =>
+    apiRequest<ObjectRecord>(`/api/v1/objects/${id}/requires-reverify`, { method: "POST", body: input }),
   archive: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/archive`, { method: "POST" }),
   restore: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/restore`, { method: "POST" }),
   remove: (id: string) => apiRequest<void>(`/api/v1/objects/${id}`, { method: "DELETE" }),

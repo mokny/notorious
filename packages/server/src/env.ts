@@ -37,6 +37,15 @@ export const env = {
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   vapidSubject: process.env.VAPID_SUBJECT ?? "mailto:admin@example.com",
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:5173",
+  // The exact public origin (scheme + hostname + optional port, no trailing
+  // slash) this instance is reachable at - required for WebAuthn/passkeys
+  // (see modules/webauthn/service.ts), which cryptographically bind a
+  // credential to the origin it was registered from. Unlike `webOrigin`
+  // (dev-only CORS convenience, irrelevant in production since CORS is wide
+  // open there - see app.ts), this has no safe default for a real
+  // self-hosted deployment: falling back to localhost would silently break
+  // passkeys on any real domain. Set it in `.env` (see docs/DEPLOYMENT.md).
+  appOrigin: process.env.APP_ORIGIN ?? process.env.WEB_ORIGIN ?? "http://localhost:5173",
   // Calls are gated by instance_settings.calls_enabled (a DB flag, off by
   // default), not by whether these are set - an operator flips the flag
   // only after running `npm run setup-calls`, which writes these itself.

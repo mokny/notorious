@@ -51,6 +51,7 @@ function toRecord(row: typeof objects.$inferSelect, values: Record<string, unkno
     coverTextStyle: row.coverTextStyle ? (JSON.parse(row.coverTextStyle) as CoverTextStyle) : null,
     slug: row.slug,
     commentsDisabled: row.commentsDisabled,
+    requiresReverify: row.requiresReverify,
     values: values as ObjectRecord["values"],
   };
 }
@@ -90,6 +91,29 @@ export function redactScriptForShare(record: ObjectRecord): ObjectRecord {
 }
 
 /**
+ * Strips everything except id/title/icon/type from a `requiresReverify`
+ * object when the requester hasn't recently reverified - applied to bulk
+ * listing/search results (workspace object list, search), which - unlike a
+ * single `GET /api/v1/objects/:id` - aren't refused outright by
+ * `workspaces/access.ts`'s `requireAccess` (there's no single `objectId` to
+ * gate there). Lets the object still show up (title + a lock affordance) in
+ * the sidebar/search without leaking any of its actual content.
+ */
+export function redactForReverify(record: ObjectRecord, hasSudo: boolean): ObjectRecord {
+  if (!record.requiresReverify || hasSudo) return record;
+  return {
+    ...record,
+    cover: null,
+    scriptSource: null,
+    scriptEnabled: false,
+    scriptLastRun: null,
+    coverTextStyle: null,
+    slug: null,
+    values: {},
+  };
+}
+
+/**
  * Throws 423 if `objectId` is currently locked - the enforcement side of the
  * owner-only lock toggle (see objects/routes.ts). Called from
  * `workspaces/access.ts`'s `requireAccess` for every object-scoped editor+
@@ -122,6 +146,17 @@ export async function isCommentsDisabled(objectId: string): Promise<boolean> {
 
 export async function setCommentsDisabled(objectId: string, disabled: boolean): Promise<ObjectRecord> {
   await db.update(objects).set({ commentsDisabled: disabled }).where(eq(objects.id, objectId));
+  return getObject(objectId);
+}
+
+/** True once `objects.requiresReverify` is set - the enforcement side of the "vault" toggle (see objects/routes.ts). Checked by `workspaces/access.ts`'s `requireAccess` for *every* object-scoped request, unlike `lockedAt`/`commentsDisabled`, which only ever gate editor-role writes. */
+export async function isObjectReverifyProtected(objectId: string): Promise<boolean> {
+  const rows = await db.select({ requiresReverify: objects.requiresReverify }).from(objects).where(eq(objects.id, objectId)).limit(1);
+  return Boolean(rows[0]?.requiresReverify);
+}
+
+export async function setObjectRequiresReverify(objectId: string, requiresReverify: boolean): Promise<ObjectRecord> {
+  await db.update(objects).set({ requiresReverify }).where(eq(objects.id, objectId));
   return getObject(objectId);
 }
 

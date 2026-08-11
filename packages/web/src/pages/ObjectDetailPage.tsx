@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi, blockApi } from "../lib/api/resources.js";
 import { getShareRole } from "../lib/api/shareMode.js";
+import { ApiError } from "../lib/api/client.js";
+import { ReverifyGate } from "../components/ReverifyGate.js";
 import { BlockEditor } from "../components/editor/BlockEditor.js";
 import { HighlightableTitle } from "../components/editor/HighlightableTitle.js";
 import { HighlightedText } from "../components/editor/HighlightedText.js";
@@ -101,12 +103,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   const {
     data: object,
     isError: objectLoadFailed,
+    error: objectLoadError,
   } = useQuery({
     queryKey: ["object", objectId],
     queryFn: () => objectApi.get(objectId!),
     enabled: Boolean(objectId),
     retry: !share, // a share-scope rejection (401/404) won't resolve by retrying, unlike a real transient network error
   });
+  // A `requiresReverify` ("vault") object's GET comes back 428 instead of the usual 401/403/404
+  // (see workspaces/access.ts's `assertReverifyAccess`) - distinguished from a real load failure
+  // so this shows a reverify prompt instead of the generic "not part of what was shared" message.
+  const needsReverify = objectLoadError instanceof ApiError && objectLoadError.statusCode === 428;
 
   const { data: properties } = useQuery({
     queryKey: ["properties", object?.objectTypeId],
@@ -197,6 +204,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
   });
 
+  const requiresReverifyMutation = useMutation({
+    mutationFn: (requiresReverify: boolean) => objectApi.setRequiresReverify(objectId!, { requiresReverify }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
+  });
+
   const commentsDisabledMutation = useMutation({
     mutationFn: (disabled: boolean) => objectApi.setCommentsDisabled(objectId!, { disabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
@@ -217,6 +229,10 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     if (object) visitObjectHistory({ id: object.id, title: object.title, icon: object.icon });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [object?.id, object?.title, object?.icon]);
+
+  if (needsReverify) {
+    return <ReverifyGate onVerified={() => queryClient.invalidateQueries({ queryKey: ["object", objectId] })} />;
+  }
 
   if (objectLoadFailed) {
     return (
@@ -385,6 +401,20 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                   <Icon name="lock" className="h-4 w-4" />
                 </span>
               )
+            )}
+            {/* "Vault" protection (see modules/reverify/) - unlike the lock button above, this
+                never blocks its own toggle: the owner-only endpoint it hits deliberately skips
+                `requireAccess`'s reverify check (see objects/routes.ts), so protecting/
+                unprotecting always stays reachable regardless of the object's own current state. */}
+            {isOwner && (
+              <button
+                onClick={() => requiresReverifyMutation.mutate(!object.requiresReverify)}
+                disabled={requiresReverifyMutation.isPending}
+                title={object.requiresReverify ? "Remove reverify protection" : "Require re-authentication to view or edit this object"}
+                className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.requiresReverify ? "text-accent" : "text-ink-muted"}`}
+              >
+                <Icon name="shield" className="h-4 w-4" />
+              </button>
             )}
             {/* Only shown once a cover is set - that's the only case where
                 the plain title input above is hidden entirely (see the

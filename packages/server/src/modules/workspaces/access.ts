@@ -3,9 +3,10 @@ import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import type { FastifyRequest } from "fastify";
 import { db } from "../../db/client.js";
 import { workspaceMembers } from "../../db/schema.js";
-import { forbidden, unauthorized } from "../../lib/httpError.js";
-import { assertObjectEditable } from "../objects/service.js";
+import { forbidden, unauthorized, reverifyRequired } from "../../lib/httpError.js";
+import { assertObjectEditable, isObjectReverifyProtected } from "../objects/service.js";
 import { requireUser } from "../../plugins/session.js";
+import { isSudoActive } from "../reverify/service.js";
 
 /** Returns the caller's role in the workspace, or null if they are not a member. */
 export async function getMemberRole(
@@ -87,7 +88,28 @@ export async function requireAccess(
     await assertObjectEditable(options.objectId);
   }
 
+  if (options.objectId) {
+    await assertReverifyAccess(request, options.objectId);
+  }
+
   return result;
+}
+
+/**
+ * Blocks every request - reads included, unlike the lock check above which
+ * only ever gates editor+ writes - against a `requiresReverify` ("vault")
+ * object unless the requesting session has recently completed a password or
+ * passkey reverify (see modules/reverify/service.ts). An anonymous share
+ * link or an API-key/MCP request is refused outright (403, not 428): neither
+ * has any way to complete an interactive reverify ceremony, so offering one
+ * would just be a dead end - see modules/reverify/service.ts's doc comment.
+ */
+async function assertReverifyAccess(request: FastifyRequest, objectId: string): Promise<void> {
+  if (!(await isObjectReverifyProtected(objectId))) return;
+
+  if (!request.user) throw forbidden("This object is protected and isn't available via a shared link");
+  if (request.authMethod !== "session") throw forbidden("This object is protected and isn't available via an API key");
+  if (!(await isSudoActive(request))) throw reverifyRequired();
 }
 
 /** Shorthand for `requireAccess` on endpoints that browse/list across a whole workspace - never satisfiable by a single-object share. */
@@ -119,6 +141,9 @@ export async function requireRealMemberAccess(
   await requireWorkspaceRole(workspaceId, user.id, minRole);
   if (objectId && roleAtLeast(minRole, "editor")) {
     await assertObjectEditable(objectId);
+  }
+  if (objectId) {
+    await assertReverifyAccess(request, objectId);
   }
   return { actorId: user.id, actorName: user.name };
 }

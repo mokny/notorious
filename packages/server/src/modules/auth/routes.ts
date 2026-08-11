@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { registerSchema, loginSchema, changePasswordSchema, changeEmailSchema } from "@notorious/shared";
+import { registerSchema, loginSchema, changePasswordSchema, changeEmailSchema, reverifyPasswordSchema } from "@notorious/shared";
 import { registerUser, verifyCredentials, getUserById, canRegisterEmail, changePassword, changeEmail } from "./service.js";
 import { createSession, destroySession, requireUser, invalidateOtherSessions, listSessions, revokeSession } from "../../plugins/session.js";
 import { sendToSession } from "../realtime/hub.js";
 import { forbidden } from "../../lib/httpError.js";
 import { env } from "../../env.js";
 import { createPendingChallenge, PENDING_TOTP_COOKIE } from "../twoFactor/service.js";
+import { reverifyWithPassword, markSudoVerified } from "../reverify/service.js";
 
 const PENDING_TOTP_TTL_SECONDS = 5 * 60;
 
@@ -111,5 +112,16 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const user = requireUser(request);
     const input = changeEmailSchema.parse(request.body);
     return changeEmail(user.id, input);
+  });
+
+  // The password branch of "sudo mode" reverification (see modules/reverify/service.ts)
+  // - the passkey branch is POST /api/v1/webauthn/reverify/verify instead, since it needs
+  // a WebAuthn ceremony (options -> browser assertion -> verify) rather than a single call.
+  app.post("/api/v1/auth/reverify", async (request, reply) => {
+    const user = requireUser(request);
+    const input = reverifyPasswordSchema.parse(request.body);
+    await reverifyWithPassword(user.id, input.password);
+    await markSudoVerified(request);
+    reply.code(204);
   });
 }

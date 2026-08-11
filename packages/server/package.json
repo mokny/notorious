@@ -42,6 +42,7 @@
     "@marsaud/smb2": "^0.18.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@notorious/shared": "*",
+    "@simplewebauthn/server": "^13.3.2",
     "archiver": "^7.0.1",
     "argon2": "^0.41.1",
     "basic-ftp": "^6.2.0",

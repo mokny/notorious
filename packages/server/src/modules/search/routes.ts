@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { searchQuerySchema, createSavedSearchSchema } from "@notorious/shared";
 import { requireUser } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireWorkspaceScopedAccess } from "../workspaces/access.js";
+import { isSudoActive } from "../reverify/service.js";
 import * as searchService from "./service.js";
 
 export async function registerSearchRoutes(app: FastifyInstance): Promise<void> {
@@ -9,7 +10,8 @@ export async function registerSearchRoutes(app: FastifyInstance): Promise<void> 
     const { workspaceId } = request.params as { workspaceId: string };
     await requireWorkspaceScopedAccess(request, workspaceId, "viewer");
     const query = searchQuerySchema.parse(request.query);
-    return searchService.searchObjects(workspaceId, query);
+    const hasSudo = await isSudoActive(request);
+    return searchService.searchObjects(workspaceId, query, hasSudo);
   });
 
   app.get("/api/v1/workspaces/:workspaceId/saved-searches", async (request) => {

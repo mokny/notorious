@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authApi, twoFactorApi } from "../../lib/api/resources.js";
+import { startRegistration } from "@simplewebauthn/browser";
+import { authApi, twoFactorApi, webauthnApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { ApiError } from "../../lib/api/client.js";
 import { Button } from "../ui/Button.js";
@@ -102,6 +103,99 @@ function SessionsList() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Passkey management (add/rename/remove) - see modules/webauthn/. Signing in with one of these skips the password + TOTP steps entirely (see LoginPage.tsx's conditional-UI autofill), and any registered passkey can also satisfy a "vault" object's reverify prompt (see ReverifyGate.tsx). */
+function PasskeysList() {
+  const queryClient = useQueryClient();
+  const { data: credentials } = useQuery({ queryKey: ["webauthnCredentials"], queryFn: webauthnApi.credentials });
+  const [error, setError] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const optionsJSON = await webauthnApi.registerOptions();
+      const response = await startRegistration({ optionsJSON });
+      await webauthnApi.registerVerify(response);
+    },
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ["webauthnCredentials"] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : "Could not add passkey"),
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: (input: { id: string; name: string }) => webauthnApi.rename(input.id, { name: input.name }),
+    onSuccess: () => {
+      setRenamingId(null);
+      void queryClient.invalidateQueries({ queryKey: ["webauthnCredentials"] });
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => webauthnApi.remove(id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["webauthnCredentials"] }),
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-ink-muted">Passkeys</p>
+        <Button variant="secondary" onClick={() => addMutation.mutate()} disabled={addMutation.isPending}>
+          Add a passkey
+        </Button>
+      </div>
+      <p className="text-sm text-ink-muted">
+        Sign in without a password using Face ID, Touch ID, a security key, or your device's screen lock.
+      </p>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      {credentials && credentials.length > 0 && (
+        <div className="divide-y divide-border rounded-lg border border-border">
+          {credentials.map((cred) => (
+            <div key={cred.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+              {renamingId === cred.id ? (
+                <form
+                  className="flex flex-1 items-center gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    renameMutation.mutate({ id: cred.id, name: renameValue });
+                  }}
+                >
+                  <TextField value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus className="max-w-xs" />
+                  <Button type="submit" variant="secondary" disabled={renameMutation.isPending}>
+                    Save
+                  </Button>
+                </form>
+              ) : (
+                <div className="min-w-0">
+                  <button
+                    className="truncate text-left hover:underline"
+                    onClick={() => {
+                      setRenamingId(cred.id);
+                      setRenameValue(cred.name);
+                    }}
+                  >
+                    {cred.name}
+                  </button>
+                  <p className="truncate text-xs text-ink-muted">{cred.lastUsedAt ? `Last used ${relativeTime(cred.lastUsedAt)}` : "Never used"}</p>
+                </div>
+              )}
+              <button
+                onClick={() => removeMutation.mutate(cred.id)}
+                disabled={removeMutation.isPending}
+                className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
+                title="Remove passkey"
+              >
+                <Icon name="trash" className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -225,6 +319,7 @@ export function SecuritySettings() {
         />
       </Modal>
 
+      <PasskeysList />
       <SessionsList />
     </div>
   );

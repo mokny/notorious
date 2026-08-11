@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { authApi, twoFactorApi } from "../lib/api/resources.js";
+import { startAuthentication, browserSupportsWebAuthnAutofill } from "@simplewebauthn/browser";
+import { authApi, twoFactorApi, webauthnApi } from "../lib/api/resources.js";
 import { ApiError } from "../lib/api/client.js";
 import { setShareMode } from "../lib/api/shareMode.js";
 import { useAuth } from "../context/AuthContext.js";
@@ -18,6 +19,38 @@ export function LoginPage() {
   const [pending2fa, setPending2fa] = useState(false);
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [code, setCode] = useState("");
+
+  // Usernameless/conditional-UI passkey login (see modules/webauthn/service.ts's
+  // `generateLoginOptions`) - the browser itself offers matching passkeys as an
+  // autofill suggestion on the email field below (needs its `autoComplete="username
+  // webauthn"`), with no separate button or prior email entry required. A no-op on a
+  // browser/platform that doesn't support it (checked via `browserSupportsWebAuthnAutofill`);
+  // the normal password form underneath still works either way. This effect's own
+  // `startAuthentication` promise only resolves once the user actually picks a passkey (or
+  // never, if they type a password instead) - nothing to cancel/cleanup on unmount here,
+  // same as the rest of this page's fire-and-forget submit handlers.
+  useEffect(() => {
+    let cancelled = false;
+    async function setupAutofill() {
+      if (user) return;
+      if (!(await browserSupportsWebAuthnAutofill())) return;
+      const optionsJSON = await webauthnApi.loginOptions();
+      try {
+        const response = await startAuthentication({ optionsJSON, useBrowserAutofill: true });
+        if (cancelled) return;
+        await webauthnApi.loginVerify(response);
+        await completeLogin();
+      } catch {
+        // No passkey picked (cancelled, or the platform authenticator was dismissed) - the
+        // user can still sign in with their password, nothing to surface as an error here.
+      }
+    }
+    void setupAutofill();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (user) return <Navigate to="/" replace />;
 
@@ -113,7 +146,14 @@ export function LoginPage() {
           <p className="mt-1 text-sm text-ink-muted">Sign in to your workspace</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-surface-raised p-6">
-          <TextField type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <TextField
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username webauthn"
+            required
+          />
           <TextField
             type="password"
             placeholder="Password"
