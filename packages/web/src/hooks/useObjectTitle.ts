@@ -9,8 +9,12 @@ import { objectApi, schemaApi } from "../lib/api/resources.js";
  */
 export function useObjectTitle(workspaceId: string | undefined, objectId: string | undefined): { title: string; icon: string } {
   const { data: object } = useQuery({
-    queryKey: ["object", objectId],
-    queryFn: () => objectApi.get(objectId!),
+    // Distinct from the ["object", objectId] key `ObjectDetailPage` etc. use
+    // for the full `GET /api/v1/objects/:id` - this hits the redacted
+    // `/summary` endpoint instead, so sharing a cache key would let a
+    // reverify-gated full fetch and this stripped-down one clobber each other.
+    queryKey: ["objectSummary", objectId],
+    queryFn: () => objectApi.summary(objectId!),
     enabled: Boolean(objectId),
     staleTime: 30_000,
   });

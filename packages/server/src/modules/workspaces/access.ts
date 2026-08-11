@@ -47,6 +47,8 @@ interface RequireAccessOptions {
   requireWorkspaceScope?: boolean;
   /** When true, skip the object-lock check even though this call would normally trigger it - for the narrow set of actions the lock is deliberately scoped to exclude (e.g. checking off a checklist item; see objects/routes.ts's lock endpoint and toggleChecklistItemSchema). Still requires normal role/membership access. */
   allowWhenLocked?: boolean;
+  /** When true, skip the hard `assertReverifyAccess` 428 for a `requiresReverify` object - for the one read that's deliberately allowed to see a vault object's title/icon without a completed reverify (see objects/routes.ts's `GET /api/v1/objects/:id/summary`, used for mention/link previews). Every other role/scope check (including single-object share scoping) still applies unchanged. */
+  skipReverifyGate?: boolean;
 }
 
 /**
@@ -88,7 +90,7 @@ export async function requireAccess(
     await assertObjectEditable(options.objectId);
   }
 
-  if (options.objectId) {
+  if (options.objectId && !options.skipReverifyGate) {
     await assertReverifyAccess(request, options.objectId);
   }
 

@@ -109,7 +109,12 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     queryKey: ["object", objectId],
     queryFn: () => objectApi.get(objectId!),
     enabled: Boolean(objectId),
-    retry: !share, // a share-scope rejection (401/404) won't resolve by retrying, unlike a real transient network error
+    // Never auto-retry: a share-scope rejection (401/404) won't resolve by
+    // retrying, and a reverify-required 428 (see `needsReverify` below) must
+    // not be masked by TanStack Query's `retry: true` meaning "retry forever"
+    // rather than "retry once" - that would keep this stuck on the generic
+    // "Loading" fallback instead of ever reaching the `ReverifyGate` branch.
+    retry: false,
   });
   // A `requiresReverify` ("vault") object's GET comes back 428 instead of the usual 401/403/404
   // (see workspaces/access.ts's `assertReverifyAccess`) - distinguished from a real load failure

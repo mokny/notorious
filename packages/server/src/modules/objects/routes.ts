@@ -62,6 +62,22 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     return request.shareAccess ? objectService.redactScriptForShare(object) : object;
   });
 
+  // Deliberately the one read that's allowed to see a `requiresReverify`
+  // object's title/icon without a completed reverify - used for mention/link
+  // previews (see web's useObjectTitle.ts) so a linked vault object shows its
+  // real title instead of "Untitled". Same object-scoping as the full GET
+  // above (a single-object share still only reaches its own object), just
+  // without the hard 428 - see access.ts's `skipReverifyGate`.
+  app.get("/api/v1/objects/:id/summary", async (request) => {
+    const { id } = request.params as { id: string };
+    const workspaceId = await objectService.getObjectWorkspaceId(id);
+    await requireAccess(request, workspaceId, "viewer", { objectId: id, skipReverifyGate: true });
+    const object = await objectService.getObject(id);
+    const hasSudo = await isSudoActive(request);
+    const redacted = objectService.redactForReverify(object, hasSudo);
+    return request.shareAccess ? objectService.redactScriptForShare(redacted) : redacted;
+  });
+
   app.patch("/api/v1/objects/:id", async (request) => {
     const { id } = request.params as { id: string };
     const workspaceId = await objectService.getObjectWorkspaceId(id);

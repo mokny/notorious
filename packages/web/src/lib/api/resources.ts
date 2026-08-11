@@ -219,6 +219,11 @@ export const objectApi = {
   create: (workspaceId: string, input: CreateObjectInput) =>
     apiRequest<ObjectRecord>(`/api/v1/workspaces/${workspaceId}/objects`, { method: "POST", body: input }),
   get: (id: string) => apiRequest<ObjectRecord>(`/api/v1/objects/${id}`),
+  // Title/icon-only, reverify-safe variant of `get` - see server's
+  // `GET /api/v1/objects/:id/summary` doc comment. Used by useObjectTitle.ts
+  // for mention/link previews so a `requiresReverify` object's real title
+  // shows up instead of "Untitled".
+  summary: (id: string) => apiRequest<ObjectRecord>(`/api/v1/objects/${id}/summary`),
   update: (id: string, input: UpdateObjectInput) =>
     apiRequest<ObjectRecord>(`/api/v1/objects/${id}`, { method: "PATCH", body: input }),
   setLocked: (id: string, input: SetObjectLockedInput) => apiRequest<ObjectRecord>(`/api/v1/objects/${id}/lock`, { method: "POST", body: input }),
