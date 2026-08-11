@@ -1,5 +1,13 @@
 import { eq, and, asc } from "drizzle-orm";
-import type { WorkspaceAiConfigSummary, AiConfiguredWorkspace, AiChatMessage, AiToolCall, SaveWorkspaceAiConfigInput, AiUsageResetInterval } from "@notorious/shared";
+import type {
+  WorkspaceAiConfigSummary,
+  AiConfiguredWorkspace,
+  AiChatMessage,
+  AiToolCall,
+  SaveWorkspaceAiConfigInput,
+  AiUsageResetInterval,
+  UpdateWorkspaceAiContextInput,
+} from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { workspaceAiConfigs, aiChatMessages, workspaces, workspaceMembers } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -12,10 +20,29 @@ export interface DecryptedAiConfig {
   model: string;
   baseUrl: string | null;
   apiKey: string;
+  purposeInstructions: string | null;
+  chatHistoryLimit: number;
+  activityFeedEnabled: boolean;
 }
 
+const DEFAULT_CHAT_HISTORY_LIMIT = 20;
+
 function toSummary(row: typeof workspaceAiConfigs.$inferSelect | undefined): WorkspaceAiConfigSummary {
-  if (!row) return { configured: false, provider: null, model: null, baseUrl: null, maxTokenBudget: null, consumedTokens: 0, usageResetInterval: null, usageResetAt: null };
+  if (!row) {
+    return {
+      configured: false,
+      provider: null,
+      model: null,
+      baseUrl: null,
+      maxTokenBudget: null,
+      consumedTokens: 0,
+      usageResetInterval: null,
+      usageResetAt: null,
+      purposeInstructions: null,
+      chatHistoryLimit: DEFAULT_CHAT_HISTORY_LIMIT,
+      activityFeedEnabled: false,
+    };
+  }
   return {
     configured: true,
     provider: row.provider,
@@ -25,6 +52,9 @@ function toSummary(row: typeof workspaceAiConfigs.$inferSelect | undefined): Wor
     consumedTokens: row.consumedTokens,
     usageResetInterval: row.usageResetInterval,
     usageResetAt: row.usageResetAt,
+    purposeInstructions: row.purposeInstructions,
+    chatHistoryLimit: row.chatHistoryLimit,
+    activityFeedEnabled: row.activityFeedEnabled,
   };
 }
 
@@ -66,7 +96,15 @@ export async function getDecryptedWorkspaceAiConfig(workspaceId: string): Promis
   const rows = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
   const row = rows[0];
   if (!row) return null;
-  return { provider: row.provider, model: row.model, baseUrl: row.baseUrl, apiKey: decrypt(row.apiKey) };
+  return {
+    provider: row.provider,
+    model: row.model,
+    baseUrl: row.baseUrl,
+    apiKey: decrypt(row.apiKey),
+    purposeInstructions: row.purposeInstructions,
+    chatHistoryLimit: row.chatHistoryLimit,
+    activityFeedEnabled: row.activityFeedEnabled,
+  };
 }
 
 export async function saveWorkspaceAiConfig(workspaceId: string, input: SaveWorkspaceAiConfigInput): Promise<WorkspaceAiConfigSummary> {
@@ -87,10 +125,36 @@ export async function saveWorkspaceAiConfig(workspaceId: string, input: SaveWork
     updatedAt: now,
   };
   if (row) {
+    // Context settings (purpose text, history limit, activity feed) are edited via
+    // `updateWorkspaceAiContext` instead - untouched by a provider/key replace.
     await db.update(workspaceAiConfigs).set(values).where(eq(workspaceAiConfigs.workspaceId, workspaceId));
   } else {
-    await db.insert(workspaceAiConfigs).values({ workspaceId, ...values, consumedTokens: 0, createdAt: now });
+    await db.insert(workspaceAiConfigs).values({
+      workspaceId,
+      ...values,
+      consumedTokens: 0,
+      purposeInstructions: null,
+      chatHistoryLimit: DEFAULT_CHAT_HISTORY_LIMIT,
+      activityFeedEnabled: false,
+      createdAt: now,
+    });
   }
+  return getWorkspaceAiConfigSummary(workspaceId);
+}
+
+/** Updates just the Agent Chat context settings of an existing config, leaving provider/model/apiKey/budget untouched. */
+export async function updateWorkspaceAiContext(workspaceId: string, input: UpdateWorkspaceAiContextInput): Promise<WorkspaceAiConfigSummary> {
+  const existing = await db.select().from(workspaceAiConfigs).where(eq(workspaceAiConfigs.workspaceId, workspaceId)).limit(1);
+  if (!existing[0]) throw badRequest("This workspace has no AI configuration to update.");
+  await db
+    .update(workspaceAiConfigs)
+    .set({
+      purposeInstructions: input.purposeInstructions,
+      chatHistoryLimit: input.chatHistoryLimit,
+      activityFeedEnabled: input.activityFeedEnabled,
+      updatedAt: nowIso(),
+    })
+    .where(eq(workspaceAiConfigs.workspaceId, workspaceId));
   return getWorkspaceAiConfigSummary(workspaceId);
 }
 

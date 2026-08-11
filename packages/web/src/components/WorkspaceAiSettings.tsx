@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AI_PROVIDERS, AI_USAGE_RESET_INTERVALS, type AiProvider, type AiUsageResetInterval } from "@notorious/shared";
+import { AI_PROVIDERS, AI_USAGE_RESET_INTERVALS, AI_CHAT_HISTORY_LIMIT_MAX, type AiProvider, type AiUsageResetInterval } from "@notorious/shared";
 import { aiApi } from "../lib/api/resources.js";
 import { Button } from "./ui/Button.js";
 import { TextField } from "./ui/TextField.js";
@@ -71,6 +71,40 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
       setQuickInitialized(true);
     }
   }, [config, quickInitialized]);
+
+  const [purposeInstructions, setPurposeInstructions] = useState("");
+  const [chatHistoryLimit, setChatHistoryLimit] = useState(20);
+  const [activityFeedEnabled, setActivityFeedEnabled] = useState(false);
+  const [contextInitialized, setContextInitialized] = useState(false);
+  const [contextSaved, setContextSaved] = useState(false);
+
+  useEffect(() => {
+    if (config?.configured && !contextInitialized) {
+      setPurposeInstructions(config.purposeInstructions ?? "");
+      setChatHistoryLimit(config.chatHistoryLimit);
+      setActivityFeedEnabled(config.activityFeedEnabled);
+      setContextInitialized(true);
+    }
+  }, [config, contextInitialized]);
+
+  const contextMutation = useMutation({
+    mutationFn: () =>
+      aiApi.updateContext(workspaceId, {
+        purposeInstructions: purposeInstructions.trim() || null,
+        chatHistoryLimit,
+        activityFeedEnabled,
+      }),
+    onSuccess: () => {
+      setContextSaved(true);
+      void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  function handleContextSubmit(event: FormEvent) {
+    event.preventDefault();
+    setContextSaved(false);
+    contextMutation.mutate();
+  }
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -291,6 +325,70 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-border p-3">{fullForm}</div>
+      )}
+
+      {config?.configured && (
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-sm font-medium text-ink">Agent Chat context</p>
+          <p className="mt-1 text-xs text-ink-muted">Controls what the Agent Chat knows about when answering - not the AI blocks used inline on pages.</p>
+
+          <form onSubmit={handleContextSubmit} className="mt-3 space-y-3">
+            <div>
+              <label className="text-xs font-medium text-ink-muted">Workspace purpose &amp; behavior</label>
+              <textarea
+                value={purposeInstructions}
+                onChange={(e) => setPurposeInstructions(e.target.value)}
+                placeholder='e.g. "This workspace tracks our support tickets - be terse, and always ask before archiving anything."'
+                rows={3}
+                maxLength={4000}
+                className="mt-1 w-full resize-y rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              />
+              <p className="mt-1 text-xs text-ink-muted">Added to the agent's instructions for everyone in this workspace.</p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs font-medium text-ink-muted">
+                <label htmlFor="chat-history-limit">Chat history sent to the agent</label>
+                <span>{chatHistoryLimit === 0 ? "None" : `Last ${chatHistoryLimit} messages`}</span>
+              </div>
+              <input
+                id="chat-history-limit"
+                type="range"
+                min={0}
+                max={AI_CHAT_HISTORY_LIMIT_MAX}
+                step={5}
+                value={chatHistoryLimit}
+                onChange={(e) => setChatHistoryLimit(Number(e.target.value))}
+                className="mt-1.5 w-full max-w-xs accent-accent"
+              />
+              <p className="mt-1 text-xs text-ink-muted">How much of your own past conversation the agent sees on each new message.</p>
+            </div>
+
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={activityFeedEnabled}
+                onChange={(e) => setActivityFeedEnabled(e.target.checked)}
+                className="mt-0.5 accent-accent"
+              />
+              <span>
+                <span className="font-medium text-ink">Let the agent look up recent workspace activity</span>
+                <span className="block text-xs text-ink-muted">
+                  Lets it answer things like "what changed recently?" by reading the activity log (objects created/updated/archived by
+                  anyone in this workspace). Off by default.
+                </span>
+              </span>
+            </label>
+
+            <div className="flex items-center gap-2">
+              <Button type="submit" variant="primary" disabled={contextMutation.isPending}>
+                Save
+              </Button>
+              {contextSaved && !contextMutation.isPending && <span className="text-xs text-ink-muted">Saved.</span>}
+              {contextMutation.isError && <span className="text-xs text-red-500">Could not save - try again.</span>}
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

@@ -256,6 +256,24 @@ export async function listRecentlyEditedObjectIds(
   return rows.map((row) => row.objectId!);
 }
 
+/**
+ * Recent activity across the whole workspace (any member's edits), most
+ * recent first - powers the AI agent's opt-in `list_recent_activity` tool
+ * (see modules/ai/tools.ts), so it can summarize "what's new" on request.
+ * Unlike `listRecentlyEditedObjectIds`, not scoped to one actor.
+ */
+export async function listRecentActivity(
+  workspaceId: string,
+  limit: number,
+): Promise<{ summary: string; action: string; objectId: string | null; createdAt: string }[]> {
+  return db
+    .select({ summary: activityLog.summary, action: activityLog.action, objectId: activityLog.objectId, createdAt: activityLog.createdAt })
+    .from(activityLog)
+    .where(eq(activityLog.workspaceId, workspaceId))
+    .orderBy(desc(activityLog.createdAt))
+    .limit(limit);
+}
+
 /** This workspace's pinned objects, in the curated order - a shared "quick navigation" list every member and anonymous share visitor sees the same version of (see workspace_pins in db/schema.ts), not a personal per-account list. */
 export async function listPins(workspaceId: string): Promise<string[]> {
   const rows = await db

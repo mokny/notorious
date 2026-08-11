@@ -70,6 +70,7 @@ import type {
   WorkspaceAiConfigSummary,
   SaveWorkspaceAiConfigInput,
   PatchWorkspaceAiConfigInput,
+  UpdateWorkspaceAiContextInput,
   AiConfiguredWorkspace,
   AiChatMessage,
   RenderedBlocksResponse,
@@ -524,9 +525,11 @@ export const aiApi = {
   patchConfig: (workspaceId: string, input: PatchWorkspaceAiConfigInput) =>
     apiRequest<WorkspaceAiConfigSummary>(`/api/v1/workspaces/${workspaceId}/ai/config`, { method: "PATCH", body: input }),
   removeConfig: (workspaceId: string) => apiRequest<void>(`/api/v1/workspaces/${workspaceId}/ai/config`, { method: "DELETE" }),
+  updateContext: (workspaceId: string, input: UpdateWorkspaceAiContextInput) =>
+    apiRequest<WorkspaceAiConfigSummary>(`/api/v1/workspaces/${workspaceId}/ai/context`, { method: "PATCH", body: input }),
   listMessages: (workspaceId: string) => apiRequest<AiChatMessage[]>(`/api/v1/workspaces/${workspaceId}/ai/chat`),
-  sendMessage: (workspaceId: string, message: string) =>
-    apiRequest<AiChatMessage[]>(`/api/v1/workspaces/${workspaceId}/ai/chat`, { method: "POST", body: { message } }),
+  sendMessage: (workspaceId: string, message: string, activeObjectId: string | null) =>
+    apiRequest<AiChatMessage[]>(`/api/v1/workspaces/${workspaceId}/ai/chat`, { method: "POST", body: { message, activeObjectId } }),
   clearMessages: (workspaceId: string) => apiRequest<void>(`/api/v1/workspaces/${workspaceId}/ai/chat`, { method: "DELETE" }),
 };
 

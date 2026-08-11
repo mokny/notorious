@@ -600,6 +600,12 @@ export const workspaceAiConfigs = sqliteTable("workspace_ai_configs", {
   // - cleared on reset or on a config edit, so the notification fires once
   // per breach rather than on every subsequent blocked request.
   budgetNotifiedAt: text("budget_notified_at"),
+  // Freeform "purpose & behavior" text an owner sets, appended to the agent's system prompt.
+  purposeInstructions: text("purpose_instructions"),
+  // How many of the user's own most-recent chat turns are sent to the model as context - see modules/ai/agent.ts's `limitHistory`. 0 = none, just the message just sent.
+  chatHistoryLimit: integer("chat_history_limit").notNull().default(20),
+  // Whether the chat-only `list_recent_activity` tool is available to the agent - off by default, never exposed via MCP.
+  activityFeedEnabled: integer("activity_feed_enabled", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

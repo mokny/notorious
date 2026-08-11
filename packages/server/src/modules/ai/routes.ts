@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { saveWorkspaceAiConfigSchema, patchWorkspaceAiConfigSchema, sendChatMessageSchema } from "@notorious/shared";
+import { saveWorkspaceAiConfigSchema, patchWorkspaceAiConfigSchema, updateWorkspaceAiContextSchema, sendChatMessageSchema } from "@notorious/shared";
 import { requireUser } from "../../plugins/session.js";
 import { requireWorkspaceRole } from "../workspaces/access.js";
 import * as aiService from "./service.js";
@@ -43,6 +43,14 @@ export async function registerAiRoutes(app: FastifyInstance): Promise<void> {
     reply.code(204);
   });
 
+  app.patch("/api/v1/workspaces/:workspaceId/ai/context", async (request) => {
+    const user = requireUser(request);
+    const { workspaceId } = request.params as { workspaceId: string };
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const input = updateWorkspaceAiContextSchema.parse(request.body);
+    return aiService.updateWorkspaceAiContext(workspaceId, input);
+  });
+
   app.get("/api/v1/workspaces/:workspaceId/ai/chat", async (request) => {
     const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
@@ -55,7 +63,7 @@ export async function registerAiRoutes(app: FastifyInstance): Promise<void> {
     const { workspaceId } = request.params as { workspaceId: string };
     await requireWorkspaceRole(workspaceId, user.id, "editor");
     const input = sendChatMessageSchema.parse(request.body);
-    return sendChatMessage(user.id, workspaceId, input.message);
+    return sendChatMessage(user.id, workspaceId, input.message, input.activeObjectId ?? null);
   });
 
   app.delete("/api/v1/workspaces/:workspaceId/ai/chat", async (request, reply) => {

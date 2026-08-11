@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useMatch } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AiChatMessage } from "@notorious/shared";
 import { aiApi } from "../../lib/api/resources.js";
@@ -51,8 +52,13 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
 
   const { data: messages } = useQuery({ queryKey, queryFn: () => aiApi.listMessages(workspaceId) });
 
+  // Whatever object detail page is open behind this chat overlay (see App.tsx - ChatSheet/ChatBubble
+  // render on top of every route) - sent along so the user can say "update this" without naming it.
+  const objectRouteMatch = useMatch("/w/:workspaceId/objects/:objectId");
+  const activeObjectId = objectRouteMatch?.params.workspaceId === workspaceId ? (objectRouteMatch.params.objectId ?? null) : null;
+
   const sendMutation = useMutation({
-    mutationFn: (message: string) => aiApi.sendMessage(workspaceId, message),
+    mutationFn: (message: string) => aiApi.sendMessage(workspaceId, message, activeObjectId),
     onSuccess: () => {
       setInput("");
       void queryClient.invalidateQueries({ queryKey });

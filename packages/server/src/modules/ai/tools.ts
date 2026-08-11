@@ -1,7 +1,7 @@
 import { z, type ZodRawShape } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { requireWorkspaceRole } from "../workspaces/access.js";
-import { listWorkspacesForUser } from "../workspaces/service.js";
+import { listWorkspacesForUser, listRecentActivity } from "../workspaces/service.js";
 import { listObjectTypes } from "../schema/service.js";
 import { searchObjects } from "../search/service.js";
 import { getUserById } from "../auth/service.js";
@@ -233,6 +233,28 @@ export const AI_TOOLS: AiTool<ZodRawShape>[] = [
     },
   },
 ];
+
+/**
+ * Opt-in per-workspace (`workspace_ai_configs.activityFeedEnabled`, off by
+ * default) - lets the agent summarize "what's been happening lately" from
+ * the workspace's activity log. Deliberately *not* part of `AI_TOOLS`: it's
+ * appended by `agent.ts` only when the workspace has it enabled, and is
+ * never exposed via the MCP server (modules/mcp/routes.ts uses `AI_TOOLS`
+ * directly) - an external API key should not gain a "what changed recently"
+ * view just because a member turned this on for the in-app chat.
+ */
+export const LIST_RECENT_ACTIVITY_TOOL: AiTool<ZodRawShape> = {
+  name: "list_recent_activity",
+  description: "List recent activity (objects created, updated or archived) across the whole workspace, most recent first - use this when asked to summarize what's new or what's been happening lately.",
+  shape: {
+    workspaceId: z.string(),
+    limit: z.number().int().min(1).max(50).optional().describe("Max entries to return, default 20"),
+  },
+  execute: async (args, ctx) => {
+    await requireEditor(ctx.userId, args.workspaceId);
+    return listRecentActivity(args.workspaceId, args.limit ?? 20);
+  },
+};
 
 /** JSON Schema for a tool's parameters, in the shape OpenAI/Anthropic's function-calling APIs expect - derived from the same zod shape MCP validates against, so the two surfaces can never drift apart. */
 export function toolParametersJsonSchema(tool: AiTool): Record<string, unknown> {

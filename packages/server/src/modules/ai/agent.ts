@@ -3,17 +3,45 @@ import type { AiChatMessage } from "@notorious/shared";
 import { badRequest } from "../../lib/httpError.js";
 import { getDecryptedWorkspaceAiConfig, listChatMessages, appendChatMessage, assertBudgetNotExceeded, recordTokenUsage } from "./service.js";
 import { getProviderAdapter, resolveBaseUrl, type ChatMessage } from "./providers/index.js";
-import { AI_TOOLS, findTool, toolParametersJsonSchema } from "./tools.js";
+import { AI_TOOLS, LIST_RECENT_ACTIVITY_TOOL, toolParametersJsonSchema, type AiTool } from "./tools.js";
+import { getObject } from "../objects/service.js";
 
 const MAX_TOOL_ITERATIONS = 8;
 
-function systemPrompt(workspaceId: string): string {
-  return [
+function systemPrompt(workspaceId: string, options: { purposeInstructions: string | null; activeObject: { id: string; title: string } | null }): string {
+  const parts = [
     "You are an assistant embedded in Notorious, a notes and knowledge-base app.",
     `The user is currently in workspace "${workspaceId}" - use this as the workspaceId for any tool that needs one, unless the user clearly means a different workspace (call list_workspaces to find its id first).`,
     "You can create, search, read, update and archive objects, and add paragraph/checklist blocks to them, via the tools available to you. Actually call the relevant tool to perform an action - never just claim you did something without calling the tool for it.",
     "Call list_object_types before create_object if you don't already know the right objectTypeId. Keep replies brief and concrete about what you did.",
-  ].join(" ");
+  ];
+  if (options.activeObject) {
+    parts.push(
+      `The user currently has the object "${options.activeObject.title}" (id: ${options.activeObject.id}) open. If they say "this", "here" or otherwise don't name a document, act on this object without asking for its title. If they explicitly name a different document, use search_objects to find that one instead.`,
+    );
+  }
+  if (options.purposeInstructions) {
+    parts.push(`Additional context about this workspace, set by its owner: ${options.purposeInstructions}`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Keeps only the most recent `limit` visible (user/assistant) chat turns
+ * plus the message just sent, cutting at a clean turn boundary so a `tool`
+ * row is never left dangling without the assistant call that produced it
+ * (tool rows always follow their assistant call in `messages`, oldest-first,
+ * never precede it). `limit <= 0` keeps just the message just sent.
+ */
+function limitHistory(messages: AiChatMessage[], limit: number): AiChatMessage[] {
+  if (limit <= 0) return messages.slice(-1);
+  const visibleIndices: number[] = [];
+  messages.forEach((message, index) => {
+    if (message.role !== "tool") visibleIndices.push(index);
+  });
+  const keep = limit + 1; // +1 for the message just sent, on top of `limit` prior turns
+  if (visibleIndices.length <= keep) return messages;
+  return messages.slice(visibleIndices[visibleIndices.length - keep]);
 }
 
 function toChatMessage(message: AiChatMessage): ChatMessage {
@@ -34,18 +62,31 @@ function toChatMessage(message: AiChatMessage): ChatMessage {
  * with no more tool calls, or `MAX_TOOL_ITERATIONS` is hit. Every message
  * along the way is persisted, so a page reload doesn't lose the exchange.
  */
-export async function sendChatMessage(userId: string, workspaceId: string, userMessage: string): Promise<AiChatMessage[]> {
+export async function sendChatMessage(userId: string, workspaceId: string, userMessage: string, activeObjectId: string | null = null): Promise<AiChatMessage[]> {
   const config = await getDecryptedWorkspaceAiConfig(workspaceId);
   if (!config) throw badRequest("No AI provider configured for this workspace - ask a workspace owner to set one up in Settings");
 
   const adapter = getProviderAdapter(config.provider);
-  const toolDefs = AI_TOOLS.map((tool) => ({ name: tool.name, description: tool.description, parameters: toolParametersJsonSchema(tool) }));
+  const activeTools: AiTool[] = config.activityFeedEnabled ? [...AI_TOOLS, LIST_RECENT_ACTIVITY_TOOL] : AI_TOOLS;
+  const toolDefs = activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: toolParametersJsonSchema(tool) }));
+
+  // Informational only (id + title, not the object's content) - lets the user say
+  // "update this" instead of naming the object; ignored if it's gone or not in this workspace.
+  let activeObject: { id: string; title: string } | null = null;
+  if (activeObjectId) {
+    try {
+      const object = await getObject(activeObjectId);
+      if (object.workspaceId === workspaceId) activeObject = { id: object.id, title: object.title };
+    } catch {
+      activeObject = null;
+    }
+  }
 
   const appended: AiChatMessage[] = [];
   const userRow = await appendChatMessage(userId, workspaceId, { role: "user", content: userMessage });
   appended.push(userRow);
 
-  const history = (await listChatMessages(userId, workspaceId)).map(toChatMessage);
+  const history = limitHistory(await listChatMessages(userId, workspaceId), config.chatHistoryLimit).map(toChatMessage);
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     await assertBudgetNotExceeded(workspaceId);
@@ -53,7 +94,7 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
       apiKey: config.apiKey,
       baseUrl: resolveBaseUrl(config.provider, config.baseUrl),
       model: config.model,
-      systemPrompt: systemPrompt(workspaceId),
+      systemPrompt: systemPrompt(workspaceId, { purposeInstructions: config.purposeInstructions, activeObject }),
       messages: history,
       tools: toolDefs,
     });
@@ -74,7 +115,7 @@ export async function sendChatMessage(userId: string, workspaceId: string, userM
     history.push(toChatMessage(assistantRow));
 
     for (const call of result.toolCalls) {
-      const tool = findTool(call.name);
+      const tool = activeTools.find((t) => t.name === call.name);
       let resultText: string;
       try {
         if (!tool) throw new Error(`Unknown tool: ${call.name}`);
