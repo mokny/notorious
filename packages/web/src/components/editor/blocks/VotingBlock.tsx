@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -122,6 +122,7 @@ function VotingItemRow({
   onChangeTitle,
   onChangeDescription,
   onRemove,
+  onTouchArmStart,
 }: {
   sortableId: string;
   item: VotingItem;
@@ -134,6 +135,8 @@ function VotingItemRow({
   onChangeTitle: (title: string) => void;
   onChangeDescription: (description: string) => void;
   onRemove: () => void;
+  /** Bind as `onPointerDownCapture` on whatever carries `listeners` below - see useDragSelectGuard.ts. */
+  onTouchArmStart: (event: PointerEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   // Same touch-vs-hover split as BlockItem.tsx/ChecklistBlock.tsx.
@@ -178,6 +181,7 @@ function VotingItemRow({
         onFocus={() => setIsEditingContent(true)}
         onBlur={() => setIsEditingContent(false)}
         {...(canLongPressDrag ? listeners : {})}
+        onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
         className={`group/votingitem relative flex items-start gap-2 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""
         }`}
@@ -186,6 +190,7 @@ function VotingItemRow({
           <button
             {...attributes}
             {...listeners}
+            onPointerDownCapture={onTouchArmStart}
             // Hidden while locked/read-only, same as ChecklistBlock's drag handle -
             // reordering items is content editing, unlike the vote arrows next to it.
             className="mt-1.5 shrink-0 cursor-grab rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/votingitem:opacity-100 disabled:opacity-0"
@@ -440,6 +445,7 @@ export function VotingBlock({
               onChangeTitle={(title) => updateItem(index, { title })}
               onChangeDescription={(description) => updateItem(index, { description })}
               onRemove={() => removeItem(index)}
+              onTouchArmStart={dragSelectGuard.onTouchArmStart}
             />
           ))}
         </SortableContext>

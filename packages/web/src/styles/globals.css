@@ -157,11 +157,15 @@ input[type="checkbox"] {
    (blocks in BlockEditor.tsx, checklist/voting items, pinned nav items,
    board-view cards - every DndContext in the app) - a fast pointer-drag
    reorder otherwise also highlights the surrounding text it passes over,
-   since none of those drag handles/cards are otherwise unselectable. Toggled
-   on/off via useDragSelectGuard.ts's onDragStart/onDragEnd/onDragCancel. */
+   since none of those drag handles/cards are otherwise unselectable.
+   touch-action: none additionally stops the browser's own touch gesture
+   handling (which is what surfaces the native selection/"Look Up" bubble on
+   iOS/Android) from ever taking over. Toggled on/off via
+   useDragSelectGuard.ts's onDragStart/onDragEnd/onDragCancel/onTouchArmStart. */
 .dnd-dragging {
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
 }
 
 /* Hides hover-revealed edit controls (drag handles, add/delete buttons -

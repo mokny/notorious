@@ -257,7 +257,12 @@ function WorkspaceLayoutInner() {
                 <SortableContext items={pinnedIds} strategy={verticalListSortingStrategy}>
                   <div className="space-y-0.5">
                     {pinnedIds.map((objectId) => (
-                      <PinnedNavItem key={objectId} workspaceId={workspaceId!} objectId={objectId} />
+                      <PinnedNavItem
+                        key={objectId}
+                        workspaceId={workspaceId!}
+                        objectId={objectId}
+                        onTouchArmStart={pinDragSelectGuard.onTouchArmStart}
+                      />
                     ))}
                   </div>
                 </SortableContext>

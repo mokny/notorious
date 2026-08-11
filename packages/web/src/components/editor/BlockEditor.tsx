@@ -618,6 +618,7 @@ export function BlockEditor({
         pendingFocusBlockId,
         clearPendingFocus: () => setPendingFocusBlockId(null),
         isDraggingAny,
+        onTouchArmStart: dragSelectGuard.onTouchArmStart,
         selectedBlockId,
         selectBlock: (blockId) => onSelectBlock?.(blockId),
         contextMenuBlockId,

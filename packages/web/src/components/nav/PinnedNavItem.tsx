@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type PointerEvent } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useSortable } from "@dnd-kit/sortable";
@@ -15,6 +15,8 @@ import { navLinkClass } from "./navLinkClass.js";
 interface PinnedNavItemProps {
   workspaceId: string;
   objectId: string;
+  /** Bind as `onPointerDownCapture` on the drag handle below - see useDragSelectGuard.ts. */
+  onTouchArmStart: (event: PointerEvent) => void;
 }
 
 /**
@@ -24,7 +26,7 @@ interface PinnedNavItemProps {
  * expand chevron, without leaving the sidebar. Drag-reorderable via the grip
  * handle (see the DndContext wrapping the pinned list in WorkspaceLayout).
  */
-export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
+export function PinnedNavItem({ workspaceId, objectId, onTouchArmStart }: PinnedNavItemProps) {
   const [expanded, setExpanded] = useState(false);
   const { title, icon } = useObjectTitle(workspaceId, objectId);
   const { toggle: togglePin } = useWorkspacePins(workspaceId);
@@ -89,6 +91,7 @@ export function PinnedNavItem({ workspaceId, objectId }: PinnedNavItemProps) {
           <button
             {...attributes}
             {...listeners}
+            onPointerDownCapture={onTouchArmStart}
             className={`shrink-0 cursor-grab rounded p-1 text-ink-muted ${
               hasHover ? "opacity-0 hover:text-ink group-hover:opacity-100" : touched ? "opacity-100" : "opacity-0"
             }`}

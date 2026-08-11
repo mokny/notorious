@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -78,6 +78,7 @@ function ChecklistItemRow({
   registerInputRef,
   readOnly,
   searchTerms,
+  onTouchArmStart,
 }: {
   sortableId: string;
   /** This item's owning block id and its key in `renderedBlocks` (`items.<index>` - see modules/templates/renderer.ts and useTemplatableField.ts). */
@@ -97,6 +98,8 @@ function ChecklistItemRow({
   readOnly: boolean;
   /** See BlockEditorContext.tsx's `searchHighlight` - checklist items aren't TipTap instances, so they can't use SearchHighlight.ts's decorations (see HighlightedText.tsx). */
   searchTerms: string[];
+  /** Bind as `onPointerDownCapture` on whatever carries `listeners` below - see useDragSelectGuard.ts. */
+  onTouchArmStart: (event: PointerEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   // Same touch-vs-hover split as BlockItem.tsx: no real hover means the
@@ -154,6 +157,7 @@ function ChecklistItemRow({
         onFocus={() => setIsEditingContent(true)}
         onBlur={() => setIsEditingContent(false)}
         {...(canLongPressDrag ? listeners : {})}
+        onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
         className={`group/checklistitem relative flex items-start gap-1 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""
         }`}
@@ -162,6 +166,7 @@ function ChecklistItemRow({
           <button
             {...attributes}
             {...listeners}
+            onPointerDownCapture={onTouchArmStart}
             className="mt-1 shrink-0 cursor-grab rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/checklistitem:opacity-100"
             title="Drag to reorder item"
           >
@@ -601,6 +606,7 @@ export function ChecklistBlock({
                 onChangeText={(markdown) => updateItem(index, { markdown })}
                 onEnter={addItem}
                 onRemove={() => removeItem(index)}
+                onTouchArmStart={dragSelectGuard.onTouchArmStart}
                 onFlush={() => {
                   flushSave();
                   finishEditingNewItem(item.id);

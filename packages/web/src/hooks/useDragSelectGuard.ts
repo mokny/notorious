@@ -4,26 +4,50 @@ const DRAGGING_CLASS = "dnd-dragging";
 
 /**
  * Suppresses text selection for the duration of a dnd-kit drag - spread the
- * returned handlers onto a `DndContext`'s onDragStart/onDragEnd/onDragCancel
- * (merge with the DndContext's own handlers where it already has any, e.g.
- * BlockEditor.tsx). See globals.css's `.dnd-dragging` rule.
+ * returned onDragStart/onDragEnd/onDragCancel onto a `DndContext` (merge with
+ * the DndContext's own handlers where it already has any, e.g.
+ * BlockEditor.tsx). Also bind `onTouchArmStart` as `onPointerDownCapture` on
+ * whichever element carries dnd-kit's own drag `listeners`: touch's
+ * TouchSensor has an activation delay before dnd-kit's onDragStart fires, and
+ * the OS can win that race with its own long-press text-selection UI (the
+ * "Look Up"/speak bubble) before the class below ever gets applied. Arming on
+ * the raw touch pointerdown closes that gap; it's disarmed again on
+ * pointerup/pointercancel if a drag never actually starts. See globals.css's
+ * `.dnd-dragging` rule.
  */
 export function useDragSelectGuard() {
-  // Ref, not state - this never needs to trigger a re-render, it only ever
-  // toggles a class directly on document.body.
+  // Refs, not state - these never need to trigger a re-render, they only
+  // ever toggle a class directly on document.body.
+  const armedRef = useRef(false);
   const draggingRef = useRef(false);
 
+  function sync() {
+    document.body.classList.toggle(DRAGGING_CLASS, armedRef.current || draggingRef.current);
+  }
+
   function onDragStart() {
-    if (draggingRef.current) return;
     draggingRef.current = true;
-    document.body.classList.add(DRAGGING_CLASS);
+    sync();
   }
 
   function onDragEnd() {
-    if (!draggingRef.current) return;
     draggingRef.current = false;
-    document.body.classList.remove(DRAGGING_CLASS);
+    sync();
   }
 
-  return { onDragStart, onDragEnd, onDragCancel: onDragEnd };
+  function onTouchArmStart(event: React.PointerEvent) {
+    if (event.pointerType !== "touch") return;
+    armedRef.current = true;
+    sync();
+    const disarm = () => {
+      armedRef.current = false;
+      sync();
+      window.removeEventListener("pointerup", disarm);
+      window.removeEventListener("pointercancel", disarm);
+    };
+    window.addEventListener("pointerup", disarm, { once: true });
+    window.addEventListener("pointercancel", disarm, { once: true });
+  }
+
+  return { onDragStart, onDragEnd, onDragCancel: onDragEnd, onTouchArmStart };
 }

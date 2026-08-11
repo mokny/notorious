@@ -29,6 +29,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
     pendingFocusBlockId,
     clearPendingFocus,
     isDraggingAny,
+    onTouchArmStart,
     selectBlock,
     contextMenuBlockId,
   } = useBlockEditor();
@@ -116,6 +117,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // dedicated handle, not a row that already contains its own
         // interactive content (text, checkboxes, ...).
         {...(canLongPressDrag ? listeners : {})}
+        onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
         className={`group/item relative flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""
         }`}
@@ -132,6 +134,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
             <button
               {...attributes}
               {...listeners}
+              onPointerDownCapture={onTouchArmStart}
               className={`cursor-grab touch-none rounded p-0.5 text-ink-muted hover:bg-surface hover:text-ink [@media(pointer:coarse)]:p-2 ${
                 isDraggingAny ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"
               }`}

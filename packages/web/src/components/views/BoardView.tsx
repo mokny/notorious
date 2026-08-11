@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type PointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import type { ObjectRecord, Property, PropertyOption } from "@notorious/shared";
@@ -79,6 +79,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
           items={columns.get(UNASSIGNED) ?? []}
           onOpenObject={openObject}
           stacked={stacked}
+          onTouchArmStart={dragSelectGuard.onTouchArmStart}
         />
         {options.map((option) => (
           <BoardColumn
@@ -89,6 +90,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
             items={columns.get(option.id) ?? []}
             onOpenObject={openObject}
             stacked={stacked}
+            onTouchArmStart={dragSelectGuard.onTouchArmStart}
           />
         ))}
       </div>
@@ -103,6 +105,7 @@ function BoardColumn({
   items,
   onOpenObject,
   stacked,
+  onTouchArmStart,
 }: {
   id: string;
   title: string;
@@ -110,6 +113,7 @@ function BoardColumn({
   items: ObjectRecord[];
   onOpenObject: (objectId: string) => void;
   stacked: boolean;
+  onTouchArmStart: (event: PointerEvent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
@@ -125,14 +129,22 @@ function BoardColumn({
       </div>
       <div className="space-y-2">
         {items.map((item) => (
-          <BoardCard key={item.id} item={item} onOpen={() => onOpenObject(item.id)} />
+          <BoardCard key={item.id} item={item} onOpen={() => onOpenObject(item.id)} onTouchArmStart={onTouchArmStart} />
         ))}
       </div>
     </div>
   );
 }
 
-function BoardCard({ item, onOpen }: { item: ObjectRecord; onOpen: () => void }) {
+function BoardCard({
+  item,
+  onOpen,
+  onTouchArmStart,
+}: {
+  item: ObjectRecord;
+  onOpen: () => void;
+  onTouchArmStart: (event: PointerEvent) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: item.id });
 
   return (
@@ -140,6 +152,7 @@ function BoardCard({ item, onOpen }: { item: ObjectRecord; onOpen: () => void })
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onPointerDownCapture={onTouchArmStart}
       onClick={onOpen}
       style={transform ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 10 } : undefined}
       className={`cursor-pointer rounded-lg border border-border bg-surface p-2.5 text-sm shadow-sm hover:ring-2 hover:ring-accent/30 ${isDragging ? "opacity-60" : ""}`}
