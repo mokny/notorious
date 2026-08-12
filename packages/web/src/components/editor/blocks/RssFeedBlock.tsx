@@ -332,6 +332,7 @@ export function RssFeedBlock({
           <button
             type="button"
             title="Refresh"
+            data-lock-exempt
             disabled={refreshMutation.isPending || cooldownActive || sources.length === 0}
             onClick={() => refreshMutation.mutate()}
             className="rounded p-1 text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-40"

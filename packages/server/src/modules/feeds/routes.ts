@@ -70,7 +70,10 @@ export async function registerFeedRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const blockId = await feedService.getFeedSourceBlockId(id);
     const { objectId, workspaceId } = await workspaceIdForBlock(blockId);
-    await requireAccess(request, workspaceId, "editor", { objectId });
+    // Refreshing pulls newer external data, it doesn't edit the object's own
+    // content - same reasoning as the checklist checkbox exemption, so it
+    // stays available even when the object is locked (see access.ts).
+    await requireAccess(request, workspaceId, "editor", { objectId, allowWhenLocked: true });
     return feedService.refreshFeedSource(id);
   });
 }
