@@ -132,6 +132,7 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
 
     const attachment = await chatService.saveChatAttachment({
       conversationId: id,
+      workspaceId: access.conversation.workspaceId,
       uploadedBy: access.userId,
       filename: data.filename,
       mimeType: data.mimetype,

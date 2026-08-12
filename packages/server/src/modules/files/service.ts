@@ -17,7 +17,7 @@ export { absoluteStoragePath };
  * missing (shouldn't happen - the caller always resolves it from a real
  * upload request first).
  */
-async function getImageLimits(workspaceId: string, kind: "image" | "cover"): Promise<ImageResizeLimits> {
+export async function getImageLimits(workspaceId: string, kind: "image" | "cover"): Promise<ImageResizeLimits> {
   const rows = await db
     .select({
       imageMaxWidth: workspaces.imageMaxWidth,

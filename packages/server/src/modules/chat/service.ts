@@ -23,6 +23,8 @@ import {
   workspaces,
   calls,
 } from "../../db/schema.js";
+import { maybeResizeImage } from "../files/imageResize.js";
+import { getImageLimits } from "../files/service.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { writeUploadedBytes, deleteUploadedSubpath } from "../../lib/storage.js";
@@ -678,27 +680,39 @@ export async function markRead(conversationId: string, userId: string, upToMessa
  */
 export async function saveChatAttachment(input: {
   conversationId: string;
+  workspaceId: string | null;
   uploadedBy: string;
   filename: string;
   mimeType: string;
   buffer: Buffer;
 }): Promise<MessageAttachment> {
-  const { id, storagePath } = await writeUploadedBytes(path.join("chat", input.conversationId), input.filename, input.buffer);
+  let { filename, mimeType, buffer } = input;
+  if (mimeType.startsWith("image/")) {
+    const limits = input.workspaceId ? await getImageLimits(input.workspaceId, "image") : { maxWidth: null, maxHeight: null, quality: 80 };
+    const resized = await maybeResizeImage(buffer, mimeType, filename, limits);
+    if (resized) {
+      buffer = resized.buffer;
+      mimeType = resized.mimeType;
+      filename = resized.filename;
+    }
+  }
+
+  const { id, storagePath } = await writeUploadedBytes(path.join("chat", input.conversationId), filename, buffer);
   const createdAt = nowIso();
 
   await db.insert(messageAttachments).values({
     id,
     conversationId: input.conversationId,
     messageId: null,
-    filename: input.filename,
-    mimeType: input.mimeType,
-    size: input.buffer.length,
+    filename,
+    mimeType,
+    size: buffer.length,
     storagePath,
     uploadedBy: input.uploadedBy,
     createdAt,
   });
 
-  return { id, messageId: "", filename: input.filename, mimeType: input.mimeType, size: input.buffer.length, uploadedBy: input.uploadedBy, createdAt };
+  return { id, messageId: "", filename, mimeType, size: buffer.length, uploadedBy: input.uploadedBy, createdAt };
 }
 
 export async function getChatAttachment(id: string): Promise<{ row: typeof messageAttachments.$inferSelect }> {
