@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
-import type { DiscoveredFeed, FeedIntervalMinutes, FeedSource, RssFeedContent, UpdateFeedSourceInput } from "@notorious/shared";
+import type { DiscoveredFeed, FeedBadgeColor, FeedIntervalMinutes, FeedSource, RssFeedContent, UpdateFeedSourceInput } from "@notorious/shared";
+import { FEED_BADGE_COLORS } from "@notorious/shared";
 import { feedApi } from "../../../lib/api/resources.js";
 import { ApiError } from "../../../lib/api/client.js";
 import { Icon } from "../../ui/Icon.js";
@@ -20,6 +21,25 @@ const INTERVAL_OPTIONS: { value: FeedIntervalMinutes; label: string }[] = [
 const MAX_ITEMS_OPTIONS: RssFeedContent["maxItemsShown"][] = [5, 10, 20, 50];
 
 const REFRESH_COOLDOWN_MS = 30_000;
+
+/** Same {bg, text} pill palette shape as CalendarBlock.tsx's `PALETTE`, keyed by FEED_BADGE_COLORS instead of hashed - a user's explicit choice picks a key directly; "auto" (no choice) still hashes to one of these same entries via `colorFor`. */
+const BADGE_PALETTE: Record<FeedBadgeColor, { bg: string; text: string; dot: string }> = {
+  blue: { bg: "bg-blue-500/10", text: "text-blue-600", dot: "bg-blue-500" },
+  emerald: { bg: "bg-emerald-500/10", text: "text-emerald-600", dot: "bg-emerald-500" },
+  amber: { bg: "bg-amber-500/10", text: "text-amber-600", dot: "bg-amber-500" },
+  purple: { bg: "bg-purple-500/10", text: "text-purple-600", dot: "bg-purple-500" },
+  pink: { bg: "bg-pink-500/10", text: "text-pink-600", dot: "bg-pink-500" },
+  cyan: { bg: "bg-cyan-500/10", text: "text-cyan-600", dot: "bg-cyan-500" },
+  orange: { bg: "bg-orange-500/10", text: "text-orange-600", dot: "bg-orange-500" },
+  teal: { bg: "bg-teal-500/10", text: "text-teal-600", dot: "bg-teal-500" },
+};
+
+/** Deterministic per-feed fallback when no color was explicitly chosen ("auto") - looks random to the user, stable across renders, no server-side randomness/column needed. Same hash approach as CalendarBlock.tsx's `colorFor`. */
+function colorFor(feedSourceId: string): FeedBadgeColor {
+  let sum = 0;
+  for (let i = 0; i < feedSourceId.length; i++) sum += feedSourceId.charCodeAt(i);
+  return FEED_BADGE_COLORS[sum % FEED_BADGE_COLORS.length]!;
+}
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
@@ -67,6 +87,23 @@ function FeedSourceRow({ source, blockId }: { source: FeedSource; blockId: strin
 
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          title="Auto color"
+          onClick={() => updateMutation.mutate({ badgeColor: null })}
+          className={`h-3 w-3 shrink-0 rounded-full border border-dashed ${source.badgeColor ? "border-ink-muted" : "border-accent"}`}
+        />
+        {FEED_BADGE_COLORS.map((color) => (
+          <button
+            key={color}
+            type="button"
+            title={color}
+            onClick={() => updateMutation.mutate({ badgeColor: color })}
+            className={`h-3 w-3 shrink-0 rounded-full ${BADGE_PALETTE[color].dot} ${source.badgeColor === color ? "ring-2 ring-offset-1 ring-ink-muted" : ""}`}
+          />
+        ))}
+      </div>
       {source.lastError && (
         <span className="shrink-0 text-amber-500" title={source.lastError}>
           <Icon name="alert-triangle" className="h-3.5 w-3.5" />
@@ -387,7 +424,10 @@ export function RssFeedBlock({
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-xs text-ink-muted">
-                  <span className="truncate rounded-full bg-surface-raised px-1.5 py-0.5">{item.sourceLabel}</span>
+                  {(() => {
+                    const palette = BADGE_PALETTE[item.sourceBadgeColor ?? colorFor(item.feedSourceId)];
+                    return <span className={`truncate rounded-full px-1.5 py-0.5 ${palette.bg} ${palette.text}`}>{item.sourceLabel}</span>;
+                  })()}
                   {item.publishedAt && (
                     <span className="shrink-0" title={new Date(item.publishedAt).toLocaleString()}>
                       {relativeTime(item.publishedAt)}

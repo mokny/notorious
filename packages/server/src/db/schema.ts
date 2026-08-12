@@ -844,6 +844,9 @@ export const feedSources = sqliteTable(
     // bookmarks), resolved once on first successful fetch and then reused -
     // shown as a per-item fallback image when an item has no thumbnail.
     faviconUrl: text("favicon_url"),
+    // User-chosen badge color (one of FEED_BADGE_COLORS), or null for "auto"
+    // - see RssFeedBlock.tsx's colorFor for the auto-derivation.
+    badgeColor: text("badge_color"),
     intervalMinutes: integer("interval_minutes").notNull(),
     nextRunAt: text("next_run_at").notNull(),
     lastRunAt: text("last_run_at"),

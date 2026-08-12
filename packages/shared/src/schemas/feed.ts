@@ -7,6 +7,10 @@ export type FeedIntervalMinutes = (typeof FEED_INTERVAL_MINUTES)[number];
 /** Max number of feed_sources rows a single block may have - see modules/feeds/service.ts's `createFeedSource`. */
 export const MAX_FEED_SOURCES_PER_BLOCK = 10;
 
+/** Badge color palette a feed can be assigned - a fixed named set (not an arbitrary hex picker) so contrast/dark-mode is guaranteed, same reasoning as CalendarBlock.tsx's object-type palette. `null` means "auto": the web app derives a stable color from the feed's id (see RssFeedBlock.tsx's `colorFor`), which needs no server-side randomness or extra column. */
+export const FEED_BADGE_COLORS = ["blue", "emerald", "amber", "purple", "pink", "cyan", "orange", "teal"] as const;
+export type FeedBadgeColor = (typeof FEED_BADGE_COLORS)[number];
+
 /** Discovery cooldown-free lookup: given a page or feed URL, find candidate RSS/Atom feed(s). */
 export const discoverFeedSchema = z.object({
   url: z.string().min(1).max(2000),
@@ -23,12 +27,15 @@ export interface DiscoverFeedResult {
   discovered: DiscoveredFeed[];
 }
 
+const badgeColorSchema = z.enum(FEED_BADGE_COLORS);
+
 export const createFeedSourceSchema = z.object({
   url: z.string().min(1).max(2000),
   displayName: z.string().max(200).optional(),
   intervalMinutes: z.number().int().refine((n): n is FeedIntervalMinutes => (FEED_INTERVAL_MINUTES as readonly number[]).includes(n), {
     message: `intervalMinutes must be one of ${FEED_INTERVAL_MINUTES.join(", ")}`,
   }),
+  badgeColor: badgeColorSchema.nullable().optional(),
 });
 export type CreateFeedSourceInput = z.infer<typeof createFeedSourceSchema>;
 
@@ -41,6 +48,7 @@ export const updateFeedSourceSchema = z.object({
       message: `intervalMinutes must be one of ${FEED_INTERVAL_MINUTES.join(", ")}`,
     })
     .optional(),
+  badgeColor: badgeColorSchema.nullable().optional(),
 });
 export type UpdateFeedSourceInput = z.infer<typeof updateFeedSourceSchema>;
 
@@ -52,6 +60,7 @@ export interface FeedSource {
   displayName: string | null;
   resolvedTitle: string | null;
   faviconUrl: string | null;
+  badgeColor: FeedBadgeColor | null;
   intervalMinutes: FeedIntervalMinutes;
   nextRunAt: string;
   lastRunAt: string | null;
@@ -74,4 +83,6 @@ export interface FeedItem {
   sourceLabel: string;
   /** The source site's favicon, for the UI to fall back to when `imageUrl` is null - see feedSources.faviconUrl. */
   sourceFaviconUrl: string | null;
+  /** The source feed's explicitly chosen badge color, or null for "auto" (see FEED_BADGE_COLORS). */
+  sourceBadgeColor: FeedBadgeColor | null;
 }

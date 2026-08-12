@@ -4,6 +4,7 @@ import type {
   CreateFeedSourceInput,
   DiscoveredFeed,
   DiscoverFeedResult,
+  FeedBadgeColor,
   FeedIntervalMinutes,
   FeedItem,
   FeedSource,
@@ -52,6 +53,7 @@ function toPublicFeedSource(row: typeof feedSources.$inferSelect): FeedSource {
     displayName: row.displayName,
     resolvedTitle: row.resolvedTitle,
     faviconUrl: row.faviconUrl,
+    badgeColor: row.badgeColor as FeedBadgeColor | null,
     intervalMinutes: row.intervalMinutes as FeedIntervalMinutes,
     nextRunAt: row.nextRunAt,
     lastRunAt: row.lastRunAt,
@@ -391,6 +393,7 @@ export async function createFeedSource(blockId: string, input: CreateFeedSourceI
     url: input.url,
     displayName: input.displayName ?? null,
     resolvedTitle: null,
+    badgeColor: input.badgeColor ?? null,
     intervalMinutes: input.intervalMinutes,
     nextRunAt,
     lastRunAt: null,
@@ -414,6 +417,7 @@ export async function updateFeedSource(id: string, input: UpdateFeedSourceInput)
 
   const updates: Partial<typeof feedSources.$inferInsert> = {};
   if (input.displayName !== undefined) updates.displayName = input.displayName;
+  if (input.badgeColor !== undefined) updates.badgeColor = input.badgeColor;
   if (input.intervalMinutes !== undefined) {
     updates.intervalMinutes = input.intervalMinutes;
     updates.nextRunAt = new Date(Date.now() + input.intervalMinutes * 60_000).toISOString();
@@ -483,6 +487,7 @@ export async function listFeedItemsForBlock(blockId: string, limit: number): Pro
       createdAt: item.createdAt,
       sourceLabel: sourceLabelFor(source),
       sourceFaviconUrl: source.faviconUrl,
+      sourceBadgeColor: source.badgeColor as FeedBadgeColor | null,
     };
   });
 
