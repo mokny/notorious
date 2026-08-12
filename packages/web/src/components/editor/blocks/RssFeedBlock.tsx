@@ -364,7 +364,15 @@ export function RssFeedBlock({
         <ul className="divide-y divide-border">
           {items.map((item) => (
             <li key={item.id} className="flex gap-3 p-3">
-              {item.imageUrl && <img src={item.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded object-cover" />}
+              {item.imageUrl ? (
+                <img src={item.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded object-cover" />
+              ) : (
+                item.sourceFaviconUrl && (
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-surface-raised">
+                    <img src={item.sourceFaviconUrl} alt="" className="h-6 w-6" />
+                  </div>
+                )
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-xs text-ink-muted">
                   <span className="truncate rounded-full bg-surface-raised px-1.5 py-0.5">{item.sourceLabel}</span>

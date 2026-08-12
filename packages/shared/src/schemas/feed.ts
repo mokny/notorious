@@ -51,6 +51,7 @@ export interface FeedSource {
   url: string;
   displayName: string | null;
   resolvedTitle: string | null;
+  faviconUrl: string | null;
   intervalMinutes: FeedIntervalMinutes;
   nextRunAt: string;
   lastRunAt: string | null;
@@ -71,4 +72,6 @@ export interface FeedItem {
   createdAt: string;
   /** `feedSources.displayName ?? feedSources.resolvedTitle ?? feedSources.url` - precomputed server-side so the UI badge never has to join. */
   sourceLabel: string;
+  /** The source site's favicon, for the UI to fall back to when `imageUrl` is null - see feedSources.faviconUrl. */
+  sourceFaviconUrl: string | null;
 }

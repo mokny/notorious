@@ -17,6 +17,7 @@ import { badRequest, conflict, notFound, HttpError } from "../../lib/httpError.j
 import { fetchTextSafely } from "./safeFetch.js";
 import { discoverFeedLinksInHtml } from "./discovery.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
+import { fetchLinkPreview } from "../linkPreview/service.js";
 
 const REFRESH_COOLDOWN_MS = 30_000;
 const MAX_ITEMS_PER_SOURCE = 50;
@@ -42,6 +43,7 @@ function toPublicFeedSource(row: typeof feedSources.$inferSelect): FeedSource {
     url: row.url,
     displayName: row.displayName,
     resolvedTitle: row.resolvedTitle,
+    faviconUrl: row.faviconUrl,
     intervalMinutes: row.intervalMinutes as FeedIntervalMinutes,
     nextRunAt: row.nextRunAt,
     lastRunAt: row.lastRunAt,
@@ -117,6 +119,8 @@ interface ParsedFeedItem {
 
 interface ParsedFeed {
   title: string | null;
+  /** The feed's own site homepage link (rss-parser's feed-level `link`, distinct from each item's `link`) - used to resolve the site's favicon, see `resolveFavicon`. */
+  siteUrl: string | null;
   items: ParsedFeedItem[];
 }
 
@@ -141,7 +145,34 @@ async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     });
   }
 
-  return { title: parsed.title ?? null, items };
+  return { title: parsed.title ?? null, siteUrl: parsed.link ?? null, items };
+}
+
+/**
+ * Resolves the source site's favicon so the UI has *something* to show per
+ * item even when a feed's own entries carry no thumbnail (most blog/news
+ * feeds don't). Reuses `linkPreview`'s existing SSRF-guarded HTML fetch
+ * rather than adding a second one - the favicon is hotlinked by the browser
+ * afterwards, same as any bookmark icon, so this is a one-time lookup, not a
+ * per-item cost. Prefers the feed's own advertised site URL (rss-parser's
+ * `link`); falls back to the feed URL's own origin when the feed doesn't
+ * declare one. Best-effort: any failure just leaves `faviconUrl` unset.
+ */
+async function resolveFavicon(feedUrl: string, siteUrl: string | null): Promise<string | null> {
+  let target = siteUrl;
+  if (!target) {
+    try {
+      target = new URL(feedUrl).origin;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const { icon } = await fetchLinkPreview(target);
+    return icon;
+  } catch {
+    return null;
+  }
 }
 
 // --- CRUD ------------------------------------------------------------------
@@ -222,12 +253,19 @@ export async function runFeedSourceFetch(row: typeof feedSources.$inferSelect): 
   try {
     const parsed = await fetchAndParseFeed(row.url);
     const { newItemCount } = await upsertItems(row.id, parsed);
+    // Resolved once and cached - a site's favicon essentially never changes,
+    // so there's no reason to re-fetch it on every poll once it's set. If an
+    // earlier attempt failed (still null), this retries on the next poll,
+    // which self-heals transient failures at the cost of one extra request
+    // per poll for sites that genuinely have no favicon.
+    const faviconUrl = row.faviconUrl ?? (await resolveFavicon(row.url, parsed.siteUrl));
     await db
       .update(feedSources)
       .set({
         lastRunAt: now,
         lastError: null,
         resolvedTitle: parsed.title ?? row.resolvedTitle,
+        faviconUrl,
       })
       .where(eq(feedSources.id, row.id));
     return { newItemCount };
@@ -365,6 +403,7 @@ export async function listFeedItemsForBlock(blockId: string, limit: number): Pro
       imageUrl: item.imageUrl,
       createdAt: item.createdAt,
       sourceLabel: sourceLabelFor(source),
+      sourceFaviconUrl: source.faviconUrl,
     };
   });
 

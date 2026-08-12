@@ -840,6 +840,10 @@ export const feedSources = sqliteTable(
     url: text("url").notNull(),
     displayName: text("display_name"),
     resolvedTitle: text("resolved_title"),
+    // The source site's favicon (same extraction linkPreview uses for
+    // bookmarks), resolved once on first successful fetch and then reused -
+    // shown as a per-item fallback image when an item has no thumbnail.
+    faviconUrl: text("favicon_url"),
     intervalMinutes: integer("interval_minutes").notNull(),
     nextRunAt: text("next_run_at").notNull(),
     lastRunAt: text("last_run_at"),
