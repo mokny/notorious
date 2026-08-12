@@ -498,6 +498,15 @@ export function ChecklistBlock({
     setPendingFocusIndex(items.length);
   }
 
+  /** Pressing Enter inside an item inserts the new item right after it, not at the
+   * list's end like `addItem` - deliberately never joins `pendingNewItemsRef`, so it
+   * stays exactly where Enter was pressed even with `sortCheckedToBottom` on. */
+  function insertItemAfter(index: number) {
+    const newItem: ChecklistItem = { id: randomId(), markdown: "", checked: false };
+    save({ ...content, items: [...items.slice(0, index + 1), newItem, ...items.slice(index + 1)] });
+    setPendingFocusIndex(index + 1);
+  }
+
   function removeItem(index: number) {
     const removedId = items[index]?.id;
     if (removedId) pendingNewItemsRef.current.delete(removedId);
@@ -604,7 +613,7 @@ export function ChecklistBlock({
                 }}
                 onToggleItem={wrappedOnToggleItem}
                 onChangeText={(markdown) => updateItem(index, { markdown })}
-                onEnter={addItem}
+                onEnter={() => insertItemAfter(index)}
                 onRemove={() => removeItem(index)}
                 onTouchArmStart={dragSelectGuard.onTouchArmStart}
                 onFlush={() => {
