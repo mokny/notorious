@@ -24,13 +24,20 @@ const MAX_ITEMS_PER_SOURCE = 50;
 const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_ITEM_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
-type FeedItemCustomFields = { mediaThumbnail?: { $?: { url?: string } }; mediaContent?: { $?: { url?: string } } };
+// `dcDate` covers old-style Atom 0.3 feeds (e.g. tagesschau.de's) that carry
+// each entry's date as `<dc:date>` instead of the `<published>`/`<updated>`
+// elements (or RSS's `<pubDate>`) rss-parser looks for by default - without
+// this, every item from such a feed gets `isoDate: undefined`, which used to
+// mean it always sorted as "no date" behind every item from a normal feed
+// (see `publishedAtFor`).
+type FeedItemCustomFields = { mediaThumbnail?: { $?: { url?: string } }; mediaContent?: { $?: { url?: string } }; dcDate?: string };
 
 const parser = new Parser<Record<string, never>, FeedItemCustomFields>({
   customFields: {
     item: [
       ["media:thumbnail", "mediaThumbnail"],
       ["media:content", "mediaContent"],
+      ["dc:date", "dcDate"],
     ],
   },
 });
@@ -108,17 +115,19 @@ function guidFor(item: Parser.Item): string | null {
  * Resolves an item's published date to an ISO string, or null when the feed
  * gives none / gives something unparsable. Prefers rss-parser's own
  * pre-validated `isoDate` (only ever set when it already parsed cleanly);
- * only falls back to parsing `pubDate` by hand for feeds where rss-parser
- * didn't produce one. `new Date(x).toISOString()` throws on an invalid date
- * rather than returning one - `Number.isNaN` on `getTime()` is checked
- * *before* calling `toISOString()`, not after, so a malformed `pubDate`
- * (some feeds use non-standard formats) can never throw out of here and
- * abort the whole feed's fetch over one bad item.
+ * falls back to parsing `pubDate` by hand, then to the `dc:date` custom
+ * field for feeds where neither of those exist (old-style Atom 0.3 feeds -
+ * see the `dcDate` custom field registration above). `new Date(x).toISOString()`
+ * throws on an invalid date rather than returning one - `Number.isNaN` on
+ * `getTime()` is checked *before* calling `toISOString()`, not after, so a
+ * malformed date (some feeds use non-standard formats) can never throw out
+ * of here and abort the whole feed's fetch over one bad item.
  */
-function publishedAtFor(item: Parser.Item): string | null {
+function publishedAtFor(item: Parser.Item & FeedItemCustomFields): string | null {
   if (item.isoDate) return item.isoDate;
-  if (!item.pubDate) return null;
-  const parsed = new Date(item.pubDate);
+  const raw = item.pubDate || item.dcDate;
+  if (!raw) return null;
+  const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
