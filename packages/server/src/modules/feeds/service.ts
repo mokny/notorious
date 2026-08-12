@@ -103,6 +103,40 @@ function guidFor(item: Parser.Item): string | null {
   return item.guid || item.link || null;
 }
 
+/**
+ * Resolves an item's published date to an ISO string, or null when the feed
+ * gives none / gives something unparsable. Prefers rss-parser's own
+ * pre-validated `isoDate` (only ever set when it already parsed cleanly);
+ * only falls back to parsing `pubDate` by hand for feeds where rss-parser
+ * didn't produce one. `new Date(x).toISOString()` throws on an invalid date
+ * rather than returning one - `Number.isNaN` on `getTime()` is checked
+ * *before* calling `toISOString()`, not after, so a malformed `pubDate`
+ * (some feeds use non-standard formats) can never throw out of here and
+ * abort the whole feed's fetch over one bad item.
+ */
+function publishedAtFor(item: Parser.Item): string | null {
+  if (item.isoDate) return item.isoDate;
+  if (!item.pubDate) return null;
+  const parsed = new Date(item.pubDate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+/**
+ * Descending-by-published-date comparator: items with a real, feed-provided
+ * `publishedAt` always sort above ones without, ordered purely by that date
+ * against each other - `createdAt` (fetch/insertion time) never gets to
+ * outrank a genuine published date, it's only a tiebreak among the items
+ * that have no parsable date of their own. Used for both the merged
+ * cross-feed item list and the per-source trim-to-50 cutoff, so both agree
+ * on what counts as "most recent".
+ */
+function compareByPublishedDesc(a: { publishedAt: string | null; createdAt: string }, b: { publishedAt: string | null; createdAt: string }): number {
+  if (a.publishedAt && b.publishedAt) return b.publishedAt.localeCompare(a.publishedAt);
+  if (a.publishedAt) return -1;
+  if (b.publishedAt) return 1;
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
 // --- Discovery -----------------------------------------------------------
 
 /**
@@ -156,12 +190,11 @@ async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     if (!guid) continue;
     const rawDescription = item.contentSnippet || item.summary || item.content || "";
     const descriptionText = rawDescription ? stripHtml(rawDescription).slice(0, MAX_DESCRIPTION_LENGTH) || null : null;
-    const publishedAt = item.isoDate ?? (item.pubDate ? new Date(item.pubDate).toISOString() : null);
     items.push({
       guid,
       title: item.title ? decodeHtmlEntities(item.title).trim() || "Untitled" : "Untitled",
       link: item.link || url,
-      publishedAt: publishedAt && !Number.isNaN(new Date(publishedAt).getTime()) ? publishedAt : null,
+      publishedAt: publishedAtFor(item),
       descriptionText,
       imageUrl: imageUrlFor(item),
     });
@@ -249,7 +282,7 @@ async function upsertItems(feedSourceId: string, parsed: ParsedFeed): Promise<{ 
     .from(feedItems)
     .where(eq(feedItems.feedSourceId, feedSourceId));
   if (all.length > MAX_ITEMS_PER_SOURCE) {
-    const sorted = [...all].sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt));
+    const sorted = [...all].sort(compareByPublishedDesc);
     const keepIds = sorted.slice(0, MAX_ITEMS_PER_SOURCE).map((r) => r.id);
     await db.delete(feedItems).where(and(eq(feedItems.feedSourceId, feedSourceId), notInArray(feedItems.id, keepIds)));
   }
@@ -430,7 +463,7 @@ export async function listFeedItemsForBlock(blockId: string, limit: number): Pro
     };
   });
 
-  merged.sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt));
+  merged.sort(compareByPublishedDesc);
   return merged.slice(0, limit);
 }
 
