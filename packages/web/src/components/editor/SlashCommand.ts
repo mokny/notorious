@@ -82,9 +82,7 @@ function buildSuggestion(
     char: "/",
     startOfLine: false,
     items: ({ query }) =>
-      buildSlashCommandItems(objectTypesRef.current)
-        .filter((item) => item.label.toLowerCase().includes(query.toLowerCase()))
-        .slice(0, 10),
+      buildSlashCommandItems(objectTypesRef.current).filter((item) => item.label.toLowerCase().includes(query.toLowerCase())),
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
     },

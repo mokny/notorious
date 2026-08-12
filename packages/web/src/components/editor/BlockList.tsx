@@ -1,10 +1,12 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPopper } from "@popperjs/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { BlockType } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { BlockItem } from "./BlockItem.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { buildSlashCommandItems } from "./SlashCommand.js";
+import { popupPopperOptions } from "./popupPositioning.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
 import { useHasHover } from "../../hooks/useHasHover.js";
 import { Icon } from "../ui/Icon.js";
@@ -20,9 +22,24 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
   const { createBlockAfter, objectTypes } = useBlockEditor();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const hasHover = useHasHover();
   useClickOutside(pickerRef, () => setPickerOpen(false), pickerOpen);
   const items = buildSlashCommandItems(objectTypes);
+
+  // Positions the menu with Popper's flip/preventOverflow/maxSize (same
+  // popupPopperOptions as SlashCommand.ts's popup) instead of a fixed
+  // `absolute left-0 mt-1`, which used to hang off-screen whenever the
+  // button sat near the bottom or right edge of a long block list.
+  useEffect(() => {
+    if (!pickerOpen || !buttonRef.current || !menuRef.current) return;
+    const popper = createPopper(buttonRef.current, menuRef.current, {
+      placement: "bottom-start",
+      modifiers: [{ name: "offset", options: { offset: [0, 4] } }, ...(popupPopperOptions.modifiers ?? [])],
+    });
+    return () => popper.destroy();
+  }, [pickerOpen]);
 
   return (
     <div className="space-y-0.5">
@@ -34,6 +51,7 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
 
       <div className="relative" ref={pickerRef}>
         <button
+          ref={buttonRef}
           onClick={() => setPickerOpen((v) => !v)}
           className={
             hasHover
@@ -44,7 +62,7 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
           <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> Add block
         </button>
         {pickerOpen && (
-          <div className="slash-menu absolute left-0 z-20 mt-1">
+          <div ref={menuRef} className="slash-menu z-20">
             {items.map((item, index) => (
               <button
                 // Object types can share a type/label with each other (never
