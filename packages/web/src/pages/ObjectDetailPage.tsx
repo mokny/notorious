@@ -599,9 +599,10 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
           className={`w-full shrink-0 space-y-3 lg:w-72 ${
             // The dividing border/padding only makes sense when there's
             // actually something below it to divide from the content above -
-            // otherwise (sectionsVisible off and no block history selected)
-            // this would just be a stray line with nothing under it.
-            sectionsVisible || selectedBlockId ? "border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" : ""
+            // otherwise (sectionsVisible off) this would just be a stray line
+            // with nothing under it. Block history is also gated behind
+            // sectionsVisible below, so it isn't a second condition here.
+            sectionsVisible ? "border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" : ""
           }`}
         >
           {sectionsVisible && (
@@ -643,7 +644,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             </>
           )}
 
-          {selectedBlockId && <BlockHistoryPanel objectId={object.id} blockId={selectedBlockId} />}
+          {sectionsVisible && selectedBlockId && <BlockHistoryPanel objectId={object.id} blockId={selectedBlockId} />}
         </aside>
       </div>
     </div>
