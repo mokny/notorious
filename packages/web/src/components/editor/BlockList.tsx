@@ -61,8 +61,13 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
         >
           <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> Add block
         </button>
+        {/* z-50 (not z-20 like most editor popups) so it clears the mobile
+            bottom bar / bottom fade gradient (both z-20, and later in
+            WorkspaceLayout.tsx's DOM order, so an equal z-index would paint
+            over this popup when it opens near the bottom of the screen) -
+            same tier BlockSlugButton.tsx uses to clear the mobile sidebar. */}
         {pickerOpen && (
-          <div ref={menuRef} className="slash-menu z-20">
+          <div ref={menuRef} className="slash-menu z-50">
             {items.map((item, index) => (
               <button
                 // Object types can share a type/label with each other (never
