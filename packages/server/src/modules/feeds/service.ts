@@ -1,5 +1,5 @@
 import Parser from "rss-parser";
-import { and, eq, inArray, lte, notInArray } from "drizzle-orm";
+import { and, eq, inArray, lt, lte, notInArray } from "drizzle-orm";
 import type {
   CreateFeedSourceInput,
   DiscoveredFeed,
@@ -22,6 +22,7 @@ import { fetchLinkPreview } from "../linkPreview/service.js";
 const REFRESH_COOLDOWN_MS = 30_000;
 const MAX_ITEMS_PER_SOURCE = 50;
 const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_ITEM_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 
 type FeedItemCustomFields = { mediaThumbnail?: { $?: { url?: string } }; mediaContent?: { $?: { url?: string } } };
 
@@ -240,14 +241,21 @@ export async function listFeedSources(blockId: string): Promise<FeedSource[]> {
 
 async function upsertItems(feedSourceId: string, parsed: ParsedFeed): Promise<{ newItemCount: number }> {
   const now = nowIso();
+  const cutoffIso = new Date(Date.now() - MAX_ITEM_AGE_MS).toISOString();
   const existing = await db
     .select({ guid: feedItems.guid })
     .from(feedItems)
     .where(eq(feedItems.feedSourceId, feedSourceId));
   const existingGuids = new Set(existing.map((r) => r.guid));
 
+  // Items older than MAX_ITEM_AGE_MS never get stored in the first place -
+  // an item with no publishedAt can't be judged by age, so it's let through
+  // (matches the existing "keep undated items" stance elsewhere in this
+  // file); anything that *is* dated and past the cutoff is dropped here.
+  const freshItems = parsed.items.filter((item) => !item.publishedAt || item.publishedAt >= cutoffIso);
+
   let newItemCount = 0;
-  for (const item of parsed.items) {
+  for (const item of freshItems) {
     if (!existingGuids.has(item.guid)) newItemCount++;
     await db
       .insert(feedItems)
@@ -273,6 +281,12 @@ async function upsertItems(feedSourceId: string, parsed: ParsedFeed): Promise<{ 
         },
       });
   }
+
+  // Purge anything that has aged past MAX_ITEM_AGE_MS since it was first
+  // stored, even if the feed still lists it (or stopped listing it and
+  // nothing else would ever touch the row again) - items with no publishedAt
+  // are left alone, same reasoning as the ingest-time filter above.
+  await db.delete(feedItems).where(and(eq(feedItems.feedSourceId, feedSourceId), lt(feedItems.publishedAt, cutoffIso)));
 
   // Trim to the MAX_ITEMS_PER_SOURCE most recent (by publishedAt, falling
   // back to createdAt for items with no publish date) - see schema.ts's doc
