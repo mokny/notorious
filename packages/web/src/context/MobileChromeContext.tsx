@@ -21,8 +21,17 @@ export function MobileChromeProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Falls back to a harmless no-op outside the provider (e.g. the standalone
+// share-link route tree, which doesn't render WorkspaceLayout) so
+// ObjectDetailPage can call this unconditionally without checking which tree
+// it's mounted under (see ObjectHistoryContext.tsx's identical fallback).
+const NOOP_VALUE: MobileChromeContextValue = {
+  coverActive: false,
+  setCoverActive: () => {},
+  sectionsVisible: false,
+  setSectionsVisible: () => {},
+};
+
 export function useMobileChrome(): MobileChromeContextValue {
-  const context = useContext(MobileChromeContext);
-  if (!context) throw new Error("useMobileChrome must be used within a MobileChromeProvider");
-  return context;
+  return useContext(MobileChromeContext) ?? NOOP_VALUE;
 }
