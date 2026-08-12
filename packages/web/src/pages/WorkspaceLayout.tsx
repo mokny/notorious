@@ -418,7 +418,6 @@ function WorkspaceLayoutInner() {
             workspaceName={workspace?.name ?? "Workspace"}
             workspaceIcon={workspace?.icon ?? "sparkles"}
             dashboardObjectId={workspace?.dashboardObjectId ?? undefined}
-            onOpenSidebar={() => setSidebarOpen(true)}
           />
         )}
         {/* Only for a real member - an anonymous share visitor has no

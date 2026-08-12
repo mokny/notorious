@@ -21,7 +21,6 @@ interface MobileTopBarProps {
   workspaceName: string;
   workspaceIcon: string;
   dashboardObjectId?: string;
-  onOpenSidebar: () => void;
 }
 
 /**
@@ -36,10 +35,10 @@ interface MobileTopBarProps {
  * carries *every* action ObjectDetailPage.tsx's sticky in-page toolbar
  * used to show on phone (that toolbar is `hidden md:flex` there now,
  * lock excepted - see MobileBottomBar.tsx) plus app-level navigation
- * (home, sidebar, settings, refresh) that used to live in the old flat
- * BottomTabBar. Styled as a native-iOS-context-menu (IOSMenu.tsx).
+ * (home, settings, refresh) that used to live in the old flat BottomTabBar.
+ * Styled as a native-iOS-context-menu (IOSMenu.tsx).
  */
-export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashboardObjectId, onOpenSidebar }: MobileTopBarProps) {
+export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashboardObjectId }: MobileTopBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -329,14 +328,6 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               onClick={() => {
                 setMenuOpen(false);
                 goHome();
-              }}
-            />
-            <IOSMenuItem
-              icon="menu"
-              label="Sidebar"
-              onClick={() => {
-                setMenuOpen(false);
-                onOpenSidebar();
               }}
             />
             {!shareToken && (

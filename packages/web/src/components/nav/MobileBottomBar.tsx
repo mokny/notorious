@@ -17,9 +17,9 @@ import { Icon } from "../ui/Icon.js";
  * Settings). Down to 3 actions (search, home, new object), plus a 4th
  * leftmost lock toggle whenever an object is actually open - moved here
  * from ObjectDetailPage.tsx's sticky action-toolbar, which hides its own
- * copy on phone (`hidden md:*`) so it isn't duplicated. Settings and
- * sidebar/menu access live in MobileTopBar.tsx's "…" overflow menu instead,
- * see that component's own doc comment.
+ * copy on phone (`hidden md:*`) so it isn't duplicated. Settings access
+ * lives in MobileTopBar.tsx's "…" overflow menu instead, see that
+ * component's own doc comment.
  */
 export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceId: string; dashboardObjectId?: string }) {
   const navigate = useNavigate();
