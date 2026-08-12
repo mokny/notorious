@@ -5,6 +5,7 @@ import { startShareInboxCleanup } from "./modules/shareTarget/cleanup.js";
 import { initScriptEngine } from "./modules/scripting/engine.js";
 import { startBackupScheduler } from "./modules/backup/scheduler.js";
 import { startAiUsageScheduler } from "./modules/ai/scheduler.js";
+import { startFeedScheduler } from "./modules/feeds/scheduler.js";
 
 const app = await buildApp();
 
@@ -12,6 +13,7 @@ startReminderScheduler();
 startShareInboxCleanup();
 startBackupScheduler();
 startAiUsageScheduler();
+startFeedScheduler();
 await initScriptEngine();
 
 app

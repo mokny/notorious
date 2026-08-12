@@ -1,6 +1,6 @@
 import type { Block } from "@notorious/shared";
 import { tableDocToTextGrid, tableCellField } from "@notorious/shared";
-import { objectApi, blockApi, viewApi, schemaApi } from "../api/resources.js";
+import { objectApi, blockApi, viewApi, schemaApi, feedApi } from "../api/resources.js";
 import { buildBlockTree, type BlockNode } from "../../components/editor/blockTree.js";
 import { externalHrefFor } from "../../components/editor/blocks/MapsBlock.js";
 
@@ -78,6 +78,15 @@ async function databaseViewMarkdown(workspaceId: string, viewId: string): Promis
     }),
   ]);
   return markdownTable(header, rows);
+}
+
+/** `- [Title](link) — date` per item, current at export time (a fresh fetch, capped at the block's own `maxItemsShown` - same list the block itself shows). */
+async function rssFeedMarkdown(blockId: string, maxItemsShown: number): Promise<string> {
+  const items = await feedApi.items(blockId, maxItemsShown).catch(() => []);
+  if (items.length === 0) return "*[No RSS feed items yet]*";
+  return items
+    .map((item) => `- [${item.title}](${item.link})${item.publishedAt ? ` — ${new Date(item.publishedAt).toLocaleDateString()}` : ""}`)
+    .join("\n");
 }
 
 async function subObjectMarkdown(
@@ -195,6 +204,8 @@ async function blockToMarkdown(
       return content.answer ? (content.answer as string) : `*Prompt: ${content.prompt ?? ""}*`;
     case "calendar":
       return "*[Calendar block - view in the app for the full schedule]*";
+    case "rssFeed":
+      return rssFeedMarkdown(node.id, (content.maxItemsShown as number) ?? 10);
     default:
       return "";
   }

@@ -237,6 +237,20 @@ export interface MapsContent {
 }
 
 /**
+ * An RSS/Atom feed reader block (see RssFeedBlock.tsx). Deliberately holds
+ * only display config, not the feeds themselves - a block can subscribe to
+ * up to 10 feeds, each server-managed (polled on a schedule, cached items)
+ * in the `feed_sources`/`feed_items` tables (see modules/feeds/) rather than
+ * embedded here, since they need their own lifecycle (add/remove/interval
+ * edits, background polling) independent of a block-content save. The feed
+ * list and its items are fetched via `GET /api/v1/blocks/:blockId/feed-sources`
+ * and `.../feed-items`, scoped by the block's id.
+ */
+export interface RssFeedContent {
+  maxItemsShown: 5 | 10 | 20 | 50;
+}
+
+/**
  * Picks a sensible block type/content for a file, based on its MIME type -
  * shared between the web drop handler (BlockEditor.tsx) and the server's
  * share-target commit flow (modules/shareTarget/service.ts), which both need

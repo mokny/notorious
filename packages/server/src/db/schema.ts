@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, primaryKey, unique, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey, unique, index, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -822,6 +822,60 @@ export const messageReactions = sqliteTable(
 // (receipt avatars, iMessage-style) can't be cleanly derived from a single
 // cursor comparison across participants who may have joined at different
 // times.
+// One row per (block, feed URL) subscribed to an rssFeed block - see
+// modules/feeds/. A block may have up to MAX_FEED_SOURCES_PER_BLOCK of
+// these (enforced in service.ts, not at the SQL level). `displayName` is a
+// user override; `resolvedTitle` is the feed's own `<title>`, filled in
+// after the first successful fetch - the UI prefers displayName, falling
+// back to resolvedTitle, then the raw url (see toPublicFeedSource).
+// `nextRunAt`/`lastRunAt`/`lastError` drive the once-a-minute poller
+// (scheduler.ts), mirroring backupSchedules' own polling fields.
+export const feedSources = sqliteTable(
+  "feed_sources",
+  {
+    id: text("id").primaryKey(),
+    blockId: text("block_id")
+      .notNull()
+      .references(() => blocks.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    displayName: text("display_name"),
+    resolvedTitle: text("resolved_title"),
+    intervalMinutes: integer("interval_minutes").notNull(),
+    nextRunAt: text("next_run_at").notNull(),
+    lastRunAt: text("last_run_at"),
+    lastError: text("last_error"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_feed_sources_next_run_at").on(table.nextRunAt)],
+);
+
+// Cached items for one feed_source - refreshed by the scheduler, trimmed to
+// the 50 most recent per source on every poll (see scheduler.ts). `guid` is
+// the feed's own item guid/id, falling back to its link, used as the
+// per-source dedup key on upsert.
+export const feedItems = sqliteTable(
+  "feed_items",
+  {
+    id: text("id").primaryKey(),
+    feedSourceId: text("feed_source_id")
+      .notNull()
+      .references(() => feedSources.id, { onDelete: "cascade" }),
+    guid: text("guid").notNull(),
+    title: text("title").notNull(),
+    link: text("link").notNull(),
+    publishedAt: text("published_at"),
+    descriptionText: text("description_text"),
+    // Hotlinked directly (media:thumbnail/enclosure URL) - no server-side
+    // download/proxy, same reasoning as BookmarkContent's favicon.
+    imageUrl: text("image_url"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    unique().on(table.feedSourceId, table.guid),
+    index("idx_feed_items_published_at").on(table.publishedAt),
+  ],
+);
+
 export const messageReadReceipts = sqliteTable(
   "message_read_receipts",
   {

@@ -27,6 +27,7 @@ export const BLOCK_TYPES = [
   "voting",
   "ai",
   "maps",
+  "rssFeed",
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -61,4 +62,5 @@ export const LEAF_BLOCK_TYPES: readonly BlockType[] = [
   "voting",
   "ai",
   "maps",
+  "rssFeed",
 ];

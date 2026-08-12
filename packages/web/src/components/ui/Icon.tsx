@@ -90,6 +90,8 @@ import {
   ScreenShareOff,
   ArrowUp,
   CornerUpLeft,
+  Rss,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -182,6 +184,8 @@ const ICONS: Record<string, LucideIcon> = {
   "screen-share-off": ScreenShareOff,
   "arrow-up": ArrowUp,
   reply: CornerUpLeft,
+  rss: Rss,
+  "alert-triangle": AlertTriangle,
 };
 
 function isImageUrl(value: string): boolean {

@@ -80,6 +80,11 @@ import type {
   ShareIntakeFields,
   ShareCommitInput,
   ShareInboxItem,
+  DiscoverFeedResult,
+  FeedSource,
+  FeedItem,
+  CreateFeedSourceInput,
+  UpdateFeedSourceInput,
   BackupDestination,
   BackupDestinationFile,
   CreateBackupDestinationInput,
@@ -540,6 +545,19 @@ export const aiApi = {
 
 export const linkPreviewApi = {
   fetch: (url: string) => apiRequest<{ title: string | null; icon: string | null }>("/api/v1/link-preview", { query: { url } }),
+};
+
+export const feedApi = {
+  discover: (blockId: string, url: string) =>
+    apiRequest<DiscoverFeedResult>(`/api/v1/blocks/${blockId}/feed-sources/discover`, { method: "POST", body: { url } }),
+  listSources: (blockId: string) => apiRequest<FeedSource[]>(`/api/v1/blocks/${blockId}/feed-sources`),
+  createSource: (blockId: string, input: CreateFeedSourceInput) =>
+    apiRequest<FeedSource>(`/api/v1/blocks/${blockId}/feed-sources`, { method: "POST", body: input }),
+  updateSource: (id: string, input: UpdateFeedSourceInput) =>
+    apiRequest<FeedSource>(`/api/v1/feed-sources/${id}`, { method: "PATCH", body: input }),
+  removeSource: (id: string) => apiRequest<void>(`/api/v1/feed-sources/${id}`, { method: "DELETE" }),
+  refreshSource: (id: string) => apiRequest<FeedSource>(`/api/v1/feed-sources/${id}/refresh`, { method: "POST" }),
+  items: (blockId: string, limit: number) => apiRequest<FeedItem[]>(`/api/v1/blocks/${blockId}/feed-items`, { query: { limit } }),
 };
 
 export const shareTargetApi = {

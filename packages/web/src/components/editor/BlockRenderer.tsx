@@ -28,6 +28,7 @@ import type {
   VotingContent,
   AiContent,
   MapsContent,
+  RssFeedContent,
 } from "@notorious/shared";
 import type { BlockNode } from "./blockTree.js";
 import { ParagraphBlock } from "./blocks/ParagraphBlock.js";
@@ -52,6 +53,7 @@ import { CalendarBlock } from "./blocks/CalendarBlock.js";
 import { VotingBlock } from "./blocks/VotingBlock.js";
 import { AiBlock } from "./blocks/AiBlock.js";
 import { MapsBlock } from "./blocks/MapsBlock.js";
+import { RssFeedBlock } from "./blocks/RssFeedBlock.js";
 
 export interface BlockRendererProps {
   block: BlockNode;
@@ -211,6 +213,8 @@ export function BlockRenderer({
       return <AiBlock blockId={block.id} content={content<AiContent>()} onSave={save} />;
     case "maps":
       return <MapsBlock content={content<MapsContent>()} onSave={save} />;
+    case "rssFeed":
+      return <RssFeedBlock blockId={block.id} content={content<RssFeedContent>()} onSave={save} />;
     default:
       return null;
   }

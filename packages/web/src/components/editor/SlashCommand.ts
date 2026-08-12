@@ -47,6 +47,7 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
   { type: "calendar", label: "Calendar", description: "Year/month/week/day/agenda calendar over one or more object types" },
   { type: "voting", label: "Voting", description: "Reddit-style list with upvotes/downvotes on each item" },
   { type: "ai", label: "AI", description: "Prompt an AI and replace it with the answer" },
+  { type: "rssFeed", label: "RSS Feed", description: "Follow one or more RSS/Atom feeds" },
 ];
 
 /**

@@ -45,6 +45,14 @@ function handleMessage(payload: RealtimeEvent, workspaceId: string, queryClient:
       // else just changed.
       queryClient.invalidateQueries({ queryKey: ["blockHistory", payload.entityId] });
     }
+    // A feed poll (scheduler.ts) or manual refresh broadcasts through the
+    // same "block" entity/"updated" action every other block-content change
+    // does (see modules/feeds/service.ts's `broadcastFeedUpdated`) - not
+    // self-echo gated like `blocks`/`blockHistory` above, since it's always
+    // a server-side background event, never something this tab itself just
+    // typed (there's no keystroke-dropping race to protect against here).
+    queryClient.invalidateQueries({ queryKey: ["feedItems", payload.entityId] });
+    queryClient.invalidateQueries({ queryKey: ["feedSources", payload.entityId] });
     // `blocksRendered`/`blockVotes`, unlike `blocks`/`blockHistory` above,
     // aren't gated by the self-echo check: neither feeds back into an
     // actively-typed textarea (the raw editing surface those two protect),
@@ -125,6 +133,8 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           queryClient.invalidateQueries({ queryKey: ["blocks"] });
           queryClient.invalidateQueries({ queryKey: ["blocksRendered"] });
           queryClient.invalidateQueries({ queryKey: ["blockHistory"] });
+          queryClient.invalidateQueries({ queryKey: ["feedItems"] });
+          queryClient.invalidateQueries({ queryKey: ["feedSources"] });
           queryClient.invalidateQueries({ queryKey: ["viewResults"] });
           queryClient.invalidateQueries({ queryKey: ["backlinks"] });
           queryClient.invalidateQueries({ queryKey: ["comments"] });

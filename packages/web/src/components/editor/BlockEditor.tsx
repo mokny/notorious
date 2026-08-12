@@ -474,6 +474,8 @@ export function BlockEditor({
         return { prompt: "" };
       case "maps":
         return { query: "" };
+      case "rssFeed":
+        return { maxItemsShown: 10 };
       default:
         return {};
     }
