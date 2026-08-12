@@ -79,6 +79,7 @@ function ChecklistItemRow({
   readOnly,
   searchTerms,
   onTouchArmStart,
+  autoFocus,
 }: {
   sortableId: string;
   /** This item's owning block id and its key in `renderedBlocks` (`items.<index>` - see modules/templates/renderer.ts and useTemplatableField.ts). */
@@ -100,6 +101,17 @@ function ChecklistItemRow({
   searchTerms: string[];
   /** Bind as `onPointerDownCapture` on whatever carries `listeners` below - see useDragSelectGuard.ts. */
   onTouchArmStart: (event: PointerEvent) => void;
+  /**
+   * True for the one item `addItem`/`insertItemAfter` just created and is about to
+   * focus. Forces `useTemplatableField` straight into edit mode, bypassing
+   * `renderedBlocks` entirely - that map is keyed by this item's positional
+   * `field` (e.g. "items.12"), which a moment ago belonged to a *different*
+   * item at that index. Until the `blocksRendered` query re-fetches post-insert,
+   * a brand-new item could otherwise inherit a stale sibling's rendered/templated
+   * value and render as an uneditable read-only preview instead of a textarea -
+   * exactly the "new item won't focus or accept typing" bug this avoids.
+   */
+  autoFocus: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   // Same touch-vs-hover split as BlockItem.tsx: no real hover means the
@@ -123,7 +135,7 @@ function ChecklistItemRow({
   const deleteRevealProgress =
     isDragging && !hasHover && transform && transform.x < 0 ? Math.min(1, -transform.x / SWIPE_DELETE_THRESHOLD_PX) : 0;
   const canToggleWhileLocked = Boolean(item.id && onToggleItem);
-  const { rendered, showRendered, startEditing, stopEditing } = useTemplatableField(blockId, field);
+  const { rendered, showRendered, startEditing, stopEditing } = useTemplatableField(blockId, field, autoFocus);
   // useTemplatableField's own `showRendered` only ever fires for a
   // *templated* field (`rendered !== undefined` - see its own doc comment),
   // which most checklist items aren't - so on its own it would never show
@@ -619,6 +631,7 @@ export function ChecklistBlock({
                 onEnter={() => insertItemAfter(index)}
                 onRemove={() => removeItem(index)}
                 onTouchArmStart={dragSelectGuard.onTouchArmStart}
+                autoFocus={Boolean(item.id) && item.id === pendingFocusId}
                 onFlush={() => {
                   flushSave();
                   finishEditingNewItem(item.id);
