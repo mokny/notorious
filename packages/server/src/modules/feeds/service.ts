@@ -56,15 +56,37 @@ function sourceLabelFor(row: Pick<typeof feedSources.$inferSelect, "displayName"
   return row.displayName || row.resolvedTitle || row.url;
 }
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, " ")
+/** Decodes both named and numeric HTML entities - some feeds double-encode (e.g. a title containing literal `&quot;`), which a named-only decode leaves untouched. */
+function decodeHtmlEntities(text: string): string {
+  return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(parseInt(code, 16)));
+}
+
+/**
+ * Cleans a feed title/description for display: decodes entities, and for
+ * descriptions also strips tags plus two flavors of leftover cruft some
+ * feeds leak through: stray `<![CDATA[`/`]]>` markers (from malformed or
+ * doubly-wrapped CDATA sections) and a trailing short bracketed "read more"
+ * link whose href got stripped along with its `<a>` tag (e.g. "...text
+ * [mehr]", "...text [...]" ) - both are footer artifacts, never real
+ * content, so trimming them is safe.
+ */
+function stripHtml(html: string): string {
+  const withoutMarkup = decodeHtmlEntities(
+    html
+      .replace(/<!\[CDATA\[/g, "")
+      .replace(/\]\]>/g, "")
+      .replace(/<[^>]+>/g, " "),
+  );
+  return withoutMarkup
+    .replace(/\s*\[[^[\]\n]{1,24}\]\s*$/, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -99,7 +121,7 @@ export async function discoverFeeds(url: string): Promise<DiscoverFeedResult> {
   try {
     const parsed = await parser.parseString(html);
     if (!parsed.items || parsed.items.length === 0) throw new Error("Not a feed");
-    const fallback: DiscoveredFeed = { url, title: parsed.title ?? null };
+    const fallback: DiscoveredFeed = { url, title: parsed.title ? decodeHtmlEntities(parsed.title).trim() || null : null };
     return { discovered: [fallback] };
   } catch {
     throw badRequest("No RSS/Atom feed could be found at that URL");
@@ -137,7 +159,7 @@ async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     const publishedAt = item.isoDate ?? (item.pubDate ? new Date(item.pubDate).toISOString() : null);
     items.push({
       guid,
-      title: item.title || "Untitled",
+      title: item.title ? decodeHtmlEntities(item.title).trim() || "Untitled" : "Untitled",
       link: item.link || url,
       publishedAt: publishedAt && !Number.isNaN(new Date(publishedAt).getTime()) ? publishedAt : null,
       descriptionText,
@@ -145,7 +167,8 @@ async function fetchAndParseFeed(url: string): Promise<ParsedFeed> {
     });
   }
 
-  return { title: parsed.title ?? null, siteUrl: parsed.link ?? null, items };
+  const feedTitle = parsed.title ? decodeHtmlEntities(parsed.title).trim() || null : null;
+  return { title: feedTitle, siteUrl: parsed.link ?? null, items };
 }
 
 /**
