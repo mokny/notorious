@@ -25,6 +25,18 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
+/** "2 hours ago"-style relative time, same thresholds as SecuritySettings.tsx's `relativeTime` - items are pruned past 3 days (see modules/feeds/service.ts's MAX_ITEM_AGE_MS) so this never needs to fall back to an absolute date. The full date/time is still available via the caller's `title` tooltip. */
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.round(diffMs / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
+
 /** One row in the config dialog's feed list - rename, interval, error indicator, remove. */
 function FeedSourceRow({ source, blockId }: { source: FeedSource; blockId: string }) {
   const queryClient = useQueryClient();
@@ -376,7 +388,11 @@ export function RssFeedBlock({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-xs text-ink-muted">
                   <span className="truncate rounded-full bg-surface-raised px-1.5 py-0.5">{item.sourceLabel}</span>
-                  {item.publishedAt && <span className="shrink-0">{new Date(item.publishedAt).toLocaleDateString()}</span>}
+                  {item.publishedAt && (
+                    <span className="shrink-0" title={new Date(item.publishedAt).toLocaleString()}>
+                      {relativeTime(item.publishedAt)}
+                    </span>
+                  )}
                 </div>
                 <a
                   href={item.link}
