@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { objectApi, schemaApi, workspaceApi } from "../../lib/api/resources.js";
+import { authApi, objectApi, schemaApi, workspaceApi } from "../../lib/api/resources.js";
 import { useObjectHistory } from "../../context/ObjectHistoryContext.js";
 import { useTheme } from "../../context/ThemeContext.js";
 import { useDeleteObject } from "../../hooks/useDeleteObject.js";
@@ -43,7 +43,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, refetch } = useAuth();
   const { entries, current, goBack, jumpTo } = useObjectHistory();
   const { sectionsVisible, setSectionsVisible } = useMobileChrome();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -135,6 +135,18 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
 
   function goHome() {
     navigate(dashboardObjectId ? `/w/${workspaceId}/objects/${dashboardObjectId}` : `/w/${workspaceId}`);
+  }
+
+  async function handleLogout() {
+    const confirmed = await confirm({
+      title: "Log out?",
+      description: "You'll be signed out of this device.",
+      confirmLabel: "Log out",
+    });
+    if (!confirmed) return;
+    await authApi.logout();
+    await refetch();
+    navigate("/login", { replace: true });
   }
 
   // Mirrors WorkspaceHome.tsx's own redirect target, so handleBack can tell
@@ -330,6 +342,14 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
             {!shareToken && (
               <>
                 <IOSMenuItem
+                  icon="board"
+                  label="Switch workspace"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate("/workspaces");
+                  }}
+                />
+                <IOSMenuItem
                   icon="user"
                   label="Account settings"
                   onClick={() => {
@@ -356,6 +376,17 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               }}
             />
             <IOSMenuItem icon="refresh" label="Refresh" onClick={() => window.location.reload()} />
+            {!shareToken && (
+              <IOSMenuItem
+                icon="close"
+                label="Log out"
+                destructive
+                onClick={() => {
+                  setMenuOpen(false);
+                  void handleLogout();
+                }}
+              />
+            )}
           </IOSMenuGroup>
         </IOSMenu>
       </div>
