@@ -58,6 +58,9 @@ export const env = {
   // this unset while calls are enabled.
   mediaPort: Number(process.env.MEDIA_PORT ?? 4001),
   mediaAnnouncedIp: process.env.MEDIA_ANNOUNCED_IP ?? "",
+  // Max chat messages kept per conversation - the oldest overflow is pruned
+  // on send (see chat/service.ts::sendMessage). 0 disables pruning entirely.
+  messageRetentionLimit: Number(process.env.MESSAGE_RETENTION_LIMIT ?? 1000),
 };
 
 /** Whether passkeys can be used at all on this instance - see `env.appOrigin`'s doc comment. Checked by every modules/webauthn/ route (registerWebauthnRoutes throws before doing anything else if this is false) and exposed unauthenticated via GET /api/v1/system/passkeys-status so the frontend can hide the passkey UI instead of showing one that always errors. */

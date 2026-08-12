@@ -1,4 +1,4 @@
-import { eq, and, ne, isNull, inArray, desc, gt, sql } from "drizzle-orm";
+import { eq, and, ne, isNull, inArray, desc, asc, gt, sql } from "drizzle-orm";
 import type {
   Conversation,
   ConversationSummary,
@@ -27,11 +27,12 @@ import { maybeResizeImage } from "../files/imageResize.js";
 import { getImageLimits } from "../files/service.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
-import { writeUploadedBytes, deleteUploadedSubpath } from "../../lib/storage.js";
+import { writeUploadedBytes, deleteUploadedSubpath, deleteUploadedBytes } from "../../lib/storage.js";
 import { sendToUserGlobal, broadcastToConversation } from "../realtime/hub.js";
 import { notifyUser } from "../push/service.js";
 import { isFocused } from "./focusState.js";
 import { indexMessage, removeFromIndex } from "./indexer.js";
+import { env } from "../../env.js";
 import path from "node:path";
 
 function toConversation(row: typeof conversations.$inferSelect): Conversation {
@@ -477,6 +478,45 @@ async function notifyNewMessage(conversationId: string, message: Message, sender
 }
 
 /** Inserts the message, then fans it out via realtime + push (see `notifyNewMessage`) - search indexing is wired in separately, see chat/indexer.ts. */
+/**
+ * Deletes the oldest messages in a conversation once it exceeds
+ * `env.messageRetentionLimit` (0 = unlimited). Replies pointing at a
+ * to-be-deleted message have `replyToId` cleared first since `messages`
+ * doesn't cascade on that self-reference, then attachment files are removed
+ * from disk (DB rows cascade with the message row).
+ */
+async function pruneOldMessages(conversationId: string): Promise<void> {
+  const limit = env.messageRetentionLimit;
+  if (limit <= 0) return;
+
+  const countRows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId));
+  const overflow = Number(countRows[0]?.count ?? 0) - limit;
+  if (overflow <= 0) return;
+
+  const oldest = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(asc(messages.createdAt))
+    .limit(overflow);
+  const oldestIds = oldest.map((r) => r.id);
+  if (oldestIds.length === 0) return;
+
+  const attachmentRows = await db
+    .select({ storagePath: messageAttachments.storagePath })
+    .from(messageAttachments)
+    .where(inArray(messageAttachments.messageId, oldestIds));
+
+  await db.update(messages).set({ replyToId: null }).where(inArray(messages.replyToId, oldestIds));
+  await db.delete(messages).where(inArray(messages.id, oldestIds));
+
+  for (const id of oldestIds) removeFromIndex(id);
+  await Promise.all(attachmentRows.map((row) => deleteUploadedBytes(row.storagePath)));
+}
+
 export async function sendMessage(
   conversationId: string,
   userId: string,
@@ -541,6 +581,7 @@ export async function sendMessage(
 
   await notifyNewMessage(conversationId, message, authorName, allParticipantUserIds);
   indexMessage(id, trimmedBody);
+  await pruneOldMessages(conversationId);
 
   return message;
 }

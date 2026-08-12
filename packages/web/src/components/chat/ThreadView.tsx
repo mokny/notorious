@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import type { Message } from "@notorious/shared";
 import { chatApi, systemApi, callApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
@@ -15,6 +15,7 @@ import { dayKey, dayLabel } from "../../lib/chatDayLabels.js";
 import { Icon } from "../ui/Icon.js";
 
 const TYPING_TIMEOUT_MS = 5000;
+const MESSAGES_PAGE_SIZE = 50;
 
 /** Dispatches to the "Notorious AI" thread (a different backend entirely - see aiConversation.ts) or the real, DB-backed conversation thread below. Calls no hooks itself so switching between the two never trips the rules of hooks - each branch is its own component instance. */
 export function ThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
@@ -37,6 +38,22 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   const rafCleanupRef = useRef<(() => void) | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
+  // How many messages (most recent N) the query currently asks for -
+  // infinite scroll grows this instead of merging separate pages, so a
+  // realtime `invalidateQueries(["chatMessages", conversationId])` (see
+  // useGlobalRealtime.ts) - which re-runs this same queryFn - naturally
+  // re-fetches the whole currently-loaded window instead of collapsing back
+  // to the newest 50 and silently dropping history the user scrolled up to.
+  const [loadedLimit, setLoadedLimit] = useState(MESSAGES_PAGE_SIZE);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
+  // Set for the duration of a loadOlder() round-trip so the messages-effect
+  // below (which otherwise treats any count change as "new message(s),
+  // scroll to bottom") instead restores the scroll offset and skips the
+  // bottom-scroll/read-receipt side effects.
+  const isLoadingOlderRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   // Mirrors the `isAtBottom` state in a ref too - the messages-effect below
   // needs the current value without retriggering on every scroll tick, and
   // without depending on stale state from its own closure.
@@ -51,9 +68,70 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   const conversation = conversations?.find((c) => c.id === conversationId);
 
   const { data: messages } = useQuery({
-    queryKey: ["chatMessages", conversationId],
-    queryFn: () => chatApi.listMessages(conversationId),
+    queryKey: ["chatMessages", conversationId, loadedLimit],
+    queryFn: () => chatApi.listMessages(conversationId, { limit: loadedLimit }),
+    placeholderData: keepPreviousData,
   });
+
+  // Reset pagination state when switching threads - loadedLimit lives
+  // outside processedRef's "is this a new thread" bookkeeping, so it needs
+  // its own reset.
+  useEffect(() => {
+    setLoadedLimit(MESSAGES_PAGE_SIZE);
+    setHasMoreOlder(true);
+    setIsLoadingOlder(false);
+    isLoadingOlderRef.current = false;
+  }, [conversationId]);
+
+  // A returned page shorter than what was asked for means we've reached the
+  // real start of the conversation's (retained) history.
+  useEffect(() => {
+    if (messages && messages.length < loadedLimit) setHasMoreOlder(false);
+  }, [messages, loadedLimit]);
+
+  function loadOlder() {
+    if (isLoadingOlderRef.current || !hasMoreOlder) return;
+    const container = scrollContainerRef.current;
+    prevScrollHeightRef.current = container?.scrollHeight ?? 0;
+    isLoadingOlderRef.current = true;
+    setIsLoadingOlder(true);
+    setLoadedLimit((limit) => limit + MESSAGES_PAGE_SIZE);
+  }
+  // Read by the IntersectionObserver callback below, which is only set up
+  // once per thread (see that effect's comment) - keeping it up to date
+  // every render avoids that callback closing over a stale `loadOlder`.
+  const loadOlderRef = useRef(loadOlder);
+  loadOlderRef.current = loadOlder;
+
+  // Auto-loads older messages once the sentinel above the oldest loaded
+  // message scrolls into view - the standard chat-app "infinite scroll up"
+  // trigger, no "load more" button. Set up once per thread (not on every
+  // `messages` change - the sentinel node itself never unmounts) so that
+  // prepending older messages and correcting the scroll offset afterwards
+  // doesn't tear down and recreate the observer, which would replay its
+  // "current state" callback and could re-trigger a load on its own.
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    const container = scrollContainerRef.current;
+    if (!sentinel || !container) return;
+    // IntersectionObserver invokes its callback once immediately on
+    // observe() with the sentinel's current state - before the thread has
+    // even auto-scrolled to the bottom on open - which would otherwise read
+    // as "user scrolled to the top" and fire an unwanted load.
+    let skippedInitial = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!skippedInitial) {
+          skippedInitial = true;
+          return;
+        }
+        if (entries[0]?.isIntersecting) loadOlderRef.current();
+      },
+      { root: container, rootMargin: "200px 0px 0px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [conversationId]);
 
   // "Read <time>" under the last message *I* sent, once the other person
   // has read it - iMessage-style. Only shown for 1:1 DMs, not channels or
@@ -211,6 +289,16 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   // isn't enough to detect "switched thread" here).
   useEffect(() => {
     if (!messages) return;
+
+    if (isLoadingOlderRef.current) {
+      isLoadingOlderRef.current = false;
+      setIsLoadingOlder(false);
+      processedRef.current = { conversationId, count: messages.length };
+      const container = scrollContainerRef.current;
+      if (container) container.scrollTop += container.scrollHeight - prevScrollHeightRef.current;
+      return;
+    }
+
     clearTimeout(typingTimeoutRef.current);
     setTypingUserName(null);
 
@@ -302,6 +390,12 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
       <div className="relative min-h-0 flex-1">
         <div ref={scrollContainerRef} onScroll={handleScroll} className="h-full overflow-y-auto py-2">
           <div ref={scrollContentRef}>
+            <div ref={topSentinelRef} />
+            {isLoadingOlder && (
+              <div className="flex justify-center py-2">
+                <Icon name="refresh" className="h-4 w-4 animate-spin text-ink-muted" />
+              </div>
+            )}
             {messages?.map((message, index) => {
               const previous = messages[index - 1];
               const showDaySeparator = !previous || dayKey(previous.createdAt) !== dayKey(message.createdAt);
