@@ -292,8 +292,11 @@ export function ChecklistBlock({
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const items = useMemo(() => content.items ?? [], [content.items]);
   const searchTerms = searchHighlight?.terms ?? [];
-  const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([]);
-  const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
+  // Keyed by item id, not position - a position-indexed array breaks the
+  // moment an item is inserted/removed anywhere but the end, since every
+  // later item's index (and therefore its ref slot) shifts out from under it.
+  const inputRefs = useRef<Map<string, HTMLTextAreaElement | null>>(new Map());
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   // Split by input type, same reasoning as BlockEditor.tsx's own sensors:
   // mouse keeps the near-instant 4px-movement drag start (from the handle
   // only), touch needs a short long-press first since the whole row is now
@@ -462,17 +465,17 @@ export function ChecklistBlock({
   }
 
   useEffect(() => {
-    if (pendingFocusIndex === null) return;
-    inputRefs.current[pendingFocusIndex]?.focus();
-    setPendingFocusIndex(null);
-  }, [pendingFocusIndex, items.length]);
+    if (pendingFocusId === null) return;
+    inputRefs.current.get(pendingFocusId)?.focus();
+    setPendingFocusId(null);
+  }, [pendingFocusId, items]);
 
   // Also resize on every render (not just on this tab's own typing) - an
   // item's text can change from elsewhere (another collaborator's live
   // edit, the block first loading with long saved text already in it) and
   // needs the same fit-to-content treatment either way.
   useEffect(() => {
-    inputRefs.current.forEach(resizeTextarea);
+    inputRefs.current.forEach((el) => resizeTextarea(el));
   });
 
   // One-time backfill for checklists saved before drag-reordering existed -
@@ -495,7 +498,7 @@ export function ChecklistBlock({
     // it doesn't jump out from under them while they're still typing.
     if (sortCheckedToBottom) pendingNewItemsRef.current.add(newItem.id!);
     save({ ...content, items: [...items, newItem] });
-    setPendingFocusIndex(items.length);
+    setPendingFocusId(newItem.id!);
   }
 
   /** Pressing Enter inside an item inserts the new item right after it, not at the
@@ -504,7 +507,7 @@ export function ChecklistBlock({
   function insertItemAfter(index: number) {
     const newItem: ChecklistItem = { id: randomId(), markdown: "", checked: false };
     save({ ...content, items: [...items.slice(0, index + 1), newItem, ...items.slice(index + 1)] });
-    setPendingFocusIndex(index + 1);
+    setPendingFocusId(newItem.id!);
   }
 
   function removeItem(index: number) {
@@ -623,7 +626,7 @@ export function ChecklistBlock({
                 }}
                 readOnly={readOnly}
                 registerInputRef={(el) => {
-                  inputRefs.current[index] = el;
+                  inputRefs.current.set(item.id ?? `unindexed-${index}`, el);
                   resizeTextarea(el);
                 }}
                 searchTerms={searchTerms}
