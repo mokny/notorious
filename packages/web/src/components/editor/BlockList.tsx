@@ -52,6 +52,7 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
       <div className="relative" ref={pickerRef}>
         <button
           ref={buttonRef}
+          data-lock-hide
           onClick={() => setPickerOpen((v) => !v)}
           className={
             hasHover
