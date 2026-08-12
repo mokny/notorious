@@ -127,7 +127,17 @@ export function BlockRenderer({
         />
       );
     case "heading":
-      return <HeadingBlock blockId={block.id} content={content<HeadingContent>()} onSave={save} onEnter={onEnter} onBackspaceEmpty={onBackspaceEmpty} />;
+      return (
+        <HeadingBlock
+          blockId={block.id}
+          content={content<HeadingContent>()}
+          onSave={save}
+          onEnter={onEnter}
+          onBackspaceEmpty={onBackspaceEmpty}
+          autoFocus={autoFocus}
+          onAutoFocused={onAutoFocused}
+        />
+      );
     case "quote":
       return <QuoteBlock blockId={block.id} content={content<QuoteContent>()} onSave={save} onEnter={onEnter} />;
     case "callout":
@@ -140,6 +150,8 @@ export function BlockRenderer({
           onSave={save}
           onToggleItem={onToggleChecklistItem}
           onReorderItems={onReorderChecklistItems}
+          autoFocus={autoFocus}
+          onAutoFocused={onAutoFocused}
         />
       );
     case "table":

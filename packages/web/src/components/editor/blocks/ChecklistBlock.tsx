@@ -291,6 +291,8 @@ export function ChecklistBlock({
   onSave,
   onToggleItem,
   onReorderItems,
+  autoFocus,
+  onAutoFocused,
 }: {
   blockId: string;
   content: ChecklistContent;
@@ -299,16 +301,31 @@ export function ChecklistBlock({
   onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
   /** Exempt-from-lock path for the `sortCheckedToBottom` auto-sort reorder below - see reorderChecklistItemsSchema. `save()`'s own generic PATCH isn't exempt, so on a locked object it would otherwise persist the checkbox toggle but silently lose the reorder that's supposed to follow it - this is called alongside `save()` (not instead of it) so the common unlocked case keeps its single normal write, and the locked case still gets the reorder committed by this one when the other 423s. */
   onReorderItems?: (itemIds: string[]) => Promise<void>;
+  /** True right after this block itself was just created (see BlockEditor.tsx's pendingFocusBlockId) - focuses its first (freshly-created, empty) item instead of any item add/insert path. */
+  autoFocus?: boolean;
+  onAutoFocused?: () => void;
 }) {
   const { readOnly, searchHighlight } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const items = useMemo(() => content.items ?? [], [content.items]);
+  const hasHover = useHasHover();
   const searchTerms = searchHighlight?.terms ?? [];
   // Keyed by item id, not position - a position-indexed array breaks the
   // moment an item is inserted/removed anywhere but the end, since every
   // later item's index (and therefore its ref slot) shifts out from under it.
   const inputRefs = useRef<Map<string, HTMLTextAreaElement | null>>(new Map());
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  // Focuses the first item of a freshly-created block (see BlockEditor.tsx's
+  // defaultContentFor, which seeds every new checklist with exactly one
+  // empty item) - mount-only, so re-renders after the user has started
+  // editing don't keep stealing focus back to that first item.
+  useEffect(() => {
+    if (!autoFocus) return;
+    const firstId = items[0]?.id;
+    if (firstId) setPendingFocusId(firstId);
+    onAutoFocused?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Split by input type, same reasoning as BlockEditor.tsx's own sensors:
   // mouse keeps the near-instant 4px-movement drag start (from the handle
   // only), touch needs a short long-press first since the whole row is now
@@ -656,9 +673,11 @@ export function ChecklistBlock({
         // isn't already covered by that rule's `group-hover`/`opacity-100`
         // matching.
         data-lock-hide
-        className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent"
+        className={`flex items-center gap-1 rounded text-ink-muted hover:text-accent ${
+          hasHover ? "text-xs" : "px-2 py-1.5 text-sm"
+        }`}
       >
-        <Icon name="plus" className="h-3 w-3" /> Add item
+        <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> Add item
       </button>
 
       {undoSnapshot && <UndoToast message="Item deleted" onUndo={undoSwipeDelete} />}

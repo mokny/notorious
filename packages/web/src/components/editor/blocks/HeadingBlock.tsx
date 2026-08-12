@@ -14,9 +14,11 @@ interface HeadingBlockProps {
   onSave: (content: HeadingContent) => Promise<void>;
   onEnter: () => void;
   onBackspaceEmpty: () => void;
+  autoFocus?: boolean;
+  onAutoFocused?: () => void;
 }
 
-export function HeadingBlock({ blockId, content, onSave, onEnter, onBackspaceEmpty }: HeadingBlockProps) {
+export function HeadingBlock({ blockId, content, onSave, onEnter, onBackspaceEmpty, autoFocus, onAutoFocused }: HeadingBlockProps) {
   const { isFocused, containerRef, handlers } = useFocusWithin<HTMLDivElement>();
 
   return (
@@ -45,6 +47,8 @@ export function HeadingBlock({ blockId, content, onSave, onEnter, onBackspaceEmp
           onSave={(markdown) => onSave({ ...content, markdown })}
           onEnter={onEnter}
           onBackspaceEmpty={onBackspaceEmpty}
+          autoFocus={autoFocus}
+          onAutoFocused={onAutoFocused}
         />
       </div>
     </div>

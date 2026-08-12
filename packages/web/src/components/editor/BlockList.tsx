@@ -6,6 +6,7 @@ import { BlockItem } from "./BlockItem.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { buildSlashCommandItems } from "./SlashCommand.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
+import { useHasHover } from "../../hooks/useHasHover.js";
 import { Icon } from "../ui/Icon.js";
 
 interface BlockListProps {
@@ -19,6 +20,7 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
   const { createBlockAfter, objectTypes } = useBlockEditor();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const hasHover = useHasHover();
   useClickOutside(pickerRef, () => setPickerOpen(false), pickerOpen);
   const items = buildSlashCommandItems(objectTypes);
 
@@ -33,9 +35,13 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
       <div className="relative" ref={pickerRef}>
         <button
           onClick={() => setPickerOpen((v) => !v)}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted opacity-0 hover:bg-surface-raised hover:opacity-100 group-hover/editor:opacity-100"
+          className={
+            hasHover
+              ? "flex items-center gap-1 rounded-md px-2 py-1 text-xs text-ink-muted opacity-0 hover:bg-surface-raised hover:opacity-100 group-hover/editor:opacity-100"
+              : "flex items-center gap-1 rounded-md px-3 py-2 text-sm text-ink-muted hover:bg-surface-raised"
+          }
         >
-          <Icon name="plus" className="h-3 w-3" /> Add block
+          <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> Add block
         </button>
         {pickerOpen && (
           <div className="slash-menu absolute left-0 z-20 mt-1">

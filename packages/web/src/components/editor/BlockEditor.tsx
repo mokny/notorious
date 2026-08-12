@@ -11,6 +11,7 @@ import { BlockEditorProvider } from "./BlockEditorContext.js";
 import { BlockList } from "./BlockList.js";
 import { useEditorHistory, type BlockSnapshot } from "./useEditorHistory.js";
 import { useKeepFocusedElementVisible } from "../../hooks/useKeepFocusedElementVisible.js";
+import { randomId } from "../../lib/randomId.js";
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "./blockGestures.js";
 import { UndoToast } from "./UndoToast.js";
@@ -441,7 +442,7 @@ export function BlockEditor({
       case "heading":
         return { markdown: "", level: 2 };
       case "checklist":
-        return { items: [] };
+        return { items: [{ id: randomId(), markdown: "", checked: false }] };
       case "table":
         return { doc: createEmptyTableDoc() };
       case "code":
