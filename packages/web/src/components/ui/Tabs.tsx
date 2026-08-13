@@ -50,6 +50,13 @@ export function Tabs({ items }: { items: TabItem[] }) {
 
   const showArrows = overflowing && isFinePointer;
 
+  const fadeWidth = "20px";
+  const maskImage = overflowing
+    ? `linear-gradient(to right, transparent, black ${canScrollLeft ? fadeWidth : "0px"}, black calc(100% - ${
+        canScrollRight ? fadeWidth : "0px"
+      }), transparent)`
+    : undefined;
+
   return (
     <div className="flex items-center gap-1">
       {showArrows && (
@@ -64,12 +71,10 @@ export function Tabs({ items }: { items: TabItem[] }) {
         </button>
       )}
       <div className="relative min-w-0 flex-1">
-        {overflowing && canScrollLeft && (
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-surface to-transparent" />
-        )}
         <div
           ref={scrollRef}
           className="scrollbar-hide -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+          style={{ WebkitMaskImage: maskImage, maskImage }}
         >
           {items.map((item) => (
             <NavLink
@@ -86,9 +91,6 @@ export function Tabs({ items }: { items: TabItem[] }) {
             </NavLink>
           ))}
         </div>
-        {overflowing && canScrollRight && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-surface to-transparent" />
-        )}
       </div>
       {showArrows && (
         <button
