@@ -88,6 +88,11 @@ export function MessageBubble({
     onReply(message);
   }
 
+  function deleteMessage() {
+    setShowPicker(false);
+    deleteMutation.mutate();
+  }
+
   function scrollToReplyOriginal(id: string) {
     document.getElementById(`chat-message-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -116,19 +121,6 @@ export function MessageBubble({
     <div className={`flex flex-col gap-0.5 px-3 py-1 ${isOwn ? "items-end" : "items-start"}`}>
       {!isOwn && !isDm && <span className="px-1 text-xs font-medium text-ink-muted">{message.authorName}</span>}
       <div className="relative flex items-center gap-1">
-        {/* Same long-press reveal as the reaction picker below - not a hover reveal, which has no touch equivalent. */}
-        {isOwn && showPicker && !message.deletedAt && (
-          <button
-            onClick={() => {
-              setShowPicker(false);
-              deleteMutation.mutate();
-            }}
-            className="rounded p-1 text-ink-muted hover:bg-surface hover:text-red-500"
-            title={t("chat.messageBubble.delete")}
-          >
-            <Icon name="trash" className="h-3 w-3" />
-          </button>
-        )}
         <div
           onPointerDown={message.deletedAt ? undefined : startLongPress}
           onPointerUp={cancelLongPress}
@@ -198,7 +190,12 @@ export function MessageBubble({
         {/* Only shown after a long-press - not a hover reveal, since that has no touch equivalent and this is the primary phone surface for chat. */}
         {showPicker && !message.deletedAt && (
           <div ref={pickerRef} className={`absolute -top-16 z-10 ${isOwn ? "right-0" : "left-0"}`}>
-            <ReactionPicker time={formatTime(message.createdAt)} onPick={toggleReaction} onReply={reply} />
+            <ReactionPicker
+              time={formatTime(message.createdAt)}
+              onPick={toggleReaction}
+              onReply={reply}
+              onDelete={isOwn ? deleteMessage : undefined}
+            />
           </div>
         )}
       </div>
@@ -226,7 +223,17 @@ export function MessageBubble({
   );
 }
 
-function ReactionPicker({ time, onPick, onReply }: { time: string; onPick: (emoji: string) => void; onReply: () => void }) {
+function ReactionPicker({
+  time,
+  onPick,
+  onReply,
+  onDelete,
+}: {
+  time: string;
+  onPick: (emoji: string) => void;
+  onReply: () => void;
+  onDelete?: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-lg">
@@ -241,6 +248,11 @@ function ReactionPicker({ time, onPick, onReply }: { time: string; onPick: (emoj
         <button onClick={onReply} className="rounded-full p-1 text-ink-muted hover:bg-surface hover:text-ink" title={t("chat.messageBubble.reply")}>
           <Icon name="reply" className="h-3.5 w-3.5" />
         </button>
+        {onDelete && (
+          <button onClick={onDelete} className="rounded-full p-1 text-ink-muted hover:bg-surface hover:text-red-500" title={t("chat.messageBubble.delete")}>
+            <Icon name="trash" className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
