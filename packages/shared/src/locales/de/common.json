@@ -142,7 +142,7 @@
       "description": "Erhalte Push-Benachrichtigungen für Aufgabenerinnerungen, Einladungen und Zuweisungen."
     },
     "apiKeys": {
-      "description": "Persönliche Schlüssel für Skripte und andere Systeme, um die API in deinem Namen anzusprechen, workspace-übergreifend. Sende sie als <code>Authorization: Bearer &lt;key&gt;</code>."
+      "description": "Persönliche Schlüssel für Skripte und andere Systeme, um die API in deinem Namen anzusprechen, workspace-übergreifend. Sende sie als <code>Authorization: Bearer DEIN_SCHLÜSSEL</code>."
     },
     "integrations": {
       "description": "Teile Bilder, Videos, Dokumente und Links direkt von deinem Handy aus mit Notorious (über das Teilen-Menü, sobald als App auf Android installiert) oder über ein Desktop-Browser-Bookmarklet."
