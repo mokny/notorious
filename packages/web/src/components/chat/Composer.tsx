@@ -23,6 +23,7 @@ export function Composer({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const lastTypingSentRef = useRef(0);
   const queryClient = useQueryClient();
   const { sendTyping } = useChatRealtime();
@@ -113,6 +114,24 @@ export function Composer({
           title="Attach a file"
         >
           <Icon name="plus" className="h-5 w-5" />
+        </button>
+        {/* Separate input dedicated to direct camera capture (`accept` + `capture`
+            steer iOS Safari into its native camera picker) - going through the
+            generic file input above for this specifically hits a WebKit bug
+            where a photo taken in landscape orientation never comes back to
+            the page (`change` never fires with any files). Selecting an
+            existing photo from the library isn't affected, so the plain "+"
+            button stays the only way to attach anything else (documents,
+            existing images, ...). */}
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={uploading}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-50"
+          title="Take a photo"
+        >
+          <Icon name="camera" className="h-5 w-5" />
         </button>
         {/* The button sits inside the pill as a flex child (not absolutely positioned) so it's always comfortably inset from the pill's own right-side curve, however tall the pill grows with a multi-line message - `items-end` keeps it pinned to the bottom-right corner as the textarea grows, matching iMessage/WhatsApp. */}
         <div className="flex flex-1 items-end gap-1 rounded-full border border-border bg-surface py-1 pl-3 pr-1 focus-within:border-accent">

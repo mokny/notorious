@@ -92,6 +92,7 @@ import {
   CornerUpLeft,
   Rss,
   AlertTriangle,
+  Camera,
   type LucideIcon,
 } from "lucide-react";
 
@@ -186,6 +187,7 @@ const ICONS: Record<string, LucideIcon> = {
   reply: CornerUpLeft,
   rss: Rss,
   "alert-triangle": AlertTriangle,
+  camera: Camera,
 };
 
 function isImageUrl(value: string): boolean {
