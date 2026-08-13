@@ -17,6 +17,7 @@ const LOCALE_LABELS: Record<string, string> = {
   en: "English",
   de: "Deutsch",
   es: "Español",
+  fr: "Français",
 };
 
 const AVATAR_EXPORT_SIZE = 256;
