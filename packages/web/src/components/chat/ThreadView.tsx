@@ -204,6 +204,10 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
     el?.scrollTo({ top: el.scrollHeight, behavior });
   }
 
+  function stickToBottomIfNeeded() {
+    if (isAtBottomRef.current) scrollToBottom("auto");
+  }
+
   // The messages-effect below scrolls to bottom as soon as React commits the
   // new message list, but avatars/images without reserved dimensions still
   // grow the content afterwards, landing the scroll position a few px short
@@ -211,15 +215,21 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   // scroll container itself - that one's a fixed `h-full`, so its own box
   // never resizes) re-applies the same "stick to bottom" rule as that effect
   // (isAtBottomRef, kept up to date by both) whenever the content's actual
-  // height changes for any reason, not just on the initial open.
+  // height changes for any reason, not just on the initial open. Attachment
+  // images are also wired to call `stickToBottomIfNeeded` directly via
+  // `onImageLoad` below - their own `onLoad` fires deterministically the
+  // instant the browser knows their natural size, rather than waiting on
+  // this observer's own (usually-immediate, but not guaranteed-synchronous)
+  // batching of the resulting layout change.
   useEffect(() => {
     const content = scrollContentRef.current;
     if (!content) return;
-    const observer = new ResizeObserver(() => {
-      if (isAtBottomRef.current) scrollToBottom("auto");
-    });
+    const observer = new ResizeObserver(() => stickToBottomIfNeeded());
     observer.observe(content);
     return () => observer.disconnect();
+    // stickToBottomIfNeeded reads isAtBottomRef.current fresh on every call, not a render-scoped
+    // closure value - safe to attach the observer once and never re-run this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-pins the view to the bottom whenever the on-screen keyboard's height
@@ -414,6 +424,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
                     isDm={conversation?.type === "dm"}
                     deliveryStatus={message.id === lastOwnMessageId ? { readAt: lastOwnReadAt } : null}
                     onReply={setReplyTarget}
+                    onImageLoad={stickToBottomIfNeeded}
                   />
                 </div>
               );

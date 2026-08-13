@@ -45,6 +45,7 @@ export function MessageBubble({
   isDm,
   deliveryStatus,
   onReply,
+  onImageLoad,
 }: {
   message: Message;
   conversationId: string;
@@ -54,6 +55,8 @@ export function MessageBubble({
   deliveryStatus?: { readAt: string | null } | null;
   /** Opens the composer's reply-preview for this message - absent for call-log rows (see caller), which have nothing quotable. */
   onReply: (message: Message) => void;
+  /** Fires once an attachment image finishes loading (or fails to) - its natural size isn't known until then, so it can grow the bubble well after the initial "scroll to bottom" already ran. Lets ThreadView re-stick to bottom immediately instead of waiting on its ResizeObserver fallback. */
+  onImageLoad?: () => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -160,7 +163,13 @@ export function MessageBubble({
                     }
                     className="mt-1 block cursor-zoom-in"
                   >
-                    <img src={chatApi.attachmentUrl(attachment.id)} alt={attachment.filename} className="max-h-64 rounded-lg" />
+                    <img
+                      src={chatApi.attachmentUrl(attachment.id)}
+                      alt={attachment.filename}
+                      className="max-h-64 rounded-lg"
+                      onLoad={onImageLoad}
+                      onError={onImageLoad}
+                    />
                   </button>
                 ) : (
                   <a
