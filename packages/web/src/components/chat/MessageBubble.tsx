@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Message, CallSummary } from "@notorious/shared";
 import { chatApi } from "../../lib/api/resources.js";
@@ -18,12 +19,13 @@ function formatCallDuration(seconds: number): string {
 
 /** Compact system-style row for a call outcome (missed/declined/ended) - iMessage/WhatsApp style, replaces the normal chat bubble entirely. See `chat/calls/service.ts::writeCallHistoryMessage`. */
 function CallLogRow({ call, createdAt }: { call: CallSummary; createdAt: string }) {
+  const { t } = useTranslation();
   const label =
     call.status === "missed"
-      ? "Missed call"
+      ? t("chat.messageBubble.missedCall")
       : call.status === "declined"
-        ? "Declined call"
-        : `Call ended · ${formatCallDuration(call.durationSeconds ?? 0)}`;
+        ? t("chat.messageBubble.declinedCall")
+        : t("chat.messageBubble.callEnded", { duration: formatCallDuration(call.durationSeconds ?? 0) });
 
   return (
     <div className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs text-ink-muted">
@@ -53,6 +55,7 @@ export function MessageBubble({
   /** Opens the composer's reply-preview for this message - absent for call-log rows (see caller), which have nothing quotable. */
   onReply: (message: Message) => void;
 }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isOwn = message.authorId === user?.id;
@@ -121,7 +124,7 @@ export function MessageBubble({
               deleteMutation.mutate();
             }}
             className="rounded p-1 text-ink-muted hover:bg-surface hover:text-red-500"
-            title="Delete"
+            title={t("chat.messageBubble.delete")}
           >
             <Icon name="trash" className="h-3 w-3" />
           </button>
@@ -137,7 +140,7 @@ export function MessageBubble({
           }`}
         >
           {message.deletedAt ? (
-            "Message deleted"
+            t("chat.messageBubble.messageDeleted")
           ) : (
             <>
               {message.replyTo && (
@@ -151,7 +154,7 @@ export function MessageBubble({
                   }`}
                 >
                   <div className="font-medium opacity-80">{message.replyTo.authorName}</div>
-                  <div className="truncate opacity-70">{message.replyTo.deleted ? "Message deleted" : message.replyTo.body || "Attachment"}</div>
+                  <div className="truncate opacity-70">{message.replyTo.deleted ? t("chat.messageBubble.messageDeleted") : message.replyTo.body || t("chat.messageBubble.attachment")}</div>
                 </button>
               )}
               {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
@@ -215,13 +218,16 @@ export function MessageBubble({
       )}
 
       {deliveryStatus && (
-        <span className="px-1 text-[11px] text-ink-muted">{deliveryStatus.readAt ? `Read ${formatTime(deliveryStatus.readAt)}` : "Delivered"}</span>
+        <span className="px-1 text-[11px] text-ink-muted">
+          {deliveryStatus.readAt ? t("chat.messageBubble.read", { time: formatTime(deliveryStatus.readAt) }) : t("chat.messageBubble.delivered")}
+        </span>
       )}
     </div>
   );
 }
 
 function ReactionPicker({ time, onPick, onReply }: { time: string; onPick: (emoji: string) => void; onReply: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center gap-1 rounded-2xl border border-border bg-surface-raised p-1 shadow-lg">
       <span className="px-2 text-[11px] text-ink-muted">{time}</span>
@@ -232,7 +238,7 @@ function ReactionPicker({ time, onPick, onReply }: { time: string; onPick: (emoj
           </button>
         ))}
         <span className="mx-0.5 h-4 w-px bg-border" />
-        <button onClick={onReply} className="rounded-full p-1 text-ink-muted hover:bg-surface hover:text-ink" title="Reply">
+        <button onClick={onReply} className="rounded-full p-1 text-ink-muted hover:bg-surface hover:text-ink" title={t("chat.messageBubble.reply")}>
           <Icon name="reply" className="h-3.5 w-3.5" />
         </button>
       </div>

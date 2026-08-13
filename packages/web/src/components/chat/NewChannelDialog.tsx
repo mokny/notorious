@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatApi, workspaceApi } from "../../lib/api/resources.js";
 import { Modal } from "../ui/Modal.js";
 
 /** Channels are open by design - any member (any role) can create one, and every workspace member can see/join it. */
 export function NewChannelDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (conversationId: string) => void }) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [workspaceId, setWorkspaceId] = useState<string>("");
   const queryClient = useQueryClient();
@@ -26,15 +28,15 @@ export function NewChannelDialog({ open, onOpenChange, onCreated }: { open: bool
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="New channel"
-      description="Open to every member of the workspace you pick."
+      title={t("chat.newChannelDialog.title")}
+      description={t("chat.newChannelDialog.description")}
       footer={
         <button
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending || !name.trim() || !effectiveWorkspaceId}
           className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
-          Create channel
+          {t("chat.newChannelDialog.create")}
         </button>
       }
     >
@@ -56,7 +58,7 @@ export function NewChannelDialog({ open, onOpenChange, onCreated }: { open: bool
           autoFocus
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="channel-name"
+          placeholder={t("chat.newChannelDialog.namePlaceholder")}
           className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
         />
       </div>

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SecretContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
@@ -46,6 +47,7 @@ export function SecretBlock({
   content: SecretContent;
   onSave: (c: SecretContent) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const { readOnly } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const [editing, setEditing] = useState(false);
@@ -76,7 +78,7 @@ export function SecretBlock({
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          placeholder="Secret text"
+          placeholder={t("editor.blocks.secret.placeholder")}
           autoComplete="off"
           className="flex-1 border-none bg-transparent text-sm outline-none"
         />
@@ -90,22 +92,22 @@ export function SecretBlock({
           data-view-toggle
           onClick={() => void handleCopy()}
           disabled={!content.text}
-          title={content.text ? "Click to copy" : "No text set yet"}
+          title={content.text ? t("editor.blocks.secret.clickToCopy") : t("editor.blocks.secret.noTextSet")}
           className="flex-1 truncate text-left font-mono text-sm tracking-widest text-ink disabled:text-ink-muted"
         >
-          {content.text ? MASK : "Click the pencil to set a secret"}
+          {content.text ? MASK : t("editor.blocks.secret.clickPencilToSet")}
         </button>
       )}
       {copyState && (
         <span className={`shrink-0 text-xs ${copyState === "copied" ? "text-green-600" : "text-red-500"}`}>
-          {copyState === "copied" ? "Copied!" : "Copy failed"}
+          {copyState === "copied" ? t("editor.blocks.secret.copied") : t("editor.blocks.secret.copyFailed")}
         </span>
       )}
       {!readOnly && !editing && (
         <button
           type="button"
           onClick={() => setEditing(true)}
-          title="Edit secret"
+          title={t("editor.blocks.secret.editSecret")}
           className="shrink-0 rounded p-1 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/block:opacity-100"
         >
           <Icon name="pencil" className="h-3.5 w-3.5" />

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { MathContent } from "@notorious/shared";
@@ -11,6 +12,7 @@ export function MathBlock({
   content: MathContent;
   onSave: (c: MathContent) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [content, save] = useDebouncedSave(externalContent, onSave);
   const rendered = useMemo(() => {
     try {
@@ -25,7 +27,7 @@ export function MathBlock({
       <textarea
         value={content.latex ?? ""}
         onChange={(e) => save({ ...content, latex: e.target.value })}
-        placeholder="e.g. E = mc^2"
+        placeholder={t("editor.blocks.math.placeholder")}
         rows={2}
         className="w-full resize-none border-none bg-transparent font-mono text-sm outline-none"
       />

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Editor } from "@tiptap/core";
 import { TABLE_COLORS } from "@notorious/shared";
 import { Icon } from "../../ui/Icon.js";
@@ -13,6 +14,7 @@ function activeClass(active: boolean): string {
 
 /** A small "pick a curated color or clear it" popover, shared by the text-color and cell-background buttons. */
 function ColorSwatchPicker({ icon, title, onPick }: { icon: string; title: string; onPick: (color: string | null) => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useClickOutside(ref, () => setOpen(false), open);
@@ -27,7 +29,7 @@ function ColorSwatchPicker({ icon, title, onPick }: { icon: string; title: strin
           <button
             type="button"
             className="flex h-6 w-6 items-center justify-center rounded border border-border text-ink-muted hover:border-accent"
-            title="Clear"
+            title={t("editor.blocks.table.clear")}
             onClick={() => {
               onPick(null);
               setOpen(false);
@@ -63,15 +65,26 @@ function ColorSwatchPicker({ icon, title, onPick }: { icon: string; title: strin
  * toggles, delete row/column) on whichever cell(s) the selection touches.
  */
 export function TableFormatToolbar({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
   return (
     <div
       className="mb-1 flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface-raised p-1"
       onMouseDown={(e) => e.preventDefault()}
     >
-      <button type="button" className={`${BUTTON} ${activeClass(editor.isActive("bold"))}`} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
+      <button
+        type="button"
+        className={`${BUTTON} ${activeClass(editor.isActive("bold"))}`}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        title={t("editor.blocks.table.bold")}
+      >
         <Icon name="bold" className="h-3.5 w-3.5" />
       </button>
-      <button type="button" className={`${BUTTON} ${activeClass(editor.isActive("italic"))}`} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">
+      <button
+        type="button"
+        className={`${BUTTON} ${activeClass(editor.isActive("italic"))}`}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        title={t("editor.blocks.table.italic")}
+      >
         <Icon name="italic" className="h-3.5 w-3.5" />
       </button>
 
@@ -81,7 +94,7 @@ export function TableFormatToolbar({ editor }: { editor: Editor }) {
         type="button"
         className={`${BUTTON} ${activeClass(editor.isActive({ textAlign: "left" }))}`}
         onClick={() => editor.chain().focus().setTextAlign("left").run()}
-        title="Align left"
+        title={t("editor.blocks.table.alignLeft")}
       >
         <Icon name="align-left" className="h-3.5 w-3.5" />
       </button>
@@ -89,7 +102,7 @@ export function TableFormatToolbar({ editor }: { editor: Editor }) {
         type="button"
         className={`${BUTTON} ${activeClass(editor.isActive({ textAlign: "center" }))}`}
         onClick={() => editor.chain().focus().setTextAlign("center").run()}
-        title="Align center"
+        title={t("editor.blocks.table.alignCenter")}
       >
         <Icon name="align-center" className="h-3.5 w-3.5" />
       </button>
@@ -97,7 +110,7 @@ export function TableFormatToolbar({ editor }: { editor: Editor }) {
         type="button"
         className={`${BUTTON} ${activeClass(editor.isActive({ textAlign: "right" }))}`}
         onClick={() => editor.chain().focus().setTextAlign("right").run()}
-        title="Align right"
+        title={t("editor.blocks.table.alignRight")}
       >
         <Icon name="align-right" className="h-3.5 w-3.5" />
       </button>
@@ -106,21 +119,33 @@ export function TableFormatToolbar({ editor }: { editor: Editor }) {
 
       <ColorSwatchPicker
         icon="palette"
-        title="Text color"
+        title={t("editor.blocks.table.textColor")}
         onPick={(color) => (color ? editor.chain().focus().setColor(color).run() : editor.chain().focus().unsetColor().run())}
       />
       <ColorSwatchPicker
         icon="paint-bucket"
-        title="Cell background"
+        title={t("editor.blocks.table.cellBackground")}
         onPick={(color) => editor.chain().focus().setCellAttribute("backgroundColor", color).run()}
       />
 
       <div className={DIVIDER} />
 
-      <button type="button" className={BUTTON} disabled={!editor.can().mergeCells()} onClick={() => editor.chain().focus().mergeCells().run()} title="Merge cells">
+      <button
+        type="button"
+        className={BUTTON}
+        disabled={!editor.can().mergeCells()}
+        onClick={() => editor.chain().focus().mergeCells().run()}
+        title={t("editor.blocks.table.mergeCells")}
+      >
         <Icon name="merge" className="h-3.5 w-3.5" />
       </button>
-      <button type="button" className={BUTTON} disabled={!editor.can().splitCell()} onClick={() => editor.chain().focus().splitCell().run()} title="Split cell">
+      <button
+        type="button"
+        className={BUTTON}
+        disabled={!editor.can().splitCell()}
+        onClick={() => editor.chain().focus().splitCell().run()}
+        title={t("editor.blocks.table.splitCell")}
+      >
         <Icon name="split" className="h-3.5 w-3.5" />
       </button>
 
@@ -130,29 +155,40 @@ export function TableFormatToolbar({ editor }: { editor: Editor }) {
         type="button"
         className={`${BUTTON} ${activeClass(editor.isActive("tableHeader"))}`}
         onClick={() => editor.chain().focus().toggleHeaderRow().run()}
-        title="Toggle header row"
+        title={t("editor.blocks.table.toggleHeaderRow")}
       >
         <Icon name="insert-row" className="h-3.5 w-3.5" />
       </button>
-      <button type="button" className={BUTTON} onClick={() => editor.chain().focus().toggleHeaderColumn().run()} title="Toggle header column">
+      <button
+        type="button"
+        className={BUTTON}
+        onClick={() => editor.chain().focus().toggleHeaderColumn().run()}
+        title={t("editor.blocks.table.toggleHeaderColumn")}
+      >
         <Icon name="insert-column" className="h-3.5 w-3.5" />
       </button>
 
       <div className={DIVIDER} />
 
-      <button type="button" className={BUTTON} disabled={!editor.can().deleteRow()} onClick={() => editor.chain().focus().deleteRow().run()} title="Delete row">
+      <button
+        type="button"
+        className={BUTTON}
+        disabled={!editor.can().deleteRow()}
+        onClick={() => editor.chain().focus().deleteRow().run()}
+        title={t("editor.blocks.table.deleteRow")}
+      >
         <Icon name="trash" className="h-3.5 w-3.5" />
-        <span className="sr-only">Delete row</span>
+        <span className="sr-only">{t("editor.blocks.table.deleteRow")}</span>
       </button>
       <button
         type="button"
         className={BUTTON}
         disabled={!editor.can().deleteColumn()}
         onClick={() => editor.chain().focus().deleteColumn().run()}
-        title="Delete column"
+        title={t("editor.blocks.table.deleteColumn")}
       >
         <Icon name="trash" className="h-3.5 w-3.5 rotate-90" />
-        <span className="sr-only">Delete column</span>
+        <span className="sr-only">{t("editor.blocks.table.deleteColumn")}</span>
       </button>
     </div>
   );

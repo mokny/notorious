@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { MermaidContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
 
@@ -9,6 +10,7 @@ export function MermaidBlock({
   content: MermaidContent;
   onSave: (c: MermaidContent) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [content, save] = useDebouncedSave(externalContent, onSave);
   const id = useId().replace(/:/g, "");
   const [svg, setSvg] = useState<string>("");
@@ -39,7 +41,7 @@ export function MermaidBlock({
         }
       } catch {
         if (!cancelled) {
-          setError("Could not render this diagram - check the syntax");
+          setError(t("editor.blocks.mermaid.renderError"));
           setSvg("");
         }
       }
@@ -48,7 +50,7 @@ export function MermaidBlock({
     return () => {
       cancelled = true;
     };
-  }, [content.code, id]);
+  }, [content.code, id, t]);
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">

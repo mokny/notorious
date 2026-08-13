@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext.js";
 import { useChatOverlay } from "../../context/ChatOverlayContext.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
@@ -16,6 +17,7 @@ import { Icon } from "../ui/Icon.js";
  * ends up rendering it.
  */
 export function ChatBubble() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const breakpoint = useBreakpoint();
   const { isOpen, open, close } = useChatOverlay();
@@ -33,7 +35,7 @@ export function ChatBubble() {
       <button
         onClick={() => (isOpen ? close() : open())}
         className="fixed bottom-5 right-5 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow-lg hover:opacity-90"
-        title="Chat"
+        title={t("chat.bubble.title")}
       >
         <Icon name={isOpen ? "close" : "comment"} className="h-5 w-5" />
         {!isOpen && unreadCount > 0 && (

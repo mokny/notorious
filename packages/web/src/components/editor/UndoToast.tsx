@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 /**
  * Fixed-position "<message> / Undo" toast - shown after a touch swipe-left
  * delete, the one delete path (block, checklist item, voting item - see
@@ -10,12 +12,13 @@
  * block-structure undo stack.
  */
 export function UndoToast({ message, onUndo }: { message: string; onUndo: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
       <div className="pointer-events-auto flex items-center gap-3 rounded-lg bg-ink px-4 py-2 text-sm text-surface shadow-xl">
         <span>{message}</span>
         <button type="button" onClick={onUndo} className="font-medium text-accent underline underline-offset-2">
-          Undo
+          {t("editor.undoToast.undo")}
         </button>
       </div>
     </div>

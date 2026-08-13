@@ -1,7 +1,9 @@
+import { useTranslation } from "react-i18next";
 import type { MediaDeviceOption } from "./useMediaDevices.js";
 
 /** Shared `<select>` + `<input type="range">` presentational pieces for CallSettingsPanel and PreJoinLobby - kept tiny and dumb, all state lives in the caller. */
 export function DeviceSelect({ label, value, options, onChange }: { label: string; value: string | undefined; options: MediaDeviceOption[]; onChange: (deviceId: string) => void }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1">
       <label className="text-xs text-ink-muted">{label}</label>
@@ -10,7 +12,7 @@ export function DeviceSelect({ label, value, options, onChange }: { label: strin
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-ink"
       >
-        {!value && <option value="">Default</option>}
+        {!value && <option value="">{t("calls.controls.default")}</option>}
         {options.map((option) => (
           <option key={option.deviceId} value={option.deviceId}>
             {option.label}

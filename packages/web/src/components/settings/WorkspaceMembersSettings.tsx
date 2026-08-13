@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { workspaceApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useRobustImage } from "../../hooks/useRobustImage.js";
@@ -27,6 +28,7 @@ function MemberAvatar({ avatarUrl, avatarColor, initial }: { avatarUrl: string; 
 }
 
 export function WorkspaceMembersSettings() {
+  const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -45,7 +47,7 @@ export function WorkspaceMembersSettings() {
       setError(null);
       void queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Could not invite this user"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("settings.workspace.members.inviteError")),
   });
 
   const roleMutation = useMutation({
@@ -65,7 +67,7 @@ export function WorkspaceMembersSettings() {
 
   return (
     <div>
-      <p className="text-sm text-ink-muted">Everyone below can access "{workspace?.name}".</p>
+      <p className="text-sm text-ink-muted">{t("settings.workspace.members.description", { name: workspace?.name })}</p>
 
       <div className="mt-4 space-y-2">
         {members?.map((member) => (
@@ -95,16 +97,18 @@ export function WorkspaceMembersSettings() {
                 >
                   {ROLES.map((role) => (
                     <option key={role} value={role}>
-                      {role}
+                      {t(`settings.workspace.members.roles.${role}`)}
                     </option>
                   ))}
                 </select>
                 <button onClick={() => removeMutation.mutate(member.userId)} className="text-xs text-red-500 hover:underline">
-                  Remove
+                  {t("settings.workspace.members.remove")}
                 </button>
               </div>
             ) : (
-              <span className="text-xs capitalize text-ink-muted">{member.role}</span>
+              <span className="text-xs capitalize text-ink-muted">
+                {t(`settings.workspace.members.roles.${member.role}`)}
+              </span>
             )}
           </div>
         ))}

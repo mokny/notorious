@@ -1,4 +1,5 @@
 import { Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext.js";
 import { systemApi } from "../lib/api/resources.js";
@@ -12,6 +13,7 @@ import { TwoFactorSetupFlow } from "../components/TwoFactorSetupFlow.js";
  * `RequireAuth` would just redirect right back here, looping forever.
  */
 export function SetupTwoFactorPage() {
+  const { t } = useTranslation();
   const { user, isLoading, refetch } = useAuth();
   const navigate = useNavigate();
   const { data: twoFactor, isLoading: twoFactorLoading } = useQuery({
@@ -28,8 +30,8 @@ export function SetupTwoFactorPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold">Set up two-factor authentication</h1>
-          <p className="mt-1 text-sm text-ink-muted">This instance requires 2FA before you can continue.</p>
+          <h1 className="text-2xl font-semibold">{t("setupTwoFactor.title")}</h1>
+          <p className="mt-1 text-sm text-ink-muted">{t("setupTwoFactor.subtitle")}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface-raised p-6">
           <TwoFactorSetupFlow

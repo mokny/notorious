@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { CalloutContent } from "@notorious/shared";
 import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 
@@ -14,6 +15,7 @@ export function CalloutBlock({
   onSave: (c: CalloutContent) => Promise<void>;
   onEnter: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="group/callout flex items-start gap-2 rounded-lg bg-accent/5 p-3">
       <select
@@ -32,7 +34,7 @@ export function CalloutBlock({
           blockId={blockId}
           field="markdown"
           markdown={content.markdown ?? ""}
-          placeholder="Callout"
+          placeholder={t("editor.blocks.callout.placeholder")}
           onSave={(markdown) => onSave({ ...content, markdown })}
           onEnter={onEnter}
         />

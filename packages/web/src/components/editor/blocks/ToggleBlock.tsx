@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import type { ToggleContent } from "@notorious/shared";
 import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 import { Icon } from "../../ui/Icon.js";
@@ -12,6 +13,7 @@ interface ToggleBlockProps {
 }
 
 export function ToggleBlock({ blockId, content, onSave, children }: ToggleBlockProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   // A search-match navigation force-opens a closed toggle that hides its
   // target (see BlockEditor.tsx's ancestor-chain scroll effect) - `open`
@@ -33,7 +35,7 @@ export function ToggleBlock({ blockId, content, onSave, children }: ToggleBlockP
             blockId={blockId}
             field="summaryMarkdown"
             markdown={content.summaryMarkdown ?? ""}
-            placeholder="Toggle"
+            placeholder={t("editor.blocks.toggle.placeholder")}
             onSave={(summaryMarkdown) => onSave({ ...content, summaryMarkdown })}
           />
         </div>

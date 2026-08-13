@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { BlockType } from "@notorious/shared";
@@ -13,6 +14,7 @@ import { useHasHover } from "../../hooks/useHasHover.js";
 import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
 
 export function BlockItem({ block }: { block: BlockNode }) {
+  const { t } = useTranslation();
   const {
     workspaceId,
     objectId,
@@ -127,7 +129,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
             <button
               onClick={() => createBlockAfter(block.parentBlockId, block.id, "paragraph")}
               className="rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/item:opacity-100 [@media(pointer:coarse)]:p-2"
-              title="Add block below"
+              title={t("editor.blockItem.addBlockBelow")}
             >
               <Icon name="plus" className="h-3.5 w-3.5" />
             </button>
@@ -138,7 +140,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
               className={`cursor-grab touch-none rounded p-0.5 text-ink-muted hover:bg-surface hover:text-ink [@media(pointer:coarse)]:p-2 ${
                 isDraggingAny ? "opacity-100" : "opacity-0 group-hover/item:opacity-100"
               }`}
-              title="Drag to reorder"
+              title={t("editor.blockItem.dragToReorder")}
             >
               <Icon name="grip-vertical" className="h-3.5 w-3.5" />
             </button>
@@ -175,7 +177,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
           <button
             onClick={() => deleteBlock(block.id)}
             className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-red-500 group-hover/item:opacity-100 [@media(pointer:coarse)]:p-2"
-            title="Delete block"
+            title={t("editor.blockItem.deleteBlock")}
           >
             <Icon name="trash" className="h-3.5 w-3.5" />
           </button>

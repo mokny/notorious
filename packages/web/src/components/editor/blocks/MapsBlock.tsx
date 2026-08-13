@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { MapsContent } from "@notorious/shared";
 import { useDebouncedSave } from "../../../hooks/useDebouncedSave.js";
@@ -45,6 +46,7 @@ export function externalHrefFor(query: string): string {
  * usable while locked, same as the fullscreen toggle on ImageBlock.
  */
 export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (content: MapsContent) => void }) {
+  const { t } = useTranslation();
   const exportMode = useExportMode();
   const [query, setQuery] = useDebouncedSave(content.query, async (query) => onSave({ ...content, query }));
   const [height, setHeight] = useState(content.height ?? DEFAULT_HEIGHT);
@@ -80,7 +82,7 @@ export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (
         <Icon name="map" className="h-4 w-4" />
         <input
           autoFocus
-          placeholder="Address, coordinates, or an origin -> destination route"
+          placeholder={t("editor.blocks.maps.queryPlaceholder")}
           className="flex-1 border-none bg-transparent outline-none"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -107,7 +109,7 @@ export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (
   return (
     <div className="group/maps relative">
       <div className="relative w-full overflow-hidden rounded-lg border border-border" style={{ height }}>
-        <iframe src={embedSrc} className="h-full w-full" style={{ border: 0 }} loading="lazy" title="Map" />
+        <iframe src={embedSrc} className="h-full w-full" style={{ border: 0 }} loading="lazy" title={t("editor.blocks.maps.mapTitle")} />
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 bg-gradient-to-b from-black/50 to-transparent p-2">
           <input
             className="pointer-events-auto min-w-0 flex-1 rounded border-none bg-white/90 px-2 py-1 text-sm text-ink opacity-0 outline-none transition-opacity group-hover/maps:opacity-100 group-focus-within/maps:opacity-100 dark:bg-black/60 dark:text-white"
@@ -119,7 +121,7 @@ export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (
             target="_blank"
             rel="noreferrer"
             data-view-toggle
-            title="Open in Google Maps"
+            title={t("editor.blocks.maps.openInGoogleMaps")}
             className="pointer-events-auto rounded bg-white/90 p-1 text-ink opacity-0 transition-opacity hover:bg-white group-hover/maps:opacity-100 dark:bg-black/60 dark:text-white"
           >
             <Icon name="link" className="h-4 w-4" />
@@ -127,7 +129,7 @@ export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (
           <button
             type="button"
             data-view-toggle
-            title="Expand"
+            title={t("editor.blocks.maps.expand")}
             onClick={() => setFullscreenOpen(true)}
             className="pointer-events-auto rounded bg-white/90 p-1 text-ink opacity-0 transition-opacity hover:bg-white group-hover/maps:opacity-100 dark:bg-black/60 dark:text-white"
           >
@@ -143,10 +145,10 @@ export function MapsBlock({ content, onSave }: { content: MapsContent; onSave: (
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/80" />
           <Dialog.Content className="fixed inset-4 z-50 flex flex-col outline-none">
-            <Dialog.Title className="sr-only">Map</Dialog.Title>
-            <iframe src={embedSrc} className="h-full w-full rounded-lg" style={{ border: 0 }} title="Map, fullscreen" />
+            <Dialog.Title className="sr-only">{t("editor.blocks.maps.mapTitle")}</Dialog.Title>
+            <iframe src={embedSrc} className="h-full w-full rounded-lg" style={{ border: 0 }} title={t("editor.blocks.maps.mapFullscreenTitle")} />
             <Dialog.Close
-              title="Close"
+              title={t("editor.blocks.maps.close")}
               data-view-toggle
               className="fixed right-6 top-6 rounded-md bg-black/40 p-2 text-white hover:bg-black/60"
             >

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { SubObjectContent } from "@notorious/shared";
@@ -38,6 +39,7 @@ const MAX_EMBED_DEPTH = 4;
  * outline look like a stack of cards instead of a tree.
  */
 function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; objectId: string; depth: number }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const { title, icon } = useObjectTitle(workspaceId, objectId);
   // Same search-navigation words BlockEditor.tsx highlights matches with
@@ -62,7 +64,7 @@ function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; o
           // View action, not an edit - see CollapsibleSection.tsx's identical marker for why.
           data-view-toggle
           className={`shrink-0 rounded p-0.5 text-ink-muted hover:text-ink ${hasChildren ? "" : "invisible"}`}
-          title="Show sub-objects"
+          title={t("editor.blocks.subObject.showSubObjects")}
         >
           <Icon name={expanded ? "chevron-down" : "chevron-right"} className="h-3.5 w-3.5" />
         </button>
@@ -97,6 +99,7 @@ function SubObjectRow({ workspaceId, objectId, depth }: { workspaceId: string; o
  * the block existing, not a separate step this component has to also do.
  */
 function SubObjectPicker({ workspaceId, onPicked }: { workspaceId: string; onPicked: (objectId: string) => void }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
@@ -132,7 +135,7 @@ function SubObjectPicker({ workspaceId, onPicked }: { workspaceId: string; onPic
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
-          placeholder="Link an existing object…"
+          placeholder={t("editor.blocks.subObject.linkExisting")}
           autoComplete="off"
           className="flex-1 border-none bg-transparent text-sm outline-none"
         />
@@ -140,7 +143,7 @@ function SubObjectPicker({ workspaceId, onPicked }: { workspaceId: string; onPic
           onClick={() => setTypeMenuOpen((v) => !v)}
           className="shrink-0 rounded-md px-2 py-1 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
         >
-          + New
+          {t("editor.blocks.subObject.newButton")}
         </button>
       </div>
 
@@ -157,7 +160,7 @@ function SubObjectPicker({ workspaceId, onPicked }: { workspaceId: string; onPic
               {object.title}
             </button>
           ))}
-          {results?.length === 0 && <p className="px-2 py-1.5 text-sm text-ink-muted">No matches</p>}
+          {results?.length === 0 && <p className="px-2 py-1.5 text-sm text-ink-muted">{t("editor.blocks.subObject.noMatches")}</p>}
         </div>
       )}
 
@@ -204,6 +207,7 @@ function PendingNewSubObject({
   objectTypeId: string;
   onCreated: (objectId: string) => void;
 }) {
+  const { t } = useTranslation();
   const hasStarted = useRef(false);
   const createMutation = useMutation({
     mutationFn: () => objectApi.create(workspaceId, { objectTypeId, title: "Untitled", values: {} }),
@@ -220,7 +224,7 @@ function PendingNewSubObject({
   return (
     <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-2 text-sm text-ink-muted">
       <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-      Creating…
+      {t("editor.blocks.subObject.creating")}
     </div>
   );
 }
@@ -251,6 +255,7 @@ function EmbeddedContent({
   objectId: string;
   embedAncestorIds: string[];
 }) {
+  const { t } = useTranslation();
   const isCircular = embedAncestorIds.includes(objectId);
   const isTooDeep = embedAncestorIds.length >= MAX_EMBED_DEPTH;
   // Same fetch ObjectDetailPage.tsx does for the top-level object - an
@@ -267,14 +272,14 @@ function EmbeddedContent({
   if (isCircular) {
     return (
       <p className="rounded-lg border border-dashed border-border p-2 text-xs text-ink-muted">
-        Can't embed this object's content here - it would create a circular reference.
+        {t("editor.blocks.subObject.circularReference")}
       </p>
     );
   }
   if (isTooDeep) {
     return (
       <p className="rounded-lg border border-dashed border-border p-2 text-xs text-ink-muted">
-        Nested too deeply to embed here - open the object directly to see its content.
+        {t("editor.blocks.subObject.tooDeep")}
       </p>
     );
   }
@@ -300,6 +305,7 @@ function EmbeddedContent({
 }
 
 export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds }: SubObjectBlockProps) {
+  const { t } = useTranslation();
   // Export always embeds a sub_object's full content regardless of the
   // block's own stored displayMode (a user picking "link" for normal viewing
   // still expects a self-contained export to include what's linked, not a
@@ -332,7 +338,7 @@ export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds 
         <div className="mt-2 flex shrink-0 gap-0.5 rounded-md border border-border p-0.5">
           <button
             type="button"
-            title="Show as link"
+            title={t("editor.blocks.subObject.showAsLink")}
             // Hidden (not just disabled) in read-only/locked content - see
             // globals.css's `[data-lock-hide]` rule. Changing the display
             // mode is a content edit like any other, so it's blocked the
@@ -345,7 +351,7 @@ export function SubObjectBlock({ content, workspaceId, onSave, embedAncestorIds 
           </button>
           <button
             type="button"
-            title="Embed content"
+            title={t("editor.blocks.subObject.embedContent")}
             data-lock-hide
             onClick={() => onSave({ ...content, displayMode: "embed" })}
             className={`rounded p-1 ${displayMode === "embed" ? "bg-accent/10 text-accent" : "text-ink-muted hover:text-ink"}`}

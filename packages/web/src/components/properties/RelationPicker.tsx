@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { searchApi } from "../../lib/api/resources.js";
@@ -19,6 +20,7 @@ interface RelationPickerProps {
 }
 
 export function RelationPicker({ workspaceId, targetObjectTypeId, value, onAdd, onRemove, highlightTerms = [] }: RelationPickerProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const debouncedQuery = useDebouncedValue(query);
@@ -49,7 +51,7 @@ export function RelationPicker({ workspaceId, targetObjectTypeId, value, onAdd, 
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Link an object…"
+          placeholder={t("properties.relationPicker.linkAnObject")}
           className="w-full rounded-lg border border-border bg-surface px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-accent/40"
         />
         {open && (
@@ -70,7 +72,7 @@ export function RelationPicker({ workspaceId, targetObjectTypeId, value, onAdd, 
                   {object.title}
                 </button>
               ))}
-            {results?.length === 0 && <p className="px-2 py-1.5 text-sm text-ink-muted">No matches</p>}
+            {results?.length === 0 && <p className="px-2 py-1.5 text-sm text-ink-muted">{t("properties.relationPicker.noMatches")}</p>}
           </div>
         )}
       </div>

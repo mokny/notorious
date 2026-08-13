@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { PropertyCell } from "../properties/PropertyCell.js";
@@ -23,6 +24,7 @@ export function TableView(props: TableViewProps) {
 }
 
 function TableViewCards({ workspaceId, items, properties, visiblePropertyIds, onOpenObject }: TableViewProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
@@ -32,7 +34,7 @@ function TableViewCards({ workspaceId, items, properties, visiblePropertyIds, on
       {items.map((object) => (
         <div key={object.id} className="rounded-lg border border-border bg-surface-raised p-3">
           <button onClick={() => openObject(object.id)} className="block w-full truncate text-left text-sm font-medium hover:underline">
-            {object.title || "Untitled"}
+            {object.title || t("nav.untitled")}
           </button>
           {columns.length > 0 && (
             <div className="mt-2 space-y-1.5 border-t border-border pt-2">
@@ -48,13 +50,14 @@ function TableViewCards({ workspaceId, items, properties, visiblePropertyIds, on
           )}
         </div>
       ))}
-      {items.length === 0 && <p className="p-6 text-center text-sm text-ink-muted">No objects yet.</p>}
+      {items.length === 0 && <p className="p-6 text-center text-sm text-ink-muted">{t("views.common.noObjects")}</p>}
     </div>
   );
 }
 
 /** Virtualized so a 100k-object workspace only ever renders the rows on screen. */
 function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onOpenObject }: TableViewProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const parentRef = useRef<HTMLDivElement>(null);
@@ -72,7 +75,7 @@ function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onO
       <table className="w-full min-w-[640px] border-collapse text-sm">
         <thead className="sticky top-0 z-10 bg-surface">
           <tr>
-            <th className="border-b border-border p-2 text-left font-medium text-ink-muted">Title</th>
+            <th className="border-b border-border p-2 text-left font-medium text-ink-muted">{t("views.table.title")}</th>
             {columns.map((property) => (
               <th key={property.id} className="border-b border-border p-2 text-left font-medium text-ink-muted">
                 {property.name}
@@ -91,7 +94,7 @@ function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onO
               >
                 <td className="flex-1 basis-56 p-2">
                   <button className="truncate text-left hover:underline" onClick={() => openObject(object.id)}>
-                    {object.title || "Untitled"}
+                    {object.title || t("nav.untitled")}
                   </button>
                 </td>
                 {columns.map((property) => (

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
 
 interface TimelineViewProps {
@@ -12,6 +13,7 @@ interface TimelineViewProps {
 
 /** A simple single-point timeline: each object is placed on a date axis by its date property. */
 export function TimelineView({ workspaceId, items, properties, datePropertyId, onOpenObject }: TimelineViewProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const dateProperty = properties.find((p) => p.id === datePropertyId) ?? properties.find((p) => p.config.type === "date" || p.config.type === "datetime");
@@ -25,10 +27,10 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId, o
   }, [items, dateProperty]);
 
   if (!dateProperty) {
-    return <p className="p-6 text-sm text-ink-muted">This object type has no date property to plot on a timeline.</p>;
+    return <p className="p-6 text-sm text-ink-muted">{t("views.timeline.noDateProperty")}</p>;
   }
   if (dated.length === 0) {
-    return <p className="p-6 text-sm text-ink-muted">No dated objects yet.</p>;
+    return <p className="p-6 text-sm text-ink-muted">{t("views.timeline.noDatedObjects")}</p>;
   }
 
   const min = new Date(dated[0]!.date).getTime();

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ExcalidrawImperativeAPI, ExcalidrawProps, NormalizedZoomValue } from "@excalidraw/excalidraw/types";
 import type { ImportedDataState } from "@excalidraw/excalidraw/data/types";
@@ -56,6 +57,7 @@ function parseInitialData(sceneJson: string | undefined): ImportedDataState | nu
  * HTML markup.
  */
 function WhiteboardExport({ sceneJson }: { sceneJson: string | undefined }) {
+  const { t } = useTranslation();
   const [svg, setSvg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,7 +83,7 @@ function WhiteboardExport({ sceneJson }: { sceneJson: string | undefined }) {
   }, [sceneJson]);
 
   if (!svg) {
-    return <div className="flex h-40 items-center justify-center text-sm text-ink-muted">Loading whiteboard…</div>;
+    return <div className="flex h-40 items-center justify-center text-sm text-ink-muted">{t("editor.blocks.whiteboard.loading")}</div>;
   }
   return <div className="overflow-hidden rounded-lg border border-border" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
@@ -98,6 +100,7 @@ export function WhiteboardBlock({
   /** Owner-only, exempt from the object lock - see toggleWhiteboardPresentingSchema. Goes through its own endpoint rather than `onSave` so the owner can still reach it on a locked board. */
   onTogglePresenting: (presenting: boolean) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const exportMode = useExportMode();
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -403,14 +406,14 @@ export function WhiteboardBlock({
       <div className="flex shrink-0 items-center gap-1 border-b border-border bg-surface-raised px-2 py-1">
         {presenting && !isOwner && (
           <span className="flex items-center gap-1 px-1.5 text-xs text-accent">
-            <Icon name="presentation" className="h-3.5 w-3.5" /> Presenting
+            <Icon name="presentation" className="h-3.5 w-3.5" /> {t("editor.blocks.whiteboard.presenting")}
           </span>
         )}
         {isOwner && (
           <button
             type="button"
             onClick={togglePresenting}
-            title={presenting ? "Stop presenting - everyone can draw again" : "Start presenting - only you can draw while this is on"}
+            title={presenting ? t("editor.blocks.whiteboard.stopPresenting") : t("editor.blocks.whiteboard.startPresenting")}
             // Toggling presentation mode is a view/mode switch the owner
             // should still be able to reach even while the object is locked
             // (or this whole block is otherwise wrapped in
@@ -433,7 +436,7 @@ export function WhiteboardBlock({
           <button
             type="button"
             onClick={() => void zoomBy(1 / ZOOM_STEP_FACTOR)}
-            title="Zoom out"
+            title={t("editor.blocks.whiteboard.zoomOut")}
             data-view-toggle
             className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
           >
@@ -442,7 +445,7 @@ export function WhiteboardBlock({
           <button
             type="button"
             onClick={() => void zoomBy(ZOOM_STEP_FACTOR)}
-            title="Zoom in"
+            title={t("editor.blocks.whiteboard.zoomIn")}
             data-view-toggle
             className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
           >
@@ -451,7 +454,7 @@ export function WhiteboardBlock({
           <button
             type="button"
             onClick={zoomToFit}
-            title="Fit to content"
+            title={t("editor.blocks.whiteboard.fitToContent")}
             data-view-toggle
             className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
           >
@@ -460,7 +463,7 @@ export function WhiteboardBlock({
           <button
             type="button"
             onClick={() => setIsFullscreen((v) => !v)}
-            title={isFullscreen ? "Exit fullscreen" : "Fill the browser window"}
+            title={isFullscreen ? t("editor.blocks.whiteboard.exitFullscreen") : t("editor.blocks.whiteboard.fillWindow")}
             // A personal view preference, not shared content - stays usable
             // even while the object is locked (see readOnlyContent.ts).
             data-view-toggle
@@ -477,7 +480,7 @@ export function WhiteboardBlock({
           would only take away panning on top of that for no reason. */}
       <div className="min-h-0 flex-1" data-pannable>
         <Suspense
-          fallback={<div className="flex h-full items-center justify-center text-sm text-ink-muted">Loading whiteboard…</div>}
+          fallback={<div className="flex h-full items-center justify-center text-sm text-ink-muted">{t("editor.blocks.whiteboard.loading")}</div>}
         >
           <ExcalidrawLazy
             initialData={initialDataArg}

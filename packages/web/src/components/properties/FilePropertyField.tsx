@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { fileApi } from "../../lib/api/resources.js";
 import { withShareToken } from "../../lib/api/shareMode.js";
 import { useRobustImage } from "../../hooks/useRobustImage.js";
@@ -15,6 +16,7 @@ interface FilePropertyFieldProps {
 
 /** File/Image property: stores a single uploaded file's id as the property value. */
 export function FilePropertyField({ workspaceId, objectId, value, isImage, onChange }: FilePropertyFieldProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const image = useRobustImage(isImage && value ? withShareToken(fileApi.downloadUrl(value)) : null);
 
@@ -39,11 +41,11 @@ export function FilePropertyField({ workspaceId, objectId, value, isImage, onCha
             rel="noreferrer"
             className="flex items-center gap-1 text-sm text-accent"
           >
-            <Icon name="paperclip" className="h-3.5 w-3.5" /> Open file
+            <Icon name="paperclip" className="h-3.5 w-3.5" /> {t("properties.filePropertyField.openFile")}
           </a>
         )}
         <button type="button" onClick={() => onChange(null)} className="text-xs text-ink-muted hover:text-red-500">
-          Remove
+          {t("properties.filePropertyField.remove")}
         </button>
       </div>
     );
@@ -56,7 +58,7 @@ export function FilePropertyField({ workspaceId, objectId, value, isImage, onCha
         onClick={() => inputRef.current?.click()}
         className="rounded-lg border border-dashed border-border px-3 py-1.5 text-sm text-ink-muted hover:border-accent hover:text-accent"
       >
-        Upload {isImage ? "image" : "file"}
+        {isImage ? t("properties.filePropertyField.uploadImage") : t("properties.filePropertyField.uploadFile")}
       </button>
       <input
         ref={inputRef}

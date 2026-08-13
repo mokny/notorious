@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { objectApi, schemaApi, workspaceApi, fileApi, blockApi } from "../lib/api/resources.js";
@@ -75,6 +76,7 @@ interface ObjectDetailPageProps {
 }
 
 export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objectIdProp, share: shareProp }: ObjectDetailPageProps = {}) {
+  const { t } = useTranslation();
   const params = useParams<{ workspaceId: string; objectId: string }>();
   const workspaceId = workspaceIdProp ?? params.workspaceId;
   const objectId = objectIdProp ?? params.objectId;
@@ -199,7 +201,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   });
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
 
-  useDocumentTitle(object && workspace ? `${title || "Untitled"} - ${workspace.name}` : undefined);
+  useDocumentTitle(object && workspace ? `${title || t("nav.untitled")} - ${workspace.name}` : undefined);
 
   const dashboardMutation = useMutation({
     mutationFn: (dashboardObjectId: string | null) => workspaceApi.update(workspaceId!, { dashboardObjectId }),
@@ -220,14 +222,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     const ok = await confirm(
       nextValue
         ? {
-            title: "Require re-verification?",
-            description: "Anyone opening this object - including you - will need to re-verify (password or passkey) before viewing or editing it.",
-            confirmLabel: "Require reverify",
+            title: t("nav.mobile.requireReverifyConfirmTitle"),
+            description: t("nav.mobile.requireReverifyConfirmDescription"),
+            confirmLabel: t("nav.mobile.requireReverifyConfirmLabel"),
           }
         : {
-            title: "Remove reverify protection?",
-            description: "This object will become accessible without re-verification, same as any other object.",
-            confirmLabel: "Remove protection",
+            title: t("nav.mobile.removeReverifyConfirmTitle"),
+            description: t("nav.mobile.removeReverifyConfirmDescription"),
+            confirmLabel: t("nav.mobile.removeReverifyConfirmLabel"),
             danger: true,
           },
     );
@@ -262,12 +264,12 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   if (objectLoadFailed) {
     return (
       <div className="p-8 text-sm text-ink-muted">
-        This object isn't part of what was shared with you, or the link has been revoked.
+        {t("objectDetail.notPartOfShare")}
       </div>
     );
   }
 
-  if (!object || !properties || !workspaceId) return <div className="p-8 text-sm text-ink-muted">Loading…</div>;
+  if (!object || !properties || !workspaceId) return <div className="p-8 text-sm text-ink-muted">{t("nav.loading")}</div>;
 
   const hasRecurrence = properties.some((p) => p.key === "recurrence");
   const pinned = isPinned(object.id);
@@ -364,7 +366,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               <HighlightableTitle
                 value={title}
                 onChange={setTitle}
-                placeholder="Untitled"
+                placeholder={t("nav.untitled")}
                 readOnly={!effectiveCanEdit}
                 terms={titleTerms}
                 className="w-full border-none bg-transparent text-3xl font-semibold outline-none"
@@ -415,14 +417,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               <button
                 onClick={() => lockMutation.mutate(!isLocked)}
                 disabled={lockMutation.isPending}
-                title={isLocked ? "Unlock this object" : "Lock this object against edits"}
+                title={isLocked ? t("nav.mobile.unlockObject") : t("nav.mobile.lockObject")}
                 className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isLocked ? "text-accent" : "text-ink-muted"}`}
               >
                 <Icon name={isLocked ? "lock" : "unlock"} className="h-4 w-4" />
               </button>
             ) : (
               isLocked && (
-                <span className="shrink-0 p-1.5 text-accent" title="This object is locked against edits">
+                <span className="shrink-0 p-1.5 text-accent" title={t("nav.mobile.objectLocked")}>
                   <Icon name="lock" className="h-4 w-4" />
                 </span>
               )
@@ -435,7 +437,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               <button
                 onClick={() => void handleToggleRequiresReverify(!object.requiresReverify)}
                 disabled={requiresReverifyMutation.isPending}
-                title={object.requiresReverify ? "Remove reverify protection" : "Require re-authentication to view or edit this object"}
+                title={object.requiresReverify ? t("objectDetail.removeReverifyProtectionTooltip") : t("objectDetail.requireReauthTooltip")}
                 className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.requiresReverify ? "text-accent" : "text-ink-muted"}`}
               >
                 <Icon name="shield" className="h-4 w-4" />
@@ -449,7 +451,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 of pushing the (all `shrink-0`) action buttons off screen. */}
             {object.cover && (
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                <HighlightedText text={title || "Untitled"} terms={titleTerms} />
+                <HighlightedText text={title || t("nav.untitled")} terms={titleTerms} />
               </span>
             )}
             {/* `key={object.id}` forces a full remount on every object
@@ -461,7 +463,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
             {!share && <ObjectSlugButton key={object.id} objectId={object.id} slug={object.slug} disabled={isLocked} />}
             <button
               onClick={() => setSectionsVisible(!sectionsVisible)}
-              title={sectionsVisible ? "Hide viewing now/properties/sub-objects/backlinks/script" : "Show viewing now/properties/sub-objects/backlinks/script"}
+              title={sectionsVisible ? t("objectDetail.hideSections") : t("objectDetail.showSections")}
               // A view action, not an edit - exempt from READ_ONLY_LOCK's
               // pointer-events-none like CollapsibleSection's own toggle.
               data-view-toggle
@@ -473,12 +475,12 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 to it) - a read-only share visitor can see this object, so
                 they should be able to export it too, not just a workspace
                 member. See ExportMenu.tsx's own doc comment. */}
-            <ExportMenu workspaceId={workspaceId} objectId={object.id} title={title || "Untitled"} />
+            <ExportMenu workspaceId={workspaceId} objectId={object.id} title={title || t("nav.untitled")} />
             {!share && (
               <>
                 <button
                   onClick={() => togglePin(object.id)}
-                  title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+                  title={pinned ? t("nav.mobile.unpinFromSidebar") : t("nav.mobile.pinToSidebar")}
                   className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${pinned ? "text-accent" : "text-ink-muted"}`}
                 >
                   <Icon name={pinned ? "pin-off" : "pin"} className="h-4 w-4" />
@@ -486,7 +488,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 <button
                   onClick={() => dashboardMutation.mutate(isDashboard ? null : object.id)}
                   disabled={dashboardMutation.isPending}
-                  title={isDashboard ? "Remove as workspace dashboard" : "Set as workspace dashboard"}
+                  title={isDashboard ? t("objectDetail.removeAsDashboard") : t("objectDetail.setAsDashboard")}
                   className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isDashboard ? "text-accent" : "text-ink-muted"}`}
                 >
                   <Icon name="layout-dashboard" className="h-4 w-4" />
@@ -500,17 +502,17 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                   <button
                     onClick={() => commentsDisabledMutation.mutate(!object.commentsDisabled)}
                     disabled={commentsDisabledMutation.isPending}
-                    title={object.commentsDisabled ? "Enable comments on this object" : "Disable comments on this object"}
+                    title={object.commentsDisabled ? t("objectDetail.enableComments") : t("objectDetail.disableComments")}
                     className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.commentsDisabled ? "text-ink-muted" : "text-accent"}`}
                   >
                     <Icon name={object.commentsDisabled ? "comment-off" : "comment"} className="h-4 w-4" />
                   </button>
                 )}
-                <ShareDialog workspaceId={workspaceId} objectId={object.id} label="Share" />
+                <ShareDialog workspaceId={workspaceId} objectId={object.id} label={t("nav.mobile.share")} />
                 <button
                   onClick={handleDelete}
                   disabled={isDeleting || isLocked}
-                  title={isLocked ? "Unlock this object before deleting it" : "Delete object"}
+                  title={isLocked ? t("objectDetail.unlockBeforeDelete") : t("objectDetail.deleteObject")}
                   className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
                 >
                   <Icon name="trash" className="h-4 w-4" />
@@ -521,7 +523,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
           {hasRecurrence && !share && (
             <Button variant="secondary" className="mt-3" onClick={() => completeRecurringMutation.mutate()}>
-              <Icon name="check-square" className="h-3.5 w-3.5" /> Mark done
+              <Icon name="check-square" className="h-3.5 w-3.5" /> {t("objectDetail.markDone")}
             </Button>
           )}
 
@@ -571,7 +573,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 arbitrary scripts is a stricter boundary than the rest of
                 this page's editing). Also gated behind `sectionsVisible`. */}
             {sectionsVisible && !share && (
-              <CollapsibleSection title="Script" forceExpanded>
+              <CollapsibleSection title={t("objectDetail.script")} forceExpanded>
                 <ScriptPanel workspaceId={workspaceId} object={object} />
               </CollapsibleSection>
             )}
@@ -613,7 +615,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                   same as `object.id` below is already safe to dereference
                   unguarded for either audience once `object` has loaded. */}
               <PresencePanel objectId={object.id} />
-              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">Properties</h3>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t("objectDetail.properties")}</h3>
               <div className={`space-y-3 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
                 {properties
                   .filter((property) => property.key !== "sub_objects")
@@ -626,7 +628,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
 
                 {objectType?.key === "variable" && (
                   <div>
-                    <label className="mb-1 block text-xs text-ink-muted">Computed Value</label>
+                    <label className="mb-1 block text-xs text-ink-muted">{t("objectDetail.computedValue")}</label>
                     {object.values.computedValueError ? (
                       <p className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
                         ⚠ {String(object.values.computedValueError)}

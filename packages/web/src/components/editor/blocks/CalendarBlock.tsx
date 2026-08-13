@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -65,9 +66,17 @@ function startOfWeek(date: Date, weekStartsOn: WeekStartsOn): Date {
   return d;
 }
 
-function weekdayLabels(weekStartsOn: WeekStartsOn): string[] {
-  const base = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return weekStartsOn === "monday" ? [...base.slice(1), "Sun"] : base;
+function weekdayLabels(weekStartsOn: WeekStartsOn, t: (key: string) => string): string[] {
+  const base = [
+    t("editor.blocks.calendar.days.sun"),
+    t("editor.blocks.calendar.days.mon"),
+    t("editor.blocks.calendar.days.tue"),
+    t("editor.blocks.calendar.days.wed"),
+    t("editor.blocks.calendar.days.thu"),
+    t("editor.blocks.calendar.days.fri"),
+    t("editor.blocks.calendar.days.sat"),
+  ];
+  return weekStartsOn === "monday" ? [...base.slice(1), base[0]!] : base;
 }
 
 function weekDays(cursor: Date, weekStartsOn: WeekStartsOn): Date[] {
@@ -101,15 +110,16 @@ function CalendarConfigEditor({
   objectTypes: ObjectType[];
   onSave: (content: CalendarBlockContent) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const sortedTypes = useMemo(() => sortObjectTypesForDisplay(objectTypes), [objectTypes]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [datePropertyByType, setDatePropertyByType] = useState<Record<string, string>>({});
 
   const propertyQueries = useQueries({
-    queries: sortedTypes.map((t) => ({
-      queryKey: ["properties", t.id],
-      queryFn: () => schemaApi.properties(t.id),
-      enabled: selected.has(t.id),
+    queries: sortedTypes.map((type) => ({
+      queryKey: ["properties", type.id],
+      queryFn: () => schemaApi.properties(type.id),
+      enabled: selected.has(type.id),
     })),
   });
 
@@ -124,11 +134,11 @@ function CalendarConfigEditor({
 
   function handleSave(): void {
     const objectTypeConfigs: CalendarBlockObjectTypeConfig[] = [];
-    for (const t of sortedTypes) {
-      if (!selected.has(t.id)) continue;
-      const datePropertyId = datePropertyByType[t.id];
+    for (const type of sortedTypes) {
+      if (!selected.has(type.id)) continue;
+      const datePropertyId = datePropertyByType[type.id];
       if (!datePropertyId) continue;
-      objectTypeConfigs.push({ objectTypeId: t.id, datePropertyId, filters: [], sorts: [] });
+      objectTypeConfigs.push({ objectTypeId: type.id, datePropertyId, filters: [], sorts: [] });
     }
     if (objectTypeConfigs.length === 0) return;
     void onSave({ objectTypeConfigs, granularity: "month" });
@@ -136,25 +146,25 @@ function CalendarConfigEditor({
 
   return (
     <div className="rounded-lg border border-dashed border-border p-3">
-      <p className="mb-2 text-sm text-ink-muted">Choose which object types to plot on this calendar:</p>
+      <p className="mb-2 text-sm text-ink-muted">{t("editor.blocks.calendar.chooseTypesPrompt")}</p>
       <div className="space-y-2">
-        {sortedTypes.map((t, index) => {
+        {sortedTypes.map((type, index) => {
           const properties = propertyQueries[index]?.data ?? [];
           const dateProperties = properties.filter(
             (p) => p.config.type === "date" || p.config.type === "datetime" || p.config.type === "daterange",
           );
           return (
-            <div key={t.id} className="flex items-center gap-2">
-              <input type="checkbox" className="accent-accent" checked={selected.has(t.id)} onChange={() => toggle(t.id)} />
-              <span className="w-32 shrink-0 truncate text-sm">{t.name}</span>
-              {selected.has(t.id) && (
+            <div key={type.id} className="flex items-center gap-2">
+              <input type="checkbox" className="accent-accent" checked={selected.has(type.id)} onChange={() => toggle(type.id)} />
+              <span className="w-32 shrink-0 truncate text-sm">{type.name}</span>
+              {selected.has(type.id) && (
                 <select
-                  value={datePropertyByType[t.id] ?? ""}
-                  onChange={(e) => setDatePropertyByType((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                  value={datePropertyByType[type.id] ?? ""}
+                  onChange={(e) => setDatePropertyByType((prev) => ({ ...prev, [type.id]: e.target.value }))}
                   className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
                 >
                   <option value="" disabled>
-                    Select a date property…
+                    {t("editor.blocks.calendar.selectDateProperty")}
                   </option>
                   {dateProperties.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -166,10 +176,10 @@ function CalendarConfigEditor({
             </div>
           );
         })}
-        {sortedTypes.length === 0 && <p className="text-sm text-ink-muted">No object types in this workspace yet.</p>}
+        {sortedTypes.length === 0 && <p className="text-sm text-ink-muted">{t("editor.blocks.calendar.noObjectTypes")}</p>}
       </div>
       <Button type="button" variant="primary" onClick={handleSave} className="mt-3">
-        Save
+        {t("editor.blocks.calendar.save")}
       </Button>
     </div>
   );
@@ -190,8 +200,9 @@ function MonthGrid({
   onDayClick: (date: Date) => void;
   onItemClick: (objectId: string) => void;
 }) {
+  const { t } = useTranslation();
   const cells = useMemo(() => monthCells(cursor, weekStartsOn), [cursor, weekStartsOn]);
-  const labels = weekdayLabels(weekStartsOn);
+  const labels = weekdayLabels(weekStartsOn, t);
 
   return (
     <div className="p-3">
@@ -227,7 +238,9 @@ function MonthGrid({
                       </button>
                     );
                   })}
-                  {dayItems.length > 3 && <p className="text-ink-muted">+{dayItems.length - 3} more</p>}
+                  {dayItems.length > 3 && (
+                    <p className="text-ink-muted">{t("editor.blocks.calendar.moreCount", { count: dayItems.length - 3 })}</p>
+                  )}
                 </>
               )}
             </div>
@@ -296,6 +309,7 @@ function HourGrid({
   onSlotClick: (date: Date) => void;
   onItemClick: (objectId: string) => void;
 }) {
+  const { t } = useTranslation();
   const allDayItems = items.filter((it) => it.isRange);
   const timedItems = items.filter((it) => !it.isRange);
   const gridColumns = `56px repeat(${days.length}, 1fr)`;
@@ -311,7 +325,7 @@ function HourGrid({
         ))}
       </div>
       <div className="grid border-b border-border text-xs" style={{ gridTemplateColumns: gridColumns }}>
-        <div className="p-1 text-right text-ink-muted">All day</div>
+        <div className="p-1 text-right text-ink-muted">{t("editor.blocks.calendar.allDay")}</div>
         {days.map((d) => {
           const dayAllDay = allDayItems.filter((it) => itemCoversDay(it, d));
           return (
@@ -378,6 +392,7 @@ function HourGrid({
 }
 
 function AgendaList({ start, items, onItemClick }: { start: Date; items: CalendarItem[]; onItemClick: (objectId: string) => void }) {
+  const { t } = useTranslation();
   const groups = useMemo(() => {
     const days = Array.from({ length: 30 }, (_, i) => {
       const d = new Date(start);
@@ -390,7 +405,7 @@ function AgendaList({ start, items, onItemClick }: { start: Date; items: Calenda
   }, [start, items]);
 
   if (groups.length === 0) {
-    return <p className="p-6 text-sm text-ink-muted">No upcoming items.</p>;
+    return <p className="p-6 text-sm text-ink-muted">{t("editor.blocks.calendar.noUpcomingItems")}</p>;
   }
 
   return (
@@ -446,6 +461,7 @@ function CreateItemDialog({
   workspaceId: string;
   onCreated: (objectId: string, objectTypeId: string) => void;
 }) {
+  const { t } = useTranslation();
   const [objectTypeId, setObjectTypeId] = useState(configs[0]?.objectTypeId ?? "");
   const [title, setTitle] = useState("");
 
@@ -477,7 +493,7 @@ function CreateItemDialog({
         <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/40" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-[70] w-[90vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface-raised p-5 shadow-lg outline-none">
           <div className="flex items-start justify-between gap-2">
-            <Dialog.Title className="text-base font-semibold">New item</Dialog.Title>
+            <Dialog.Title className="text-base font-semibold">{t("editor.blocks.calendar.newItem")}</Dialog.Title>
             <Dialog.Close className="rounded-md p-1 text-ink-muted hover:bg-surface hover:text-ink">
               <Icon name="close" className="h-4 w-4" />
             </Dialog.Close>
@@ -509,12 +525,12 @@ function CreateItemDialog({
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title…"
+              placeholder={t("editor.blocks.calendar.titlePlaceholder")}
               className="w-full rounded-lg border border-border bg-surface px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-accent/40"
             />
             <div className="flex justify-end gap-2">
               <Button type="submit" variant="primary" disabled={!title.trim() || createMutation.isPending}>
-                Create
+                {t("editor.blocks.calendar.create")}
               </Button>
             </div>
           </form>
@@ -525,6 +541,7 @@ function CreateItemDialog({
 }
 
 export function CalendarBlock({ content, workspaceId, objectTypes, onSave }: CalendarBlockProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { readOnly } = useBlockEditor();
@@ -655,7 +672,7 @@ export function CalendarBlock({ content, workspaceId, objectTypes, onSave }: Cal
       case "day":
         return currentDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
       case "agenda":
-        return "Upcoming";
+        return t("editor.blocks.calendar.upcoming");
     }
   })();
 
@@ -689,7 +706,7 @@ export function CalendarBlock({ content, workspaceId, objectTypes, onSave }: Cal
             onClick={() => setCurrentDate(new Date())}
             className="rounded px-2 py-1 text-xs text-ink-muted hover:bg-surface hover:text-ink"
           >
-            Today
+            {t("editor.blocks.calendar.today")}
           </button>
           <button type="button" data-view-toggle onClick={() => shiftDate(1)} className="rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink">
             <Icon name="chevron-right" className="h-3.5 w-3.5" />
@@ -700,7 +717,7 @@ export function CalendarBlock({ content, workspaceId, objectTypes, onSave }: Cal
           type="button"
           data-view-toggle
           onClick={() => setIsFullscreen((v) => !v)}
-          title={isFullscreen ? "Exit fullscreen" : "Fill the browser window"}
+          title={isFullscreen ? t("editor.blocks.calendar.exitFullscreen") : t("editor.blocks.calendar.fillWindow")}
           className="ml-auto rounded p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
         >
           <Icon name={isFullscreen ? "minimize" : "maximize"} className="h-3.5 w-3.5" />
@@ -714,7 +731,7 @@ export function CalendarBlock({ content, workspaceId, objectTypes, onSave }: Cal
             return (
               <span key={cfg.objectTypeId} className="flex items-center gap-1.5 text-ink-muted">
                 <span className={`h-2 w-2 rounded-full ${color.dot}`} />
-                {type?.name ?? "Unknown"}
+                {type?.name ?? t("editor.blocks.calendar.unknownType")}
               </span>
             );
           })}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatApi, workspaceApi } from "../../lib/api/resources.js";
 import { Modal } from "../ui/Modal.js";
@@ -21,6 +22,7 @@ export function BrowseChannelsDialog({
   onSelect: (conversationId: string) => void;
   onCreateNew: () => void;
 }) {
+  const { t } = useTranslation();
   const [workspaceId, setWorkspaceId] = useState<string>("");
   const queryClient = useQueryClient();
 
@@ -44,7 +46,7 @@ export function BrowseChannelsDialog({
   });
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title="Channels" description="Every channel is open - join one, or start a new one.">
+    <Modal open={open} onOpenChange={onOpenChange} title={t("chat.browseChannels.title")} description={t("chat.browseChannels.description")}>
       <div className="flex flex-col gap-2">
         {workspaces && workspaces.length > 1 && (
           <select
@@ -61,8 +63,8 @@ export function BrowseChannelsDialog({
         )}
 
         <div className="-mx-1 max-h-72 overflow-y-auto">
-          {isLoading && <p className="px-1 py-2 text-sm text-ink-muted">Loading…</p>}
-          {!isLoading && channels?.length === 0 && <p className="px-1 py-2 text-sm text-ink-muted">No channels in this workspace yet.</p>}
+          {isLoading && <p className="px-1 py-2 text-sm text-ink-muted">{t("chat.browseChannels.loading")}</p>}
+          {!isLoading && channels?.length === 0 && <p className="px-1 py-2 text-sm text-ink-muted">{t("chat.browseChannels.empty")}</p>}
           {channels?.map((entry) => (
             <div key={entry.conversation.id} className="flex items-center justify-between gap-2 rounded-md px-1 py-1.5 hover:bg-surface">
               <div className="flex min-w-0 items-center gap-1.5">
@@ -78,7 +80,7 @@ export function BrowseChannelsDialog({
                   }}
                   className="shrink-0 text-xs text-accent hover:underline"
                 >
-                  Open
+                  {t("chat.browseChannels.open")}
                 </button>
               ) : (
                 <button
@@ -86,7 +88,7 @@ export function BrowseChannelsDialog({
                   disabled={joinMutation.isPending}
                   className="shrink-0 rounded-md bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
-                  Join
+                  {t("chat.browseChannels.join")}
                 </button>
               )}
             </div>
@@ -94,7 +96,7 @@ export function BrowseChannelsDialog({
         </div>
 
         <button onClick={onCreateNew} className="flex items-center gap-1.5 self-start rounded-md px-1 py-1.5 text-sm text-accent hover:underline">
-          <Icon name="plus" className="h-4 w-4" /> New channel
+          <Icon name="plus" className="h-4 w-4" /> {t("chat.browseChannels.newChannel")}
         </button>
       </div>
     </Modal>

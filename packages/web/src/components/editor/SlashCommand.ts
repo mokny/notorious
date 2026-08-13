@@ -2,6 +2,7 @@ import { Extension } from "@tiptap/core";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
+import i18next from "i18next";
 import { sortObjectTypesForDisplay, type BlockType, type ObjectType } from "@notorious/shared";
 import { popupPopperOptions } from "./popupPositioning.js";
 
@@ -19,36 +20,55 @@ export interface SlashCommandItem {
   objectTypeId?: string;
 }
 
-export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
-  { type: "paragraph", label: "Text", description: "Plain paragraph" },
-  { type: "heading", label: "Heading", description: "Section heading" },
-  { type: "quote", label: "Quote", description: "Highlighted quote" },
-  { type: "callout", label: "Callout", description: "Emphasized note with an icon" },
-  { type: "checklist", label: "Checklist", description: "To-do items with checkboxes" },
-  { type: "table", label: "Table", description: "Simple rows and columns" },
-  { type: "code", label: "Code", description: "Syntax-highlighted code block" },
-  { type: "image", label: "Image", description: "Upload or embed an image" },
-  { type: "video", label: "Video", description: "Embed a video" },
-  { type: "embed", label: "Embed", description: "Embed a link" },
-  { type: "pdf", label: "PDF", description: "Upload a PDF, expandable to view inline" },
-  { type: "audio", label: "Audio", description: "Upload an audio file with a player" },
-  { type: "file", label: "File", description: "Upload any other file as a download card" },
-  { type: "maps", label: "Maps", description: "Embed a Google Maps address, coordinates, or route" },
-  { type: "math", label: "Math", description: "LaTeX formula" },
-  { type: "mermaid", label: "Mermaid diagram", description: "Flowcharts and diagrams" },
-  { type: "toggle", label: "Toggle", description: "Collapsible section" },
-  { type: "secret", label: "Secret", description: "Hidden text, revealed only by copying to the clipboard" },
-  { type: "divider", label: "Divider", description: "Horizontal rule" },
-  { type: "columns", label: "Columns", description: "Side-by-side layout" },
-  { type: "database_view", label: "Linked view", description: "Embed a saved view of objects" },
-  { type: "sub_object", label: "Existing Object", description: "Link an existing object, expandable to its own sub-objects" },
-  { type: "bookmark", label: "Bookmark", description: "Save a link with a title and description" },
-  { type: "whiteboard", label: "Whiteboard", description: "Sketch with shapes, arrows and freehand drawing" },
-  { type: "calendar", label: "Calendar", description: "Year/month/week/day/agenda calendar over one or more object types" },
-  { type: "voting", label: "Voting", description: "Reddit-style list with upvotes/downvotes on each item" },
-  { type: "ai", label: "AI", description: "Prompt an AI and replace it with the answer" },
-  { type: "rssFeed", label: "RSS Feed", description: "Follow one or more RSS/Atom feeds" },
+/**
+ * Fixed block-type entries with their translation key - the label/description
+ * shown to the user are looked up fresh (see `buildFixedSlashCommandItems`)
+ * so the popup and `SLASH_COMMAND_ITEMS` below always reflect the currently
+ * active language, not just whatever was active when this module first
+ * loaded. Not a component, so this uses `i18next.t` directly instead of the
+ * `useTranslation` hook (see packages/web/src/lib/i18n.ts).
+ */
+const SLASH_COMMAND_ITEM_DEFS: { type: BlockType; key: string }[] = [
+  { type: "paragraph", key: "paragraph" },
+  { type: "heading", key: "heading" },
+  { type: "quote", key: "quote" },
+  { type: "callout", key: "callout" },
+  { type: "checklist", key: "checklist" },
+  { type: "table", key: "table" },
+  { type: "code", key: "code" },
+  { type: "image", key: "image" },
+  { type: "video", key: "video" },
+  { type: "embed", key: "embed" },
+  { type: "pdf", key: "pdf" },
+  { type: "audio", key: "audio" },
+  { type: "file", key: "file" },
+  { type: "maps", key: "maps" },
+  { type: "math", key: "math" },
+  { type: "mermaid", key: "mermaid" },
+  { type: "toggle", key: "toggle" },
+  { type: "secret", key: "secret" },
+  { type: "divider", key: "divider" },
+  { type: "columns", key: "columns" },
+  { type: "database_view", key: "database_view" },
+  { type: "sub_object", key: "sub_object" },
+  { type: "bookmark", key: "bookmark" },
+  { type: "whiteboard", key: "whiteboard" },
+  { type: "calendar", key: "calendar" },
+  { type: "voting", key: "voting" },
+  { type: "ai", key: "ai" },
+  { type: "rssFeed", key: "rssFeed" },
 ];
+
+function buildFixedSlashCommandItems(): SlashCommandItem[] {
+  return SLASH_COMMAND_ITEM_DEFS.map(({ type, key }) => ({
+    type,
+    label: i18next.t(`editor.slashCommand.items.${key}.label`),
+    description: i18next.t(`editor.slashCommand.items.${key}.description`),
+  }));
+}
+
+/** Snapshot of the fixed items in whatever language is active when this module loads - used by BlockHistoryPanel.tsx's static type->label lookup. The live picker/slash-menu below always calls `buildFixedSlashCommandItems()` fresh instead, so it stays correctly localized across a language switch. */
+export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = buildFixedSlashCommandItems();
 
 /**
  * Appends one "create a new X" entry per workspace object type after the
@@ -63,10 +83,10 @@ export function buildSlashCommandItems(objectTypes: ObjectType[]): SlashCommandI
     .map((objectType) => ({
       type: "sub_object",
       label: objectType.name,
-      description: `Create a new ${objectType.name} and embed it here`,
+      description: i18next.t("editor.slashCommand.createAndEmbed", { name: objectType.name }),
       objectTypeId: objectType.id,
     }));
-  return [...SLASH_COMMAND_ITEMS, ...perType];
+  return [...buildFixedSlashCommandItems(), ...perType];
 }
 
 /** Extension options: the host component supplies what happens when a block type is chosen, and a ref to the current object types (read at call-time, not just when the extension is first configured - see useMarkdownEditor.ts). */

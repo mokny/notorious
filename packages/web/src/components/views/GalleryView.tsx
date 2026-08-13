@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { Icon } from "../ui/Icon.js";
@@ -19,6 +20,7 @@ interface GalleryViewProps {
 }
 
 export function GalleryView({ workspaceId, items, properties, visiblePropertyIds, onOpenObject }: GalleryViewProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
@@ -39,7 +41,7 @@ export function GalleryView({ workspaceId, items, properties, visiblePropertyIds
             </div>
           )}
           <div className="p-3">
-            <p className="truncate text-sm font-medium">{object.title || "Untitled"}</p>
+            <p className="truncate text-sm font-medium">{object.title || t("nav.untitled")}</p>
             <div className="mt-1 flex flex-wrap gap-1">
               {columns.slice(0, 3).map((property) => {
                 const value = object.values[property.key];
@@ -54,7 +56,9 @@ export function GalleryView({ workspaceId, items, properties, visiblePropertyIds
           </div>
         </button>
       ))}
-      {items.length === 0 && <p className="col-span-full p-6 text-center text-sm text-ink-muted">No objects yet.</p>}
+      {items.length === 0 && (
+        <p className="col-span-full p-6 text-center text-sm text-ink-muted">{t("views.common.noObjects")}</p>
+      )}
     </div>
   );
 }

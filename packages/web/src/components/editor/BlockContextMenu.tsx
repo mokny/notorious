@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { blockApi } from "../../lib/api/resources.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
@@ -15,6 +16,7 @@ import { useBlockEditor } from "./BlockEditorContext.js";
  * the same gesture a swipe-left/up/down uses to delete/reorder.
  */
 export function BlockContextMenu({ blockId, slug }: { blockId: string; slug: string | null }) {
+  const { t } = useTranslation();
   const { objectId, deleteBlock, closeBlockMenu } = useBlockEditor();
   const [value, setValue] = useState(slug ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export function BlockContextMenu({ blockId, slug }: { blockId: string; slug: str
       closeBlockMenu();
       void queryClient.invalidateQueries({ queryKey: ["blocks", objectId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Could not save this id"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("editor.blockMenu.saveIdFailed")),
   });
 
   return (
@@ -38,15 +40,15 @@ export function BlockContextMenu({ blockId, slug }: { blockId: string; slug: str
       className="absolute right-2 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg"
       onClick={(e) => e.stopPropagation()}
     >
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Block id</p>
+      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">{t("editor.blockMenu.blockId")}</p>
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="e.g. total_price"
+        placeholder={t("editor.blockMenu.blockIdPlaceholder")}
         autoComplete="off"
         className="w-full rounded-md border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
       />
-      <p className="mt-1 text-[11px] text-ink-muted">Reference this block from templates as blocks.{value || "…"}.</p>
+      <p className="mt-1 text-[11px] text-ink-muted">{t("editor.blockMenu.reference", { value: value || "…" })}</p>
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
       <button
         type="button"
@@ -54,7 +56,7 @@ export function BlockContextMenu({ blockId, slug }: { blockId: string; slug: str
         disabled={mutation.isPending}
         className="mt-2 w-full rounded-md bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
       >
-        Save id
+        {t("editor.blockMenu.saveId")}
       </button>
       <button
         type="button"
@@ -64,7 +66,7 @@ export function BlockContextMenu({ blockId, slug }: { blockId: string; slug: str
         }}
         className="mt-2 flex w-full items-center justify-center gap-1 rounded-md p-2 text-xs font-medium text-red-500 hover:bg-red-500/10"
       >
-        <Icon name="trash" className="h-3.5 w-3.5" /> Delete block
+        <Icon name="trash" className="h-3.5 w-3.5" /> {t("editor.blockMenu.deleteBlock")}
       </button>
     </div>
   );

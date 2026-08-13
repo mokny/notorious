@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Message } from "@notorious/shared";
 import { chatApi } from "../../lib/api/resources.js";
@@ -18,6 +19,7 @@ export function Composer({
   replyTarget?: Message | null;
   onCancelReply?: () => void;
 }) {
+  const { t } = useTranslation();
   const [body, setBody] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{ id: string; filename: string }[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -63,7 +65,7 @@ export function Composer({
       const attachment = await promise;
       setPendingAttachments((attachments) => [...attachments, { id: attachment.id, filename: attachment.filename }]);
     } catch {
-      setUploadError(`Failed to attach "${file.name}"`);
+      setUploadError(t("chat.composer.attachFailed", { filename: file.name }));
     } finally {
       setUploading(false);
     }
@@ -84,9 +86,9 @@ export function Composer({
           <Icon name="reply" className="h-3.5 w-3.5 shrink-0 text-ink-muted" />
           <div className="min-w-0 flex-1">
             <div className="text-xs font-medium text-ink-muted">{replyTarget.authorName}</div>
-            <div className="truncate text-xs text-ink-muted">{replyTarget.deletedAt ? "Message deleted" : replyTarget.body || "Attachment"}</div>
+            <div className="truncate text-xs text-ink-muted">{replyTarget.deletedAt ? t("chat.composer.messageDeleted") : replyTarget.body || t("chat.composer.attachment")}</div>
           </div>
-          <button type="button" onClick={onCancelReply} className="shrink-0 rounded p-0.5 text-ink-muted hover:bg-border hover:text-ink" title="Cancel reply">
+          <button type="button" onClick={onCancelReply} className="shrink-0 rounded p-0.5 text-ink-muted hover:bg-border hover:text-ink" title={t("chat.composer.cancelReply")}>
             <Icon name="close" className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -110,7 +112,7 @@ export function Composer({
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-50"
-          title="Attach a file"
+          title={t("chat.composer.attachFile")}
         >
           <Icon name="plus" className="h-5 w-5" />
         </button>
@@ -129,7 +131,7 @@ export function Composer({
               }
             }}
             rows={1}
-            placeholder="Message"
+            placeholder={t("chat.composer.placeholder")}
             className="min-w-0 max-h-32 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none"
           />
           {/* While listening, this stays the (pulsing) stop control even once
@@ -142,7 +144,7 @@ export function Composer({
               type="button"
               onClick={toggleListening}
               className="flex h-8 w-8 shrink-0 animate-pulse items-center justify-center rounded-full bg-red-500 text-white"
-              title="Stop dictation"
+              title={t("chat.composer.stopDictation")}
             >
               <Icon name="mic" className="h-4 w-4" />
             </button>
@@ -151,7 +153,7 @@ export function Composer({
               type="button"
               onClick={toggleListening}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-border hover:text-ink"
-              title="Dictate"
+              title={t("chat.composer.dictate")}
             >
               <Icon name="mic" className="h-4 w-4" />
             </button>
@@ -162,7 +164,7 @@ export function Composer({
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
                 hasContent ? "bg-accent text-white hover:opacity-90" : "text-ink-muted"
               } disabled:opacity-40`}
-              title="Send"
+              title={t("chat.composer.send")}
             >
               <Icon name="arrow-up" className="h-4 w-4" />
             </button>

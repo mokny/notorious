@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { Workspace } from "@notorious/shared";
 import { workspaceApi, fileApi } from "../../lib/api/resources.js";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave.js";
@@ -9,6 +10,7 @@ import { IconPicker } from "../IconPicker.js";
 import { Icon } from "../ui/Icon.js";
 
 export function WorkspaceGeneralSettings() {
+  const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const queryClient = useQueryClient();
   const { data: workspace } = useQuery({ queryKey: ["workspace", workspaceId], queryFn: () => workspaceApi.get(workspaceId!) });
@@ -69,8 +71,13 @@ export function WorkspaceGeneralSettings() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-ink-muted">Rename "{workspace.name}", pick an icon, or upload your own image.</p>
-      <TextField value={name} onChange={(e) => setName(e.target.value)} className="max-w-sm" aria-label="Workspace name" />
+      <p className="text-sm text-ink-muted">{t("settings.workspace.general.description", { name: workspace.name })}</p>
+      <TextField
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="max-w-sm"
+        aria-label={t("settings.workspace.general.nameLabel")}
+      />
       <IconPicker
         icon={workspace.icon}
         fallbackIcon={workspace.icon}
@@ -81,19 +88,19 @@ export function WorkspaceGeneralSettings() {
         }}
       />
       <label className="flex max-w-sm items-center justify-between gap-2 text-sm">
-        <span>Calendar week starts on</span>
+        <span>{t("settings.workspace.general.weekStart")}</span>
         <select
           value={workspace.weekStartsOn}
           onChange={(e) => updateWeekStartMutation.mutate(e.target.value as "sunday" | "monday")}
           className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
         >
-          <option value="sunday">Sunday</option>
-          <option value="monday">Monday</option>
+          <option value="sunday">{t("settings.workspace.general.sunday")}</option>
+          <option value="monday">{t("settings.workspace.general.monday")}</option>
         </select>
       </label>
       <div className="max-w-sm space-y-2">
         <div className="flex items-center justify-between gap-2 text-sm">
-          <span>Cover height</span>
+          <span>{t("settings.workspace.general.coverHeight")}</span>
           <span className="text-ink-muted">{coverHeight}px</span>
         </div>
         <input
@@ -105,7 +112,7 @@ export function WorkspaceGeneralSettings() {
           onPointerUp={(e) => updateCoverHeightMutation.mutate(Number(e.currentTarget.value))}
           onKeyUp={(e) => updateCoverHeightMutation.mutate(Number(e.currentTarget.value))}
           className="w-full accent-accent"
-          aria-label="Cover height"
+          aria-label={t("settings.workspace.general.coverHeight")}
         />
         <div
           className="flex w-full items-center justify-center rounded-lg bg-gradient-to-br from-accent/30 to-accent/10 text-ink-muted"
@@ -116,62 +123,59 @@ export function WorkspaceGeneralSettings() {
       </div>
 
       <div className="max-w-sm space-y-3 border-t border-border pt-4">
-        <p className="text-sm text-ink-muted">
-          Automatically downscale uploaded images that exceed these pixel dimensions, re-encoding them as WebP. Leave a field empty for no
-          limit (disabled by default).
-        </p>
+        <p className="text-sm text-ink-muted">{t("settings.workspace.general.imageLimitsDescription")}</p>
         <div className="space-y-1.5">
-          <span className="text-sm font-medium">Normal images (max size)</span>
+          <span className="text-sm font-medium">{t("settings.workspace.general.normalImages")}</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
               min={1}
-              placeholder="Width"
+              placeholder={t("settings.workspace.general.width")}
               defaultValue={workspace.imageMaxWidth ?? ""}
               onBlur={(e) => updateImageLimitsMutation.mutate({ imageMaxWidth: parseLimitInput(e.target.value) })}
               className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
-              aria-label="Max image width"
+              aria-label={t("settings.workspace.general.maxImageWidth")}
             />
             <span className="text-ink-muted">×</span>
             <input
               type="number"
               min={1}
-              placeholder="Height"
+              placeholder={t("settings.workspace.general.height")}
               defaultValue={workspace.imageMaxHeight ?? ""}
               onBlur={(e) => updateImageLimitsMutation.mutate({ imageMaxHeight: parseLimitInput(e.target.value) })}
               className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
-              aria-label="Max image height"
+              aria-label={t("settings.workspace.general.maxImageHeight")}
             />
             <span className="text-ink-muted">px</span>
           </div>
         </div>
         <div className="space-y-1.5">
-          <span className="text-sm font-medium">Cover images (max size)</span>
+          <span className="text-sm font-medium">{t("settings.workspace.general.coverImages")}</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
               min={1}
-              placeholder="Width"
+              placeholder={t("settings.workspace.general.width")}
               defaultValue={workspace.coverMaxWidth ?? ""}
               onBlur={(e) => updateImageLimitsMutation.mutate({ coverMaxWidth: parseLimitInput(e.target.value) })}
               className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
-              aria-label="Max cover width"
+              aria-label={t("settings.workspace.general.maxCoverWidth")}
             />
             <span className="text-ink-muted">×</span>
             <input
               type="number"
               min={1}
-              placeholder="Height"
+              placeholder={t("settings.workspace.general.height")}
               defaultValue={workspace.coverMaxHeight ?? ""}
               onBlur={(e) => updateImageLimitsMutation.mutate({ coverMaxHeight: parseLimitInput(e.target.value) })}
               className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
-              aria-label="Max cover height"
+              aria-label={t("settings.workspace.general.maxCoverHeight")}
             />
             <span className="text-ink-muted">px</span>
           </div>
         </div>
         <label className="flex items-center justify-between gap-2 text-sm">
-          <span>WebP quality when resizing</span>
+          <span>{t("settings.workspace.general.webpQuality")}</span>
           <input
             type="number"
             min={1}
@@ -182,7 +186,7 @@ export function WorkspaceGeneralSettings() {
               if (Number.isFinite(n) && n >= 1 && n <= 100) updateImageLimitsMutation.mutate({ imageQuality: Math.round(n) });
             }}
             className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-sm"
-            aria-label="WebP quality"
+            aria-label={t("settings.workspace.general.webpQuality")}
           />
         </label>
       </div>

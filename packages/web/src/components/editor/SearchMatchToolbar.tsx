@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../ui/Icon.js";
 
 interface SearchMatchToolbarProps {
@@ -28,6 +29,7 @@ interface SearchMatchToolbarProps {
  * none`.
  */
 export function SearchMatchToolbar({ current, total, onPrev, onNext, onClose }: SearchMatchToolbarProps) {
+  const { t } = useTranslation();
   return createPortal(
     <div
       className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
@@ -41,13 +43,11 @@ export function SearchMatchToolbar({ current, total, onPrev, onNext, onClose }: 
       style={{ top: "calc(env(safe-area-inset-top, 0px) + 56px)" }}
     >
       <div className="pointer-events-auto flex items-center gap-1 rounded-lg bg-ink px-2 py-1.5 text-sm text-surface shadow-xl [@media(pointer:coarse)]:gap-1.5 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2 [@media(pointer:coarse)]:text-base">
-        <span className="px-2 tabular-nums">
-          {current} of {total}
-        </span>
+        <span className="px-2 tabular-nums">{t("editor.search.matchCount", { current, total })}</span>
         <button
           type="button"
           onClick={onPrev}
-          title="Previous match"
+          title={t("editor.search.previousMatch")}
           className="rounded p-1 hover:bg-surface/10 [@media(pointer:coarse)]:p-2.5"
         >
           <Icon name="chevron-up" className="h-4 w-4 [@media(pointer:coarse)]:h-5 [@media(pointer:coarse)]:w-5" />
@@ -55,7 +55,7 @@ export function SearchMatchToolbar({ current, total, onPrev, onNext, onClose }: 
         <button
           type="button"
           onClick={onNext}
-          title="Next match"
+          title={t("editor.search.nextMatch")}
           className="rounded p-1 hover:bg-surface/10 [@media(pointer:coarse)]:p-2.5"
         >
           <Icon name="chevron-down" className="h-4 w-4 [@media(pointer:coarse)]:h-5 [@media(pointer:coarse)]:w-5" />
@@ -63,7 +63,7 @@ export function SearchMatchToolbar({ current, total, onPrev, onNext, onClose }: 
         <button
           type="button"
           onClick={onClose}
-          title="Close"
+          title={t("editor.search.close")}
           className="rounded p-1 hover:bg-surface/10 [@media(pointer:coarse)]:p-2.5"
         >
           <Icon name="close" className="h-4 w-4 [@media(pointer:coarse)]:h-5 [@media(pointer:coarse)]:w-5" />

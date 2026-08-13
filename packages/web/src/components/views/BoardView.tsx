@@ -1,5 +1,6 @@
 import { useMemo, type PointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import type { ObjectRecord, Property, PropertyOption } from "@notorious/shared";
 import { useObjectMutations } from "../../hooks/useObjectMutations.js";
@@ -18,6 +19,7 @@ interface BoardViewProps {
 const UNASSIGNED = "__unassigned__";
 
 export function BoardView({ workspaceId, items, properties, pivotPropertyId, onOpenObject }: BoardViewProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const mutations = useObjectMutations(workspaceId);
@@ -58,7 +60,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
   }
 
   if (!pivot) {
-    return <p className="p-6 text-sm text-ink-muted">Pick a status/select property as this board's column property in view settings.</p>;
+    return <p className="p-6 text-sm text-ink-muted">{t("views.board.noPivotProperty")}</p>;
   }
 
   return (
@@ -74,7 +76,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
       <div className={stacked ? "flex h-full flex-col gap-4 overflow-y-auto p-4" : "flex h-full gap-4 overflow-x-auto p-4"}>
         <BoardColumn
           id={UNASSIGNED}
-          title="No status"
+          title={t("views.board.noStatus")}
           color="#94a3b8"
           items={columns.get(UNASSIGNED) ?? []}
           onOpenObject={openObject}
@@ -145,6 +147,7 @@ function BoardCard({
   onOpen: () => void;
   onTouchArmStart: (event: PointerEvent) => void;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: item.id });
 
   return (
@@ -157,7 +160,7 @@ function BoardCard({
       style={transform ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 10 } : undefined}
       className={`cursor-pointer rounded-lg border border-border bg-surface p-2.5 text-sm shadow-sm hover:ring-2 hover:ring-accent/30 ${isDragging ? "opacity-60" : ""}`}
     >
-      {item.title || "Untitled"}
+      {item.title || t("nav.untitled")}
     </div>
   );
 }

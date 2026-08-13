@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -94,6 +95,7 @@ export function BlockEditor({
   highlightQuery = null,
   onCloseHighlight,
 }: BlockEditorProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const resolvedEmbedAncestorIds = embedAncestorIds ?? [objectId];
   // Only ever set by SubObjectBlock.tsx's own nested render (see its "embed"
@@ -650,7 +652,7 @@ export function BlockEditor({
         {(isDragOver || isUploadingFiles) && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-accent bg-accent/5">
             <p className="rounded-lg bg-surface px-4 py-2 text-sm font-medium text-accent shadow-lg">
-              {isUploadingFiles ? "Uploading…" : "Drop files to attach them"}
+              {isUploadingFiles ? t("editor.dropzone.uploading") : t("editor.dropzone.dropToAttach")}
             </p>
           </div>
         )}
@@ -672,7 +674,7 @@ export function BlockEditor({
 
       {showUndoToast && (
         <UndoToast
-          message="Block deleted"
+          message={t("editor.undoToast.blockDeleted")}
           onUndo={() => {
             history.undo();
             setShowUndoToast(false);

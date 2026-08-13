@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPopper } from "@popperjs/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { BlockType } from "@notorious/shared";
@@ -19,6 +20,7 @@ interface BlockListProps {
 
 /** Renders one nesting level's siblings as a sortable list, with an "add block" affordance at the end. */
 export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: BlockListProps) {
+  const { t } = useTranslation();
   const { createBlockAfter, objectTypes } = useBlockEditor();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -60,7 +62,7 @@ export function BlockList({ blocks, parentBlockId, extraContentForNewBlocks }: B
               : "flex items-center gap-1 rounded-md px-3 py-2 text-sm text-ink-muted hover:bg-surface-raised"
           }
         >
-          <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> Add block
+          <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> {t("editor.blockList.addBlock")}
         </button>
         {/* z-50 (not z-20 like most editor popups) so it clears the mobile
             bottom bar / bottom fade gradient (both z-20, and later in

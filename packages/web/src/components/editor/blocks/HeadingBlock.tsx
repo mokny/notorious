@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { HeadingContent } from "@notorious/shared";
 import { TemplatableMarkdown } from "../TemplatableMarkdown.js";
 import { useFocusWithin } from "../../../hooks/useFocusWithin.js";
@@ -19,6 +20,7 @@ interface HeadingBlockProps {
 }
 
 export function HeadingBlock({ blockId, content, onSave, onEnter, onBackspaceEmpty, autoFocus, onAutoFocused }: HeadingBlockProps) {
+  const { t } = useTranslation();
   const { isFocused, containerRef, handlers } = useFocusWithin<HTMLDivElement>();
 
   return (
@@ -43,7 +45,7 @@ export function HeadingBlock({ blockId, content, onSave, onEnter, onBackspaceEmp
           field="markdown"
           markdown={content.markdown ?? ""}
           className="tiptap flex-1"
-          placeholder="Heading"
+          placeholder={t("editor.blocks.heading.placeholder")}
           onSave={(markdown) => onSave({ ...content, markdown })}
           onEnter={onEnter}
           onBackspaceEmpty={onBackspaceEmpty}

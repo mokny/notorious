@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -27,6 +28,7 @@ function resizeTextarea(el: HTMLTextAreaElement | null): void {
 const CHECKED_MOVE_DELAY_MS = 2000;
 
 function ChecklistSettingsPopover({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -38,7 +40,7 @@ function ChecklistSettingsPopover({ enabled, onChange }: { enabled: boolean; onC
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        title="Checklist settings"
+        title={t("editor.blocks.checklist.settingsTitle")}
         className="shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/block:opacity-100"
       >
         <Icon name="settings" className="h-3.5 w-3.5" />
@@ -51,7 +53,7 @@ function ChecklistSettingsPopover({ enabled, onChange }: { enabled: boolean; onC
         >
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" className="accent-accent" checked={enabled} onChange={(e) => onChange(e.target.checked)} />
-            Move checked items to the bottom after 2s
+            {t("editor.blocks.checklist.moveCheckedToBottom")}
           </label>
         </div>
       )}
@@ -113,6 +115,7 @@ function ChecklistItemRow({
    */
   autoFocus: boolean;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   // Same touch-vs-hover split as BlockItem.tsx: no real hover means the
   // handle/delete buttons disappear entirely (not just opacity-hidden) to
@@ -180,7 +183,7 @@ function ChecklistItemRow({
             {...listeners}
             onPointerDownCapture={onTouchArmStart}
             className="mt-1 shrink-0 cursor-grab rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/checklistitem:opacity-100"
-            title="Drag to reorder item"
+            title={t("editor.blocks.checklist.dragToReorder")}
           >
             <Icon name="grip-vertical" className="h-3.5 w-3.5" />
           </button>
@@ -256,7 +259,7 @@ function ChecklistItemRow({
               setSearchPreviewOverridden(false);
             }}
             readOnly={readOnly}
-            placeholder="To-do"
+            placeholder={t("editor.blocks.checklist.placeholder")}
             autoComplete="off"
             rows={1}
             className={`flex-1 resize-none overflow-hidden border-none bg-transparent py-0.5 text-sm outline-none ${
@@ -305,6 +308,7 @@ export function ChecklistBlock({
   autoFocus?: boolean;
   onAutoFocused?: () => void;
 }) {
+  const { t } = useTranslation();
   const { readOnly, searchHighlight } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const items = useMemo(() => content.items ?? [], [content.items]);
@@ -677,10 +681,10 @@ export function ChecklistBlock({
           hasHover ? "text-xs" : "px-2 py-1.5 text-sm"
         }`}
       >
-        <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> Add item
+        <Icon name="plus" className={hasHover ? "h-3 w-3" : "h-4 w-4"} /> {t("editor.blocks.checklist.addItem")}
       </button>
 
-      {undoSnapshot && <UndoToast message="Item deleted" onUndo={undoSwipeDelete} />}
+      {undoSnapshot && <UndoToast message={t("editor.blocks.checklist.itemDeleted")} onUndo={undoSwipeDelete} />}
     </div>
   );
 }

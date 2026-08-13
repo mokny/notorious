@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import type { Message } from "@notorious/shared";
 import { chatApi, systemApi, callApi } from "../../lib/api/resources.js";
@@ -25,6 +26,7 @@ export function ThreadView({ conversationId, onBack }: { conversationId: string;
 }
 
 function RealThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { setFocusedConversation, onTyping, onCallRing, onCallParticipants, onCallEnded } = useChatRealtime();
@@ -338,14 +340,14 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
           otherParticipant && <ChatAvatar name={otherParticipant.name} avatarColor={otherParticipant.avatarColor} avatarUrl={otherParticipant.avatarUrl} size={7} />
         )}
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-          {conversation ? (conversation.type === "workspace_channel" ? `# ${conversation.name}` : conversation.name) : "Chat"}
+          {conversation ? (conversation.type === "workspace_channel" ? `# ${conversation.name}` : conversation.name) : t("chat.thread.chatFallback")}
         </span>
         {callsEnabled &&
           (isInThisCall ? (
             <button
               onClick={() => void call.leaveCall()}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-white hover:opacity-90"
-              title="Leave call"
+              title={t("chat.thread.leaveCall")}
             >
               <Icon name="phone-off" className="h-4 w-4" />
             </button>
@@ -354,7 +356,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
               onClick={() => (activeCall ? call.requestJoinCall(activeCall.callId, conversationId) : call.requestStartCall(conversationId))}
               disabled={call.phase !== "idle"}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-40"
-              title="Call"
+              title={t("chat.thread.call")}
             >
               <Icon name="phone" className="h-4 w-4" />
             </button>
@@ -365,21 +367,21 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
         <div className="flex items-center justify-between gap-2 border-b border-border bg-accent/10 px-3 py-2">
           <span className="flex items-center gap-1.5 text-xs font-medium text-accent">
             <Icon name="phone" className="h-3.5 w-3.5" />
-            Call in progress · {activeCall.participantUserIds.length} {activeCall.participantUserIds.length === 1 ? "participant" : "participants"}
+            {t("chat.thread.callInProgress", { count: activeCall.participantUserIds.length })}
           </span>
           <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => call.requestJoinCall(activeCall.callId, conversationId)}
               disabled={call.phase !== "idle"}
               className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white hover:opacity-90 disabled:opacity-50"
-              title="Join call"
+              title={t("chat.thread.joinCall")}
             >
               <Icon name="phone" className="h-6 w-6" />
             </button>
             <button
               onClick={() => call.ignoreActiveCall(activeCall.callId)}
               className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white hover:opacity-90"
-              title="Ignore"
+              title={t("chat.thread.ignore")}
             >
               <Icon name="phone-off" className="h-6 w-6" />
             </button>
@@ -416,7 +418,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
                 </div>
               );
             })}
-            {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{typingUserName} is typing…</p>}
+            {typingUserName && <p className="px-4 py-1 text-xs italic text-ink-muted">{t("chat.thread.typing", { name: typingUserName })}</p>}
           </div>
         </div>
 

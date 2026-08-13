@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ImageContent, VideoContent, EmbedContent, PdfContent, AudioContent, FileContent } from "@notorious/shared";
 import { fileApi } from "../../../lib/api/resources.js";
 import { withShareToken } from "../../../lib/api/shareMode.js";
@@ -19,11 +20,12 @@ interface MediaProps<T> {
 }
 
 function UrlPrompt({ onSave, label }: { onSave: (url: string) => void; label: string }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 text-sm text-ink-muted">
       <Icon name="image" className="h-4 w-4" />
       <input
-        placeholder={`Paste a ${label} URL, or upload below`}
+        placeholder={t("editor.blocks.media.urlPromptPlaceholder", { label })}
         className="flex-1 border-none bg-transparent outline-none"
         onKeyDown={(e) => {
           if (e.key === "Enter") onSave((e.target as HTMLInputElement).value);
@@ -34,6 +36,7 @@ function UrlPrompt({ onSave, label }: { onSave: (url: string) => void; label: st
 }
 
 export function ImageBlock({ content: externalContent, workspaceId, objectId, onSave }: MediaProps<ImageContent>) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [content, save] = useDebouncedSave(externalContent, onSave);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -55,7 +58,7 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
           ) : (
             <button
               type="button"
-              title="Click to enlarge"
+              title={t("editor.blocks.media.clickToEnlarge")}
               // A view action, not an edit - stays clickable even while the
               // object is locked (see readOnlyContent.ts's blanket
               // `button:not([data-view-toggle])` rule).
@@ -92,7 +95,7 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
           <a
             href={withShareToken(content.url)}
             download
-            title="Download image"
+            title={t("editor.blocks.media.downloadImage")}
             data-view-toggle
             className="absolute right-2 top-2 rounded-md bg-black/40 p-1.5 text-white opacity-0 transition-opacity hover:bg-black/60 group-hover:opacity-100"
           >
@@ -101,7 +104,7 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
         </div>
         {showCaptionPreview ? (
           <div onClick={() => setCaptionPreviewOverridden(true)} className="mt-1 w-full cursor-text text-center text-xs text-ink-muted">
-            <HighlightedText text={content.caption || "Caption"} terms={searchTerms} />
+            <HighlightedText text={content.caption || t("editor.blocks.media.captionPlaceholder")} terms={searchTerms} />
           </div>
         ) : (
           <input
@@ -109,7 +112,7 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
             onChange={(e) => save({ ...content, caption: e.target.value })}
             onBlur={() => setCaptionPreviewOverridden(false)}
             autoFocus={captionPreviewOverridden}
-            placeholder="Caption"
+            placeholder={t("editor.blocks.media.captionPlaceholder")}
             className="mt-1 w-full border-none bg-transparent text-center text-xs text-ink-muted outline-none"
           />
         )}
@@ -119,9 +122,9 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
 
   return (
     <div className="space-y-2">
-      <UrlPrompt label="image" onSave={(url) => save({ ...content, url })} />
+      <UrlPrompt label={t("editor.blocks.media.labelImage")} onSave={(url) => save({ ...content, url })} />
       <button onClick={() => inputRef.current?.click()} className="text-xs text-accent hover:underline">
-        Or upload a file…
+        {t("editor.blocks.media.orUploadFile")}
       </button>
       <input
         ref={inputRef}
@@ -140,6 +143,7 @@ export function ImageBlock({ content: externalContent, workspaceId, objectId, on
 }
 
 export function VideoBlock({ content, workspaceId, objectId, onSave }: MediaProps<VideoContent>) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const exportMode = useExportMode();
 
@@ -164,9 +168,9 @@ export function VideoBlock({ content, workspaceId, objectId, onSave }: MediaProp
 
   return (
     <div className="space-y-2">
-      <UrlPrompt label="video" onSave={(url) => onSave({ ...content, url })} />
+      <UrlPrompt label={t("editor.blocks.media.labelVideo")} onSave={(url) => onSave({ ...content, url })} />
       <button onClick={() => inputRef.current?.click()} className="text-xs text-accent hover:underline">
-        Or upload a file…
+        {t("editor.blocks.media.orUploadFile")}
       </button>
       <input
         ref={inputRef}
@@ -185,6 +189,7 @@ export function VideoBlock({ content, workspaceId, objectId, onSave }: MediaProp
 }
 
 export function EmbedBlock({ content, onSave }: { content: EmbedContent; onSave: (c: EmbedContent) => void }) {
+  const { t } = useTranslation();
   if (content.url) {
     // Dropping a PDF/audio file into the editor also lands here (see
     // blockForDroppedFile in BlockEditor.tsx) - that content is our own,
@@ -203,7 +208,7 @@ export function EmbedBlock({ content, onSave }: { content: EmbedContent; onSave:
       />
     );
   }
-  return <UrlPrompt label="page to embed" onSave={(url) => onSave({ ...content, url })} />;
+  return <UrlPrompt label={t("editor.blocks.media.labelEmbedPage")} onSave={(url) => onSave({ ...content, url })} />;
 }
 
 function formatFileSize(bytes: number): string {
@@ -220,12 +225,13 @@ function formatFileSize(bytes: number): string {
 
 /** Generic "upload a file, no URL-paste option" prompt - unlike UrlPrompt, pdf/audio/file blocks have no meaningful remote-URL use case (the whole point is a locally uploaded file), so this only ever shows the upload button. */
 function UploadPrompt({ label, accept, onUpload }: { label: string; accept: string; onUpload: (file: File) => void }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 text-sm text-ink-muted">
       <Icon name="upload" className="h-4 w-4 shrink-0" />
       <button onClick={() => inputRef.current?.click()} className="text-accent hover:underline">
-        Upload {label}…
+        {t("editor.blocks.media.uploadLabel", { label })}
       </button>
       <input
         ref={inputRef}
@@ -243,12 +249,13 @@ function UploadPrompt({ label, accept, onUpload }: { label: string; accept: stri
 
 /** A dropped/uploaded PDF (see PdfContent) - shown as a collapsible card rather than loading the PDF up front like EmbedBlock's iframe does for a pasted embed URL: the iframe only mounts once expanded, so a document-heavy object doesn't pay to load every PDF in it just to render the page. */
 export function PdfBlock({ content, workspaceId, objectId, onSave }: MediaProps<PdfContent>) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   if (!content.url) {
     return (
       <UploadPrompt
-        label="a PDF"
+        label={t("editor.blocks.media.labelPdf")}
         accept="application/pdf"
         onUpload={async (file) => {
           const asset = await fileApi.upload(workspaceId, file, objectId);
@@ -275,7 +282,7 @@ export function PdfBlock({ content, workspaceId, objectId, onSave }: MediaProps<
         <a
           href={withShareToken(content.url)}
           download={content.filename}
-          title="Download"
+          title={t("editor.blocks.media.download")}
           data-view-toggle
           className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
         >
@@ -293,10 +300,11 @@ export function PdfBlock({ content, workspaceId, objectId, onSave }: MediaProps<
 
 /** A dropped/uploaded audio file (see AudioContent) - a native HTML5 player, unlike EmbedBlock's iframe which audio used to fall back to. */
 export function AudioBlock({ content, workspaceId, objectId, onSave }: MediaProps<AudioContent>) {
+  const { t } = useTranslation();
   if (!content.url) {
     return (
       <UploadPrompt
-        label="audio"
+        label={t("editor.blocks.media.labelAudio")}
         accept="audio/*"
         onUpload={async (file) => {
           const asset = await fileApi.upload(workspaceId, file, objectId);
@@ -320,10 +328,11 @@ export function AudioBlock({ content, workspaceId, objectId, onSave }: MediaProp
 
 /** Catch-all for a dropped/uploaded file that isn't an image/video/pdf/audio (see FileContent) - just an icon+name+size download card, no inline preview. */
 export function FileBlock({ content, workspaceId, objectId, onSave }: MediaProps<FileContent>) {
+  const { t } = useTranslation();
   if (!content.url) {
     return (
       <UploadPrompt
-        label="a file"
+        label={t("editor.blocks.media.labelFile")}
         accept="*/*"
         onUpload={async (file) => {
           const asset = await fileApi.upload(workspaceId, file, objectId);

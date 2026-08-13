@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useTranslation } from "react-i18next";
 import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { Icon } from "./Icon.js";
 import { ImageLoadError } from "./ImageLoadError.js";
@@ -54,6 +55,7 @@ function clampTranslate(scale: number, x: number, y: number, container: HTMLElem
  * stays in one place instead of two parallel implementations.
  */
 export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProps) {
+  const { t } = useTranslation();
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
   // Only the double-tap/double-click snap should animate - pan/pinch/wheel
   // already fire one update per input event, so transitioning each of those
@@ -191,7 +193,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
           }}
           className="fixed inset-0 z-50 flex touch-none select-none items-center justify-center overflow-hidden p-8 outline-none"
         >
-          <Dialog.Title className="sr-only">{image.alt || "Image"}</Dialog.Title>
+          <Dialog.Title className="sr-only">{image.alt || t("ui.lightbox.image")}</Dialog.Title>
           {robustImage.failed ? (
             <ImageLoadError onRetry={robustImage.retry} className="h-40 w-64 rounded-lg" />
           ) : (
@@ -216,7 +218,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
           {hasMultiple && index > 0 && (
             <button
               type="button"
-              title="Previous"
+              title={t("ui.lightbox.previous")}
               onClick={() => onIndexChange(index - 1)}
               className="fixed left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60"
             >
@@ -226,7 +228,7 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
           {hasMultiple && index < images.length - 1 && (
             <button
               type="button"
-              title="Next"
+              title={t("ui.lightbox.next")}
               onClick={() => onIndexChange(index + 1)}
               className="fixed right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60"
             >
@@ -237,12 +239,12 @@ export function Lightbox({ images, index, onIndexChange, onClose }: LightboxProp
           <a
             href={image.src}
             download={image.downloadName ?? true}
-            title="Download image"
+            title={t("ui.lightbox.download")}
             className="fixed right-16 top-4 rounded-md bg-black/40 p-2 text-white hover:bg-black/60"
           >
             <Icon name="download" className="h-5 w-5" />
           </a>
-          <Dialog.Close title="Close" className="fixed right-4 top-4 rounded-md bg-black/40 p-2 text-white hover:bg-black/60">
+          <Dialog.Close title={t("ui.lightbox.close")} className="fixed right-4 top-4 rounded-md bg-black/40 p-2 text-white hover:bg-black/60">
             <Icon name="close" className="h-5 w-5" />
           </Dialog.Close>
         </Dialog.Content>

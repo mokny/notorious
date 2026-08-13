@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Fingerprint } from "lucide-react";
@@ -10,6 +11,7 @@ import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const { user, refetch } = useAuth();
   const navigate = useNavigate();
   const [method, setMethod] = useState<"password" | "passkey">("password");
@@ -47,7 +49,7 @@ export function RegisterPage() {
       await refetch();
       navigate("/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Registration failed");
+      setError(err instanceof ApiError ? err.message : t("register.registrationFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -68,7 +70,7 @@ export function RegisterPage() {
         setSubmitting(false);
         return;
       }
-      setError(err instanceof ApiError ? err.message : "Passkey registration failed");
+      setError(err instanceof ApiError ? err.message : t("register.passkeyRegistrationFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -78,13 +80,12 @@ export function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold">Create your account</h1>
-          <p className="mt-1 text-sm text-ink-muted">A personal workspace is created automatically</p>
+          <h1 className="text-2xl font-semibold">{t("register.title")}</h1>
+          <p className="mt-1 text-sm text-ink-muted">{t("register.subtitle")}</p>
         </div>
         {registrationStatus?.enabled === false && (
           <p className="rounded-lg border border-border bg-surface-raised p-3 text-sm text-ink-muted">
-            Open registration is currently disabled on this instance. If a workspace owner invited you, you can still
-            create your account below - just use the email address the invite was sent to.
+            {t("register.registrationDisabled")}
           </p>
         )}
         <div className="space-y-3 rounded-xl border border-border bg-surface-raised p-6">
@@ -98,7 +99,7 @@ export function RegisterPage() {
                   setError(null);
                 }}
               >
-                Password
+                {t("register.password")}
               </button>
               <button
                 type="button"
@@ -108,18 +109,18 @@ export function RegisterPage() {
                   setError(null);
                 }}
               >
-                Passkey
+                {t("register.passkey")}
               </button>
             </div>
           )}
 
           {method === "password" ? (
             <form onSubmit={handleSubmit} className="space-y-3">
-              <TextField placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required />
-              <TextField type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <TextField placeholder={t("register.fullNamePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} required />
+              <TextField type="email" placeholder={t("login.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} required />
               <TextField
                 type="password"
-                placeholder="Password (min. 8 characters)"
+                placeholder={t("register.passwordPlaceholder")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={8}
@@ -127,25 +128,25 @@ export function RegisterPage() {
               />
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button type="submit" variant="primary" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Creating account…" : "Create account"}
+                {isSubmitting ? t("register.creatingAccount") : t("register.createAccount")}
               </Button>
             </form>
           ) : (
             <form onSubmit={handlePasskeySubmit} className="space-y-3">
-              <TextField placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required />
-              <TextField type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <TextField placeholder={t("register.fullNamePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} required />
+              <TextField type="email" placeholder={t("login.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} required />
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button type="submit" variant="primary" className="w-full" disabled={isSubmitting}>
                 <Fingerprint className="size-4" />
-                {isSubmitting ? "Waiting for passkey…" : "Create account with a passkey"}
+                {isSubmitting ? t("login.waitingForPasskey") : t("register.createAccountWithPasskey")}
               </Button>
             </form>
           )}
         </div>
         <p className="text-center text-sm text-ink-muted">
-          Already have an account?{" "}
+          {t("register.alreadyHaveAccount")}{" "}
           <Link to="/login" className="text-accent hover:underline">
-            Sign in
+            {t("login.signIn")}
           </Link>
         </p>
       </div>

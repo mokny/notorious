@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { Property, PropertyValue } from "@notorious/shared";
 import { TagPicker } from "./TagPicker.js";
 import { RelationPicker } from "./RelationPicker.js";
@@ -30,6 +31,7 @@ export function PropertyField({
   onRelationAdd,
   onRelationRemove,
 }: PropertyFieldProps) {
+  const { t } = useTranslation();
   const config = property.config;
 
   switch (config.type) {
@@ -42,7 +44,7 @@ export function PropertyField({
           {value as string}
         </a>
       ) : (
-        <DebouncedTextInput className={inputClass} type="url" placeholder="https://…" value={(value as string) ?? ""} onSave={onChange} />
+        <DebouncedTextInput className={inputClass} type="url" placeholder={t("properties.field.urlPlaceholder")} value={(value as string) ?? ""} onSave={onChange} />
       );
 
     case "email":
@@ -97,7 +99,7 @@ export function PropertyField({
       return (
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 text-xs text-ink-muted">
-            Start
+            {t("properties.field.start")}
             <input
               className={inputClass}
               type="date"
@@ -112,7 +114,7 @@ export function PropertyField({
             />
           </label>
           <label className="flex items-center gap-1 text-xs text-ink-muted">
-            End
+            {t("properties.field.end")}
             <input
               className={inputClass}
               type="date"
@@ -180,10 +182,10 @@ export function PropertyField({
       );
 
     case "formula":
-      return <span className="text-sm text-ink-muted">{formatComputed(value)} (formula)</span>;
+      return <span className="text-sm text-ink-muted">{formatComputed(value)} {t("properties.field.formulaSuffix")}</span>;
 
     case "rollup":
-      return <span className="text-sm text-ink-muted">{formatComputed(value)} (rollup)</span>;
+      return <span className="text-sm text-ink-muted">{formatComputed(value)} {t("properties.field.rollupSuffix")}</span>;
 
     default:
       return null;

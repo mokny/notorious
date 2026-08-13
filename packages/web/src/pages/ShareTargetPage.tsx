@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import type { ShareInboxItem } from "@notorious/shared";
@@ -18,6 +19,7 @@ function titleSeedFor(item: ShareInboxItem): string {
 }
 
 export function ShareTargetPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -49,10 +51,10 @@ export function ShareTargetPage() {
           });
           setInboxItem(await shareTargetApi.inbox(id));
         } else {
-          setResolveError("Nothing was shared.");
+          setResolveError(t("shareTarget.nothingShared"));
         }
       } catch {
-        setResolveError("This shared content has expired or was already used.");
+        setResolveError(t("shareTarget.contentExpired"));
       }
     }
     void resolve();
@@ -154,16 +156,18 @@ export function ShareTargetPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col gap-5 p-6">
-      <h1 className="text-lg font-semibold text-ink">Share to Notorious</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("shareTarget.title")}</h1>
 
       <div className="rounded-lg border border-border bg-surface-raised p-3 text-sm text-ink-muted">
-        {inboxItem.kind === "files" && <p>{inboxItem.files.length} file(s): {inboxItem.files.map((f) => f.filename).join(", ")}</p>}
+        {inboxItem.kind === "files" && (
+          <p>{t("shareTarget.filesCount", { count: inboxItem.files.length, files: inboxItem.files.map((f) => f.filename).join(", ") })}</p>
+        )}
         {inboxItem.kind === "url" && <p>{inboxItem.url}</p>}
         {inboxItem.kind === "text" && <p className="line-clamp-3">{inboxItem.text}</p>}
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium text-ink">
-        Workspace
+        {t("shareTarget.workspaceLabel")}
         <select
           className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40"
           value={workspaceId}
@@ -179,15 +183,15 @@ export function ShareTargetPage() {
 
       <div className="flex gap-2">
         <Button variant={action === "create" ? "primary" : "secondary"} className="flex-1" onClick={() => setAction("create")}>
-          Create new object
+          {t("shareTarget.createNewObject")}
         </Button>
         <Button variant={action === "append" ? "primary" : "secondary"} className="flex-1" onClick={() => setAction("append")}>
-          Add to existing object
+          {t("shareTarget.addToExisting")}
         </Button>
       </div>
 
       <label className="flex flex-col gap-1 text-sm font-medium text-ink">
-        Object type
+        {t("shareTarget.objectTypeLabel")}
         <select
           className="rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/40"
           value={objectTypeId}
@@ -206,15 +210,17 @@ export function ShareTargetPage() {
 
       {action === "create" ? (
         <label className="flex flex-col gap-1 text-sm font-medium text-ink">
-          Title
-          <TextField value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Untitled" />
+          {t("shareTarget.titleLabel")}
+          <TextField value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("nav.untitled")} />
         </label>
       ) : (
         <div className="flex flex-col gap-2">
           <TextField
             value={objectFilter}
             onChange={(e) => setObjectFilter(e.target.value)}
-            placeholder={`Search ${sortedObjectTypes.find((t) => t.id === objectTypeId)?.name ?? "objects"}...`}
+            placeholder={t("shareTarget.searchPlaceholder", {
+              type: sortedObjectTypes.find((ot) => ot.id === objectTypeId)?.name ?? t("shareTarget.objectsFallback"),
+            })}
           />
           <div className="max-h-60 overflow-y-auto rounded-lg border border-border">
             {filteredObjects.map((object) => (
@@ -225,18 +231,18 @@ export function ShareTargetPage() {
                   targetObjectId === object.id ? "bg-accent/10 text-accent" : "text-ink"
                 }`}
               >
-                {object.title || "Untitled"}
+                {object.title || t("nav.untitled")}
               </button>
             ))}
-            {filteredObjects.length === 0 && <p className="px-3 py-2 text-sm text-ink-muted">No objects found.</p>}
+            {filteredObjects.length === 0 && <p className="px-3 py-2 text-sm text-ink-muted">{t("shareTarget.noObjectsFound")}</p>}
           </div>
         </div>
       )}
 
       <Button variant="primary" disabled={!canSubmit || commitMutation.isPending} onClick={() => commitMutation.mutate()}>
-        {commitMutation.isPending ? "Sharing..." : "Confirm"}
+        {commitMutation.isPending ? t("shareTarget.sharing") : t("shareTarget.confirm")}
       </Button>
-      {commitMutation.isError && <p className="text-sm text-red-500">Something went wrong. Please try again.</p>}
+      {commitMutation.isError && <p className="text-sm text-red-500">{t("shareTarget.genericError")}</p>}
     </div>
   );
 }

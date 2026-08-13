@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { blockApi } from "../../lib/api/resources.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
@@ -17,6 +18,7 @@ import { Icon } from "../ui/Icon.js";
  * correctly while the object is locked.
  */
 export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string; blockId: string; slug: string | null }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(slug ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
       setOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["blocks", objectId] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Could not save this id"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("editor.slugButton.saveFailed")),
   });
 
   return (
@@ -55,7 +57,7 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
           setError(null);
           setOpen((v) => !v);
         }}
-        title="Block id (for templates)"
+        title={t("editor.slugButton.title")}
         className="mt-1 shrink-0 rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/item:opacity-100"
       >
         <Icon name="braces" className="h-3.5 w-3.5" />
@@ -67,15 +69,15 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
           className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-surface-raised p-2 shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Block id</p>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">{t("editor.slugButton.blockId")}</p>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="e.g. total_price"
+            placeholder={t("editor.slugButton.blockIdPlaceholder")}
             autoComplete="off"
             className="w-full rounded-md border border-border bg-surface px-2 py-1 text-xs outline-none focus:border-accent"
           />
-          <p className="mt-1 text-[11px] text-ink-muted">Reference this block from templates as blocks.{value || "…"}.</p>
+          <p className="mt-1 text-[11px] text-ink-muted">{t("editor.slugButton.reference", { value: value || "…" })}</p>
           {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
           <button
             type="button"
@@ -83,7 +85,7 @@ export function BlockSlugButton({ objectId, blockId, slug }: { objectId: string;
             disabled={mutation.isPending}
             className="mt-2 w-full rounded-md bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
-            Save
+            {t("editor.slugButton.save")}
           </button>
         </div>
       )}

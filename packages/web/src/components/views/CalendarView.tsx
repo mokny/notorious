@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { Icon } from "../ui/Icon.js";
 
@@ -16,6 +17,7 @@ function startOfMonth(date: Date): Date {
 }
 
 export function CalendarView({ workspaceId, items, properties, datePropertyId, onOpenObject }: CalendarViewProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
@@ -34,7 +36,7 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
   }, [items, dateProperty]);
 
   if (!dateProperty) {
-    return <p className="p-6 text-sm text-ink-muted">This object type has no date property to plot on a calendar.</p>;
+    return <p className="p-6 text-sm text-ink-muted">{t("views.calendar.noDateProperty")}</p>;
   }
 
   const firstDay = startOfMonth(cursor);
@@ -54,9 +56,9 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
         </button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-xs">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+        {(["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const).map((day) => (
           <div key={day} className="p-1 text-center font-medium text-ink-muted">
-            {day}
+            {t(`views.calendar.day.${day}`)}
           </div>
         ))}
         {cells.map((day, index) => {
@@ -76,7 +78,9 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
                       {item.title}
                     </button>
                   ))}
-                  {dayItems.length > 3 && <p className="text-ink-muted">+{dayItems.length - 3} more</p>}
+                  {dayItems.length > 3 && (
+                    <p className="text-ink-muted">{t("views.calendar.moreCount", { count: dayItems.length - 3 })}</p>
+                  )}
                 </>
               )}
             </div>

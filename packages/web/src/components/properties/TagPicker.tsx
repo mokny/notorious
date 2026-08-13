@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { PropertyOption } from "@notorious/shared";
 
 interface TagPickerProps {
@@ -10,6 +11,7 @@ interface TagPickerProps {
 
 /** Colored-pill picker shared by tag/multi_tag/status/select/multi_select properties. */
 export function TagPicker({ options, value, multi, onChange }: TagPickerProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +39,7 @@ export function TagPicker({ options, value, multi, onChange }: TagPickerProps) {
         onClick={() => setOpen((v) => !v)}
         className="flex min-h-[2rem] w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 text-left text-sm"
       >
-        {selected.length === 0 && <span className="text-ink-muted">Empty</span>}
+        {selected.length === 0 && <span className="text-ink-muted">{t("properties.tagPicker.empty")}</span>}
         {selected.map((option) => (
           <Pill key={option.id} option={option} />
         ))}
@@ -58,7 +60,7 @@ export function TagPicker({ options, value, multi, onChange }: TagPickerProps) {
               {value.includes(option.id) && <span className="text-accent">✓</span>}
             </button>
           ))}
-          {options.length === 0 && <p className="px-2 py-1.5 text-sm text-ink-muted">No options defined yet</p>}
+          {options.length === 0 && <p className="px-2 py-1.5 text-sm text-ink-muted">{t("properties.tagPicker.noOptionsDefined")}</p>}
         </div>
       )}
     </div>

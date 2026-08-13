@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { View } from "@notorious/shared";
 import { useViewData } from "../../hooks/useViewData.js";
 import { TableView } from "./TableView.js";
@@ -17,9 +18,10 @@ export function ViewRenderer({
   /** Overrides the default full-navigation click on a row/card - used for the tablet split view (see ObjectTypePage/SearchPage). */
   onOpenObject?: (objectId: string) => void;
 }) {
+  const { t } = useTranslation();
   const { items, properties, isLoading } = useViewData(view);
 
-  if (isLoading) return <div className="p-6 text-sm text-ink-muted">Loading…</div>;
+  if (isLoading) return <div className="p-6 text-sm text-ink-muted">{t("nav.loading")}</div>;
 
   switch (view.type) {
     case "table":

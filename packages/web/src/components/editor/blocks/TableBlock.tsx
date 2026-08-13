@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Table from "@tiptap/extension-table";
@@ -134,6 +135,7 @@ export function TableBlock({
   content: TableContent;
   onSave: (c: TableContent) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const { readOnly, renderedBlocks, searchHighlight } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const doc = content?.doc ?? createEmptyTableDoc();
@@ -180,7 +182,7 @@ export function TableBlock({
       <button
         type="button"
         onClick={() => setIsFullscreen((v) => !v)}
-        title={isFullscreen ? "Exit fullscreen" : "Fill the browser window"}
+        title={isFullscreen ? t("editor.blocks.table.exitFullscreen") : t("editor.blocks.table.fillWindow")}
         // A view preference, not shared content - stays usable even while the
         // object is locked or viewed by an anonymous share visitor (see
         // readOnlyContent.ts / globals.css's `.locked-content` rule).

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { DatabaseViewContent } from "@notorious/shared";
 import { viewApi } from "../../../lib/api/resources.js";
 import { ViewRenderer } from "../../views/ViewRenderer.js";
@@ -20,6 +21,7 @@ interface DatabaseViewBlockProps {
  * actual type - see ExportModeProvider.
  */
 function ExportTable({ workspaceId, content }: { workspaceId: string; content: DatabaseViewContent }) {
+  const { t } = useTranslation();
   const { data: views } = useQuery({ queryKey: ["allViews", workspaceId], queryFn: () => viewApi.list(workspaceId) });
   const view = views?.find((v) => v.id === content.viewId);
   const { items, properties } = useViewData(view);
@@ -43,7 +45,7 @@ function ExportTable({ workspaceId, content }: { workspaceId: string; content: D
       <tbody>
         {items.map((object) => (
           <tr key={object.id} className="border-b border-border">
-            <td className="py-1.5 pr-3">{object.title || "Untitled"}</td>
+            <td className="py-1.5 pr-3">{object.title || t("editor.blocks.database.untitled")}</td>
             {columns.map((property) => (
               <td key={property.id} className="py-1.5 pr-3">
                 <PropertyCell workspaceId={workspaceId} object={object} property={property} />
@@ -58,6 +60,7 @@ function ExportTable({ workspaceId, content }: { workspaceId: string; content: D
 
 /** Embeds a saved view inline in a note - Notion calls this a "linked database". */
 export function DatabaseViewBlock({ content, workspaceId, onSave }: DatabaseViewBlockProps) {
+  const { t } = useTranslation();
   const exportMode = useExportMode();
   const { data: views } = useQuery({ queryKey: ["allViews", workspaceId], queryFn: () => viewApi.list(workspaceId) });
   const view = views?.find((v) => v.id === content.viewId);
@@ -69,14 +72,14 @@ export function DatabaseViewBlock({ content, workspaceId, onSave }: DatabaseView
   if (!view) {
     return (
       <div className="rounded-lg border border-dashed border-border p-3">
-        <p className="mb-2 text-sm text-ink-muted">Choose a view to embed:</p>
+        <p className="mb-2 text-sm text-ink-muted">{t("editor.blocks.database.chooseViewPrompt")}</p>
         <select
           onChange={(e) => onSave({ ...content, viewId: e.target.value })}
           defaultValue=""
           className="w-full rounded-lg border border-border bg-surface px-2 py-1 text-sm"
         >
           <option value="" disabled>
-            Select a view…
+            {t("editor.blocks.database.selectViewPlaceholder")}
           </option>
           {views?.map((v) => (
             <option key={v.id} value={v.id}>

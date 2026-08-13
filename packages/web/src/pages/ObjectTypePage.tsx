@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { schemaApi, viewApi, objectApi } from "../lib/api/resources.js";
 import { ViewRenderer } from "../components/views/ViewRenderer.js";
@@ -11,15 +12,16 @@ import { useBreakpoint } from "../hooks/useBreakpoint.js";
 import { ObjectDetailPage } from "./ObjectDetailPage.js";
 
 const VIEW_TYPES = [
-  { type: "table", label: "Table", icon: "rows" },
-  { type: "board", label: "Board", icon: "board" },
-  { type: "list", label: "List", icon: "list" },
-  { type: "gallery", label: "Gallery", icon: "image" },
-  { type: "calendar", label: "Calendar", icon: "calendar" },
-  { type: "timeline", label: "Timeline", icon: "timeline" },
+  { type: "table", labelKey: "objectType.viewTypes.table", icon: "rows" },
+  { type: "board", labelKey: "objectType.viewTypes.board", icon: "board" },
+  { type: "list", labelKey: "objectType.viewTypes.list", icon: "list" },
+  { type: "gallery", labelKey: "objectType.viewTypes.gallery", icon: "image" },
+  { type: "calendar", labelKey: "objectType.viewTypes.calendar", icon: "calendar" },
+  { type: "timeline", labelKey: "objectType.viewTypes.timeline", icon: "timeline" },
 ] as const;
 
 export function ObjectTypePage() {
+  const { t } = useTranslation();
   const { workspaceId, objectTypeKey } = useParams<{ workspaceId: string; objectTypeKey: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -81,7 +83,7 @@ export function ObjectTypePage() {
     onSuccess: (object) => openObject(object.id),
   });
 
-  if (!objectType) return <div className="p-8 text-sm text-ink-muted">Loading…</div>;
+  if (!objectType) return <div className="p-8 text-sm text-ink-muted">{t("nav.loading")}</div>;
 
   const activeView = views?.find((v) => v.id === activeViewId);
 
@@ -95,7 +97,7 @@ export function ObjectTypePage() {
         </div>
         {!isSharedSession() && (
           <Button variant="primary" onClick={() => createObjectMutation.mutate()}>
-            <Icon name="plus" className="h-3.5 w-3.5" /> New {objectType.name}
+            <Icon name="plus" className="h-3.5 w-3.5" /> {t("objectType.newObject", { name: objectType.name })}
           </Button>
         )}
       </div>
@@ -124,7 +126,7 @@ export function ObjectTypePage() {
                   onClick={() => createViewMutation.mutate(viewType.type)}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
                 >
-                  <Icon name={viewType.icon} className="h-3.5 w-3.5" /> {viewType.label}
+                  <Icon name={viewType.icon} className="h-3.5 w-3.5" /> {t(viewType.labelKey)}
                 </button>
               ))}
             </div>
@@ -136,7 +138,7 @@ export function ObjectTypePage() {
         {activeView ? (
           <ViewRenderer workspaceId={workspaceId!} view={activeView} onOpenObject={splitActive ? openObject : undefined} />
         ) : (
-          <p className="p-6 text-sm text-ink-muted">Create a view above to see your {objectType.name.toLowerCase()} objects.</p>
+          <p className="p-6 text-sm text-ink-muted">{t("objectType.createViewPrompt", { name: objectType.name.toLowerCase() })}</p>
         )}
       </div>
       </div>
@@ -154,12 +156,12 @@ export function ObjectTypePage() {
               }
               className="flex items-center gap-1.5 self-start px-4 pt-3 text-xs text-ink-muted hover:text-ink"
             >
-              <Icon name="close" className="h-3.5 w-3.5" /> Close
+              <Icon name="close" className="h-3.5 w-3.5" /> {t("objectType.close")}
             </button>
             <ObjectDetailPage workspaceId={workspaceId} objectId={openObjectId} />
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-ink-muted">Select an object to view it here.</div>
+          <div className="flex flex-1 items-center justify-center text-sm text-ink-muted">{t("objectType.selectObjectPrompt")}</div>
         ))}
     </div>
   );

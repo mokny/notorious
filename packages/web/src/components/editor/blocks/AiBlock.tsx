@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AiContent } from "@notorious/shared";
 import { blockApi } from "../../../lib/api/resources.js";
 import { ApiError } from "../../../lib/api/client.js";
@@ -19,6 +20,7 @@ export function AiBlock({
   content: AiContent;
   onSave: (c: AiContent) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const { readOnly } = useBlockEditor();
   const confirm = useConfirm();
   const [contextWarningDismissed, setContextWarningDismissed] = useLocalStorageState(CONTEXT_WARNING_DISMISSED_KEY, false);
@@ -58,10 +60,9 @@ export function AiBlock({
     }
     let dontShowAgain = false;
     const confirmed = await confirm({
-      title: "Send page content to the AI?",
-      description:
-        "This page's title and full content will be sent to the AI provider configured in Settings, along with your prompt. Only enable this if you're comfortable sharing this page's content with that provider.",
-      confirmLabel: "Include page content",
+      title: t("editor.blocks.ai.confirmTitle"),
+      description: t("editor.blocks.ai.confirmDescription"),
+      confirmLabel: t("editor.blocks.ai.confirmLabel"),
       children: (
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           <input
@@ -71,7 +72,7 @@ export function AiBlock({
               dontShowAgain = e.target.checked;
             }}
           />
-          Don't show this again
+          {t("editor.blocks.ai.dontShowAgain")}
         </label>
       ),
     });
@@ -92,7 +93,7 @@ export function AiBlock({
       setContent(block.content as unknown as AiContent);
       setManualEditing(false);
     } catch (error) {
-      setSendError(error instanceof ApiError ? error.message : "Request failed");
+      setSendError(error instanceof ApiError ? error.message : t("editor.blocks.ai.requestFailed"));
     } finally {
       isGeneratingRef.current = false;
       setIsGenerating(false);
@@ -120,7 +121,7 @@ export function AiBlock({
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             readOnly={readOnly || isGenerating}
-            placeholder="Ask the AI something…"
+            placeholder={t("editor.blocks.ai.promptPlaceholder")}
             rows={3}
             className="w-full resize-y rounded-md border border-border bg-transparent p-2 text-sm outline-none focus:border-accent"
           />
@@ -132,7 +133,7 @@ export function AiBlock({
               disabled={isGenerating}
               onChange={(e) => void handleIncludeContextChange(e.target.checked)}
             />
-            Include this page's content as context
+            {t("editor.blocks.ai.includeContext")}
           </label>
           {sendError && <p className="text-xs text-red-500">{sendError}</p>}
           <div className="flex justify-end" data-lock-hide>
@@ -141,7 +142,7 @@ export function AiBlock({
               disabled={!prompt.trim() || isGenerating}
               className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              {isGenerating ? "Generating…" : "Send"}
+              {isGenerating ? t("editor.blocks.ai.generating") : t("editor.blocks.ai.send")}
             </button>
           </div>
         </div>
@@ -161,14 +162,14 @@ export function AiBlock({
               disabled={isGenerating}
               className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent disabled:opacity-50"
             >
-              <Icon name="refresh" className="h-3 w-3" /> {isGenerating ? "Regenerating…" : "Regenerate"}
+              <Icon name="refresh" className="h-3 w-3" /> {isGenerating ? t("editor.blocks.ai.regenerating") : t("editor.blocks.ai.regenerate")}
             </button>
             <button
               onClick={startEditing}
               disabled={isGenerating}
               className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent disabled:opacity-50"
             >
-              <Icon name="pencil" className="h-3 w-3" /> Edit
+              <Icon name="pencil" className="h-3 w-3" /> {t("editor.blocks.ai.edit")}
             </button>
           </div>
         </div>

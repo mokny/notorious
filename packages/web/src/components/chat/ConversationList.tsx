@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { ConversationSummary } from "@notorious/shared";
 import { chatApi, aiApi } from "../../lib/api/resources.js";
 import { useConfirm } from "../../context/ConfirmContext.js";
@@ -32,6 +33,7 @@ function conversationInitial(conversation: ConversationSummary): { name: string;
  * ChatListPage.tsx), so it takes no layout opinion beyond "a list of rows".
  */
 export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSelect: (id: string) => void; onNewChat: () => void; onNewChannel: () => void }) {
+  const { t } = useTranslation();
   const { data: conversations, isLoading } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
   const currentWorkspaceId = useCurrentWorkspaceId();
   // Pinned "Notorious AI" row for the active workspace, if it has AI
@@ -60,11 +62,13 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
     event.stopPropagation();
     const isChannel = conversation.type === "workspace_channel";
     const ok = await confirm({
-      title: isChannel ? `Leave #${conversation.name}?` : `Delete chat with ${conversation.name}?`,
+      title: isChannel
+        ? t("chat.conversationList.leaveConfirmTitle", { name: conversation.name })
+        : t("chat.conversationList.deleteConfirmTitle", { name: conversation.name }),
       description: isChannel
-        ? "You can rejoin from the channel list any time - the channel and its history stay for everyone else."
-        : "This only removes it from your list - the other participant keeps their side of the conversation.",
-      confirmLabel: isChannel ? "Leave" : "Delete",
+        ? t("chat.conversationList.leaveConfirmDescription")
+        : t("chat.conversationList.deleteConfirmDescription"),
+      confirmLabel: isChannel ? t("chat.conversationList.leave") : t("chat.conversationList.delete"),
       danger: true,
     });
     if (ok) leaveMutation.mutate(conversation.id);
@@ -73,21 +77,21 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-sm font-semibold text-ink">Chats</span>
+        <span className="text-sm font-semibold text-ink">{t("chat.conversationList.title")}</span>
         <div className="flex items-center gap-1">
-          <button onClick={onNewChannel} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Channels">
+          <button onClick={onNewChannel} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title={t("chat.conversationList.channels")}>
             <Icon name="hash" className="h-4 w-4" />
           </button>
-          <button onClick={onNewChat} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="New chat">
+          <button onClick={onNewChat} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title={t("chat.conversationList.newChat")}>
             <Icon name="pencil" className="h-4 w-4" />
           </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {isLoading && <p className="p-3 text-sm text-ink-muted">Loading…</p>}
+        {isLoading && <p className="p-3 text-sm text-ink-muted">{t("chat.conversationList.loading")}</p>}
         {!isLoading && (!conversations || conversations.length === 0) && (!aiWorkspaces || aiWorkspaces.length === 0) && (
-          <p className="p-3 text-sm text-ink-muted">No conversations yet.</p>
+          <p className="p-3 text-sm text-ink-muted">{t("chat.conversationList.empty")}</p>
         )}
         <ul>
           {aiWorkspaces?.map((workspace) => (
@@ -102,7 +106,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
                   <Icon name="bot" className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <span className="truncate text-base font-medium text-ink">Notorious AI</span>
+                  <span className="truncate text-base font-medium text-ink">{t("chat.aiThread.name")}</span>
                   <div className="truncate text-sm text-ink-muted">{workspace.workspaceName}</div>
                 </div>
               </button>
@@ -128,10 +132,10 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm text-ink-muted">
                         {conversation.lastMessage
-                          ? `${conversation.lastMessage.authorName}: ${conversation.lastMessage.body ?? "Message deleted"}`
+                          ? `${conversation.lastMessage.authorName}: ${conversation.lastMessage.body ?? t("chat.conversationList.messageDeleted")}`
                           : conversation.workspaceName
                             ? conversation.workspaceName
-                            : "No messages yet"}
+                            : t("chat.conversationList.noMessagesYet")}
                       </span>
                       {conversation.unreadCount > 0 && (
                         <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
@@ -144,7 +148,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
                 <button
                   onClick={(event) => handleDelete(event, conversation)}
                   className="mr-2 shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-red-500"
-                  title={conversation.type === "workspace_channel" ? "Leave channel" : "Delete chat"}
+                  title={conversation.type === "workspace_channel" ? t("chat.conversationList.leaveChannel") : t("chat.conversationList.deleteChat")}
                 >
                   <Icon name="trash" className="h-4 w-4" />
                 </button>

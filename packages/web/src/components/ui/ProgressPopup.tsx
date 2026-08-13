@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Modal } from "./Modal.js";
 import { Button } from "./Button.js";
 
@@ -11,16 +12,6 @@ export interface BackupProgressState {
   /** Overrides the default phase label - e.g. a more specific "done" message than the generic one. */
   message?: string;
 }
-
-const PHASE_LABELS: Record<BackupProgressPhase, string> = {
-  connecting: "Connecting to destination...",
-  transferring: "Transferring...",
-  encrypting: "Encrypting...",
-  decrypting: "Decrypting...",
-  importing: "Importing...",
-  done: "Done",
-  error: "Failed",
-};
 
 interface ProgressPopupProps {
   open: boolean;
@@ -43,8 +34,18 @@ interface ProgressPopupProps {
  * vanishing.
  */
 export function ProgressPopup({ open, title, state, onCancel, onClose, onRetry }: ProgressPopupProps) {
+  const { t } = useTranslation();
   const running = state.phase !== "done" && state.phase !== "error";
   const indeterminate = state.percent === undefined;
+  const phaseLabels: Record<BackupProgressPhase, string> = {
+    connecting: t("ui.progressPopup.phases.connecting"),
+    transferring: t("ui.progressPopup.phases.transferring"),
+    encrypting: t("ui.progressPopup.phases.encrypting"),
+    decrypting: t("ui.progressPopup.phases.decrypting"),
+    importing: t("ui.progressPopup.phases.importing"),
+    done: t("ui.progressPopup.phases.done"),
+    error: t("ui.progressPopup.phases.error"),
+  };
 
   return (
     <Modal
@@ -58,17 +59,17 @@ export function ProgressPopup({ open, title, state, onCancel, onClose, onRetry }
       footer={
         running ? (
           <Button variant="secondary" onClick={onCancel}>
-            Cancel
+            {t("ui.progressPopup.cancel")}
           </Button>
         ) : (
           <>
             {state.phase === "error" && onRetry && (
               <Button variant="secondary" onClick={onRetry}>
-                Retry
+                {t("ui.progressPopup.retry")}
               </Button>
             )}
             <Button variant="primary" onClick={onClose}>
-              Close
+              {t("ui.progressPopup.close")}
             </Button>
           </>
         )
@@ -76,10 +77,10 @@ export function ProgressPopup({ open, title, state, onCancel, onClose, onRetry }
     >
       <div className="space-y-3">
         {state.phase === "error" ? (
-          <p className="text-sm text-red-500">{state.error ?? "Something went wrong."}</p>
+          <p className="text-sm text-red-500">{state.error ?? t("ui.progressPopup.genericError")}</p>
         ) : (
           <>
-            <p className="text-sm text-ink-muted">{state.message ?? PHASE_LABELS[state.phase]}</p>
+            <p className="text-sm text-ink-muted">{state.message ?? phaseLabels[state.phase]}</p>
             <div className="h-2 w-full overflow-hidden rounded-full bg-surface">
               {indeterminate ? (
                 <div className="h-full w-full animate-pulse rounded-full bg-accent/50" />

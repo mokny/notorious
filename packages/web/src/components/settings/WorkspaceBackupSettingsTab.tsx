@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { backupApi } from "../../lib/api/resources.js";
 import { ApiError } from "../../lib/api/client.js";
 import { Button } from "../ui/Button.js";
@@ -12,6 +13,7 @@ import { downloadBlob } from "../../lib/downloadBlob.js";
 import { BackupSettings } from "../BackupSettings.js";
 
 export function WorkspaceBackupSettingsTab() {
+  const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const queryClient = useQueryClient();
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -35,10 +37,10 @@ export function WorkspaceBackupSettingsTab() {
         controller.signal,
       );
       downloadBlob(blob, `workspace-${workspaceId}.zip`);
-      downloadTransfer.finish("Backup downloaded.");
+      downloadTransfer.finish(t("settings.workspace.backup.downloadedToast"));
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      downloadTransfer.fail(err instanceof ApiError ? err.message : "Download failed");
+      downloadTransfer.fail(err instanceof ApiError ? err.message : t("settings.workspace.backup.downloadFailed"));
     }
   }
 
@@ -55,7 +57,7 @@ export function WorkspaceBackupSettingsTab() {
       setImportKey("");
       setImportNeedsKey(false);
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      restoreTransfer.finish("Restored as a new workspace - check the workspace picker.");
+      restoreTransfer.finish(t("settings.workspace.backup.restoredToast"));
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         restoreTransfer.close();
@@ -67,7 +69,7 @@ export function WorkspaceBackupSettingsTab() {
         setImportNeedsKey(true);
         return;
       }
-      restoreTransfer.fail(err instanceof ApiError ? err.message : "Could not restore this backup");
+      restoreTransfer.fail(err instanceof ApiError ? err.message : t("settings.workspace.backup.restoreFailed"));
     }
   }
 
@@ -79,16 +81,13 @@ export function WorkspaceBackupSettingsTab() {
 
   return (
     <div>
-      <p className="text-sm text-ink-muted">
-        Every backup is encrypted with this workspace's code below. Download one manually, restore one as a
-        brand-new workspace, or set up automatic scheduled backups to one or more destinations.
-      </p>
+      <p className="text-sm text-ink-muted">{t("settings.workspace.backup.description")}</p>
       <div className="mt-4 flex gap-2">
         <Button variant="secondary" onClick={handleDownloadBackup}>
-          Download backup
+          {t("settings.workspace.backup.downloadBackup")}
         </Button>
         <Button variant="secondary" onClick={() => importInputRef.current?.click()}>
-          Restore from ZIP
+          {t("settings.workspace.backup.restoreFromZip")}
         </Button>
         <input
           ref={importInputRef}
@@ -111,26 +110,26 @@ export function WorkspaceBackupSettingsTab() {
             setImportKey("");
           }
         }}
-        title="Enter backup code"
-        description="This backup is encrypted. Enter the workspace's backup code to restore it."
+        title={t("settings.workspace.backup.enterCodeTitle")}
+        description={t("settings.workspace.backup.enterCodeDescription")}
       >
         <form onSubmit={handleImportKeySubmit} className="flex items-center gap-2">
           <TextField
             autoFocus
-            placeholder="Backup code"
+            placeholder={t("settings.workspace.backup.codePlaceholder")}
             value={importKey}
             onChange={(e) => setImportKey(e.target.value)}
             className="flex-1"
           />
           <Button type="submit" variant="primary" disabled={!importKey}>
-            Restore
+            {t("settings.workspace.backup.restore")}
           </Button>
         </form>
       </Modal>
 
       <ProgressPopup
         open={downloadTransfer.open}
-        title="Downloading backup"
+        title={t("settings.workspace.backup.downloadingTitle")}
         state={downloadTransfer.state}
         onCancel={downloadTransfer.cancel}
         onClose={downloadTransfer.close}
@@ -138,7 +137,7 @@ export function WorkspaceBackupSettingsTab() {
       />
       <ProgressPopup
         open={restoreTransfer.open}
-        title="Restoring backup"
+        title={t("settings.workspace.backup.restoringTitle")}
         state={restoreTransfer.state}
         onCancel={restoreTransfer.cancel}
         onClose={restoreTransfer.close}

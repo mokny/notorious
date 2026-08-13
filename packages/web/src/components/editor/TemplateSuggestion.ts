@@ -2,6 +2,7 @@ import { Extension } from "@tiptap/core";
 import Suggestion, { type SuggestionOptions, type SuggestionProps } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
+import i18next from "i18next";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { TemplateAutocompleteSchemaResponse } from "@notorious/shared";
 import { searchApi, blockApi } from "../../lib/api/resources.js";
@@ -19,13 +20,23 @@ type TriggerContext =
   | { mode: "filter"; query: string }
   | { mode: "property"; query: string; path: string };
 
-const NAMESPACE_ITEMS: SuggestionItem[] = [
-  { label: "object", insertText: "object", detail: "The object this field belongs to" },
-  { label: "blocks", insertText: "blocks", detail: "This object's own blocks, by slug" },
-  { label: "objects", insertText: "objects", detail: "Cross-object reference: objects.<slug>" },
-  { label: "variables", insertText: "variables", detail: "Workspace Variables, by name" },
-  { label: "http", insertText: "http", detail: "Outbound HTTP request: http.get(url), http.post(url, body), …" },
-];
+/**
+ * Fixed namespace entries - `label`/`insertText` are literal template
+ * syntax identifiers (`object`, `blocks`, ...), not user-facing prose, so
+ * they stay as-is; only `detail` (the description shown next to each entry
+ * in the popup) is translated, computed fresh on each call so it reflects
+ * the currently active language (see SlashCommand.ts's
+ * `buildFixedSlashCommandItems` for the same pattern).
+ */
+function buildNamespaceItems(): SuggestionItem[] {
+  return [
+    { label: "object", insertText: "object", detail: i18next.t("editor.templateSuggestion.namespace.object") },
+    { label: "blocks", insertText: "blocks", detail: i18next.t("editor.templateSuggestion.namespace.blocks") },
+    { label: "objects", insertText: "objects", detail: i18next.t("editor.templateSuggestion.namespace.objects") },
+    { label: "variables", insertText: "variables", detail: i18next.t("editor.templateSuggestion.namespace.variables") },
+    { label: "http", insertText: "http", detail: i18next.t("editor.templateSuggestion.namespace.http") },
+  ];
+}
 
 /** `http.<method>(...)` - see parser.ts's HTTP_METHODS and modules/templates/http.ts on the server. Every argument is a string literal (headers a literal `[["Name", "value"], ...]` list), so there's nothing to search live here - just the fixed method names. */
 const HTTP_METHOD_ITEMS: SuggestionItem[] = [
@@ -167,7 +178,7 @@ function buildSuggestion(
       // search for matching Variable objects by name directly (only once at
       // least one character has been typed, unlike the `variables.` property
       // branch above - firing this on every bare `{{` would be noisy).
-      const staticItems = NAMESPACE_ITEMS.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
+      const staticItems = buildNamespaceItems().filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
       if (!query || !workspaceIdRef.current) return staticItems;
       const matches = await variableMatches(workspaceIdRef.current, schemaRef.current, query);
       const variableItems = matches.map((obj) => ({ label: obj.title, insertText: `variables.${obj.title}`, detail: "Variable" }));

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMatch } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AiChatMessage } from "@notorious/shared";
 import { aiApi } from "../../lib/api/resources.js";
@@ -14,6 +15,7 @@ import { useSpeechToText, speechToTextSupported } from "../../hooks/useSpeechToT
  * message from a real workspace member at a glance.
  */
 function AiMessageBubble({ message }: { message: AiChatMessage }) {
+  const { t } = useTranslation();
   if (message.role === "tool") return null; // raw tool results are implementation detail - the assistant's own reply summarizes what happened
   const isUser = message.role === "user";
   return (
@@ -32,7 +34,7 @@ function AiMessageBubble({ message }: { message: AiChatMessage }) {
           {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
           {message.toolCalls?.map((call) => (
             <p key={call.id} className={`mt-1 flex items-center gap-1 text-xs ${isUser ? "text-white/80" : "text-ink-muted"}`}>
-              <Icon name="terminal" className="h-3 w-3" /> Called <code>{call.name}</code>
+              <Icon name="terminal" className="h-3 w-3" /> {t("chat.aiThread.calledTool")} <code>{call.name}</code>
             </p>
           ))}
         </div>
@@ -44,6 +46,7 @@ function AiMessageBubble({ message }: { message: AiChatMessage }) {
 
 /** The "Notorious AI" thread - visually a ThreadView (see aiConversation.ts for how ThreadView dispatches here), but backed entirely by the workspace-scoped ai_chat_messages API instead of the real conversations/messages tables, since it shares its tool set with the MCP server (modules/ai/tools.ts on the server). */
 export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onBack?: () => void }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const queryKey = ["aiChat", workspaceId];
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -94,9 +97,9 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white">
           <Icon name="bot" className="h-4 w-4" />
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">Notorious AI</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{t("chat.aiThread.name")}</span>
         {messages && messages.length > 0 && (
-          <button onClick={() => clearMutation.mutate()} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-red-500" title="Clear history">
+          <button onClick={() => clearMutation.mutate()} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-red-500" title={t("chat.aiThread.clearHistory")}>
             <Icon name="trash" className="h-4 w-4" />
           </button>
         )}
@@ -104,9 +107,7 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
 
       <div className="flex-1 overflow-y-auto py-2">
         {messages?.length === 0 && (
-          <p className="px-4 py-2 text-sm text-ink-muted">
-            Ask me to create objects, search for things, or update existing ones - e.g. "Create a task called Review PR".
-          </p>
+          <p className="px-4 py-2 text-sm text-ink-muted">{t("chat.aiThread.emptyPrompt")}</p>
         )}
         {messages?.map((message, index) => {
           const previous = messages[index - 1];
@@ -122,10 +123,10 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
             </div>
           );
         })}
-        {sendMutation.isPending && <p className="px-4 py-1 text-xs italic text-ink-muted">Thinking…</p>}
+        {sendMutation.isPending && <p className="px-4 py-1 text-xs italic text-ink-muted">{t("chat.aiThread.thinking")}</p>}
         {/* Shows the server's actual error message (e.g. a budget-exceeded block, the AI provider's own error body, or a network/timeout failure - see agent.ts and the provider adapters) instead of a generic string. */}
         {sendMutation.isError && (
-          <p className="px-4 py-1 text-xs text-red-500">{sendMutation.error instanceof Error ? sendMutation.error.message : "Something went wrong - try again."}</p>
+          <p className="px-4 py-1 text-xs text-red-500">{sendMutation.error instanceof Error ? sendMutation.error.message : t("chat.aiThread.genericError")}</p>
         )}
         <div ref={bottomRef} />
       </div>
@@ -141,7 +142,7 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
             }
           }}
           rows={1}
-          placeholder="Ask Notorious AI…"
+          placeholder={t("chat.aiThread.placeholder")}
           disabled={sendMutation.isPending}
           className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent"
         />
@@ -154,7 +155,7 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
             type="button"
             onClick={toggleListening}
             className="flex h-9 w-9 shrink-0 animate-pulse items-center justify-center rounded-full bg-red-500 text-white"
-            title="Stop dictation"
+            title={t("chat.aiThread.stopDictation")}
           >
             <Icon name="mic" className="h-4 w-4" />
           </button>
@@ -163,7 +164,7 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
             type="button"
             onClick={toggleListening}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
-            title="Dictate"
+            title={t("chat.aiThread.dictate")}
           >
             <Icon name="mic" className="h-4 w-4" />
           </button>
@@ -172,7 +173,7 @@ export function AiThreadView({ workspaceId, onBack }: { workspaceId: string; onB
             type="submit"
             disabled={sendMutation.isPending || !input.trim()}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white hover:opacity-90 disabled:opacity-40"
-            title="Send"
+            title={t("chat.aiThread.send")}
           >
             <Icon name="send" className="h-4 w-4" />
           </button>

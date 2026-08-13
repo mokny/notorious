@@ -146,6 +146,83 @@
     },
     "integrations": {
       "description": "Share images, videos, documents, and links into Notorious directly from your phone's share sheet (once installed as an app on Android) or from a desktop browser bookmarklet."
+    },
+    "workspace": {
+      "title": "Workspace settings",
+      "footerVersion": "Notorious v{{version}}",
+      "tabs": {
+        "general": "General",
+        "members": "Members",
+        "sharing": "Sharing",
+        "ai": "AI",
+        "webhooks": "Webhooks",
+        "backup": "Backup",
+        "dangerZone": "Danger zone"
+      },
+      "general": {
+        "description": "Rename \"{{name}}\", pick an icon, or upload your own image.",
+        "nameLabel": "Workspace name",
+        "weekStart": "Calendar week starts on",
+        "sunday": "Sunday",
+        "monday": "Monday",
+        "coverHeight": "Cover height",
+        "imageLimitsDescription": "Automatically downscale uploaded images that exceed these pixel dimensions, re-encoding them as WebP. Leave a field empty for no limit (disabled by default).",
+        "normalImages": "Normal images (max size)",
+        "width": "Width",
+        "height": "Height",
+        "maxImageWidth": "Max image width",
+        "maxImageHeight": "Max image height",
+        "coverImages": "Cover images (max size)",
+        "maxCoverWidth": "Max cover width",
+        "maxCoverHeight": "Max cover height",
+        "webpQuality": "WebP quality when resizing"
+      },
+      "members": {
+        "description": "Everyone below can access \"{{name}}\".",
+        "remove": "Remove",
+        "invitePlaceholder": "Invite by email",
+        "invite": "Invite",
+        "inviteError": "Could not invite this user",
+        "roles": {
+          "owner": "owner",
+          "viewer": "viewer",
+          "commenter": "commenter",
+          "editor": "editor"
+        }
+      },
+      "sharing": {
+        "description": "Share the whole workspace via a link, without requiring an account. Set a role, and optionally an expiry - you can revoke it at any time below.",
+        "shareWorkspace": "Share workspace",
+        "activeLinks": "Active share links (workspace and individual objects)"
+      },
+      "ai": {
+        "description": "Configure one AI provider API key shared by everyone in this workspace, used by the Agent Chat and AI blocks. Optionally cap total token usage and pick how often it resets."
+      },
+      "webhooks": {
+        "description": "Get an HTTP POST with the full object whenever something changes in this workspace - useful for syncing to another system or triggering your own automation."
+      },
+      "backup": {
+        "description": "Every backup is encrypted with this workspace's code below. Download one manually, restore one as a brand-new workspace, or set up automatic scheduled backups to one or more destinations.",
+        "downloadBackup": "Download backup",
+        "restoreFromZip": "Restore from ZIP",
+        "downloadedToast": "Backup downloaded.",
+        "downloadFailed": "Download failed",
+        "restoredToast": "Restored as a new workspace - check the workspace picker.",
+        "restoreFailed": "Could not restore this backup",
+        "enterCodeTitle": "Enter backup code",
+        "enterCodeDescription": "This backup is encrypted. Enter the workspace's backup code to restore it.",
+        "codePlaceholder": "Backup code",
+        "restore": "Restore",
+        "downloadingTitle": "Downloading backup",
+        "restoringTitle": "Restoring backup"
+      },
+      "dangerZone": {
+        "description": "Permanently deletes this workspace for everyone - every object, block, file, view and member's access. Not reversible; download a backup first if you might want any of this later.",
+        "deleteConfirmTitle": "Delete \"{{name}}\"?",
+        "deleteConfirmDescription": "This deletes the entire workspace for everyone: every object, block, file, view and member's access. This cannot be undone.",
+        "deleteConfirmButton": "Delete workspace",
+        "deleteButton": "Delete this workspace"
+      }
     }
   },
   "login": {
@@ -181,6 +258,579 @@
       "attachment": "Sent an attachment",
       "reaction": "reacted {{emoji}} to \"{{preview}}\"",
       "reactionToYourMessage": "reacted {{emoji}} to your message"
+    }
+  },
+  "views": {
+    "common": {
+      "noObjects": "No objects yet."
+    },
+    "board": {
+      "noPivotProperty": "Pick a status/select property as this board's column property in view settings.",
+      "noStatus": "No status"
+    },
+    "calendar": {
+      "noDateProperty": "This object type has no date property to plot on a calendar.",
+      "moreCount": "+{{count}} more",
+      "day": {
+        "sun": "Sun",
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat"
+      }
+    },
+    "table": {
+      "title": "Title"
+    },
+    "timeline": {
+      "noDateProperty": "This object type has no date property to plot on a timeline.",
+      "noDatedObjects": "No dated objects yet."
+    }
+  },
+  "editor": {
+    "dropzone": {
+      "uploading": "Uploading…",
+      "dropToAttach": "Drop files to attach them"
+    },
+    "undoToast": {
+      "blockDeleted": "Block deleted",
+      "undo": "Undo"
+    },
+    "blockMenu": {
+      "blockId": "Block id",
+      "blockIdPlaceholder": "e.g. total_price",
+      "reference": "Reference this block from templates as blocks.{{value}}.",
+      "saveIdFailed": "Could not save this id",
+      "saveId": "Save id",
+      "deleteBlock": "Delete block"
+    },
+    "slugButton": {
+      "title": "Block id (for templates)",
+      "blockId": "Block id",
+      "blockIdPlaceholder": "e.g. total_price",
+      "reference": "Reference this block from templates as blocks.{{value}}.",
+      "saveFailed": "Could not save this id",
+      "save": "Save"
+    },
+    "blockItem": {
+      "addBlockBelow": "Add block below",
+      "dragToReorder": "Drag to reorder",
+      "deleteBlock": "Delete block"
+    },
+    "blockList": {
+      "addBlock": "Add block"
+    },
+    "search": {
+      "matchCount": "{{current}} of {{total}}",
+      "previousMatch": "Previous match",
+      "nextMatch": "Next match",
+      "close": "Close"
+    },
+    "slashCommand": {
+      "items": {
+        "paragraph": { "label": "Text", "description": "Plain paragraph" },
+        "heading": { "label": "Heading", "description": "Section heading" },
+        "quote": { "label": "Quote", "description": "Highlighted quote" },
+        "callout": { "label": "Callout", "description": "Emphasized note with an icon" },
+        "checklist": { "label": "Checklist", "description": "To-do items with checkboxes" },
+        "table": { "label": "Table", "description": "Simple rows and columns" },
+        "code": { "label": "Code", "description": "Syntax-highlighted code block" },
+        "image": { "label": "Image", "description": "Upload or embed an image" },
+        "video": { "label": "Video", "description": "Embed a video" },
+        "embed": { "label": "Embed", "description": "Embed a link" },
+        "pdf": { "label": "PDF", "description": "Upload a PDF, expandable to view inline" },
+        "audio": { "label": "Audio", "description": "Upload an audio file with a player" },
+        "file": { "label": "File", "description": "Upload any other file as a download card" },
+        "maps": { "label": "Maps", "description": "Embed a Google Maps address, coordinates, or route" },
+        "math": { "label": "Math", "description": "LaTeX formula" },
+        "mermaid": { "label": "Mermaid diagram", "description": "Flowcharts and diagrams" },
+        "toggle": { "label": "Toggle", "description": "Collapsible section" },
+        "secret": { "label": "Secret", "description": "Hidden text, revealed only by copying to the clipboard" },
+        "divider": { "label": "Divider", "description": "Horizontal rule" },
+        "columns": { "label": "Columns", "description": "Side-by-side layout" },
+        "database_view": { "label": "Linked view", "description": "Embed a saved view of objects" },
+        "sub_object": { "label": "Existing Object", "description": "Link an existing object, expandable to its own sub-objects" },
+        "bookmark": { "label": "Bookmark", "description": "Save a link with a title and description" },
+        "whiteboard": { "label": "Whiteboard", "description": "Sketch with shapes, arrows and freehand drawing" },
+        "calendar": { "label": "Calendar", "description": "Year/month/week/day/agenda calendar over one or more object types" },
+        "voting": { "label": "Voting", "description": "Reddit-style list with upvotes/downvotes on each item" },
+        "ai": { "label": "AI", "description": "Prompt an AI and replace it with the answer" },
+        "rssFeed": { "label": "RSS Feed", "description": "Follow one or more RSS/Atom feeds" }
+      },
+      "createAndEmbed": "Create a new {{name}} and embed it here"
+    },
+    "templateSuggestion": {
+      "namespace": {
+        "object": "The object this field belongs to",
+        "blocks": "This object's own blocks, by slug",
+        "objects": "Cross-object reference: objects.<slug>",
+        "variables": "Workspace Variables, by name",
+        "http": "Outbound HTTP request: http.get(url), http.post(url, body), …"
+      }
+    },
+    "blocks": {
+      "ai": {
+        "promptPlaceholder": "Ask the AI something…",
+        "includeContext": "Include this page's content as context",
+        "confirmTitle": "Send page content to the AI?",
+        "confirmDescription": "This page's title and full content will be sent to the AI provider configured in Settings, along with your prompt. Only enable this if you're comfortable sharing this page's content with that provider.",
+        "confirmLabel": "Include page content",
+        "dontShowAgain": "Don't show this again",
+        "generating": "Generating…",
+        "send": "Send",
+        "regenerating": "Regenerating…",
+        "regenerate": "Regenerate",
+        "edit": "Edit",
+        "requestFailed": "Request failed"
+      },
+      "bookmark": {
+        "urlPlaceholder": "Paste a URL to bookmark…",
+        "fetchingTitle": "Fetching title…",
+        "descriptionPlaceholder": "Add a description…",
+        "changeUrl": "Change URL"
+      },
+      "calendar": {
+        "chooseTypesPrompt": "Choose which object types to plot on this calendar:",
+        "selectDateProperty": "Select a date property…",
+        "noObjectTypes": "No object types in this workspace yet.",
+        "save": "Save",
+        "moreCount": "+{{count}} more",
+        "today": "Today",
+        "exitFullscreen": "Exit fullscreen",
+        "fillWindow": "Fill the browser window",
+        "unknownType": "Unknown",
+        "allDay": "All day",
+        "noUpcomingItems": "No upcoming items.",
+        "upcoming": "Upcoming",
+        "newItem": "New item",
+        "titlePlaceholder": "Title…",
+        "create": "Create",
+        "days": {
+          "sun": "Sun",
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat"
+        }
+      },
+      "callout": {
+        "placeholder": "Callout"
+      },
+      "checklist": {
+        "settingsTitle": "Checklist settings",
+        "moveCheckedToBottom": "Move checked items to the bottom after 2s",
+        "dragToReorder": "Drag to reorder item",
+        "placeholder": "To-do",
+        "addItem": "Add item",
+        "itemDeleted": "Item deleted"
+      },
+      "columns": {
+        "addColumn": "Add column"
+      },
+      "database": {
+        "chooseViewPrompt": "Choose a view to embed:",
+        "selectViewPlaceholder": "Select a view…",
+        "untitled": "Untitled"
+      },
+      "heading": {
+        "placeholder": "Heading"
+      },
+      "maps": {
+        "queryPlaceholder": "Address, coordinates, or an origin -> destination route",
+        "openInGoogleMaps": "Open in Google Maps",
+        "expand": "Expand",
+        "mapTitle": "Map",
+        "mapFullscreenTitle": "Map, fullscreen",
+        "close": "Close"
+      },
+      "math": {
+        "placeholder": "e.g. E = mc^2"
+      },
+      "media": {
+        "urlPromptPlaceholder": "Paste a {{label}} URL, or upload below",
+        "labelImage": "image",
+        "labelVideo": "video",
+        "labelEmbedPage": "page to embed",
+        "orUploadFile": "Or upload a file…",
+        "uploadLabel": "Upload {{label}}…",
+        "labelPdf": "a PDF",
+        "labelAudio": "audio",
+        "labelFile": "a file",
+        "captionPlaceholder": "Caption",
+        "downloadImage": "Download image",
+        "clickToEnlarge": "Click to enlarge",
+        "download": "Download"
+      },
+      "mermaid": {
+        "renderError": "Could not render this diagram - check the syntax"
+      },
+      "quote": {
+        "placeholder": "Quote"
+      },
+      "rssFeed": {
+        "interval5": "5 minutes",
+        "interval15": "15 minutes",
+        "interval30": "30 minutes",
+        "interval60": "1 hour",
+        "interval360": "6 hours",
+        "interval720": "12 hours",
+        "interval1440": "24 hours",
+        "justNow": "Just now",
+        "minutesAgo": "{{count}}m ago",
+        "hoursAgo": "{{count}}h ago",
+        "daysAgo": "{{count}}d ago",
+        "autoColor": "Auto color",
+        "rename": "Rename",
+        "removeFeed": "Remove feed",
+        "feedUrlPlaceholder": "Feed or page URL…",
+        "addFeed": "+ Add feed",
+        "multipleFeedsFound": "Multiple feeds were found - pick one:",
+        "noFeedFound": "No RSS/Atom feed could be found at that URL",
+        "discoverFailed": "Could not discover a feed at that URL",
+        "addFailed": "Could not add this feed",
+        "title": "RSS feeds",
+        "subscribeDescription": "Subscribe to up to 10 feeds - items from all of them are merged and shown together.",
+        "noFeedsYet": "No feeds yet.",
+        "show": "Show",
+        "itemsCount": "{{count}} items",
+        "done": "Done",
+        "headerLabel": "RSS Feed",
+        "refresh": "Refresh",
+        "manageFeeds": "Manage feeds",
+        "noFeedsConfigured": "No feeds configured yet.",
+        "addAFeed": "Add a feed",
+        "noItemsYet": "No items yet."
+      },
+      "secret": {
+        "placeholder": "Secret text",
+        "clickToCopy": "Click to copy",
+        "noTextSet": "No text set yet",
+        "clickPencilToSet": "Click the pencil to set a secret",
+        "copied": "Copied!",
+        "copyFailed": "Copy failed",
+        "editSecret": "Edit secret"
+      },
+      "subObject": {
+        "showSubObjects": "Show sub-objects",
+        "linkExisting": "Link an existing object…",
+        "newButton": "+ New",
+        "noMatches": "No matches",
+        "creating": "Creating…",
+        "circularReference": "Can't embed this object's content here - it would create a circular reference.",
+        "tooDeep": "Nested too deeply to embed here - open the object directly to see its content.",
+        "showAsLink": "Show as link",
+        "embedContent": "Embed content"
+      },
+      "table": {
+        "exitFullscreen": "Exit fullscreen",
+        "fillWindow": "Fill the browser window",
+        "bold": "Bold",
+        "italic": "Italic",
+        "alignLeft": "Align left",
+        "alignCenter": "Align center",
+        "alignRight": "Align right",
+        "textColor": "Text color",
+        "cellBackground": "Cell background",
+        "clear": "Clear",
+        "mergeCells": "Merge cells",
+        "splitCell": "Split cell",
+        "toggleHeaderRow": "Toggle header row",
+        "toggleHeaderColumn": "Toggle header column",
+        "deleteRow": "Delete row",
+        "deleteColumn": "Delete column",
+        "insertColumn": "Insert column",
+        "insertRow": "Insert row"
+      },
+      "toggle": {
+        "placeholder": "Toggle"
+      },
+      "voting": {
+        "settingsTitle": "Voting settings",
+        "allowMultiple": "Allow voting on multiple items",
+        "votingDeadline": "Voting deadline",
+        "dragToReorder": "Drag to reorder item",
+        "upvote": "Upvote",
+        "downvote": "Downvote",
+        "optionPlaceholder": "Option",
+        "descriptionPlaceholder": "Description (optional)",
+        "votingClosed": "Voting closed",
+        "addOption": "Add option",
+        "itemDeleted": "Item deleted"
+      },
+      "whiteboard": {
+        "loading": "Loading whiteboard…",
+        "presenting": "Presenting",
+        "stopPresenting": "Stop presenting - everyone can draw again",
+        "startPresenting": "Start presenting - only you can draw while this is on",
+        "zoomOut": "Zoom out",
+        "zoomIn": "Zoom in",
+        "fitToContent": "Fit to content",
+        "exitFullscreen": "Exit fullscreen",
+        "fillWindow": "Fill the browser window"
+      }
+    }
+  },
+  "chat": {
+    "bubble": {
+      "title": "Chat"
+    },
+    "browseChannels": {
+      "title": "Channels",
+      "description": "Every channel is open - join one, or start a new one.",
+      "loading": "Loading…",
+      "empty": "No channels in this workspace yet.",
+      "open": "Open",
+      "join": "Join",
+      "newChannel": "New channel"
+    },
+    "composer": {
+      "placeholder": "Message",
+      "messageDeleted": "Message deleted",
+      "attachment": "Attachment",
+      "cancelReply": "Cancel reply",
+      "attachFile": "Attach a file",
+      "stopDictation": "Stop dictation",
+      "dictate": "Dictate",
+      "send": "Send",
+      "attachFailed": "Failed to attach \"{{filename}}\""
+    },
+    "conversationList": {
+      "title": "Chats",
+      "channels": "Channels",
+      "newChat": "New chat",
+      "loading": "Loading…",
+      "empty": "No conversations yet.",
+      "messageDeleted": "Message deleted",
+      "noMessagesYet": "No messages yet",
+      "leaveChannel": "Leave channel",
+      "deleteChat": "Delete chat",
+      "leaveConfirmTitle": "Leave #{{name}}?",
+      "deleteConfirmTitle": "Delete chat with {{name}}?",
+      "leaveConfirmDescription": "You can rejoin from the channel list any time - the channel and its history stay for everyone else.",
+      "deleteConfirmDescription": "This only removes it from your list - the other participant keeps their side of the conversation.",
+      "leave": "Leave",
+      "delete": "Delete"
+    },
+    "newChannelDialog": {
+      "title": "New channel",
+      "description": "Open to every member of the workspace you pick.",
+      "create": "Create channel",
+      "namePlaceholder": "channel-name"
+    },
+    "newChatDialog": {
+      "title": "New chat",
+      "description": "Enter the email of one or more registered users. Several emails (comma-separated) start a group.",
+      "start": "Start chat",
+      "emailsPlaceholder": "someone@example.com, other@example.com",
+      "errorFallback": "Could not start chat"
+    },
+    "messageBubble": {
+      "missedCall": "Missed call",
+      "declinedCall": "Declined call",
+      "callEnded": "Call ended · {{duration}}",
+      "delete": "Delete",
+      "messageDeleted": "Message deleted",
+      "attachment": "Attachment",
+      "reply": "Reply",
+      "read": "Read {{time}}",
+      "delivered": "Delivered"
+    },
+    "aiThread": {
+      "name": "Notorious AI",
+      "clearHistory": "Clear history",
+      "emptyPrompt": "Ask me to create objects, search for things, or update existing ones - e.g. \"Create a task called Review PR\".",
+      "thinking": "Thinking…",
+      "genericError": "Something went wrong - try again.",
+      "calledTool": "Called",
+      "dictate": "Dictate",
+      "stopDictation": "Stop dictation",
+      "send": "Send",
+      "placeholder": "Ask Notorious AI…"
+    },
+    "thread": {
+      "typing": "{{name}} is typing…",
+      "chatFallback": "Chat",
+      "callInProgress_one": "Call in progress · {{count}} participant",
+      "callInProgress_other": "Call in progress · {{count}} participants",
+      "joinCall": "Join call",
+      "ignore": "Ignore",
+      "leaveCall": "Leave call",
+      "call": "Call"
+    }
+  },
+  "calls": {
+    "controls": {
+      "microphone": "Microphone",
+      "camera": "Camera",
+      "speaker": "Speaker",
+      "default": "Default",
+      "micVolume": "Mic volume",
+      "outputVolume": "Output volume"
+    },
+    "view": {
+      "you": "You",
+      "someone": "Someone",
+      "muteMicrophone": "Mute microphone",
+      "unmuteMicrophone": "Unmute microphone",
+      "turnCameraOff": "Turn camera off",
+      "turnCameraOn": "Turn camera on",
+      "stopSharingScreen": "Stop sharing screen",
+      "shareScreen": "Share screen",
+      "callSettings": "Call settings",
+      "minimize": "Minimize",
+      "leaveCall": "Leave call",
+      "expandCall": "Expand call"
+    },
+    "incomingBanner": {
+      "incomingCall": "Incoming call…",
+      "decline": "Decline",
+      "accept": "Accept"
+    },
+    "preJoin": {
+      "micLevel": "Mic level",
+      "turnCameraOff": "Turn camera off",
+      "turnCameraOn": "Turn camera on",
+      "cancel": "Cancel",
+      "joinCall": "Join call",
+      "call": "Call"
+    }
+  },
+  "search": {
+    "close": "Close",
+    "selectObjectHint": "Select an object to view it here."
+  },
+  "objectDetail": {
+    "notPartOfShare": "This object isn't part of what was shared with you, or the link has been revoked.",
+    "removeReverifyProtectionTooltip": "Remove reverify protection",
+    "requireReauthTooltip": "Require re-authentication to view or edit this object",
+    "hideSections": "Hide viewing now/properties/sub-objects/backlinks/script",
+    "showSections": "Show viewing now/properties/sub-objects/backlinks/script",
+    "removeAsDashboard": "Remove as workspace dashboard",
+    "setAsDashboard": "Set as workspace dashboard",
+    "enableComments": "Enable comments on this object",
+    "disableComments": "Disable comments on this object",
+    "unlockBeforeDelete": "Unlock this object before deleting it",
+    "deleteObject": "Delete object",
+    "markDone": "Mark done",
+    "properties": "Properties",
+    "computedValue": "Computed Value",
+    "script": "Script"
+  },
+  "objectType": {
+    "viewTypes": {
+      "table": "Table",
+      "board": "Board",
+      "list": "List",
+      "gallery": "Gallery",
+      "calendar": "Calendar",
+      "timeline": "Timeline"
+    },
+    "newObject": "New {{name}}",
+    "createViewPrompt": "Create a view above to see your {{name}} objects.",
+    "close": "Close",
+    "selectObjectPrompt": "Select an object to view it here."
+  },
+  "workspacePicker": {
+    "greeting": "Hi {{name}}, choose a workspace",
+    "subtitle": "Workspaces keep your objects, views and collaborators separate.",
+    "newWorkspaceNamePlaceholder": "New workspace name",
+    "create": "Create",
+    "untitledWorkspace": "Untitled Workspace"
+  },
+  "sharePage": {
+    "linkExpiredTitle": "This link doesn't work anymore",
+    "linkExpiredDescription": "It may have been revoked, or it has expired.",
+    "sharedRole": "Shared · {{role}}"
+  },
+  "shareTarget": {
+    "nothingShared": "Nothing was shared.",
+    "contentExpired": "This shared content has expired or was already used.",
+    "title": "Share to Notorious",
+    "filesCount": "{{count}} file(s): {{files}}",
+    "workspaceLabel": "Workspace",
+    "createNewObject": "Create new object",
+    "addToExisting": "Add to existing object",
+    "objectTypeLabel": "Object type",
+    "titleLabel": "Title",
+    "searchPlaceholder": "Search {{type}}...",
+    "objectsFallback": "objects",
+    "noObjectsFound": "No objects found.",
+    "sharing": "Sharing...",
+    "confirm": "Confirm",
+    "genericError": "Something went wrong. Please try again."
+  },
+  "setupTwoFactor": {
+    "title": "Set up two-factor authentication",
+    "subtitle": "This instance requires 2FA before you can continue."
+  },
+  "register": {
+    "title": "Create your account",
+    "subtitle": "A personal workspace is created automatically",
+    "registrationDisabled": "Open registration is currently disabled on this instance. If a workspace owner invited you, you can still create your account below - just use the email address the invite was sent to.",
+    "password": "Password",
+    "passkey": "Passkey",
+    "fullNamePlaceholder": "Full name",
+    "passwordPlaceholder": "Password (min. 8 characters)",
+    "creatingAccount": "Creating account…",
+    "createAccount": "Create account",
+    "createAccountWithPasskey": "Create account with a passkey",
+    "alreadyHaveAccount": "Already have an account?",
+    "registrationFailed": "Registration failed",
+    "passkeyRegistrationFailed": "Passkey registration failed"
+  },
+  "properties": {
+    "field": {
+      "urlPlaceholder": "https://…",
+      "start": "Start",
+      "end": "End",
+      "formulaSuffix": "(formula)",
+      "rollupSuffix": "(rollup)"
+    },
+    "filePropertyField": {
+      "openFile": "Open file",
+      "remove": "Remove",
+      "uploadImage": "Upload image",
+      "uploadFile": "Upload file"
+    },
+    "relationPicker": {
+      "linkAnObject": "Link an object…",
+      "noMatches": "No matches"
+    },
+    "tagPicker": {
+      "empty": "Empty",
+      "noOptionsDefined": "No options defined yet"
+    }
+  },
+  "ui": {
+    "imageLoadError": {
+      "retryTitle": "Click to retry loading the image",
+      "message": "Couldn't load image — tap to retry"
+    },
+    "lightbox": {
+      "image": "Image",
+      "previous": "Previous",
+      "next": "Next",
+      "download": "Download image",
+      "close": "Close"
+    },
+    "progressPopup": {
+      "phases": {
+        "connecting": "Connecting to destination...",
+        "transferring": "Transferring...",
+        "encrypting": "Encrypting...",
+        "decrypting": "Decrypting...",
+        "importing": "Importing...",
+        "done": "Done",
+        "error": "Failed"
+      },
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "close": "Close",
+      "genericError": "Something went wrong."
     }
   }
 }

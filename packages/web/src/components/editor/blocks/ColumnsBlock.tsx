@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import type { ColumnsContent } from "@notorious/shared";
 import { Icon } from "../../ui/Icon.js";
 
@@ -9,6 +10,7 @@ interface ColumnsBlockProps {
 }
 
 export function ColumnsBlock({ content, onSave, renderColumn }: ColumnsBlockProps) {
+  const { t } = useTranslation();
   const columnCount = Math.max(2, content.columnCount || 2);
 
   return (
@@ -24,7 +26,7 @@ export function ColumnsBlock({ content, onSave, renderColumn }: ColumnsBlockProp
         onClick={() => onSave({ ...content, columnCount: columnCount + 1 })}
         className="mt-1 flex items-center gap-1 text-xs text-ink-muted hover:text-accent"
       >
-        <Icon name="plus" className="h-3 w-3" /> Add column
+        <Icon name="plus" className="h-3 w-3" /> {t("editor.blocks.columns.addColumn")}
       </button>
     </div>
   );

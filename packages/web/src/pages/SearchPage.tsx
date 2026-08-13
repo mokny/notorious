@@ -1,10 +1,12 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Icon } from "../components/ui/Icon.js";
 import { useBreakpoint } from "../hooks/useBreakpoint.js";
 import { SearchPanel } from "../components/search/SearchPanel.js";
 import { ObjectDetailPage } from "./ObjectDetailPage.js";
 
 export function SearchPage() {
+  const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,12 +47,12 @@ export function SearchPage() {
               }
               className="flex items-center gap-1.5 self-start px-4 pt-3 text-xs text-ink-muted hover:text-ink"
             >
-              <Icon name="close" className="h-3.5 w-3.5" /> Close
+              <Icon name="close" className="h-3.5 w-3.5" /> {t("search.close")}
             </button>
             <ObjectDetailPage workspaceId={workspaceId} objectId={openObjectId} />
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-ink-muted">Select an object to view it here.</div>
+          <div className="flex flex-1 items-center justify-center text-sm text-ink-muted">{t("search.selectObjectHint")}</div>
         ))}
     </div>
   );

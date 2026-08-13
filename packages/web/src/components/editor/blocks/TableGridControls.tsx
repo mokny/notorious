@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Editor } from "@tiptap/core";
 import { Icon } from "../../ui/Icon.js";
 import { withCellSelection } from "./tableSelection.js";
@@ -44,6 +45,7 @@ function measure(container: HTMLElement): Geometry | null {
  * recomputed on every editor transaction and on container resize.
  */
 export function TableGridControls({ editor, container }: { editor: Editor; container: HTMLElement }) {
+  const { t } = useTranslation();
   const [geometry, setGeometry] = useState<Geometry | null>(null);
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export function TableGridControls({ editor, container }: { editor: Editor; conta
           onClick={() => insertColumn(i)}
           className="pointer-events-auto absolute z-10 flex h-4 w-4 -translate-x-1/2 -translate-y-full items-center justify-center rounded bg-accent text-white opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-50"
           style={{ left: x, top: geometry.rowBoundaries[0]! - 2 }}
-          title="Insert column"
+          title={t("editor.blocks.table.insertColumn")}
         >
           <Icon name="plus" className="h-3 w-3" />
         </button>
@@ -94,7 +96,7 @@ export function TableGridControls({ editor, container }: { editor: Editor; conta
           onClick={() => insertRow(i)}
           className="pointer-events-auto absolute z-10 flex h-4 w-4 -translate-x-full -translate-y-1/2 items-center justify-center rounded bg-accent text-white opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-50"
           style={{ left: geometry.colBoundaries[0]! - 2, top: y }}
-          title="Insert row"
+          title={t("editor.blocks.table.insertRow")}
         >
           <Icon name="plus" className="h-3 w-3" />
         </button>

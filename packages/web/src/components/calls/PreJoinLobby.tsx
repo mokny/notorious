@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useCall, type PreJoinRequest } from "../../context/CallContext.js";
 import { useMediaDeviceList, supportsOutputDeviceSelection } from "./useMediaDevices.js";
 import { DeviceSelect, GainSlider } from "./CallDeviceControls.js";
@@ -16,6 +17,7 @@ import { Icon } from "../ui/Icon.js";
  * torn down again if they flip it back off or cancel/confirm.
  */
 export function PreJoinLobby() {
+  const { t } = useTranslation();
   const { phase, preJoin, cancelPreJoin, confirmPreJoin, micDeviceId, cameraDeviceId, speakerDeviceId, micGain, outputVolume, setMicDevice, setCameraDevice, setSpeakerDevice, setMicGain, setOutputVolume } = useCall();
   const [cameraOn, setCameraOn] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
@@ -165,16 +167,16 @@ export function PreJoinLobby() {
         <div className="h-1.5 w-40 overflow-hidden rounded-full bg-surface-raised">
           <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${Math.round(micLevel * 100)}%` }} />
         </div>
-        <span className="text-xs text-ink-muted">Mic level</span>
+        <span className="text-xs text-ink-muted">{t("calls.preJoin.micLevel")}</span>
       </div>
 
       <div className="w-full max-w-md space-y-3 rounded-lg border border-border bg-surface-raised p-3">
-        <DeviceSelect label="Microphone" value={micDeviceId} options={micDevices} onChange={(id) => void setMicDevice(id)} />
-        <DeviceSelect label="Camera" value={cameraDeviceId} options={cameraDevices} onChange={(id) => void setCameraDevice(id)} />
-        {canSelectSpeaker && <DeviceSelect label="Speaker" value={speakerDeviceId} options={speakerDevices} onChange={setSpeakerDevice} />}
+        <DeviceSelect label={t("calls.controls.microphone")} value={micDeviceId} options={micDevices} onChange={(id) => void setMicDevice(id)} />
+        <DeviceSelect label={t("calls.controls.camera")} value={cameraDeviceId} options={cameraDevices} onChange={(id) => void setCameraDevice(id)} />
+        {canSelectSpeaker && <DeviceSelect label={t("calls.controls.speaker")} value={speakerDeviceId} options={speakerDevices} onChange={setSpeakerDevice} />}
         <div className="border-t border-border pt-2 space-y-3">
-          <GainSlider label="Mic volume" value={micGain} onChange={setMicGain} />
-          <GainSlider label="Output volume" value={outputVolume} onChange={setOutputVolume} />
+          <GainSlider label={t("calls.controls.micVolume")} value={micGain} onChange={setMicGain} />
+          <GainSlider label={t("calls.controls.outputVolume")} value={outputVolume} onChange={setOutputVolume} />
         </div>
       </div>
 
@@ -182,7 +184,7 @@ export function PreJoinLobby() {
         <button
           onClick={() => setCameraOn((on) => !on)}
           className={`flex h-12 w-12 items-center justify-center rounded-full ${cameraOn ? "bg-surface-raised text-ink" : "bg-surface-raised text-ink-muted"}`}
-          title={cameraOn ? "Turn camera off" : "Turn camera on"}
+          title={cameraOn ? t("calls.preJoin.turnCameraOff") : t("calls.preJoin.turnCameraOn")}
         >
           <Icon name={cameraOn ? "video" : "video-off"} className="h-5 w-5" />
         </button>
@@ -193,7 +195,7 @@ export function PreJoinLobby() {
           onClick={handleCancel}
           disabled={joining}
           className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 text-white shadow-lg hover:opacity-90 disabled:opacity-50"
-          title="Cancel"
+          title={t("calls.preJoin.cancel")}
         >
           <Icon name="phone-off" className="h-6 w-6" />
         </button>
@@ -201,7 +203,7 @@ export function PreJoinLobby() {
           onClick={() => void handleConfirm()}
           disabled={joining}
           className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:opacity-90 disabled:opacity-50"
-          title={cachedRequest?.mode === "join" ? "Join call" : "Call"}
+          title={cachedRequest?.mode === "join" ? t("calls.preJoin.joinCall") : t("calls.preJoin.call")}
         >
           <Icon name={joining ? "refresh" : "phone"} className={`h-6 w-6 ${joining ? "animate-spin" : ""}`} />
         </button>

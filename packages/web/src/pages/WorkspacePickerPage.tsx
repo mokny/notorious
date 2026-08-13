@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { workspaceApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
@@ -8,6 +9,7 @@ import { TextField } from "../components/ui/TextField.js";
 import { Icon } from "../components/ui/Icon.js";
 
 export function WorkspacePickerPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -16,7 +18,7 @@ export function WorkspacePickerPage() {
   const { data: workspaces } = useQuery({ queryKey: ["workspaces"], queryFn: workspaceApi.list });
 
   const createWorkspace = useMutation({
-    mutationFn: () => workspaceApi.create({ name: name || "Untitled Workspace", icon: "sparkles" }),
+    mutationFn: () => workspaceApi.create({ name: name || t("workspacePicker.untitledWorkspace"), icon: "sparkles" }),
     onSuccess: async (workspace) => {
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       openWorkspace(workspace.id);
@@ -38,8 +40,8 @@ export function WorkspacePickerPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-16">
       <img src="/logo.png" alt="" className="mb-6 h-16 w-16 rounded-2xl" />
-      <h1 className="text-2xl font-semibold">Hi {user?.name?.split(" ")[0]}, choose a workspace</h1>
-      <p className="mt-1 text-sm text-ink-muted">Workspaces keep your objects, views and collaborators separate.</p>
+      <h1 className="text-2xl font-semibold">{t("workspacePicker.greeting", { name: user?.name?.split(" ")[0] })}</h1>
+      <p className="mt-1 text-sm text-ink-muted">{t("workspacePicker.subtitle")}</p>
 
       <div className="mt-8 space-y-2">
         {workspaces?.map((workspace) => (
@@ -55,9 +57,9 @@ export function WorkspacePickerPage() {
       </div>
 
       <form onSubmit={handleCreate} className="mt-8 flex gap-2">
-        <TextField placeholder="New workspace name" value={name} onChange={(e) => setName(e.target.value)} />
+        <TextField placeholder={t("workspacePicker.newWorkspaceNamePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
         <Button type="submit" variant="primary" disabled={createWorkspace.isPending}>
-          <Icon name="plus" /> Create
+          <Icon name="plus" /> {t("workspacePicker.create")}
         </Button>
       </form>
     </div>

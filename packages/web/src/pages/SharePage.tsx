@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import { Navigate, Outlet, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ResolvedShareLink } from "@notorious/shared";
 import { shareLinkApi } from "../lib/api/resources.js";
@@ -31,6 +32,7 @@ function useShareResolution(): ResolvedShareLink {
  *   access to browse anywhere else.
  */
 export function SharePage() {
+  const { t } = useTranslation();
   const { token } = useParams<{ token: string }>();
 
   const {
@@ -71,8 +73,8 @@ export function SharePage() {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-2 text-center">
         <Icon name="close" className="h-8 w-8 text-ink-muted" />
-        <p className="text-lg font-medium">This link doesn't work anymore</p>
-        <p className="text-sm text-ink-muted">It may have been revoked, or it has expired.</p>
+        <p className="text-lg font-medium">{t("sharePage.linkExpiredTitle")}</p>
+        <p className="text-sm text-ink-muted">{t("sharePage.linkExpiredDescription")}</p>
       </div>
     );
   }
@@ -89,7 +91,7 @@ export function SharePage() {
         <Icon name={resolved.workspaceIcon} className="h-5 w-5" />
         <span className="font-medium">{resolved.workspaceName}</span>
         <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs capitalize text-ink-muted">
-          Shared · {resolved.role}
+          {t("sharePage.sharedRole", { role: resolved.role })}
         </span>
       </header>
       <ShareResolutionContext.Provider value={resolved}>

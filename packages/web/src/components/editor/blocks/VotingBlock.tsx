@@ -1,4 +1,5 @@
 import { useRef, useState, type PointerEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -44,6 +45,7 @@ function VotingSettingsPopover({
   votingEndsAt: string | null;
   onSave: (allowMultipleVotes: boolean, votingEndsAt: string | null) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -55,7 +57,7 @@ function VotingSettingsPopover({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        title="Voting settings"
+        title={t("editor.blocks.voting.settingsTitle")}
         // Exempt from the object-lock (owner-only) - see
         // updateVotingSettingsSchema and ObjectDetailPage.tsx's
         // READ_ONLY_LOCK_ALLOW_CHECKLIST.
@@ -84,7 +86,7 @@ function VotingSettingsPopover({
               checked={allowMultipleVotes}
               onChange={(e) => void onSave(e.target.checked, votingEndsAt)}
             />
-            Allow voting on multiple items
+            {t("editor.blocks.voting.allowMultiple")}
           </label>
           <label className="flex items-center gap-2 text-xs">
             <input
@@ -94,7 +96,7 @@ function VotingSettingsPopover({
               checked={votingEndsAt !== null}
               onChange={(e) => void onSave(allowMultipleVotes, e.target.checked ? new Date(Date.now() + 86_400_000).toISOString() : null)}
             />
-            Voting deadline
+            {t("editor.blocks.voting.votingDeadline")}
           </label>
           {votingEndsAt !== null && (
             <input
@@ -138,6 +140,7 @@ function VotingItemRow({
   /** Bind as `onPointerDownCapture` on whatever carries `listeners` below - see useDragSelectGuard.ts. */
   onTouchArmStart: (event: PointerEvent) => void;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
   // Same touch-vs-hover split as BlockItem.tsx/ChecklistBlock.tsx.
   const hasHover = useHasHover();
@@ -195,7 +198,7 @@ function VotingItemRow({
             // reordering items is content editing, unlike the vote arrows next to it.
             className="mt-1.5 shrink-0 cursor-grab rounded p-0.5 text-ink-muted opacity-0 hover:bg-surface hover:text-ink group-hover/votingitem:opacity-100 disabled:opacity-0"
             style={{ visibility: readOnly ? "hidden" : "visible" }}
-            title="Drag to reorder item"
+            title={t("editor.blocks.voting.dragToReorder")}
           >
             <Icon name="grip-vertical" className="h-3.5 w-3.5" />
           </button>
@@ -213,7 +216,7 @@ function VotingItemRow({
             data-vote-exempt
             disabled={votingClosed}
             onClick={() => onVote("up")}
-            title="Upvote"
+            title={t("editor.blocks.voting.upvote")}
             className={`rounded p-0.5 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 ${
               summary.myVote === "up" ? "text-accent" : "text-ink-muted hover:text-ink"
             }`}
@@ -226,7 +229,7 @@ function VotingItemRow({
             data-vote-exempt
             disabled={votingClosed}
             onClick={() => onVote("down")}
-            title="Downvote"
+            title={t("editor.blocks.voting.downvote")}
             className={`rounded p-0.5 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 ${
               summary.myVote === "down" ? "text-red-500" : "text-ink-muted hover:text-ink"
             }`}
@@ -246,7 +249,7 @@ function VotingItemRow({
               onClick={() => !readOnly && setTitlePreviewOverridden(true)}
               className={`w-full text-sm font-medium ${readOnly ? "" : "cursor-text"}`}
             >
-              <HighlightedText text={item.title || "Option"} terms={searchTerms} />
+              <HighlightedText text={item.title || t("editor.blocks.voting.optionPlaceholder")} terms={searchTerms} />
             </div>
           ) : (
             <textarea
@@ -262,7 +265,7 @@ function VotingItemRow({
               onBlur={() => setTitlePreviewOverridden(false)}
               autoFocus={titlePreviewOverridden}
               readOnly={readOnly}
-              placeholder="Option"
+              placeholder={t("editor.blocks.voting.optionPlaceholder")}
               autoComplete="off"
               rows={1}
               className="w-full resize-none overflow-hidden border-none bg-transparent text-sm font-medium outline-none"
@@ -274,7 +277,7 @@ function VotingItemRow({
                 onClick={() => !readOnly && setDescriptionPreviewOverridden(true)}
                 className={`w-full text-xs text-ink-muted ${readOnly ? "" : "cursor-text"}`}
               >
-                <HighlightedText text={item.description || "Description (optional)"} terms={searchTerms} />
+                <HighlightedText text={item.description || t("editor.blocks.voting.descriptionPlaceholder")} terms={searchTerms} />
               </div>
             ) : (
               <input
@@ -283,7 +286,7 @@ function VotingItemRow({
                 onBlur={() => setDescriptionPreviewOverridden(false)}
                 autoFocus={descriptionPreviewOverridden}
                 readOnly={readOnly}
-                placeholder="Description (optional)"
+                placeholder={t("editor.blocks.voting.descriptionPlaceholder")}
                 autoComplete="off"
                 className="w-full border-none bg-transparent text-xs text-ink-muted outline-none"
               />
@@ -316,6 +319,7 @@ export function VotingBlock({
   /** Owner-only, exempt from the object lock - see updateVotingSettingsSchema. */
   onUpdateSettings: (allowMultipleVotes: boolean, votingEndsAt: string | null) => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const { readOnly, workspaceId, searchHighlight } = useBlockEditor();
   const searchTerms = searchHighlight?.terms ?? [];
   const { user } = useAuth();
@@ -413,7 +417,7 @@ export function VotingBlock({
   return (
     <div className="group/block space-y-1">
       <div className="flex items-center justify-end">
-        {votingClosed && <span className="mr-auto text-xs text-ink-muted">Voting closed</span>}
+        {votingClosed && <span className="mr-auto text-xs text-ink-muted">{t("editor.blocks.voting.votingClosed")}</span>}
         {isOwner && (
           <VotingSettingsPopover
             allowMultipleVotes={allowMultipleVotes}
@@ -452,11 +456,11 @@ export function VotingBlock({
       </DndContext>
       {!readOnly && (
         <button onClick={addItem} data-lock-hide className="flex items-center gap-1 text-xs text-ink-muted hover:text-accent">
-          <Icon name="plus" className="h-3 w-3" /> Add option
+          <Icon name="plus" className="h-3 w-3" /> {t("editor.blocks.voting.addOption")}
         </button>
       )}
 
-      {undoSnapshot && <UndoToast message="Item deleted" onUndo={undoSwipeDelete} />}
+      {undoSnapshot && <UndoToast message={t("editor.blocks.voting.itemDeleted")} onUndo={undoSwipeDelete} />}
     </div>
   );
 }
