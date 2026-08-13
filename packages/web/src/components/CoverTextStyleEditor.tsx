@@ -3,18 +3,29 @@ import type { CoverTextStyle } from "@notorious/shared";
 import { FONT_FAMILY_OPTIONS } from "../lib/coverTextStyle.js";
 import { useClickOutside } from "../hooks/useClickOutside.js";
 
-/** Popover for configuring the styling of the title overlaid on a cover image - see CoverImage.tsx, which owns the debounced save and passes the current draft style down as `style`. */
+/**
+ * Configures the styling of the title overlaid on a cover image - see
+ * CoverImage.tsx / CoverMenuItem.tsx, which own the debounced save and pass
+ * the current draft style down as `style`.
+ *
+ * `variant="popover"` (default) is CoverImage.tsx's desktop hover overlay -
+ * self-positioned, closes on outside click. `variant="inline"` is
+ * CoverMenuItem.tsx's mobile accordion row - plain block content, no
+ * positioning/outside-click handling of its own (already inside a Modal).
+ */
 export function CoverTextStyleEditor({
   style,
   onChange,
   onClose,
+  variant = "popover",
 }: {
   style: CoverTextStyle;
   onChange: (style: CoverTextStyle) => void;
   onClose: () => void;
+  variant?: "popover" | "inline";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  useClickOutside(containerRef, onClose);
+  useClickOutside(containerRef, onClose, variant === "popover");
 
   function set<K extends keyof CoverTextStyle>(key: K, value: CoverTextStyle[K]): void {
     onChange({ ...style, [key]: value });
@@ -23,7 +34,11 @@ export function CoverTextStyleEditor({
   return (
     <div
       ref={containerRef}
-      className="absolute right-3 top-14 z-20 w-64 space-y-3 rounded-lg border border-border bg-surface-raised p-3 text-sm text-ink shadow-lg"
+      className={
+        variant === "popover"
+          ? "absolute right-3 top-14 z-20 w-64 space-y-3 rounded-lg border border-border bg-surface-raised p-3 text-sm text-ink shadow-lg"
+          : "space-y-3 text-sm text-ink"
+      }
     >
       <div className="flex items-center gap-2">
         <label className="flex-1 text-xs text-ink-muted">Text color</label>

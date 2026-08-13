@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type SyntheticEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { CoverTextStyle } from "@notorious/shared";
-import { objectApi, fileApi } from "../lib/api/resources.js";
 import { withShareToken } from "../lib/api/shareMode.js";
-import { useDebouncedSave } from "../hooks/useDebouncedSave.js";
+import { useCoverActions } from "../hooks/useCoverActions.js";
 import { useFitText } from "../hooks/useFitText.js";
 import { useHasHover } from "../hooks/useHasHover.js";
 import { useRobustImage } from "../hooks/useRobustImage.js";
@@ -11,13 +8,14 @@ import { useTouchReveal } from "../hooks/useTouchReveal.js";
 import { HighlightableTitle } from "./editor/HighlightableTitle.js";
 import { HighlightedText } from "./editor/HighlightedText.js";
 import { useBreakpoint } from "../hooks/useBreakpoint.js";
-import { DEFAULT_COVER_TEXT_STYLE, coverTextCss } from "../lib/coverTextStyle.js";
+import { coverTextCss } from "../lib/coverTextStyle.js";
 import { CoverTextStyleEditor } from "./CoverTextStyleEditor.js";
 import { Icon } from "./ui/Icon.js";
 import { ImageLoadError } from "./ui/ImageLoadError.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { useMobileChrome } from "../context/MobileChromeContext.js";
 import { THEME_COLORS } from "../lib/themeColors.js";
+import type { CoverTextStyle } from "@notorious/shared";
 
 interface CoverImageProps {
   workspaceId: string;
@@ -33,11 +31,6 @@ interface CoverImageProps {
   icon: (size: number) => ReactNode;
   /** Search words to highlight in the title overlay - see HighlightableTitle.tsx. */
   highlightTerms?: string[];
-}
-
-/** Extracts the file id from a `fileApi.downloadUrl()`-shaped icon/cover value, so a replaced upload can clean up the one it's replacing. */
-function fileIdFromUrl(url: string): string | null {
-  return url.startsWith("/api/v1/files/") ? url.slice("/api/v1/files/".length) : null;
 }
 
 // On the phone breakpoint a cover is always full-bleed (WorkspaceLayout
@@ -74,22 +67,20 @@ export function CoverImage({
   icon,
   highlightTerms = [],
 }: CoverImageProps) {
-  const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [hover, setHover] = useState(false);
   const [styleEditorOpen, setStyleEditorOpen] = useState(false);
   const { theme } = useTheme();
   const { setCoverActive } = useMobileChrome();
   const isPhone = useBreakpoint() === "phone";
-  // Change/Remove/style-picker were only ever reachable via mouse hover -
-  // unreachable by touch, since a touch device never fires
-  // mouseenter/mouseleave (see useHasHover.ts). Swaps to the same
-  // tap-to-reveal pattern PinnedNavItem.tsx uses for its own hover-only
-  // controls on touch devices, while leaving real-hover devices on the
-  // existing mouseenter/mouseleave-driven `hover` state.
+  // Change/Remove/style-picker are hover-only controls - only ever
+  // reachable on hover-capable (md+) devices. Below md, MobileTopBar's "…"
+  // menu owns these actions instead (CoverMenuItem.tsx) since this overlay
+  // (absolute, top-right) collides with MobileTopBar's own floating pill
+  // there; see CoverMenuItem.tsx.
   const hasHover = useHasHover();
   const { touched, containerRef, onTouchStart } = useTouchReveal<HTMLDivElement>();
   const controlsVisible = hasHover ? hover : touched;
+  const { fileInputRef, style, setStyle, applyCover, handleUpload } = useCoverActions(workspaceId, objectId, cover, coverTextStyle);
 
   // Tells WorkspaceLayout's mobile header to switch to its transparent
   // overlay style while this cover is on screen, and restores the Dynamic
@@ -138,18 +129,9 @@ export function CoverImage({
       // A non-same-origin cover would taint the canvas and make
       // getImageData throw - falls back to just leaving the theme's own
       // status-bar color in place. Covers are always same-origin uploads
-      // (see fileIdFromUrl above), so this is only a safety net.
+      // (see useCoverActions.ts's fileIdFromUrl), so this is only a safety net.
     }
   }
-
-  const setCoverMutation = useMutation({
-    mutationFn: (newCover: string | null) => objectApi.update(objectId, { cover: newCover }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["object", objectId] }),
-  });
-
-  const [style, setStyle] = useDebouncedSave(coverTextStyle ?? DEFAULT_COVER_TEXT_STYLE, (value) =>
-    objectApi.update(objectId, { coverTextStyle: value }).then(() => undefined),
-  );
 
   const robustCover = useRobustImage(cover ? withShareToken(cover) : null);
 
@@ -167,18 +149,6 @@ export function CoverImage({
     // is what's *not* actually available to the title text.
     reservedWidth: () => (iconRef.current?.getBoundingClientRect().width ?? 0) + 8,
   });
-
-  async function applyCover(value: string | null) {
-    const previousCover = cover;
-    await setCoverMutation.mutateAsync(value);
-    const oldFileId = previousCover ? fileIdFromUrl(previousCover) : null;
-    if (oldFileId) void fileApi.remove(oldFileId).catch(() => {});
-  }
-
-  async function handleUpload(file: File) {
-    const asset = await fileApi.upload(workspaceId, file, objectId, undefined, "cover");
-    await applyCover(fileApi.downloadUrl(asset.id));
-  }
 
   const fileInput = (
     <input
@@ -302,7 +272,7 @@ export function CoverImage({
       </div>
 
       {controlsVisible && canEdit && (
-        <div className="absolute right-3 top-3 flex gap-1.5">
+        <div className="absolute right-3 top-3 hidden gap-1.5 md:flex">
           <button
             onClick={() => setStyleEditorOpen((v) => !v)}
             className="rounded-md bg-surface/90 px-2 py-1 text-xs text-ink shadow hover:bg-surface"

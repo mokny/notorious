@@ -10,10 +10,12 @@ import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
 import { useMobileChrome } from "../../context/MobileChromeContext.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useConfirm } from "../../context/ConfirmContext.js";
-import { isSharedSession } from "../../lib/api/shareMode.js";
+import { isSharedSession, getShareRole } from "../../lib/api/shareMode.js";
+import { roleAtLeast } from "@notorious/shared";
 import { ShareDialog } from "../ShareDialog.js";
 import { ExportMenu } from "../ExportMenu.js";
 import { ObjectSlugButton } from "../ObjectSlugButton.js";
+import { CoverMenuItem } from "../CoverMenuItem.js";
 import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "./IOSMenu.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -87,6 +89,13 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
   });
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
   const isLocked = Boolean(object?.lockedAt);
+  // Mirrors ObjectDetailPage.tsx's `effectiveCanEdit` (passed to CoverImage
+  // as `canEdit`) - an editor-role share-link visitor can edit the cover
+  // there despite `shareToken` being set, so gating CoverMenuItem on
+  // `!shareToken` like the member-only rows below would wrongly hide it for
+  // that visitor.
+  const shareRole = getShareRole();
+  const canEditCover = (!shareRole || roleAtLeast(shareRole, "editor")) && !isLocked;
   const { isPinned, toggle: togglePin } = useWorkspacePins(workspaceId);
   const pinned = object ? isPinned(object.id) : false;
   const isDashboard = workspace?.dashboardObjectId === object?.id;
@@ -277,6 +286,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                   setMenuOpen(false);
                 }}
               />
+              {canEditCover && <CoverMenuItem workspaceId={workspaceId} objectId={object.id} cover={object.cover} coverTextStyle={object.coverTextStyle} />}
               <ExportMenu variant="menuItem" workspaceId={workspaceId} objectId={object.id} title={title} />
               {!shareToken && (
                 <>
