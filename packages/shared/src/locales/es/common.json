@@ -1,0 +1,1052 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "search": "Buscar",
+    "pinned": "Fijados",
+    "recentlyViewed": "Vistos recientemente",
+    "recentlyEdited": "Editados recientemente",
+    "browseObjects": "Explorar objetos",
+    "sharedViaLink": "Viendo mediante un enlace compartido",
+    "shared": "Compartido",
+    "account": "Cuenta",
+    "settingsLabel": "Ajustes",
+    "switchWorkspace": "Cambiar de espacio de trabajo",
+    "accountSettings": "Ajustes de la cuenta",
+    "workspaceSettings": "Ajustes del espacio de trabajo",
+    "logOut": "Cerrar sesión",
+    "logOutConfirmTitle": "¿Cerrar sesión?",
+    "logOutConfirmDescription": "Se cerrará tu sesión en este dispositivo.",
+    "toggleTheme": "Cambiar tema",
+    "openMenu": "Abrir menú",
+    "loading": "Cargando…",
+    "untitled": "Sin título",
+    "notifications": {
+      "title": "Notificaciones",
+      "markAllRead": "Marcar todas como leídas",
+      "empty": "Aún no hay notificaciones.",
+      "commentedOn": "{{actor}} comentó en «{{title}}»"
+    },
+    "installHint": {
+      "prompt": "Instala Notorious en tu móvil para un acceso rápido a pantalla completa.",
+      "ios": "Instalar Notorious: toca <icon></icon> y luego «Añadir a pantalla de inicio».",
+      "android": "Instalar Notorious: abre el menú de tu navegador y elige «Añadir a la pantalla de inicio» o «Instalar aplicación».",
+      "install": "Instalar",
+      "dismiss": "Descartar"
+    },
+    "pushBanner": {
+      "blocked": "Las notificaciones push están bloqueadas en tu navegador. Actívalas en la configuración del sitio de tu navegador para recibir recordatorios, menciones e invitaciones.",
+      "prompt": "Activa las notificaciones push para recibir recordatorios, menciones e invitaciones.",
+      "enable": "Activar",
+      "dismiss": "Descartar"
+    },
+    "mobile": {
+      "back": "Atrás",
+      "more": "Más",
+      "home": "Inicio",
+      "newObject": "Nuevo objeto",
+      "chats": "Chats",
+      "search": "Buscar",
+      "noHistory": "Aún no se ha visitado ningún objeto en esta sesión.",
+      "unlockObject": "Desbloquear este objeto",
+      "lockObject": "Bloquear este objeto contra ediciones",
+      "objectLocked": "Este objeto está bloqueado contra ediciones",
+      "disableReverify": "Desactivar la reverificación",
+      "requireReverify": "Exigir reverificación",
+      "hideDetails": "Ocultar detalles",
+      "showDetails": "Mostrar detalles",
+      "unpinFromSidebar": "Desfijar de la barra lateral",
+      "pinToSidebar": "Fijar en la barra lateral",
+      "removeAsDashboard": "Quitar como panel principal",
+      "setAsDashboard": "Establecer como panel principal",
+      "enableComments": "Activar comentarios",
+      "disableComments": "Desactivar comentarios",
+      "share": "Compartir",
+      "delete": "Eliminar",
+      "lightMode": "Modo claro",
+      "darkMode": "Modo oscuro",
+      "refresh": "Actualizar",
+      "requireReverifyConfirmTitle": "¿Exigir reverificación?",
+      "requireReverifyConfirmDescription": "Cualquiera que abra este objeto -incluido tú- deberá reverificarse (contraseña o passkey) antes de verlo o editarlo.",
+      "requireReverifyConfirmLabel": "Exigir reverificación",
+      "removeReverifyConfirmTitle": "¿Eliminar la protección de reverificación?",
+      "removeReverifyConfirmDescription": "Este objeto será accesible sin reverificación, igual que cualquier otro objeto.",
+      "removeReverifyConfirmLabel": "Eliminar protección"
+    }
+  },
+  "settings": {
+    "title": "Ajustes de la cuenta",
+    "back": "Atrás",
+    "tabs": {
+      "profile": "Perfil",
+      "security": "Seguridad",
+      "notifications": "Notificaciones",
+      "apiKeys": "Claves de API",
+      "integrations": "Integraciones"
+    },
+    "profile": {
+      "avatar": "Avatar",
+      "uploadAvatar": "Subir avatar",
+      "removeAvatar": "Eliminar avatar",
+      "email": "Dirección de correo electrónico",
+      "currentPassword": "Contraseña actual",
+      "updateEmail": "Actualizar correo electrónico",
+      "emailUpdated": "Dirección de correo electrónico actualizada.",
+      "emailUpdateFailed": "No se pudo actualizar tu dirección de correo electrónico",
+      "avatarUploadFailed": "No se pudo subir el avatar",
+      "avatarRemoveFailed": "No se pudo eliminar el avatar",
+      "cropAvatarTitle": "Recorta tu avatar",
+      "cancel": "Cancelar",
+      "saveAvatar": "Guardar avatar",
+      "language": "Idioma",
+      "languageUpdateFailed": "No se pudo actualizar tu idioma"
+    },
+    "security": {
+      "password": "Contraseña",
+      "currentPassword": "Contraseña actual",
+      "passkeyOnlyNotice": "Esta cuenta se creó con una passkey y aún no tiene contraseña - configura una a continuación como opción de inicio de sesión de respaldo.",
+      "newPassword": "Nueva contraseña",
+      "updatePassword": "Actualizar contraseña",
+      "setPassword": "Establecer contraseña",
+      "passwordUpdateFailed": "No se pudo actualizar tu contraseña",
+      "passwordUpdated": "Contraseña actualizada. Se ha cerrado la sesión en tus otros dispositivos.",
+      "passwordSet": "Contraseña establecida.",
+      "twoFactor": "Autenticación de dos factores",
+      "twoFactorEnabled": "La autenticación de dos factores está activada en tu cuenta.",
+      "disable2fa": "Desactivar 2FA",
+      "disable2faFailed": "No se pudo desactivar la autenticación de dos factores",
+      "twoFactorDescription": "Añade una capa extra de seguridad exigiendo un código de una app de autenticación al iniciar sesión.",
+      "enable2fa": "Activar 2FA",
+      "setup2faTitle": "Configurar la autenticación de dos factores",
+      "passkeys": "Passkeys",
+      "addPasskey": "Añadir una passkey",
+      "passkeysDescription": "Inicia sesión sin contraseña usando Face ID, Touch ID, una llave de seguridad o el bloqueo de pantalla de tu dispositivo.",
+      "addPasskeyFailed": "No se pudo añadir la passkey",
+      "save": "Guardar",
+      "neverUsed": "Nunca usada",
+      "lastUsed": "Usada por última vez {{time}}",
+      "removePasskey": "Eliminar passkey",
+      "devices": "Dispositivos",
+      "logOutOtherDevices": "Cerrar sesión en todos los demás dispositivos",
+      "thisDevice": "Este dispositivo",
+      "unknownDevice": "Dispositivo desconocido",
+      "unknownIp": "IP desconocida",
+      "active": "Activo {{time}}",
+      "logOutThisDevice": "Cerrar sesión en este dispositivo",
+      "justNow": "Justo ahora",
+      "minutesAgo": "hace {{count}}m",
+      "hoursAgo": "hace {{count}}h",
+      "daysAgo": "hace {{count}}d",
+      "unknown": "Desconocido"
+    },
+    "notifications": {
+      "description": "Recibe una notificación push para recordatorios de tareas, invitaciones y asignaciones."
+    },
+    "apiKeys": {
+      "description": "Claves personales para que scripts y otros sistemas llamen a la API en tu nombre, en todos tus espacios de trabajo. Envíalas como <code>Authorization: Bearer TU_CLAVE</code>."
+    },
+    "integrations": {
+      "description": "Comparte imágenes, vídeos, documentos y enlaces directamente en Notorious desde el menú de compartir de tu móvil (una vez instalada como app en Android) o desde un marcador de navegador de escritorio."
+    },
+    "workspace": {
+      "title": "Ajustes del espacio de trabajo",
+      "footerVersion": "Notorious v{{version}}",
+      "tabs": {
+        "general": "General",
+        "members": "Miembros",
+        "sharing": "Compartir",
+        "ai": "IA",
+        "webhooks": "Webhooks",
+        "backup": "Copia de seguridad",
+        "dangerZone": "Zona de peligro"
+      },
+      "general": {
+        "description": "Renombra «{{name}}», elige un icono o sube tu propia imagen.",
+        "nameLabel": "Nombre del espacio de trabajo",
+        "weekStart": "La semana del calendario empieza el",
+        "sunday": "Domingo",
+        "monday": "Lunes",
+        "coverHeight": "Altura de la portada",
+        "imageLimitsDescription": "Reduce automáticamente las imágenes subidas que superen estas dimensiones en píxeles, recodificándolas como WebP. Deja un campo vacío para no aplicar límite (desactivado por defecto).",
+        "normalImages": "Imágenes normales (tamaño máx.)",
+        "width": "Ancho",
+        "height": "Alto",
+        "maxImageWidth": "Ancho máximo de imagen",
+        "maxImageHeight": "Alto máximo de imagen",
+        "coverImages": "Imágenes de portada (tamaño máx.)",
+        "maxCoverWidth": "Ancho máximo de portada",
+        "maxCoverHeight": "Alto máximo de portada",
+        "webpQuality": "Calidad WebP al redimensionar"
+      },
+      "members": {
+        "description": "Todos los que aparecen abajo tienen acceso a «{{name}}».",
+        "remove": "Quitar",
+        "invitePlaceholder": "Invitar por correo electrónico",
+        "invite": "Invitar",
+        "inviteError": "No se pudo invitar a esta persona",
+        "roles": {
+          "owner": "propietario",
+          "viewer": "espectador",
+          "commenter": "comentarista",
+          "editor": "editor"
+        }
+      },
+      "sharing": {
+        "description": "Comparte todo el espacio de trabajo mediante un enlace, sin necesidad de una cuenta. Elige un rol y, opcionalmente, una fecha de caducidad - puedes revocarlo en cualquier momento a continuación.",
+        "shareWorkspace": "Compartir espacio de trabajo",
+        "activeLinks": "Enlaces de compartición activos (espacio de trabajo y objetos individuales)"
+      },
+      "ai": {
+        "description": "Configura una clave de API de un proveedor de IA compartida por todos en este espacio de trabajo, usada por el Chat con Agente y los bloques de IA. Opcionalmente, limita el uso total de tokens y elige con qué frecuencia se restablece.",
+        "provider": {
+          "openai": "OpenAI",
+          "anthropic": "Anthropic",
+          "google": "Google (Gemini)",
+          "openai-compatible": "Compatible con OpenAI (Ollama, modelos locales, ...)"
+        },
+        "interval": {
+          "hourly": "Cada hora",
+          "daily": "Diario",
+          "weekly": "Semanal",
+          "monthly": "Mensual"
+        },
+        "resetOption": "Restablecer: {{interval}}",
+        "replaceCurrentConfig": "Reemplazar la configuración actual:",
+        "setupProvider": "Configura un proveedor de IA para compartir con todos en este espacio de trabajo:",
+        "modelPlaceholderGoogle": "Modelo (p. ej. gemini-3.5-flash-lite)",
+        "modelPlaceholderDefault": "Modelo (p. ej. gpt-4o, claude-sonnet-5)",
+        "baseUrlPlaceholder": "URL base (p. ej. http://localhost:11434/v1)",
+        "apiKeyPlaceholder": "Clave de API",
+        "maxTokensPlaceholder": "Tokens máximos por periodo (vacío = ilimitado)",
+        "save": "Guardar",
+        "saveConfigError": "No se pudo guardar esta configuración de IA - revisa los valores e inténtalo de nuevo.",
+        "quickSaveError": "No se pudo guardar - revisa los valores e inténtalo de nuevo.",
+        "remove": "Quitar",
+        "modelLabel": "Modelo: {{model}}",
+        "tokenUsagePeriod": "Uso de tokens en este periodo",
+        "unlimited": "(ilimitado)",
+        "resetsAt": "Se restablece {{interval}} - próximo reinicio {{date}}",
+        "quickEdit": "Edición rápida",
+        "replaceConfig": "Reemplazar configuración",
+        "adjustTokenLimit": "Ajusta el límite de tokens y la periodicidad del reinicio sin tocar la clave de API:",
+        "agentChatContext": "Contexto del Chat con Agente",
+        "agentChatContextDescription": "Controla qué sabe el Chat con Agente al responder - no los bloques de IA usados directamente en las páginas.",
+        "purposeLabel": "Propósito y comportamiento del espacio de trabajo",
+        "purposePlaceholder": "p. ej. «Este espacio de trabajo gestiona nuestros tickets de soporte - sé conciso y pregunta siempre antes de archivar algo.»",
+        "purposeHelp": "Se añade a las instrucciones del agente para todos en este espacio de trabajo.",
+        "chatHistoryLabel": "Historial de chat enviado al agente",
+        "chatHistoryNone": "Ninguno",
+        "chatHistoryLast": "Últimos {{count}} mensajes",
+        "chatHistoryHelp": "Cuánta de tu propia conversación anterior ve el agente en cada mensaje nuevo.",
+        "activityFeedLabel": "Permitir que el agente consulte la actividad reciente del espacio de trabajo",
+        "activityFeedDescription": "Le permite responder cosas como «¿qué ha cambiado recientemente?» leyendo el registro de actividad (objetos creados/actualizados/archivados por cualquiera en este espacio de trabajo). Desactivado por defecto.",
+        "saved": "Guardado.",
+        "contextSaveError": "No se pudo guardar - inténtalo de nuevo."
+      },
+      "webhooks": {
+        "description": "Recibe una petición HTTP POST con el objeto completo cada vez que algo cambie en este espacio de trabajo - útil para sincronizar con otro sistema o activar tu propia automatización.",
+        "event": {
+          "created": "Creado",
+          "updated": "Actualizado",
+          "archived": "Archivado",
+          "restored": "Restaurado",
+          "deleted": "Eliminado"
+        },
+        "secretWarningPrefix": "Copia este secreto de firma ahora - no se volverá a mostrar. Úsalo para verificar la cabecera",
+        "secretWarningSuffix": "en cada entrega.",
+        "copy": "Copiar",
+        "dismiss": "Descartar",
+        "lastDelivery": "Última entrega {{time}} - {{status}}",
+        "neverTriggered": "Aún no se ha activado nunca",
+        "sendTestDelivery": "Enviar una entrega de prueba",
+        "enabled": "Activado",
+        "deleteWebhook": "Eliminar este webhook",
+        "testSent": "Entrega de prueba enviada - comprueba el estado arriba en cuanto llegue.",
+        "testFailed": "No se pudo enviar la entrega de prueba.",
+        "noWebhooks": "Aún no hay webhooks.",
+        "addWebhook": "Añadir webhook"
+      },
+      "backup": {
+        "description": "Cada copia de seguridad se cifra con el código de este espacio de trabajo que aparece abajo. Descarga una manualmente, restaura una como un espacio de trabajo completamente nuevo, o configura copias de seguridad automáticas programadas a uno o varios destinos.",
+        "downloadBackup": "Descargar copia de seguridad",
+        "restoreFromZip": "Restaurar desde ZIP",
+        "downloadedToast": "Copia de seguridad descargada.",
+        "downloadFailed": "Error en la descarga",
+        "restoredToast": "Restaurado como un nuevo espacio de trabajo - consulta el selector de espacios de trabajo.",
+        "restoreFailed": "No se pudo restaurar esta copia de seguridad",
+        "enterCodeTitle": "Introduce el código de la copia de seguridad",
+        "enterCodeDescription": "Esta copia de seguridad está cifrada. Introduce el código de copia de seguridad del espacio de trabajo para restaurarla.",
+        "codePlaceholder": "Código de copia de seguridad",
+        "restore": "Restaurar",
+        "downloadingTitle": "Descargando copia de seguridad",
+        "restoringTitle": "Restaurando copia de seguridad",
+        "encryptionCode": "Código de cifrado",
+        "encryptionCodeDescription": "Cada copia de seguridad (descarga manual o programada) se cifra con este código. Guárdalo en un lugar seguro - sin él, una copia de seguridad no se puede restaurar, y no hay forma de recuperarla si se pierde.",
+        "copy": "Copiar",
+        "showCode": "Mostrar código",
+        "generateNewCode": "Generar nuevo código",
+        "codeRegeneratedWarning": "Se ha generado un nuevo código. Las copias de seguridad hechas con el código anterior ya no se pueden restaurar.",
+        "schedule": "Programación",
+        "weekday": {
+          "mon": "lun",
+          "tue": "mar",
+          "wed": "mié",
+          "thu": "jue",
+          "fri": "vie",
+          "sat": "sáb",
+          "sun": "dom"
+        },
+        "time": "Hora",
+        "every": "Cada",
+        "weeks": "semana(s)",
+        "enabled": "Activado",
+        "saveSchedule": "Guardar programación",
+        "timezoneMismatch": "La hora de esta programación se estableció en {{timezone}}, no en tu zona horaria actual ({{browserTimezone}}) - guarda de nuevo para cambiarla a tu hora local.",
+        "nextRun": "Próxima ejecución: {{time}}",
+        "lastRun": "Última ejecución {{time}} - {{status}}",
+        "destinations": "Destinos",
+        "backupNow": "Hacer copia de seguridad ahora",
+        "runFailed": "No se pudo iniciar la ejecución de la copia de seguridad",
+        "destinationType": {
+          "local": "Disco local",
+          "sftp": "SFTP",
+          "ftp": "FTP",
+          "samba": "Samba / SMB"
+        },
+        "keepsLast": "Conserva las últimas {{count}} copias de seguridad",
+        "neverRun": "Nunca ejecutado",
+        "backupFilesTitle": "Archivos de copia de seguridad en este destino",
+        "testConnection": "Probar conexión",
+        "deleteDestination": "Eliminar este destino",
+        "connectionOk": "Conexión correcta.",
+        "testFailed": "Prueba fallida.",
+        "loadingFiles": "Cargando archivos de copia de seguridad...",
+        "loadFilesError": "No se pudieron cargar los archivos de copia de seguridad.",
+        "noFilesAtDestination": "Aún no hay archivos de copia de seguridad en este destino.",
+        "download": "Descargar",
+        "restoreAsNewWorkspace": "Restaurar como nuevo espacio de trabajo",
+        "deleteBackupFile": "Eliminar este archivo de copia de seguridad",
+        "noDestinations": "Aún no hay destinos de copia de seguridad.",
+        "namePlaceholder": "Nombre",
+        "hostPlaceholder": "Host",
+        "portPlaceholder": "Puerto",
+        "sharePlaceholder": "Recurso compartido",
+        "remotePathPlaceholder": "Ruta remota",
+        "usernamePlaceholder": "Nombre de usuario",
+        "passwordPlaceholder": "Contraseña",
+        "domainPlaceholder": "Dominio (opcional)",
+        "ftps": "FTPS",
+        "addDestination": "Añadir destino",
+        "cancel": "Cancelar",
+        "retentionCountTitle": "Número de copias de seguridad a conservar",
+        "restoreConfirmTitle": "¿Restaurar esta copia de seguridad como un nuevo espacio de trabajo?",
+        "restoreConfirmDescription": "Esto crea un espacio de trabajo completamente nuevo a partir de este archivo de copia de seguridad - tu espacio de trabajo actual nunca se modifica ni se sobrescribe.",
+        "restoreConfirmLabel": "Restaurar",
+        "deleteFileConfirmTitle": "¿Eliminar este archivo de copia de seguridad?",
+        "deleteFileConfirmDescription": "Esto lo elimina permanentemente del destino. No se puede deshacer.",
+        "deleteFileConfirmLabel": "Eliminar",
+        "regenerateConfirmTitle": "¿Generar un nuevo código de copia de seguridad?",
+        "regenerateConfirmDescription": "Toda copia de seguridad ya hecha con el código actual quedará permanentemente ilegible - no hay forma de recuperarlas sin el código antiguo. Asegúrate de que ya no necesitas ninguna antes de continuar.",
+        "regenerateConfirmLabel": "Generar nuevo código"
+      },
+      "dangerZone": {
+        "description": "Elimina este espacio de trabajo de forma permanente para todos - cada objeto, bloque, archivo, vista y el acceso de cada miembro. No es reversible; descarga primero una copia de seguridad si podrías necesitar algo de esto más adelante.",
+        "deleteConfirmTitle": "¿Eliminar «{{name}}»?",
+        "deleteConfirmDescription": "Esto elimina todo el espacio de trabajo para todos: cada objeto, bloque, archivo, vista y el acceso de cada miembro. No se puede deshacer.",
+        "deleteConfirmButton": "Eliminar espacio de trabajo",
+        "deleteButton": "Eliminar este espacio de trabajo"
+      }
+    }
+  },
+  "login": {
+    "title": "Notorious",
+    "subtitle": "Inicia sesión en tu espacio de trabajo",
+    "twoFactorTitle": "Autenticación de dos factores",
+    "enterBackupCode": "Introduce uno de tus códigos de respaldo",
+    "enterAuthCode": "Introduce el código de 6 dígitos de tu app de autenticación",
+    "backupCodePlaceholder": "Código de respaldo",
+    "codePlaceholder": "Código de 6 dígitos",
+    "verifying": "Verificando…",
+    "verify": "Verificar",
+    "invalidCode": "Código no válido",
+    "useAuthCodeInstead": "Usar el código de autenticación en su lugar",
+    "useBackupCodeInstead": "Usar un código de respaldo en su lugar",
+    "signInWithPasskey": "Iniciar sesión con una passkey",
+    "waitingForPasskey": "Esperando la passkey…",
+    "passkeySignInFailed": "Error al iniciar sesión con passkey",
+    "or": "o",
+    "emailPlaceholder": "Correo electrónico",
+    "passwordPlaceholder": "Contraseña",
+    "signingIn": "Iniciando sesión…",
+    "signIn": "Iniciar sesión",
+    "loginFailed": "Error al iniciar sesión",
+    "noAccount": "¿No tienes cuenta?",
+    "createOne": "Crea una"
+  },
+  "push": {
+    "mention": {
+      "title": "{{actor}} comentó en «{{title}}»"
+    },
+    "chat": {
+      "attachment": "Envió un archivo adjunto",
+      "reaction": "reaccionó con {{emoji}} a «{{preview}}»",
+      "reactionToYourMessage": "reaccionó con {{emoji}} a tu mensaje"
+    }
+  },
+  "views": {
+    "common": {
+      "noObjects": "Aún no hay objetos."
+    },
+    "board": {
+      "noPivotProperty": "Elige una propiedad de estado/selección como propiedad de columna de este tablero en los ajustes de la vista.",
+      "noStatus": "Sin estado"
+    },
+    "calendar": {
+      "noDateProperty": "Este tipo de objeto no tiene una propiedad de fecha que representar en un calendario.",
+      "moreCount": "+{{count}} más",
+      "day": {
+        "sun": "dom",
+        "mon": "lun",
+        "tue": "mar",
+        "wed": "mié",
+        "thu": "jue",
+        "fri": "vie",
+        "sat": "sáb"
+      }
+    },
+    "table": {
+      "title": "Título"
+    },
+    "timeline": {
+      "noDateProperty": "Este tipo de objeto no tiene una propiedad de fecha que representar en una línea de tiempo.",
+      "noDatedObjects": "Aún no hay objetos con fecha."
+    }
+  },
+  "editor": {
+    "dropzone": {
+      "uploading": "Subiendo…",
+      "dropToAttach": "Suelta los archivos aquí para adjuntarlos"
+    },
+    "undoToast": {
+      "blockDeleted": "Bloque eliminado",
+      "undo": "Deshacer"
+    },
+    "blockMenu": {
+      "blockId": "ID del bloque",
+      "blockIdPlaceholder": "p. ej. total_price",
+      "reference": "Haz referencia a este bloque desde plantillas como blocks.{{value}}.",
+      "saveIdFailed": "No se pudo guardar este ID",
+      "saveId": "Guardar ID",
+      "deleteBlock": "Eliminar bloque"
+    },
+    "slugButton": {
+      "title": "ID del bloque (para plantillas)",
+      "blockId": "ID del bloque",
+      "blockIdPlaceholder": "p. ej. total_price",
+      "reference": "Haz referencia a este bloque desde plantillas como blocks.{{value}}.",
+      "saveFailed": "No se pudo guardar este ID",
+      "save": "Guardar"
+    },
+    "blockItem": {
+      "addBlockBelow": "Añadir bloque debajo",
+      "dragToReorder": "Arrastra para reordenar",
+      "deleteBlock": "Eliminar bloque"
+    },
+    "blockList": {
+      "addBlock": "Añadir bloque"
+    },
+    "search": {
+      "matchCount": "{{current}} de {{total}}",
+      "previousMatch": "Coincidencia anterior",
+      "nextMatch": "Siguiente coincidencia",
+      "close": "Cerrar"
+    },
+    "slashCommand": {
+      "items": {
+        "paragraph": {
+          "label": "Texto",
+          "description": "Párrafo simple"
+        },
+        "heading": {
+          "label": "Encabezado",
+          "description": "Encabezado de sección"
+        },
+        "quote": {
+          "label": "Cita",
+          "description": "Cita destacada"
+        },
+        "callout": {
+          "label": "Destacado",
+          "description": "Nota resaltada con un icono"
+        },
+        "checklist": {
+          "label": "Lista de tareas",
+          "description": "Elementos pendientes con casillas"
+        },
+        "table": {
+          "label": "Tabla",
+          "description": "Filas y columnas simples"
+        },
+        "code": {
+          "label": "Código",
+          "description": "Bloque de código con resaltado de sintaxis"
+        },
+        "image": {
+          "label": "Imagen",
+          "description": "Subir o incrustar una imagen"
+        },
+        "video": {
+          "label": "Vídeo",
+          "description": "Incrustar un vídeo"
+        },
+        "embed": {
+          "label": "Incrustación",
+          "description": "Incrustar un enlace"
+        },
+        "pdf": {
+          "label": "PDF",
+          "description": "Sube un PDF, ampliable para verlo en línea"
+        },
+        "audio": {
+          "label": "Audio",
+          "description": "Sube un archivo de audio con reproductor"
+        },
+        "file": {
+          "label": "Archivo",
+          "description": "Sube cualquier otro archivo como tarjeta de descarga"
+        },
+        "maps": {
+          "label": "Mapas",
+          "description": "Incrustar una dirección, coordenadas o ruta de Google Maps"
+        },
+        "math": {
+          "label": "Matemáticas",
+          "description": "Fórmula LaTeX"
+        },
+        "mermaid": {
+          "label": "Diagrama Mermaid",
+          "description": "Diagramas de flujo y otros diagramas"
+        },
+        "toggle": {
+          "label": "Desplegable",
+          "description": "Sección plegable"
+        },
+        "secret": {
+          "label": "Secreto",
+          "description": "Texto oculto, revelado solo al copiarlo al portapapeles"
+        },
+        "divider": {
+          "label": "Separador",
+          "description": "Línea horizontal"
+        },
+        "columns": {
+          "label": "Columnas",
+          "description": "Diseño en columnas paralelas"
+        },
+        "database_view": {
+          "label": "Vista enlazada",
+          "description": "Incrustar una vista guardada de objetos"
+        },
+        "sub_object": {
+          "label": "Objeto existente",
+          "description": "Enlaza un objeto existente, ampliable a sus propios subobjetos"
+        },
+        "bookmark": {
+          "label": "Marcador",
+          "description": "Guardar un enlace con título y descripción"
+        },
+        "whiteboard": {
+          "label": "Pizarra",
+          "description": "Dibuja con formas, flechas y trazo libre"
+        },
+        "calendar": {
+          "label": "Calendario",
+          "description": "Calendario de año/mes/semana/día/agenda sobre uno o varios tipos de objeto"
+        },
+        "voting": {
+          "label": "Votación",
+          "description": "Lista estilo Reddit con votos a favor/en contra en cada elemento"
+        },
+        "ai": {
+          "label": "IA",
+          "description": "Envía un prompt a la IA y sustitúyelo por la respuesta"
+        },
+        "rssFeed": {
+          "label": "Feed RSS",
+          "description": "Sigue uno o varios feeds RSS/Atom"
+        }
+      },
+      "createAndEmbed": "Crear un nuevo {{name}} e incrustarlo aquí"
+    },
+    "templateSuggestion": {
+      "namespace": {
+        "object": "El objeto al que pertenece este campo",
+        "blocks": "Los propios bloques de este objeto, por slug",
+        "objects": "Referencia entre objetos: objects.<slug>",
+        "variables": "Variables del espacio de trabajo, por nombre",
+        "http": "Solicitud HTTP saliente: http.get(url), http.post(url, body), …"
+      }
+    },
+    "blocks": {
+      "ai": {
+        "promptPlaceholder": "Pregúntale algo a la IA…",
+        "includeContext": "Incluir el contenido de esta página como contexto",
+        "confirmTitle": "¿Enviar el contenido de la página a la IA?",
+        "confirmDescription": "El título y el contenido completo de esta página se enviarán, junto con tu prompt, al proveedor de IA configurado en Ajustes. Actívalo solo si estás cómodo compartiendo el contenido de esta página con ese proveedor.",
+        "confirmLabel": "Incluir el contenido de la página",
+        "dontShowAgain": "No volver a mostrar esto",
+        "generating": "Generando…",
+        "send": "Enviar",
+        "regenerating": "Regenerando…",
+        "regenerate": "Regenerar",
+        "edit": "Editar",
+        "requestFailed": "La solicitud falló"
+      },
+      "bookmark": {
+        "urlPlaceholder": "Pega una URL para guardarla como marcador…",
+        "fetchingTitle": "Obteniendo el título…",
+        "descriptionPlaceholder": "Añadir una descripción…",
+        "changeUrl": "Cambiar URL"
+      },
+      "calendar": {
+        "chooseTypesPrompt": "Elige qué tipos de objeto representar en este calendario:",
+        "selectDateProperty": "Selecciona una propiedad de fecha…",
+        "noObjectTypes": "Aún no hay tipos de objeto en este espacio de trabajo.",
+        "save": "Guardar",
+        "moreCount": "+{{count}} más",
+        "today": "Hoy",
+        "exitFullscreen": "Salir de pantalla completa",
+        "fillWindow": "Llenar la ventana del navegador",
+        "unknownType": "Desconocido",
+        "allDay": "Todo el día",
+        "noUpcomingItems": "No hay elementos próximos.",
+        "upcoming": "Próximos",
+        "newItem": "Nuevo elemento",
+        "titlePlaceholder": "Título…",
+        "create": "Crear",
+        "days": {
+          "sun": "dom",
+          "mon": "lun",
+          "tue": "mar",
+          "wed": "mié",
+          "thu": "jue",
+          "fri": "vie",
+          "sat": "sáb"
+        }
+      },
+      "callout": {
+        "placeholder": "Destacado"
+      },
+      "checklist": {
+        "settingsTitle": "Ajustes de la lista de tareas",
+        "moveCheckedToBottom": "Mover los elementos marcados al final tras 2s",
+        "dragToReorder": "Arrastra para reordenar el elemento",
+        "placeholder": "Tarea",
+        "addItem": "Añadir elemento",
+        "itemDeleted": "Elemento eliminado"
+      },
+      "columns": {
+        "addColumn": "Añadir columna"
+      },
+      "database": {
+        "chooseViewPrompt": "Elige una vista para incrustar:",
+        "selectViewPlaceholder": "Selecciona una vista…",
+        "untitled": "Sin título"
+      },
+      "heading": {
+        "placeholder": "Encabezado"
+      },
+      "maps": {
+        "queryPlaceholder": "Dirección, coordenadas o una ruta origen -> destino",
+        "openInGoogleMaps": "Abrir en Google Maps",
+        "expand": "Expandir",
+        "mapTitle": "Mapa",
+        "mapFullscreenTitle": "Mapa, pantalla completa",
+        "close": "Cerrar"
+      },
+      "math": {
+        "placeholder": "p. ej. E = mc^2"
+      },
+      "media": {
+        "urlPromptPlaceholder": "Pega una URL de {{label}}, o súbelo abajo",
+        "labelImage": "imagen",
+        "labelVideo": "vídeo",
+        "labelEmbedPage": "página para incrustar",
+        "orUploadFile": "O sube un archivo…",
+        "uploadLabel": "Subir {{label}}…",
+        "labelPdf": "un PDF",
+        "labelAudio": "audio",
+        "labelFile": "un archivo",
+        "captionPlaceholder": "Leyenda",
+        "downloadImage": "Descargar imagen",
+        "clickToEnlarge": "Haz clic para ampliar",
+        "download": "Descargar"
+      },
+      "mermaid": {
+        "renderError": "No se pudo renderizar este diagrama - comprueba la sintaxis"
+      },
+      "quote": {
+        "placeholder": "Cita"
+      },
+      "rssFeed": {
+        "interval5": "5 minutos",
+        "interval15": "15 minutos",
+        "interval30": "30 minutos",
+        "interval60": "1 hora",
+        "interval360": "6 horas",
+        "interval720": "12 horas",
+        "interval1440": "24 horas",
+        "justNow": "Justo ahora",
+        "minutesAgo": "hace {{count}}m",
+        "hoursAgo": "hace {{count}}h",
+        "daysAgo": "hace {{count}}d",
+        "autoColor": "Color automático",
+        "rename": "Renombrar",
+        "removeFeed": "Eliminar feed",
+        "feedUrlPlaceholder": "URL del feed o de la página…",
+        "addFeed": "+ Añadir feed",
+        "multipleFeedsFound": "Se encontraron varios feeds - elige uno:",
+        "noFeedFound": "No se encontró ningún feed RSS/Atom en esa URL",
+        "discoverFailed": "No se pudo descubrir ningún feed en esa URL",
+        "addFailed": "No se pudo añadir este feed",
+        "title": "Feeds RSS",
+        "subscribeDescription": "Suscríbete a hasta 10 feeds - los elementos de todos ellos se combinan y se muestran juntos.",
+        "noFeedsYet": "Aún no hay feeds.",
+        "show": "Mostrar",
+        "itemsCount": "{{count}} elementos",
+        "done": "Listo",
+        "headerLabel": "Feed RSS",
+        "refresh": "Actualizar",
+        "manageFeeds": "Gestionar feeds",
+        "noFeedsConfigured": "Aún no hay feeds configurados.",
+        "addAFeed": "Añadir un feed",
+        "noItemsYet": "Aún no hay elementos."
+      },
+      "secret": {
+        "placeholder": "Texto secreto",
+        "clickToCopy": "Haz clic para copiar",
+        "noTextSet": "Aún no hay texto establecido",
+        "clickPencilToSet": "Haz clic en el lápiz para establecer un secreto",
+        "copied": "¡Copiado!",
+        "copyFailed": "Error al copiar",
+        "editSecret": "Editar secreto"
+      },
+      "subObject": {
+        "showSubObjects": "Mostrar subobjetos",
+        "linkExisting": "Enlazar un objeto existente…",
+        "newButton": "+ Nuevo",
+        "noMatches": "Sin coincidencias",
+        "creating": "Creando…",
+        "circularReference": "No se puede incrustar el contenido de este objeto aquí - crearía una referencia circular.",
+        "tooDeep": "Anidado demasiado profundo para incrustarlo aquí - abre el objeto directamente para ver su contenido.",
+        "showAsLink": "Mostrar como enlace",
+        "embedContent": "Incrustar contenido"
+      },
+      "table": {
+        "exitFullscreen": "Salir de pantalla completa",
+        "fillWindow": "Llenar la ventana del navegador",
+        "bold": "Negrita",
+        "italic": "Cursiva",
+        "alignLeft": "Alinear a la izquierda",
+        "alignCenter": "Centrar",
+        "alignRight": "Alinear a la derecha",
+        "textColor": "Color de texto",
+        "cellBackground": "Fondo de celda",
+        "clear": "Quitar",
+        "mergeCells": "Combinar celdas",
+        "splitCell": "Dividir celda",
+        "toggleHeaderRow": "Alternar fila de encabezado",
+        "toggleHeaderColumn": "Alternar columna de encabezado",
+        "deleteRow": "Eliminar fila",
+        "deleteColumn": "Eliminar columna",
+        "insertColumn": "Insertar columna",
+        "insertRow": "Insertar fila"
+      },
+      "toggle": {
+        "placeholder": "Desplegable"
+      },
+      "voting": {
+        "settingsTitle": "Ajustes de votación",
+        "allowMultiple": "Permitir votar en varios elementos",
+        "votingDeadline": "Plazo de votación",
+        "dragToReorder": "Arrastra para reordenar el elemento",
+        "upvote": "Voto a favor",
+        "downvote": "Voto en contra",
+        "optionPlaceholder": "Opción",
+        "descriptionPlaceholder": "Descripción (opcional)",
+        "votingClosed": "Votación cerrada",
+        "addOption": "Añadir opción",
+        "itemDeleted": "Elemento eliminado"
+      },
+      "whiteboard": {
+        "loading": "Cargando pizarra…",
+        "presenting": "Presentando",
+        "stopPresenting": "Detener presentación - todos pueden volver a dibujar",
+        "startPresenting": "Iniciar presentación - solo tú puedes dibujar mientras esté activo",
+        "zoomOut": "Alejar",
+        "zoomIn": "Acercar",
+        "fitToContent": "Ajustar al contenido",
+        "exitFullscreen": "Salir de pantalla completa",
+        "fillWindow": "Llenar la ventana del navegador"
+      }
+    }
+  },
+  "chat": {
+    "bubble": {
+      "title": "Chat"
+    },
+    "browseChannels": {
+      "title": "Canales",
+      "description": "Todos los canales están abiertos - únete a uno o crea uno nuevo.",
+      "loading": "Cargando…",
+      "empty": "Aún no hay canales en este espacio de trabajo.",
+      "open": "Abrir",
+      "join": "Unirse",
+      "newChannel": "Nuevo canal"
+    },
+    "composer": {
+      "placeholder": "Mensaje",
+      "messageDeleted": "Mensaje eliminado",
+      "attachment": "Archivo adjunto",
+      "cancelReply": "Cancelar respuesta",
+      "attachFile": "Adjuntar un archivo",
+      "stopDictation": "Detener dictado",
+      "dictate": "Dictar",
+      "send": "Enviar",
+      "attachFailed": "No se pudo adjuntar «{{filename}}»"
+    },
+    "conversationList": {
+      "title": "Chats",
+      "channels": "Canales",
+      "newChat": "Nuevo chat",
+      "loading": "Cargando…",
+      "empty": "Aún no hay conversaciones.",
+      "messageDeleted": "Mensaje eliminado",
+      "noMessagesYet": "Aún no hay mensajes",
+      "leaveChannel": "Abandonar canal",
+      "deleteChat": "Eliminar chat",
+      "leaveConfirmTitle": "¿Abandonar #{{name}}?",
+      "deleteConfirmTitle": "¿Eliminar el chat con {{name}}?",
+      "leaveConfirmDescription": "Puedes volver a unirte al canal desde la lista de canales en cualquier momento - el canal y su historial permanecen para todos los demás.",
+      "deleteConfirmDescription": "Esto solo lo elimina de tu lista - el otro participante conserva su parte de la conversación.",
+      "leave": "Abandonar",
+      "delete": "Eliminar"
+    },
+    "newChannelDialog": {
+      "title": "Nuevo canal",
+      "description": "Abierto para todos los miembros del espacio de trabajo que elijas.",
+      "create": "Crear canal",
+      "namePlaceholder": "nombre-del-canal"
+    },
+    "newChatDialog": {
+      "title": "Nuevo chat",
+      "description": "Introduce el correo electrónico de uno o varios usuarios registrados. Varios correos (separados por comas) inician un grupo.",
+      "start": "Iniciar chat",
+      "emailsPlaceholder": "alguien@ejemplo.com, otro@ejemplo.com",
+      "errorFallback": "No se pudo iniciar el chat"
+    },
+    "messageBubble": {
+      "missedCall": "Llamada perdida",
+      "declinedCall": "Llamada rechazada",
+      "callEnded": "Llamada finalizada · {{duration}}",
+      "delete": "Eliminar",
+      "messageDeleted": "Mensaje eliminado",
+      "attachment": "Archivo adjunto",
+      "reply": "Responder",
+      "read": "Leído {{time}}",
+      "delivered": "Entregado"
+    },
+    "aiThread": {
+      "name": "Notorious AI",
+      "clearHistory": "Borrar historial",
+      "emptyPrompt": "Pídeme crear objetos, buscar algo o actualizar los existentes - p. ej. «Crea una tarea llamada Revisar PR».",
+      "thinking": "Pensando…",
+      "genericError": "Algo salió mal - inténtalo de nuevo.",
+      "calledTool": "Llamó a",
+      "dictate": "Dictar",
+      "stopDictation": "Detener dictado",
+      "send": "Enviar",
+      "placeholder": "Pregunta a Notorious AI…"
+    },
+    "thread": {
+      "typing": "{{name}} está escribiendo…",
+      "chatFallback": "Chat",
+      "callInProgress_one": "Llamada en curso · {{count}} participante",
+      "callInProgress_other": "Llamada en curso · {{count}} participantes",
+      "joinCall": "Unirse a la llamada",
+      "ignore": "Ignorar",
+      "leaveCall": "Salir de la llamada",
+      "call": "Llamar"
+    }
+  },
+  "calls": {
+    "controls": {
+      "microphone": "Micrófono",
+      "camera": "Cámara",
+      "speaker": "Altavoz",
+      "default": "Predeterminado",
+      "micVolume": "Volumen del micrófono",
+      "outputVolume": "Volumen de salida"
+    },
+    "view": {
+      "you": "Tú",
+      "someone": "Alguien",
+      "muteMicrophone": "Silenciar micrófono",
+      "unmuteMicrophone": "Activar micrófono",
+      "turnCameraOff": "Apagar cámara",
+      "turnCameraOn": "Encender cámara",
+      "stopSharingScreen": "Dejar de compartir pantalla",
+      "shareScreen": "Compartir pantalla",
+      "callSettings": "Ajustes de la llamada",
+      "minimize": "Minimizar",
+      "leaveCall": "Salir de la llamada",
+      "expandCall": "Expandir llamada"
+    },
+    "incomingBanner": {
+      "incomingCall": "Llamada entrante…",
+      "decline": "Rechazar",
+      "accept": "Aceptar"
+    },
+    "preJoin": {
+      "micLevel": "Nivel del micrófono",
+      "turnCameraOff": "Apagar cámara",
+      "turnCameraOn": "Encender cámara",
+      "cancel": "Cancelar",
+      "joinCall": "Unirse a la llamada",
+      "call": "Llamar"
+    }
+  },
+  "search": {
+    "close": "Cerrar",
+    "selectObjectHint": "Selecciona un objeto para verlo aquí."
+  },
+  "objectDetail": {
+    "notPartOfShare": "Este objeto no forma parte de lo que se compartió contigo, o el enlace ha sido revocado.",
+    "removeReverifyProtectionTooltip": "Eliminar la protección de reverificación",
+    "requireReauthTooltip": "Exigir reautenticación para ver o editar este objeto",
+    "hideSections": "Ocultar en línea ahora/propiedades/subobjetos/enlaces entrantes/script",
+    "showSections": "Mostrar en línea ahora/propiedades/subobjetos/enlaces entrantes/script",
+    "removeAsDashboard": "Quitar como panel principal del espacio de trabajo",
+    "setAsDashboard": "Establecer como panel principal del espacio de trabajo",
+    "enableComments": "Activar comentarios en este objeto",
+    "disableComments": "Desactivar comentarios en este objeto",
+    "unlockBeforeDelete": "Desbloquea este objeto antes de eliminarlo",
+    "deleteObject": "Eliminar objeto",
+    "markDone": "Marcar como hecho",
+    "properties": "Propiedades",
+    "computedValue": "Valor calculado",
+    "script": "Script"
+  },
+  "objectType": {
+    "viewTypes": {
+      "table": "Tabla",
+      "board": "Tablero",
+      "list": "Lista",
+      "gallery": "Galería",
+      "calendar": "Calendario",
+      "timeline": "Línea de tiempo"
+    },
+    "newObject": "Nuevo {{name}}",
+    "createViewPrompt": "Crea una vista arriba para ver tus objetos {{name}}.",
+    "close": "Cerrar",
+    "selectObjectPrompt": "Selecciona un objeto para verlo aquí."
+  },
+  "workspacePicker": {
+    "greeting": "Hola {{name}}, elige un espacio de trabajo",
+    "subtitle": "Los espacios de trabajo mantienen separados tus objetos, vistas y colaboradores.",
+    "newWorkspaceNamePlaceholder": "Nombre del nuevo espacio de trabajo",
+    "create": "Crear",
+    "untitledWorkspace": "Espacio de trabajo sin título"
+  },
+  "sharePage": {
+    "linkExpiredTitle": "Este enlace ya no funciona",
+    "linkExpiredDescription": "Puede que haya sido revocado, o que haya caducado.",
+    "sharedRole": "Compartido · {{role}}"
+  },
+  "shareTarget": {
+    "nothingShared": "No se compartió nada.",
+    "contentExpired": "Este contenido compartido ha caducado o ya se ha usado.",
+    "title": "Compartir con Notorious",
+    "filesCount": "{{count}} archivo(s): {{files}}",
+    "workspaceLabel": "Espacio de trabajo",
+    "createNewObject": "Crear nuevo objeto",
+    "addToExisting": "Añadir a un objeto existente",
+    "objectTypeLabel": "Tipo de objeto",
+    "titleLabel": "Título",
+    "searchPlaceholder": "Buscar {{type}}...",
+    "objectsFallback": "objetos",
+    "noObjectsFound": "No se encontraron objetos.",
+    "sharing": "Compartiendo...",
+    "confirm": "Confirmar",
+    "genericError": "Algo salió mal. Inténtalo de nuevo."
+  },
+  "setupTwoFactor": {
+    "title": "Configurar la autenticación de dos factores",
+    "subtitle": "Esta instancia requiere 2FA antes de que puedas continuar."
+  },
+  "register": {
+    "title": "Crea tu cuenta",
+    "subtitle": "Se crea automáticamente un espacio de trabajo personal",
+    "registrationDisabled": "El registro abierto está actualmente desactivado en esta instancia. Si el propietario de un espacio de trabajo te ha invitado, aún puedes crear tu cuenta a continuación - simplemente usa la dirección de correo a la que se envió la invitación.",
+    "password": "Contraseña",
+    "passkey": "Passkey",
+    "fullNamePlaceholder": "Nombre completo",
+    "passwordPlaceholder": "Contraseña (mín. 8 caracteres)",
+    "creatingAccount": "Creando cuenta…",
+    "createAccount": "Crear cuenta",
+    "createAccountWithPasskey": "Crear cuenta con una passkey",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+    "registrationFailed": "Error en el registro",
+    "passkeyRegistrationFailed": "Error en el registro con passkey"
+  },
+  "properties": {
+    "field": {
+      "urlPlaceholder": "https://…",
+      "start": "Inicio",
+      "end": "Fin",
+      "formulaSuffix": "(fórmula)",
+      "rollupSuffix": "(resumen)"
+    },
+    "filePropertyField": {
+      "openFile": "Abrir archivo",
+      "remove": "Quitar",
+      "uploadImage": "Subir imagen",
+      "uploadFile": "Subir archivo"
+    },
+    "relationPicker": {
+      "linkAnObject": "Enlazar un objeto…",
+      "noMatches": "Sin coincidencias"
+    },
+    "tagPicker": {
+      "empty": "Vacío",
+      "noOptionsDefined": "Aún no hay opciones definidas"
+    }
+  },
+  "ui": {
+    "imageLoadError": {
+      "retryTitle": "Haz clic para volver a cargar la imagen",
+      "message": "No se pudo cargar la imagen — toca para reintentar"
+    },
+    "lightbox": {
+      "image": "Imagen",
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "download": "Descargar imagen",
+      "close": "Cerrar"
+    },
+    "progressPopup": {
+      "phases": {
+        "connecting": "Conectando con el destino...",
+        "transferring": "Transfiriendo...",
+        "encrypting": "Cifrando...",
+        "decrypting": "Descifrando...",
+        "importing": "Importando...",
+        "done": "Listo",
+        "error": "Fallido"
+      },
+      "cancel": "Cancelar",
+      "retry": "Reintentar",
+      "close": "Cerrar",
+      "genericError": "Algo salió mal."
+    }
+  }
+}

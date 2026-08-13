@@ -16,6 +16,7 @@ import { Icon } from "../ui/Icon.js";
 const LOCALE_LABELS: Record<string, string> = {
   en: "English",
   de: "Deutsch",
+  es: "Español",
 };
 
 const AVATAR_EXPORT_SIZE = 256;
