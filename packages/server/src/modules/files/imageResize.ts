@@ -42,6 +42,12 @@ export async function maybeResizeImage(
   if (!exceedsWidth && !exceedsHeight) return null;
 
   const resizedBuffer = await sharp(buffer)
+    // Bakes the EXIF orientation into the pixels (and drops the tag) before
+    // resizing - WebP output doesn't get the same EXIF-orientation handling
+    // from browsers that JPEG does, so without this a photo taken in
+    // portrait (stored as landscape pixels + a rotate-90 EXIF tag) would
+    // render sideways.
+    .rotate()
     .resize({ width: limits.maxWidth ?? undefined, height: limits.maxHeight ?? undefined, fit: "inside", withoutEnlargement: true })
     .webp({ quality: limits.quality })
     .toBuffer();
