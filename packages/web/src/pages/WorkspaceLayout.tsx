@@ -89,7 +89,6 @@ function WorkspaceLayoutInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const sidebarAvatarImage = useRobustImage(user?.avatarUrl ?? null);
   const shareToken = getShareToken();
@@ -211,26 +210,14 @@ function WorkspaceLayoutInner() {
             <span className="ml-auto shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs text-ink-muted">{t("nav.shared")}</span>
           </div>
         ) : (
-          <div className="relative border-b border-border" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
+          <div className="border-b border-border" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
             <button
-              onClick={() => setWorkspaceMenuOpen((v) => !v)}
+              onClick={() => navigate("/workspaces")}
               className="flex w-full items-center gap-2 px-4 pb-4 text-left hover:bg-surface"
             >
               <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
               <span className="truncate font-medium">{workspace?.name ?? t("nav.loading")}</span>
             </button>
-            <IOSMenu open={workspaceMenuOpen} onClose={() => setWorkspaceMenuOpen(false)} align="start" widthClassName="w-56">
-              <IOSMenuGroup>
-                <IOSMenuItem
-                  icon="settings"
-                  label={t("nav.workspaceSettings")}
-                  onClick={() => {
-                    setWorkspaceMenuOpen(false);
-                    navigate(`/w/${workspaceId}/settings`);
-                  }}
-                />
-              </IOSMenuGroup>
-            </IOSMenu>
           </div>
         )}
 
@@ -318,6 +305,14 @@ function WorkspaceLayoutInner() {
                     onClick={() => {
                       setAvatarMenuOpen(false);
                       navigate("/workspaces");
+                    }}
+                  />
+                  <IOSMenuItem
+                    icon="settings"
+                    label={t("nav.workspaceSettings")}
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      navigate(`/w/${workspaceId}/settings`);
                     }}
                   />
                   <IOSMenuItem
