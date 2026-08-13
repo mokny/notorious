@@ -21,6 +21,7 @@ export function Composer({
   const [body, setBody] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{ id: string; filename: string }[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastTypingSentRef = useRef(0);
   const queryClient = useQueryClient();
@@ -56,10 +57,13 @@ export function Composer({
     event.target.value = "";
     if (!file) return;
     setUploading(true);
+    setUploadError(null);
     try {
       const { promise } = chatApi.uploadAttachment(conversationId, file);
       const attachment = await promise;
       setPendingAttachments((attachments) => [...attachments, { id: attachment.id, filename: attachment.filename }]);
+    } catch {
+      setUploadError(`Failed to attach "${file.name}"`);
     } finally {
       setUploading(false);
     }
@@ -87,6 +91,7 @@ export function Composer({
           </button>
         </div>
       )}
+      {uploadError && <div className="mb-1.5 px-1 text-xs text-red-500">{uploadError}</div>}
       {pendingAttachments.length > 0 && (
         <div className="mb-1.5 flex flex-wrap gap-1 px-1">
           {pendingAttachments.map((attachment) => (

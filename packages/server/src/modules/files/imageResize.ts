@@ -41,17 +41,27 @@ export async function maybeResizeImage(
   const exceedsHeight = limits.maxHeight != null && height > limits.maxHeight;
   if (!exceedsWidth && !exceedsHeight) return null;
 
-  const resizedBuffer = await sharp(buffer)
-    // Bakes the EXIF orientation into the pixels (and drops the tag) before
-    // resizing - WebP output doesn't get the same EXIF-orientation handling
-    // from browsers that JPEG does, so without this a photo taken in
-    // portrait (stored as landscape pixels + a rotate-90 EXIF tag) would
-    // render sideways.
-    .rotate()
-    .resize({ width: limits.maxWidth ?? undefined, height: limits.maxHeight ?? undefined, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: limits.quality })
-    .toBuffer();
+  try {
+    const resizedBuffer = await sharp(buffer)
+      // Bakes the EXIF orientation into the pixels (and drops the tag) before
+      // resizing - WebP output doesn't get the same EXIF-orientation handling
+      // from browsers that JPEG does, so without this a photo taken in
+      // portrait (stored as landscape pixels + a rotate-90 EXIF tag) would
+      // render sideways.
+      .rotate()
+      .resize({ width: limits.maxWidth ?? undefined, height: limits.maxHeight ?? undefined, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: limits.quality })
+      .toBuffer();
 
-  const newFilename = `${filename.replace(/\.[^./]+$/, "")}.webp`;
-  return { buffer: resizedBuffer, mimeType: "image/webp", filename: newFilename };
+    const newFilename = `${filename.replace(/\.[^./]+$/, "")}.webp`;
+    return { buffer: resizedBuffer, mimeType: "image/webp", filename: newFilename };
+  } catch (error) {
+    // Some real-world JPEGs (odd ICC profiles, embedded MPF/thumbnail
+    // segments some phone cameras write, ...) make sharp/libvips choke on
+    // rotate+re-encode. This is meant to be a storage-saving convenience,
+    // not a hard requirement, so on failure fall back to storing the
+    // original upload untouched rather than failing the whole upload.
+    console.error(`maybeResizeImage: failed to resize ${filename}, storing original`, error);
+    return null;
+  }
 }
