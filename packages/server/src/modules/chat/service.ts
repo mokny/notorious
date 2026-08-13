@@ -24,7 +24,7 @@ import {
   calls,
 } from "../../db/schema.js";
 import { maybeResizeImage } from "../files/imageResize.js";
-import { getImageLimits } from "../files/service.js";
+import { env } from "../../env.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { writeUploadedBytes, deleteUploadedSubpath, deleteUploadedBytes } from "../../lib/storage.js";
@@ -32,7 +32,6 @@ import { sendToUserGlobal, broadcastToConversation } from "../realtime/hub.js";
 import { notifyUser } from "../push/service.js";
 import { isFocused } from "./focusState.js";
 import { indexMessage, removeFromIndex } from "./indexer.js";
-import { env } from "../../env.js";
 import path from "node:path";
 
 function toConversation(row: typeof conversations.$inferSelect): Conversation {
@@ -729,7 +728,7 @@ export async function saveChatAttachment(input: {
 }): Promise<MessageAttachment> {
   let { filename, mimeType, buffer } = input;
   if (mimeType.startsWith("image/")) {
-    const limits = input.workspaceId ? await getImageLimits(input.workspaceId, "image") : { maxWidth: null, maxHeight: null, quality: 80 };
+    const limits = { maxWidth: env.chatImageMaxWidth, maxHeight: env.chatImageMaxHeight, quality: 80 };
     const resized = await maybeResizeImage(buffer, mimeType, filename, limits);
     if (resized) {
       buffer = resized.buffer;

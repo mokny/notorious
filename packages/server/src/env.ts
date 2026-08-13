@@ -61,6 +61,14 @@ export const env = {
   // Max chat messages kept per conversation - the oldest overflow is pruned
   // on send (see chat/service.ts::sendMessage). 0 disables pruning entirely.
   messageRetentionLimit: Number(process.env.MESSAGE_RETENTION_LIMIT ?? 1000),
+  // Max width/height (px) images sent as chat attachments are downscaled to
+  // (see chat/service.ts::saveChatAttachment, modules/files/imageResize.ts).
+  // Applies to every chat/DM regardless of workspace - unlike the per-workspace
+  // imageMaxWidth/Height columns (which only cover note/block image uploads),
+  // this is a fixed instance-wide limit since chat attachments aren't always
+  // tied to a workspace (DMs have none).
+  chatImageMaxWidth: Number(process.env.CHAT_IMAGE_MAX_WIDTH ?? 1500),
+  chatImageMaxHeight: Number(process.env.CHAT_IMAGE_MAX_HEIGHT ?? 1500),
 };
 
 /** Whether passkeys can be used at all on this instance - see `env.appOrigin`'s doc comment. Checked by every modules/webauthn/ route (registerWebauthnRoutes throws before doing anything else if this is false) and exposed unauthenticated via GET /api/v1/system/passkeys-status so the frontend can hide the passkey UI instead of showing one that always errors. */
