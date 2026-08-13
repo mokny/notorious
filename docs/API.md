@@ -4,6 +4,8 @@ Every action available in the web UI is available through the REST API. The full
 reference is generated from the server's Zod schemas and served live at **`/api/docs`** (Swagger UI)
 once the server is running - this file is a narrative overview, not a replacement for it.
 
+Runnable Python and PHP example scripts live in [`examples/`](../examples/).
+
 ## Authentication
 
 Two ways to authenticate, checked in this order on every request:
