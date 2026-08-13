@@ -14,6 +14,7 @@ import { useHasHover } from "../../../hooks/useHasHover.js";
 import { blockApi, workspaceApi } from "../../../lib/api/resources.js";
 import { getVisitorId } from "../../../lib/visitorIdentity.js";
 import { randomId } from "../../../lib/randomId.js";
+import { resizeTextarea } from "../../../lib/resizeTextarea.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 import { HighlightedText } from "../HighlightedText.js";
@@ -21,13 +22,6 @@ import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGe
 import { UndoToast } from "../UndoToast.js";
 
 const EMPTY_SUMMARY: VoteSummary = { up: 0, down: 0, myVote: null };
-
-/** Grows a textarea to fit its (possibly wrapped, no literal newlines) content instead of clipping it - reset to "auto" first so it can shrink back down too, not just grow. Same helper as ChecklistBlock.tsx's own `resizeTextarea`. */
-function resizeTextarea(el: HTMLTextAreaElement | null): void {
-  if (!el) return;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
-}
 
 /** Local <-> UTC round-trip for a `datetime-local` input, same helper as PropertyField.tsx's own `toLocalInputValue`. */
 function toLocalInputValue(iso: string): string {

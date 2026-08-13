@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Message } from "@notorious/shared";
@@ -6,6 +6,7 @@ import { chatApi } from "../../lib/api/resources.js";
 import { Icon } from "../ui/Icon.js";
 import { useChatRealtime } from "../../context/ChatRealtimeContext.js";
 import { useSpeechToText, speechToTextSupported } from "../../hooks/useSpeechToText.js";
+import { resizeTextarea } from "../../lib/resizeTextarea.js";
 
 const TYPING_DEBOUNCE_MS = 2000;
 
@@ -25,10 +26,17 @@ export function Composer({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastTypingSentRef = useRef(0);
   const queryClient = useQueryClient();
   const { sendTyping } = useChatRealtime();
   const { isListening, toggleListening } = useSpeechToText(setBody);
+
+  // Re-run on every `body` change (typing, dictation, and the post-send clear) rather than only
+  // on the textarea's own onChange, since useSpeechToText drives `body` directly.
+  useEffect(() => {
+    resizeTextarea(textareaRef.current);
+  }, [body]);
 
   const sendMutation = useMutation({
     mutationFn: () =>
@@ -119,6 +127,7 @@ export function Composer({
         {/* The button sits inside the pill as a flex child (not absolutely positioned) so it's always comfortably inset from the pill's own right-side curve, however tall the pill grows with a multi-line message - `items-end` keeps it pinned to the bottom-right corner as the textarea grows, matching iMessage/WhatsApp. */}
         <div className="flex flex-1 items-end gap-1 rounded-full border border-border bg-surface py-1 pl-3 pr-1 focus-within:border-accent">
           <textarea
+            ref={textareaRef}
             value={body}
             onChange={(event) => {
               setBody(event.target.value);
@@ -132,7 +141,7 @@ export function Composer({
             }}
             rows={1}
             placeholder={t("chat.composer.placeholder")}
-            className="min-w-0 max-h-32 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none"
+            className="min-w-0 max-h-[4.5rem] flex-1 resize-none overflow-y-auto bg-transparent py-1.5 text-sm text-ink outline-none"
           />
           {/* While listening, this stays the (pulsing) stop control even once
               dictated text starts filling the field - it only falls back to

@@ -10,19 +10,13 @@ import { useHasHover } from "../../../hooks/useHasHover.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { useKeepInViewport } from "../../../hooks/useKeepInViewport.js";
 import { randomId } from "../../../lib/randomId.js";
+import { resizeTextarea } from "../../../lib/resizeTextarea.js";
 import { Icon } from "../../ui/Icon.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 import { useTemplatableField } from "../useTemplatableField.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGestures.js";
 import { UndoToast } from "../UndoToast.js";
 import { HighlightedText } from "../HighlightedText.js";
-
-/** Grows a textarea to fit its (possibly wrapped, no literal newlines) content instead of scrolling/clipping it - reset to "auto" first so it can shrink back down too, not just grow. */
-function resizeTextarea(el: HTMLTextAreaElement | null): void {
-  if (!el) return;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
-}
 
 /** Delay before a checked-off item slides to the bottom - see ChecklistContent.sortCheckedToBottom. */
 const CHECKED_MOVE_DELAY_MS = 2000;
