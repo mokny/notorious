@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi } from "../../lib/api/resources.js";
 import { Icon } from "../ui/Icon.js";
@@ -12,6 +13,7 @@ import { navLinkClass } from "./navLinkClass.js";
  * instead of a permanently expanded list, so the sidebar stays short.
  */
 export function ObjectTypeMenu({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +35,7 @@ export function ObjectTypeMenu({ workspaceId }: { workspaceId: string }) {
         className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ink-muted hover:bg-surface hover:text-ink"
       >
         <Icon name="plus" className="h-4 w-4" />
-        Browse objects
+        {t("nav.browseObjects")}
       </button>
 
       {open && (

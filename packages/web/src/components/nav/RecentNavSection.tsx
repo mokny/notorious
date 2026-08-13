@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useObjectTitle } from "../../hooks/useObjectTitle.js";
 import { useRecentObjects } from "../../hooks/useRecentObjects.js";
 import { usePersistedOpen } from "../../hooks/usePersistedOpen.js";
@@ -7,6 +8,7 @@ import { navLinkClass } from "./navLinkClass.js";
 
 /** Collapsible "recently viewed" list - the open/closed state itself is remembered. */
 export function RecentNavSection({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const { recentIds } = useRecentObjects(workspaceId);
   const [open, setOpen] = usePersistedOpen(`recent-${workspaceId}`, true);
 
@@ -20,7 +22,7 @@ export function RecentNavSection({ workspaceId }: { workspaceId: string }) {
       >
         <Icon name={open ? "chevron-down" : "chevron-right"} className="h-3 w-3" />
         <Icon name="clock" className="h-3 w-3" />
-        Recently viewed
+        {t("nav.recentlyViewed")}
       </button>
       {open && (
         <div className="space-y-0.5">

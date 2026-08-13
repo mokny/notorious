@@ -21,6 +21,11 @@ export const users = sqliteTable("users", {
   // already has a tab focused/visible - see push/service.ts::notifyUser and
   // push-sw.ts. Defaults to showing them anyway.
   pushShowWhenOpen: integer("push_show_when_open", { mode: "boolean" }).notNull().default(true),
+  // Preferred UI/push-notification language (an @notorious/shared
+  // SUPPORTED_LOCALES code) - null until set via Settings or AuthContext.tsx's
+  // one-time browser-language detection. Null means "render in the
+  // default/English fallback", not "unset".
+  locale: text("locale"),
 });
 
 export const sessions = sqliteTable("sessions", {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { authApi, objectApi, schemaApi, workspaceApi } from "../../lib/api/resources.js";
 import { useObjectHistory } from "../../context/ObjectHistoryContext.js";
 import { useTheme } from "../../context/ThemeContext.js";
@@ -39,6 +40,7 @@ interface MobileTopBarProps {
  * Styled as a native-iOS-context-menu (IOSMenu.tsx).
  */
 export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashboardObjectId }: MobileTopBarProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -108,14 +110,14 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
     const ok = await confirm(
       nextValue
         ? {
-            title: "Require re-verification?",
-            description: "Anyone opening this object - including you - will need to re-verify (password or passkey) before viewing or editing it.",
-            confirmLabel: "Require reverify",
+            title: t("nav.mobile.requireReverifyConfirmTitle"),
+            description: t("nav.mobile.requireReverifyConfirmDescription"),
+            confirmLabel: t("nav.mobile.requireReverifyConfirmLabel"),
           }
         : {
-            title: "Remove reverify protection?",
-            description: "This object will become accessible without re-verification, same as any other object.",
-            confirmLabel: "Remove protection",
+            title: t("nav.mobile.removeReverifyConfirmTitle"),
+            description: t("nav.mobile.removeReverifyConfirmDescription"),
+            confirmLabel: t("nav.mobile.removeReverifyConfirmLabel"),
             danger: true,
           },
     );
@@ -124,7 +126,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
 
   const { deleteObject } = useDeleteObject(workspaceId, onObjectPage ? routeObjectId : undefined);
 
-  const title = onObjectPage && current ? current.title || "Untitled" : workspaceName;
+  const title = onObjectPage && current ? current.title || t("nav.untitled") : workspaceName;
   const icon = onObjectPage && current ? current.icon ?? "file-text" : workspaceIcon;
   // The dashboard object is already shown as its own pinned row above (see
   // the `dashboardObjectId &&` block below) - filtered back out here so it
@@ -138,9 +140,9 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
 
   async function handleLogout() {
     const confirmed = await confirm({
-      title: "Log out?",
-      description: "You'll be signed out of this device.",
-      confirmLabel: "Log out",
+      title: t("nav.logOutConfirmTitle"),
+      description: t("nav.logOutConfirmDescription"),
+      confirmLabel: t("nav.logOut"),
     });
     if (!confirmed) return;
     await authApi.logout();
@@ -184,7 +186,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
       <button
         onClick={handleBack}
         className="pointer-events-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised/95 shadow-lg backdrop-blur"
-        title="Back"
+        title={t("nav.mobile.back")}
       >
         <Icon name="chevron-left" className="h-5 w-5" />
       </button>
@@ -203,7 +205,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
             <IOSMenuGroup>
               <IOSMenuItem
                 icon={dashboardObject?.icon ?? "layout-dashboard"}
-                label={dashboardObject?.title || "Dashboard"}
+                label={dashboardObject?.title || t("nav.dashboard")}
                 onClick={() => {
                   jumpTo(dashboardObjectId);
                   navigate(`/w/${workspaceId}/objects/${dashboardObjectId}`);
@@ -213,14 +215,14 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
             </IOSMenuGroup>
           )}
           {historyEntries.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-ink-muted">No objects visited yet this session.</p>
+            <p className="px-4 py-3 text-sm text-ink-muted">{t("nav.mobile.noHistory")}</p>
           ) : (
             <IOSMenuGroup>
               {historyEntries.map((entry) => (
                 <IOSMenuItem
                   key={entry.id}
                   icon={entry.icon ?? "file-text"}
-                  label={entry.title || "Untitled"}
+                  label={entry.title || t("nav.untitled")}
                   onClick={() => {
                     jumpTo(entry.id);
                     navigate(`/w/${workspaceId}/objects/${entry.id}`);
@@ -233,7 +235,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
           <IOSMenuGroup>
             <IOSMenuItem
               icon="board"
-              label="Switch workspace"
+              label={t("nav.switchWorkspace")}
               onClick={() => {
                 setBreadcrumbOpen(false);
                 navigate("/workspaces");
@@ -247,7 +249,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
         <button
           onClick={() => setMenuOpen((v) => !v)}
           className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface-raised/95 shadow-lg backdrop-blur"
-          title="More"
+          title={t("nav.mobile.more")}
         >
           <Icon name="more" className="h-5 w-5" />
         </button>
@@ -257,7 +259,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
             <IOSMenuGroup>
               <IOSMenuItem
                 icon="shield"
-                label={object.requiresReverify ? "Disable reverification" : "Require reverification"}
+                label={object.requiresReverify ? t("nav.mobile.disableReverify") : t("nav.mobile.requireReverify")}
                 onClick={() => {
                   setMenuOpen(false);
                   void handleToggleRequiresReverify(!object.requiresReverify);
@@ -269,7 +271,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
             <IOSMenuGroup>
               <IOSMenuItem
                 icon="eye"
-                label={sectionsVisible ? "Hide details" : "Show details"}
+                label={sectionsVisible ? t("nav.mobile.hideDetails") : t("nav.mobile.showDetails")}
                 onClick={() => {
                   setSectionsVisible(!sectionsVisible);
                   setMenuOpen(false);
@@ -281,7 +283,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                   <ObjectSlugButton variant="menuItem" objectId={object.id} slug={object.slug} disabled={isLocked} />
                   <IOSMenuItem
                     icon={pinned ? "pin-off" : "pin"}
-                    label={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+                    label={pinned ? t("nav.mobile.unpinFromSidebar") : t("nav.mobile.pinToSidebar")}
                     onClick={() => {
                       togglePin(object.id);
                       setMenuOpen(false);
@@ -289,7 +291,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                   />
                   <IOSMenuItem
                     icon="layout-dashboard"
-                    label={isDashboard ? "Remove as dashboard" : "Set as dashboard"}
+                    label={isDashboard ? t("nav.mobile.removeAsDashboard") : t("nav.mobile.setAsDashboard")}
                     onClick={() => {
                       dashboardMutation.mutate(isDashboard ? null : object.id);
                       setMenuOpen(false);
@@ -298,17 +300,17 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                   {isOwner && (
                     <IOSMenuItem
                       icon={object.commentsDisabled ? "comment-off" : "comment"}
-                      label={object.commentsDisabled ? "Enable comments" : "Disable comments"}
+                      label={object.commentsDisabled ? t("nav.mobile.enableComments") : t("nav.mobile.disableComments")}
                       onClick={() => {
                         commentsDisabledMutation.mutate(!object.commentsDisabled);
                         setMenuOpen(false);
                       }}
                     />
                   )}
-                  <ShareDialog variant="menuItem" workspaceId={workspaceId} objectId={object.id} label="Share" />
+                  <ShareDialog variant="menuItem" workspaceId={workspaceId} objectId={object.id} label={t("nav.mobile.share")} />
                   <IOSMenuItem
                     icon="trash"
-                    label="Delete"
+                    label={t("nav.mobile.delete")}
                     destructive
                     disabled={isLocked}
                     onClick={() => {
@@ -324,7 +326,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
           <IOSMenuGroup>
             <IOSMenuItem
               icon="layout-dashboard"
-              label="Home"
+              label={t("nav.mobile.home")}
               onClick={() => {
                 setMenuOpen(false);
                 goHome();
@@ -334,7 +336,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               <>
                 <IOSMenuItem
                   icon="board"
-                  label="Switch workspace"
+                  label={t("nav.switchWorkspace")}
                   onClick={() => {
                     setMenuOpen(false);
                     navigate("/workspaces");
@@ -342,7 +344,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                 />
                 <IOSMenuItem
                   icon="user"
-                  label="Account settings"
+                  label={t("nav.accountSettings")}
                   onClick={() => {
                     setMenuOpen(false);
                     navigate("/settings");
@@ -350,7 +352,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                 />
                 <IOSMenuItem
                   icon="settings"
-                  label="Workspace settings"
+                  label={t("nav.workspaceSettings")}
                   onClick={() => {
                     setMenuOpen(false);
                     navigate(`/w/${workspaceId}/settings`);
@@ -360,17 +362,17 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
             )}
             <IOSMenuItem
               icon={theme === "dark" ? "sun" : "moon"}
-              label={theme === "dark" ? "Light mode" : "Dark mode"}
+              label={theme === "dark" ? t("nav.mobile.lightMode") : t("nav.mobile.darkMode")}
               onClick={() => {
                 setMenuOpen(false);
                 toggleTheme();
               }}
             />
-            <IOSMenuItem icon="refresh" label="Refresh" onClick={() => window.location.reload()} />
+            <IOSMenuItem icon="refresh" label={t("nav.mobile.refresh")} onClick={() => window.location.reload()} />
             {!shareToken && (
               <IOSMenuItem
                 icon="close"
-                label="Log out"
+                label={t("nav.logOut")}
                 destructive
                 onClick={() => {
                   setMenuOpen(false);

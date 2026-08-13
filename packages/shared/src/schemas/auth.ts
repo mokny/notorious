@@ -63,6 +63,12 @@ export const updatePushPreferencesSchema = z.object({
 });
 export type UpdatePushPreferencesInput = z.infer<typeof updatePushPreferencesSchema>;
 
+/** `locale` isn't restricted to `SUPPORTED_LOCALES` here (see i18n/index.ts) - the server just stores whatever code it's given, so an instance can add a language's `common.json` without also touching this schema. `null` clears back to the default/browser-detected language. */
+export const updateLocaleSchema = z.object({
+  locale: z.string().min(1).max(35).nullable(),
+});
+export type UpdateLocaleInput = z.infer<typeof updateLocaleSchema>;
+
 /** POST /api/v1/auth/reverify's password branch - see modules/reverify/service.ts. The passkey branch (POST /api/v1/webauthn/reverify/verify) carries a WebAuthn assertion instead, not a plain JSON body validated by zod. */
 export const reverifyPasswordSchema = z.object({
   password: z.string().min(1).max(200),

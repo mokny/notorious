@@ -1,6 +1,8 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import Cropper, { type Area } from "react-easy-crop";
+import { SUPPORTED_LOCALES } from "@notorious/shared";
 import { authApi, usersApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { ApiError } from "../../lib/api/client.js";
@@ -9,6 +11,12 @@ import { Button } from "../ui/Button.js";
 import { TextField } from "../ui/TextField.js";
 import { Modal } from "../ui/Modal.js";
 import { Icon } from "../ui/Icon.js";
+
+/** Human-readable label per supported locale code - extend alongside `packages/shared/src/locales/`. */
+const LOCALE_LABELS: Record<string, string> = {
+  en: "English",
+  de: "Deutsch",
+};
 
 const AVATAR_EXPORT_SIZE = 256;
 
@@ -40,8 +48,10 @@ async function getCroppedAvatarBlob(imageSrc: string, area: Area): Promise<Blob>
 
 /** Lets the current user change their own avatar or email address. */
 export function ProfileSettings() {
+  const { t, i18n } = useTranslation();
   const { user, refetch } = useAuth();
   const [newEmail, setNewEmail] = useState(user?.email ?? "");
+  const [localeError, setLocaleError] = useState<string | null>(null);
   const [emailPassword, setEmailPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailSuccess, setEmailSuccess] = useState(false);
@@ -80,7 +90,7 @@ export function ProfileSettings() {
       await refetch();
     },
     onError: (err) => {
-      setAvatarError(err instanceof ApiError ? err.message : "Could not upload avatar");
+      setAvatarError(err instanceof ApiError ? err.message : t("settings.profile.avatarUploadFailed"));
     },
   });
 
@@ -90,7 +100,7 @@ export function ProfileSettings() {
       await refetch();
     },
     onError: (err) => {
-      setAvatarError(err instanceof ApiError ? err.message : "Could not remove avatar");
+      setAvatarError(err instanceof ApiError ? err.message : t("settings.profile.avatarRemoveFailed"));
     },
   });
 
@@ -106,7 +116,7 @@ export function ProfileSettings() {
     },
     onError: (err) => {
       setEmailSuccess(false);
-      setEmailError(err instanceof ApiError ? err.message : "Could not update your email address");
+      setEmailError(err instanceof ApiError ? err.message : t("settings.profile.emailUpdateFailed"));
     },
   });
 
@@ -116,10 +126,22 @@ export function ProfileSettings() {
     emailMutation.mutate();
   }
 
+  const localeMutation = useMutation({
+    mutationFn: (locale: string) => authApi.updateLocale({ locale }),
+    onSuccess: async (_, locale) => {
+      setLocaleError(null);
+      await i18n.changeLanguage(locale);
+      await refetch();
+    },
+    onError: (err) => {
+      setLocaleError(err instanceof ApiError ? err.message : t("settings.profile.languageUpdateFailed"));
+    },
+  });
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <p className="text-xs font-medium text-ink-muted">Avatar</p>
+        <p className="text-xs font-medium text-ink-muted">{t("settings.profile.avatar")}</p>
         <div className="flex items-center gap-3">
           {user?.avatarUrl && !avatarImage.failed ? (
             <img src={avatarImage.src} onError={avatarImage.onError} alt="" className="h-14 w-14 rounded-full object-cover" />
@@ -133,11 +155,11 @@ export function ProfileSettings() {
           )}
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" onClick={() => avatarInputRef.current?.click()}>
-              <Icon name="upload" className="h-3.5 w-3.5" /> Upload avatar
+              <Icon name="upload" className="h-3.5 w-3.5" /> {t("settings.profile.uploadAvatar")}
             </Button>
             {user?.avatarUrl && (
               <Button type="button" variant="danger" onClick={() => removeAvatarMutation.mutate()} disabled={removeAvatarMutation.isPending}>
-                <Icon name="trash" className="h-3.5 w-3.5" /> Remove avatar
+                <Icon name="trash" className="h-3.5 w-3.5" /> {t("settings.profile.removeAvatar")}
               </Button>
             )}
             <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFileChange} />
@@ -147,35 +169,52 @@ export function ProfileSettings() {
       </div>
 
       <form onSubmit={handleEmailSubmit} className="space-y-2">
-        <p className="text-xs font-medium text-ink-muted">Email address</p>
+        <p className="text-xs font-medium text-ink-muted">{t("settings.profile.email")}</p>
         <div className="flex flex-wrap gap-2">
           <TextField type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="max-w-xs" required />
           <TextField
             type="password"
-            placeholder="Current password"
+            placeholder={t("settings.profile.currentPassword")}
             value={emailPassword}
             onChange={(e) => setEmailPassword(e.target.value)}
             className="max-w-xs"
             required
           />
           <Button type="submit" variant="secondary" disabled={emailMutation.isPending}>
-            Update email
+            {t("settings.profile.updateEmail")}
           </Button>
         </div>
         {emailError && <p className="text-sm text-red-500">{emailError}</p>}
-        {emailSuccess && <p className="text-sm text-green-600">Email address updated.</p>}
+        {emailSuccess && <p className="text-sm text-green-600">{t("settings.profile.emailUpdated")}</p>}
       </form>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-ink-muted">{t("settings.profile.language")}</p>
+        <select
+          value={user?.locale ?? i18n.language}
+          onChange={(e) => localeMutation.mutate(e.target.value)}
+          disabled={localeMutation.isPending}
+          className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+        >
+          {SUPPORTED_LOCALES.map((locale) => (
+            <option key={locale} value={locale}>
+              {LOCALE_LABELS[locale] ?? locale}
+            </option>
+          ))}
+        </select>
+        {localeError && <p className="text-sm text-red-500">{localeError}</p>}
+      </div>
 
       <Modal
         open={avatarImageSrc !== null}
         onOpenChange={(open) => {
           if (!open) closeCropModal();
         }}
-        title="Crop your avatar"
+        title={t("settings.profile.cropAvatarTitle")}
         footer={
           <>
             <Button type="button" variant="secondary" onClick={closeCropModal}>
-              Cancel
+              {t("settings.profile.cancel")}
             </Button>
             <Button
               type="button"
@@ -183,7 +222,7 @@ export function ProfileSettings() {
               onClick={() => uploadAvatarMutation.mutate()}
               disabled={uploadAvatarMutation.isPending || !croppedArea}
             >
-              Save avatar
+              {t("settings.profile.saveAvatar")}
             </Button>
           </>
         }

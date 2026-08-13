@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import { eq, and } from "drizzle-orm";
-import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, UpdatePushPreferencesInput, User } from "@notorious/shared";
+import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, UpdatePushPreferencesInput, UpdateLocaleInput, User } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { users, workspaceInvites, workspaceMembers, webauthnCredentials } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -23,6 +23,7 @@ async function toUser(row: typeof users.$inferSelect): Promise<User> {
     pushShowWhenOpen: row.pushShowWhenOpen,
     hasPassword: row.passwordHash !== null,
     hasPasskey: await hasAnyCredential(row.id),
+    locale: row.locale,
   };
 }
 
@@ -49,7 +50,7 @@ export async function registerUser(input: RegisterInput): Promise<User> {
   await createWorkspace(id, { name: `${input.name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, input.email);
 
-  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: true, hasPasskey: false };
+  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: true, hasPasskey: false, locale: null };
 }
 
 /**
@@ -88,7 +89,7 @@ export async function registerUserWithPasskey(
   await createWorkspace(id, { name: `${name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, email);
 
-  return { id, email, name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: false, hasPasskey: true };
+  return { id, email, name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: false, hasPasskey: true, locale: null };
 }
 
 /**
@@ -186,6 +187,14 @@ export async function changeEmail(userId: string, input: ChangeEmailInput): Prom
 
 export async function updatePushPreferences(userId: string, input: UpdatePushPreferencesInput): Promise<User> {
   await db.update(users).set({ pushShowWhenOpen: input.pushShowWhenOpen }).where(eq(users.id, userId));
+  const user = await getUserById(userId);
+  if (!user) throw unauthorized();
+  return user;
+}
+
+/** Persists the user's preferred UI/push-notification language - see the `locale` schema field's doc comment and AuthContext.tsx's detection flow. */
+export async function updateLocale(userId: string, input: UpdateLocaleInput): Promise<User> {
+  await db.update(users).set({ locale: input.locale }).where(eq(users.id, userId));
   const user = await getUserById(userId);
   if (!user) throw unauthorized();
   return user;

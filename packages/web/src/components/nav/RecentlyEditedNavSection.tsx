@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { workspaceApi } from "../../lib/api/resources.js";
 import { useObjectTitle } from "../../hooks/useObjectTitle.js";
 import { usePersistedOpen } from "../../hooks/usePersistedOpen.js";
@@ -13,6 +14,7 @@ import { navLinkClass } from "./navLinkClass.js";
  * list of what was opened on this device.
  */
 export function RecentlyEditedNavSection({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const { data: recentIds } = useQuery({
     queryKey: ["recentEdits", workspaceId],
     queryFn: () => workspaceApi.recentEdits(workspaceId),
@@ -29,7 +31,7 @@ export function RecentlyEditedNavSection({ workspaceId }: { workspaceId: string 
       >
         <Icon name={open ? "chevron-down" : "chevron-right"} className="h-3 w-3" />
         <Icon name="pencil" className="h-3 w-3" />
-        Recently edited
+        {t("nav.recentlyEdited")}
       </button>
       {open && (
         <div className="space-y-0.5">

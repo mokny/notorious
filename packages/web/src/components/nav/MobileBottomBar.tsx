@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { sortObjectTypesForDisplay } from "@notorious/shared";
 import { schemaApi, objectApi, workspaceApi, chatApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
@@ -22,6 +23,7 @@ import { Icon } from "../ui/Icon.js";
  * component's own doc comment.
  */
 export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceId: string; dashboardObjectId?: string }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -106,12 +108,12 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
               onClick={() => lockMutation.mutate(!isLocked)}
               disabled={lockMutation.isPending}
               className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface disabled:opacity-50 ${isLocked ? "text-red-500" : "text-ink-muted hover:text-ink"}`}
-              title={isLocked ? "Unlock this object" : "Lock this object against edits"}
+              title={isLocked ? t("nav.mobile.unlockObject") : t("nav.mobile.lockObject")}
             >
               <Icon name={isLocked ? "lock" : "unlock"} className="h-5 w-5" />
             </button>
           ) : (
-            <span className="flex h-11 w-11 items-center justify-center text-red-500" title="This object is locked against edits">
+            <span className="flex h-11 w-11 items-center justify-center text-red-500" title={t("nav.mobile.objectLocked")}>
               <Icon name="lock" className="h-5 w-5" />
             </span>
           ))}
@@ -119,7 +121,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
         <button
           onClick={openSearch}
           className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
-          title="Search"
+          title={t("nav.mobile.search")}
         >
           <Icon name="search" className="h-5 w-5" />
         </button>
@@ -127,7 +129,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
         <button
           onClick={() => navigate(homePath)}
           className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface ${isHome ? "text-accent" : "text-ink-muted hover:text-ink"}`}
-          title="Home"
+          title={t("nav.mobile.home")}
         >
           <Icon name="layout-dashboard" className="h-5 w-5" />
         </button>
@@ -137,7 +139,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
             <button
               onClick={() => setNewMenuOpen((v) => !v)}
               className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
-              title="New object"
+              title={t("nav.mobile.newObject")}
             >
               <Icon name="pencil" className="h-5 w-5" />
             </button>
@@ -158,7 +160,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
           <button
             onClick={() => openChat()}
             className="relative flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
-            title="Chats"
+            title={t("nav.mobile.chats")}
           >
             <Icon name="comment" className="h-5 w-5" />
             {chatUnreadCount > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />}

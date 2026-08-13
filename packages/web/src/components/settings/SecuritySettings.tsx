@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { startRegistration } from "@simplewebauthn/browser";
 import { authApi, twoFactorApi, webauthnApi, systemApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
@@ -11,8 +13,8 @@ import { Icon } from "../ui/Icon.js";
 import { TwoFactorSetupFlow } from "../TwoFactorSetupFlow.js";
 
 /** Very rough user-agent -> "Browser on OS" label - good enough for a device list, no need for a full UA-parsing dependency. */
-function describeUserAgent(userAgent: string | null): string {
-  if (!userAgent) return "Unknown device";
+function describeUserAgent(userAgent: string | null, t: TFunction): string {
+  if (!userAgent) return t("settings.security.unknownDevice");
   const os = /iPhone|iPad/.test(userAgent)
     ? "iOS"
     : /Android/.test(userAgent)
@@ -40,20 +42,21 @@ function describeUserAgent(userAgent: string | null): string {
   return `${browser} on ${os}`;
 }
 
-function relativeTime(iso: string | null): string {
-  if (!iso) return "Unknown";
+function relativeTime(iso: string | null, t: TFunction): string {
+  if (!iso) return t("settings.security.unknown");
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t("settings.security.justNow");
+  if (minutes < 60) return t("settings.security.minutesAgo", { count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("settings.security.hoursAgo", { count: hours });
   const days = Math.round(hours / 24);
-  return `${days}d ago`;
+  return t("settings.security.daysAgo", { count: days });
 }
 
 /** The device list backing "log out other devices" (see plugins/session.ts's `listSessions` server-side) - sessions now stay valid indefinitely for an actively-used device (rolling renewal), so this is the only way to end one deliberately short of a password change. */
 function SessionsList() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: sessions } = useQuery({ queryKey: ["sessions"], queryFn: authApi.sessions });
 
@@ -71,10 +74,10 @@ function SessionsList() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-ink-muted">Devices</p>
+        <p className="text-xs font-medium text-ink-muted">{t("settings.security.devices")}</p>
         {otherCount > 0 && (
           <Button variant="secondary" onClick={() => revokeOthersMutation.mutate()} disabled={revokeOthersMutation.isPending}>
-            Log out all other devices
+            {t("settings.security.logOutOtherDevices")}
           </Button>
         )}
       </div>
@@ -83,11 +86,11 @@ function SessionsList() {
           <div key={session.id} className="flex items-center justify-between gap-3 p-3 text-sm">
             <div className="min-w-0">
               <p className="truncate">
-                {describeUserAgent(session.userAgent)}
-                {session.isCurrent && <span className="ml-2 text-xs text-accent">This device</span>}
+                {describeUserAgent(session.userAgent, t)}
+                {session.isCurrent && <span className="ml-2 text-xs text-accent">{t("settings.security.thisDevice")}</span>}
               </p>
               <p className="truncate text-xs text-ink-muted">
-                {session.ip ?? "Unknown IP"} · Active {relativeTime(session.lastSeenAt)}
+                {session.ip ?? t("settings.security.unknownIp")} · {t("settings.security.active", { time: relativeTime(session.lastSeenAt, t) })}
               </p>
             </div>
             {!session.isCurrent && (
@@ -95,7 +98,7 @@ function SessionsList() {
                 onClick={() => revokeMutation.mutate(session.id)}
                 disabled={revokeMutation.isPending}
                 className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
-                title="Log out this device"
+                title={t("settings.security.logOutThisDevice")}
               >
                 <Icon name="trash" className="h-4 w-4" />
               </button>
@@ -109,6 +112,7 @@ function SessionsList() {
 
 /** Passkey management (add/rename/remove) - see modules/webauthn/. Signing in with one of these skips the password + TOTP steps entirely (see LoginPage.tsx's conditional-UI autofill), and any registered passkey can also satisfy a "vault" object's reverify prompt (see ReverifyGate.tsx). */
 function PasskeysList() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: credentials } = useQuery({ queryKey: ["webauthnCredentials"], queryFn: webauthnApi.credentials });
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +129,7 @@ function PasskeysList() {
       setError(null);
       void queryClient.invalidateQueries({ queryKey: ["webauthnCredentials"] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Could not add passkey"),
+    onError: (err) => setError(err instanceof ApiError ? err.message : t("settings.security.addPasskeyFailed")),
   });
 
   const renameMutation = useMutation({
@@ -144,14 +148,12 @@ function PasskeysList() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-ink-muted">Passkeys</p>
+        <p className="text-xs font-medium text-ink-muted">{t("settings.security.passkeys")}</p>
         <Button variant="secondary" onClick={() => addMutation.mutate()} disabled={addMutation.isPending}>
-          Add a passkey
+          {t("settings.security.addPasskey")}
         </Button>
       </div>
-      <p className="text-sm text-ink-muted">
-        Sign in without a password using Face ID, Touch ID, a security key, or your device's screen lock.
-      </p>
+      <p className="text-sm text-ink-muted">{t("settings.security.passkeysDescription")}</p>
       {error && <p className="text-sm text-red-500">{error}</p>}
       {credentials && credentials.length > 0 && (
         <div className="divide-y divide-border rounded-lg border border-border">
@@ -167,7 +169,7 @@ function PasskeysList() {
                 >
                   <TextField value={renameValue} onChange={(e) => setRenameValue(e.target.value)} autoFocus className="max-w-xs" />
                   <Button type="submit" variant="secondary" disabled={renameMutation.isPending}>
-                    Save
+                    {t("settings.security.save")}
                   </Button>
                 </form>
               ) : (
@@ -181,14 +183,16 @@ function PasskeysList() {
                   >
                     {cred.name}
                   </button>
-                  <p className="truncate text-xs text-ink-muted">{cred.lastUsedAt ? `Last used ${relativeTime(cred.lastUsedAt)}` : "Never used"}</p>
+                  <p className="truncate text-xs text-ink-muted">
+                    {cred.lastUsedAt ? t("settings.security.lastUsed", { time: relativeTime(cred.lastUsedAt, t) }) : t("settings.security.neverUsed")}
+                  </p>
                 </div>
               )}
               <button
                 onClick={() => removeMutation.mutate(cred.id)}
                 disabled={removeMutation.isPending}
                 className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
-                title="Remove passkey"
+                title={t("settings.security.removePasskey")}
               >
                 <Icon name="trash" className="h-4 w-4" />
               </button>
@@ -202,6 +206,7 @@ function PasskeysList() {
 
 /** Lets the current user change their own password or enable/disable 2FA. */
 export function SecuritySettings() {
+  const { t } = useTranslation();
   const { user, refetch } = useAuth();
   const { data: passkeysStatus } = useQuery({ queryKey: ["passkeysStatus"], queryFn: systemApi.passkeysStatus });
 
@@ -225,7 +230,7 @@ export function SecuritySettings() {
     },
     onError: (err) => {
       setPasswordSuccess(false);
-      setPasswordError(err instanceof ApiError ? err.message : "Could not update your password");
+      setPasswordError(err instanceof ApiError ? err.message : t("settings.security.passwordUpdateFailed"));
     },
   });
 
@@ -243,7 +248,7 @@ export function SecuritySettings() {
       await refetch();
     },
     onError: (err) => {
-      setDisableError(err instanceof ApiError ? err.message : "Could not disable two-factor authentication");
+      setDisableError(err instanceof ApiError ? err.message : t("settings.security.disable2faFailed"));
     },
   });
 
@@ -255,15 +260,13 @@ export function SecuritySettings() {
   return (
     <div className="space-y-6">
       <form onSubmit={handlePasswordSubmit} className="space-y-2">
-        <p className="text-xs font-medium text-ink-muted">Password</p>
-        {!user?.hasPassword && (
-          <p className="text-sm text-ink-muted">This account was created with a passkey and has no password yet - set one below as a backup sign-in option.</p>
-        )}
+        <p className="text-xs font-medium text-ink-muted">{t("settings.security.password")}</p>
+        {!user?.hasPassword && <p className="text-sm text-ink-muted">{t("settings.security.passkeyOnlyNotice")}</p>}
         <div className="flex flex-wrap gap-2">
           {user?.hasPassword && (
             <TextField
               type="password"
-              placeholder="Current password"
+              placeholder={t("settings.security.currentPassword")}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               className="max-w-xs"
@@ -272,7 +275,7 @@ export function SecuritySettings() {
           )}
           <TextField
             type="password"
-            placeholder="New password"
+            placeholder={t("settings.security.newPassword")}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             className="max-w-xs"
@@ -280,27 +283,27 @@ export function SecuritySettings() {
             required
           />
           <Button type="submit" variant="secondary" disabled={passwordMutation.isPending}>
-            {user?.hasPassword ? "Update password" : "Set password"}
+            {user?.hasPassword ? t("settings.security.updatePassword") : t("settings.security.setPassword")}
           </Button>
         </div>
         {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
         {passwordSuccess && (
           <p className="text-sm text-green-600">
-            {user?.hasPassword ? "Password updated. Your other sessions have been signed out." : "Password set."}
+            {user?.hasPassword ? t("settings.security.passwordUpdated") : t("settings.security.passwordSet")}
           </p>
         )}
       </form>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium text-ink-muted">Two-factor authentication</p>
+        <p className="text-xs font-medium text-ink-muted">{t("settings.security.twoFactor")}</p>
         {user?.totpEnabled ? (
           <form onSubmit={handleDisableSubmit} className="space-y-2">
-            <p className="text-sm text-ink-muted">Two-factor authentication is enabled on your account.</p>
+            <p className="text-sm text-ink-muted">{t("settings.security.twoFactorEnabled")}</p>
             <div className="flex flex-wrap gap-2">
               {user?.hasPassword && (
                 <TextField
                   type="password"
-                  placeholder="Current password"
+                  placeholder={t("settings.security.currentPassword")}
                   value={disablePassword}
                   onChange={(e) => setDisablePassword(e.target.value)}
                   className="max-w-xs"
@@ -308,22 +311,22 @@ export function SecuritySettings() {
                 />
               )}
               <Button type="submit" variant="danger" disabled={disableMutation.isPending}>
-                Disable 2FA
+                {t("settings.security.disable2fa")}
               </Button>
             </div>
             {disableError && <p className="text-sm text-red-500">{disableError}</p>}
           </form>
         ) : (
           <div>
-            <p className="text-sm text-ink-muted">Add an extra layer of security by requiring a code from an authenticator app when you sign in.</p>
+            <p className="text-sm text-ink-muted">{t("settings.security.twoFactorDescription")}</p>
             <Button variant="secondary" className="mt-2" onClick={() => setSetupOpen(true)}>
-              Enable 2FA
+              {t("settings.security.enable2fa")}
             </Button>
           </div>
         )}
       </div>
 
-      <Modal open={setupOpen} onOpenChange={setSetupOpen} title="Set up two-factor authentication">
+      <Modal open={setupOpen} onOpenChange={setSetupOpen} title={t("settings.security.setup2faTitle")}>
         <TwoFactorSetupFlow
           onComplete={async () => {
             setSetupOpen(false);

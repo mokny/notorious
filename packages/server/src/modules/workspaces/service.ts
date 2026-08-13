@@ -131,6 +131,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       totpEnabled: users.totpEnabled,
       pushShowWhenOpen: users.pushShowWhenOpen,
       passwordHash: users.passwordHash,
+      locale: users.locale,
     })
     .from(workspaceMembers)
     .innerJoin(users, eq(workspaceMembers.userId, users.id))
@@ -160,6 +161,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       pushShowWhenOpen: row.pushShowWhenOpen,
       hasPassword: row.passwordHash !== null,
       hasPasskey: userIdsWithPasskey.has(row.userId),
+      locale: row.locale,
     },
   }));
 }

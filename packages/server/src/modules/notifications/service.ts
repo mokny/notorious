@@ -1,9 +1,10 @@
 import { eq, and, desc, isNull } from "drizzle-orm";
 import type { Notification } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { notifications, comments, workspaces } from "../../db/schema.js";
+import { notifications, comments, workspaces, users } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { notFound } from "../../lib/httpError.js";
+import { translate } from "../../lib/i18n.js";
 import { notifyUser } from "../push/service.js";
 import { sendToUser } from "../realtime/hub.js";
 
@@ -131,9 +132,10 @@ export async function notifyCommentParticipants(input: {
       };
       sendToUser(input.workspaceId, userId, { type: "notification", workspaceId: input.workspaceId, notification });
 
+      const [recipient] = await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId)).limit(1);
       await notifyUser(userId, {
         type: "mention",
-        title: `${input.actorName} commented on "${input.objectTitle}"`,
+        title: await translate(recipient?.locale ?? null, "push.mention.title", { actor: input.actorName, title: input.objectTitle }),
         body,
         url: `/w/${input.workspaceId}/objects/${input.objectId}`,
       });

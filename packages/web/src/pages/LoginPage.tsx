@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { startAuthentication, browserSupportsWebAuthnAutofill } from "@simplewebauthn/browser";
 import { Fingerprint } from "lucide-react";
 import { authApi, twoFactorApi, webauthnApi, systemApi } from "../lib/api/resources.js";
@@ -10,6 +11,7 @@ import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const { user, refetch } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -86,7 +88,7 @@ export function LoginPage() {
       // A user-dismissed/cancelled passkey prompt (NotAllowedError) isn't a real error -
       // they can still sign in with their password, nothing to surface here.
       if (err instanceof DOMException && err.name === "NotAllowedError") return;
-      setError(err instanceof ApiError ? err.message : "Passkey sign-in failed");
+      setError(err instanceof ApiError ? err.message : t("login.passkeySignInFailed"));
     } finally {
       setPasskeySubmitting(false);
     }
@@ -104,7 +106,7 @@ export function LoginPage() {
         await completeLogin();
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
+      setError(err instanceof ApiError ? err.message : t("login.loginFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +120,7 @@ export function LoginPage() {
       await twoFactorApi.verify(useBackupCode ? { backupCode: code } : { code });
       await completeLogin();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Invalid code");
+      setError(err instanceof ApiError ? err.message : t("login.invalidCode"));
     } finally {
       setSubmitting(false);
     }
@@ -129,14 +131,14 @@ export function LoginPage() {
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
-            <h1 className="text-2xl font-semibold">Two-factor authentication</h1>
+            <h1 className="text-2xl font-semibold">{t("login.twoFactorTitle")}</h1>
             <p className="mt-1 text-sm text-ink-muted">
-              {useBackupCode ? "Enter one of your backup codes" : "Enter the 6-digit code from your authenticator app"}
+              {useBackupCode ? t("login.enterBackupCode") : t("login.enterAuthCode")}
             </p>
           </div>
           <form onSubmit={handleVerify} className="space-y-3 rounded-xl border border-border bg-surface-raised p-6">
             <TextField
-              placeholder={useBackupCode ? "Backup code" : "6-digit code"}
+              placeholder={useBackupCode ? t("login.backupCodePlaceholder") : t("login.codePlaceholder")}
               value={code}
               onChange={(e) => setCode(useBackupCode ? e.target.value : e.target.value.replace(/\D/g, "").slice(0, 6))}
               inputMode={useBackupCode ? "text" : "numeric"}
@@ -146,7 +148,7 @@ export function LoginPage() {
             />
             {error && <p className="text-sm text-red-500">{error}</p>}
             <Button type="submit" variant="primary" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Verifying…" : "Verify"}
+              {isSubmitting ? t("login.verifying") : t("login.verify")}
             </Button>
           </form>
           <p className="text-center text-sm text-ink-muted">
@@ -159,7 +161,7 @@ export function LoginPage() {
                 setError(null);
               }}
             >
-              {useBackupCode ? "Use authenticator code instead" : "Use a backup code instead"}
+              {useBackupCode ? t("login.useAuthCodeInstead") : t("login.useBackupCodeInstead")}
             </button>
           </p>
         </div>
@@ -171,8 +173,8 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold">Notorious</h1>
-          <p className="mt-1 text-sm text-ink-muted">Sign in to your workspace</p>
+          <h1 className="text-2xl font-semibold">{t("login.title")}</h1>
+          <p className="mt-1 text-sm text-ink-muted">{t("login.subtitle")}</p>
         </div>
         <div className="space-y-3 rounded-xl border border-border bg-surface-raised p-6">
           {passkeysEnabled && (
@@ -185,11 +187,11 @@ export function LoginPage() {
                 onClick={handlePasskeyLogin}
               >
                 <Fingerprint className="size-4" />
-                {isPasskeySubmitting ? "Waiting for passkey…" : "Sign in with a passkey"}
+                {isPasskeySubmitting ? t("login.waitingForPasskey") : t("login.signInWithPasskey")}
               </Button>
               <div className="flex items-center gap-3 text-xs text-ink-muted">
                 <div className="h-px flex-1 bg-border" />
-                or
+                {t("login.or")}
                 <div className="h-px flex-1 bg-border" />
               </div>
             </>
@@ -197,7 +199,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <TextField
               type="email"
-              placeholder="Email"
+              placeholder={t("login.emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username webauthn"
@@ -205,21 +207,21 @@ export function LoginPage() {
             />
             <TextField
               type="password"
-              placeholder="Password"
+              placeholder={t("login.passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
             {error && <p className="text-sm text-red-500">{error}</p>}
             <Button type="submit" variant="primary" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in…" : "Sign in"}
+              {isSubmitting ? t("login.signingIn") : t("login.signIn")}
             </Button>
           </form>
         </div>
         <p className="text-center text-sm text-ink-muted">
-          No account?{" "}
+          {t("login.noAccount")}{" "}
           <Link to="/register" className="text-accent hover:underline">
-            Create one
+            {t("login.createOne")}
           </Link>
         </p>
       </div>

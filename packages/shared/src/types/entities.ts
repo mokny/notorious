@@ -22,6 +22,8 @@ export interface User {
   hasPassword: boolean;
   /** Whether this account has at least one registered passkey (see modules/webauthn/). Exempts the account from an instance-wide `require2faEnabled` mandate (App.tsx's `RequireAuth`) - a passkey is already considered a strong-enough factor on its own. */
   hasPasskey: boolean;
+  /** Preferred UI/push-notification language (an `@notorious/shared` `SUPPORTED_LOCALES` code, e.g. `"en"`/`"de"`) - null until either the user picks one in Settings or AuthContext.tsx's one-time browser-language detection finds a supported match. Null means "render in the default/English fallback", not "unset the language". */
+  locale: string | null;
 }
 
 /**

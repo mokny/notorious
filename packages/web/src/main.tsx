@@ -6,6 +6,7 @@ import { AuthProvider } from "./context/AuthContext.js";
 import { ThemeProvider } from "./context/ThemeContext.js";
 import { ConfirmProvider } from "./context/ConfirmContext.js";
 import { App } from "./App.js";
+import "./lib/i18n.js";
 import "./styles/globals.css";
 
 const queryClient = new QueryClient({

@@ -40,3 +40,5 @@ export * from "./schemas/feed.js";
 
 export * from "./templates/lexer.js";
 export * from "./templates/parser.js";
+
+export * from "./i18n/index.js";

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { workspaceApi, authApi } from "../lib/api/resources.js";
@@ -80,6 +81,7 @@ export function WorkspaceLayout() {
 }
 
 function WorkspaceLayoutInner() {
+  const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { user, refetch } = useAuth();
   const { theme, toggle } = useTheme();
@@ -161,9 +163,9 @@ function WorkspaceLayoutInner() {
 
   async function handleLogout() {
     const confirmed = await confirm({
-      title: "Log out?",
-      description: "You'll be signed out of this device.",
-      confirmLabel: "Log out",
+      title: t("nav.logOutConfirmTitle"),
+      description: t("nav.logOutConfirmDescription"),
+      confirmLabel: t("nav.logOut"),
     });
     if (!confirmed) return;
     await authApi.logout();
@@ -205,8 +207,8 @@ function WorkspaceLayoutInner() {
             style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}
           >
             <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
-            <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
-            <span className="ml-auto shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs text-ink-muted">Shared</span>
+            <span className="truncate font-medium">{workspace?.name ?? t("nav.loading")}</span>
+            <span className="ml-auto shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs text-ink-muted">{t("nav.shared")}</span>
           </div>
         ) : (
           <div className="relative border-b border-border" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
@@ -215,13 +217,13 @@ function WorkspaceLayoutInner() {
               className="flex w-full items-center gap-2 px-4 pb-4 text-left hover:bg-surface"
             >
               <Icon name={workspace?.icon ?? "sparkles"} className="h-5 w-5 text-accent" />
-              <span className="truncate font-medium">{workspace?.name ?? "Loading…"}</span>
+              <span className="truncate font-medium">{workspace?.name ?? t("nav.loading")}</span>
             </button>
             <IOSMenu open={workspaceMenuOpen} onClose={() => setWorkspaceMenuOpen(false)} align="start" widthClassName="w-56">
               <IOSMenuGroup>
                 <IOSMenuItem
                   icon="settings"
-                  label="Workspace settings"
+                  label={t("nav.workspaceSettings")}
                   onClick={() => {
                     setWorkspaceMenuOpen(false);
                     navigate(`/w/${workspaceId}/settings`);
@@ -235,16 +237,16 @@ function WorkspaceLayoutInner() {
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
           {workspace?.dashboardObjectId && (
             <NavLink to={`/w/${workspaceId}/objects/${workspace.dashboardObjectId}`} className={({ isActive }) => navLinkClass(isActive)}>
-              <Icon name="layout-dashboard" className="h-4 w-4" /> Dashboard
+              <Icon name="layout-dashboard" className="h-4 w-4" /> {t("nav.dashboard")}
             </NavLink>
           )}
           <ObjectTypeMenu workspaceId={workspaceId!} />
           <NavLink to={`/w/${workspaceId}/search`} className={({ isActive }) => navLinkClass(isActive)}>
-            <Icon name="search" className="h-4 w-4" /> Search
+            <Icon name="search" className="h-4 w-4" /> {t("nav.search")}
           </NavLink>
           {pinnedIds.length > 0 && (
             <div className="mt-3">
-              <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Pinned</p>
+              <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">{t("nav.pinned")}</p>
               <DndContext
                 sensors={pinSensors}
                 onDragStart={pinDragSelectGuard.onDragStart}
@@ -281,13 +283,13 @@ function WorkspaceLayoutInner() {
           style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
         >
           {shareToken ? (
-            <span className="truncate text-sm text-ink-muted">Viewing via a shared link</span>
+            <span className="truncate text-sm text-ink-muted">{t("nav.sharedViaLink")}</span>
           ) : (
             <div className="relative min-w-0">
               <button
                 onClick={() => setAvatarMenuOpen((v) => !v)}
                 className="flex items-center gap-2 overflow-hidden rounded-lg p-1 -m-1 text-left hover:bg-surface"
-                title="Account"
+                title={t("nav.account")}
               >
                 {isPWA ? (
                   <Icon name="settings" className="h-5 w-5 shrink-0 text-ink-muted" />
@@ -306,13 +308,13 @@ function WorkspaceLayoutInner() {
                     {user?.name?.[0]}
                   </span>
                 )}
-                <span className="truncate text-sm">{isPWA ? "Settings" : user?.name}</span>
+                <span className="truncate text-sm">{isPWA ? t("nav.settingsLabel") : user?.name}</span>
               </button>
               <IOSMenu open={avatarMenuOpen} onClose={() => setAvatarMenuOpen(false)} side="top" align="start" widthClassName="w-56">
                 <IOSMenuGroup>
                   <IOSMenuItem
                     icon="board"
-                    label="Switch workspace"
+                    label={t("nav.switchWorkspace")}
                     onClick={() => {
                       setAvatarMenuOpen(false);
                       navigate("/workspaces");
@@ -320,7 +322,7 @@ function WorkspaceLayoutInner() {
                   />
                   <IOSMenuItem
                     icon="user"
-                    label="Account settings"
+                    label={t("nav.accountSettings")}
                     onClick={() => {
                       setAvatarMenuOpen(false);
                       navigate("/settings");
@@ -328,7 +330,7 @@ function WorkspaceLayoutInner() {
                   />
                   <IOSMenuItem
                     icon="close"
-                    label="Log out"
+                    label={t("nav.logOut")}
                     destructive
                     onClick={() => {
                       setAvatarMenuOpen(false);
@@ -341,7 +343,7 @@ function WorkspaceLayoutInner() {
           )}
           <div className="flex items-center gap-1">
             {!shareToken && workspaceId && <NotificationBell workspaceId={workspaceId} />}
-            <button onClick={toggle} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title="Toggle theme">
+            <button onClick={toggle} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title={t("nav.toggleTheme")}>
               <Icon name={theme === "dark" ? "sun" : "moon"} />
             </button>
           </div>
@@ -378,7 +380,7 @@ function WorkspaceLayoutInner() {
               className={`rounded-md p-1.5 hover:bg-surface-raised ${
                 showCoverOverlay ? "text-white hover:text-white" : "text-ink-muted hover:text-ink"
               }`}
-              title="Open menu"
+              title={t("nav.openMenu")}
             >
               <Icon name="menu" className="h-5 w-5" />
             </button>

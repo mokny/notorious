@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { notificationApi } from "../../lib/api/resources.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -14,6 +15,7 @@ import { Icon } from "../ui/Icon.js";
  * dropped, same as every other panel in this app.
  */
 export function NotificationBell({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -51,7 +53,7 @@ export function NotificationBell({ workspaceId }: { workspaceId: string }) {
       <button
         onClick={() => setOpen((v) => !v)}
         className="relative rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
-        title="Notifications"
+        title={t("nav.notifications.title")}
       >
         <Icon name="bell" className="h-4 w-4" />
         {unreadCount > 0 && (
@@ -64,19 +66,19 @@ export function NotificationBell({ workspaceId }: { workspaceId: string }) {
       {open && (
         <div className="absolute bottom-full left-0 z-20 mb-1 max-h-96 w-80 overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg">
           <div className="flex items-center justify-between px-2 py-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">Notifications</span>
+            <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t("nav.notifications.title")}</span>
             {unreadCount > 0 && (
               <button
                 onClick={() => markAllReadMutation.mutate()}
                 className="text-xs text-accent hover:underline"
               >
-                Mark all read
+                {t("nav.notifications.markAllRead")}
               </button>
             )}
           </div>
 
           {!notifications || notifications.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-ink-muted">No notifications yet.</p>
+            <p className="px-2 py-3 text-sm text-ink-muted">{t("nav.notifications.empty")}</p>
           ) : (
             <ul>
               {notifications.map((notification) => (
@@ -88,7 +90,7 @@ export function NotificationBell({ workspaceId }: { workspaceId: string }) {
                     <div className="flex items-center gap-1.5">
                       {!notification.readAt && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
                       <span className="truncate font-medium text-ink">
-                        {notification.actorName} commented on "{notification.objectTitle}"
+                        {t("nav.notifications.commentedOn", { actor: notification.actorName, title: notification.objectTitle })}
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-ink-muted">{notification.body}</p>

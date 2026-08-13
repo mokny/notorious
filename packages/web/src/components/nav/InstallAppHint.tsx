@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from "react-i18next";
 import { useLocalStorageState } from "../../hooks/useLocalStorageState.js";
 import { useInstallPrompt } from "../../hooks/useInstallPrompt.js";
 import { Icon } from "../ui/Icon.js";
@@ -27,6 +28,7 @@ function isAndroid(): boolean {
  * Dismissal is remembered so this doesn't nag on every visit.
  */
 export function InstallAppHint() {
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = useLocalStorageState("notorious:install-hint-dismissed", false);
   const { canPrompt, promptInstall } = useInstallPrompt();
   const ios = isIOS();
@@ -39,13 +41,14 @@ export function InstallAppHint() {
       <Icon name="smartphone" className="h-4 w-4 shrink-0 text-accent" />
       <span className="flex-1">
         {canPrompt ? (
-          "Install Notorious on your phone for quick, full-screen access."
+          t("nav.installHint.prompt")
         ) : ios ? (
-          <>
-            Install Notorious: tap <Icon name="share" className="mx-0.5 inline h-3 w-3 align-text-bottom" /> then "Add to Home Screen".
-          </>
+          <Trans
+            i18nKey="nav.installHint.ios"
+            components={{ icon: <Icon name="share" className="mx-0.5 inline h-3 w-3 align-text-bottom" /> }}
+          />
         ) : (
-          'Install Notorious: open your browser menu and choose "Add to Home screen" or "Install app".'
+          t("nav.installHint.android")
         )}
       </span>
       {canPrompt && (
@@ -53,12 +56,12 @@ export function InstallAppHint() {
           onClick={() => void promptInstall()}
           className="shrink-0 rounded-md bg-accent px-2 py-1 font-medium text-white hover:opacity-90"
         >
-          Install
+          {t("nav.installHint.install")}
         </button>
       )}
       <button
         onClick={() => setDismissed(true)}
-        title="Dismiss"
+        title={t("nav.installHint.dismiss")}
         className="shrink-0 rounded-md p-1 text-ink-muted hover:bg-surface-raised hover:text-ink"
       >
         <Icon name="close" className="h-3.5 w-3.5" />

@@ -30,6 +30,7 @@ import { badRequest, notFound } from "../../lib/httpError.js";
 import { writeUploadedBytes, deleteUploadedSubpath, deleteUploadedBytes } from "../../lib/storage.js";
 import { sendToUserGlobal, broadcastToConversation } from "../realtime/hub.js";
 import { notifyUser } from "../push/service.js";
+import { translate } from "../../lib/i18n.js";
 import { isFocused } from "./focusState.js";
 import { indexMessage, removeFromIndex } from "./indexer.js";
 import path from "node:path";
@@ -464,10 +465,11 @@ async function notifyNewMessage(conversationId: string, message: Message, sender
       const unreadConversationCount = await countUnreadConversations(userId);
       sendToUserGlobal(userId, { type: "chatUnreadCount", unreadConversationCount });
       if (isFocused(userId, conversationId)) return;
+      const [recipient] = await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId)).limit(1);
       await notifyUser(userId, {
         type: "chat-message",
         title: senderName,
-        body: message.body ? preview(message.body) : "Sent an attachment",
+        body: message.body ? preview(message.body) : await translate(recipient?.locale ?? null, "push.chat.attachment"),
         conversationId,
         url: `/messages/${conversationId}`,
         badge: unreadConversationCount,
@@ -627,10 +629,14 @@ async function notifyReaction(messageId: string, conversationId: string, reactor
   if (!message || message.authorId === reactorId) return;
   if (isFocused(message.authorId, conversationId)) return;
 
+  const [recipient] = await db.select({ locale: users.locale }).from(users).where(eq(users.id, message.authorId)).limit(1);
+  const body = message.body
+    ? await translate(recipient?.locale ?? null, "push.chat.reaction", { emoji, preview: preview(message.body) })
+    : await translate(recipient?.locale ?? null, "push.chat.reactionToYourMessage", { emoji });
   await notifyUser(message.authorId, {
     type: "chat-reaction",
     title: reactorName,
-    body: `reacted ${emoji} to ${message.body ? `"${preview(message.body)}"` : "your message"}`,
+    body,
     conversationId,
     url: `/messages/${conversationId}`,
   });
