@@ -124,8 +124,8 @@ export function Composer({
         >
           <Icon name="plus" className="h-5 w-5" />
         </button>
-        {/* The button sits inside the pill as a flex child (not absolutely positioned) so it's always comfortably inset from the pill's own right-side curve, however tall the pill grows with a multi-line message - `items-end` keeps it pinned to the bottom-right corner as the textarea grows, matching iMessage/WhatsApp. */}
-        <div className="flex flex-1 items-end gap-1 rounded-full border border-border bg-surface py-1 pl-3 pr-1 focus-within:border-accent">
+        {/* The button sits inside the pill as a flex child (not absolutely positioned) so it's always comfortably inset from the pill's own right-side curve, however tall the pill grows with a multi-line message - `items-end` keeps it pinned to the bottom-right corner as the textarea grows, matching iMessage/WhatsApp. Fixed radius (not `rounded-full`) so the corners don't balloon into an over-rounded stretch once the textarea grows past one line - `rounded-full` computes off the box's own height, which looks right at the single-line height this value is tuned for but exaggerated at 3 lines. */}
+        <div className="flex flex-1 items-end gap-1 rounded-[22px] border border-border bg-surface py-1 pl-3 pr-1 focus-within:border-accent">
           <textarea
             ref={textareaRef}
             value={body}
