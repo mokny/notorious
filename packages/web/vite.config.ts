@@ -15,6 +15,16 @@ export default defineConfig({
         theme_color: "#0f172a",
         background_color: "#0f172a",
         display: "standalone",
+        // Best-effort workaround for a long-standing WebKit bug: in an
+        // installed (standalone) PWA, a landscape photo taken via
+        // input[type=file][capture] never comes back to the page if the
+        // device rotates during capture - the native camera sheet's
+        // completion handler gets lost. Locking the installed app itself to
+        // portrait is one of the few things that's been reported to help;
+        // not guaranteed on iOS (Apple only partially honors this manifest
+        // field) and comes with the tradeoff of no landscape UI at all when
+        // installed to the home screen (browser tab use is unaffected).
+        orientation: "portrait",
         start_url: "/",
         icons: [
           { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
