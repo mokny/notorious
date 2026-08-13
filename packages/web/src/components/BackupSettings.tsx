@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { BACKUP_DESTINATION_TYPES, type BackupDestinationType, type BackupScheduleInput } from "@notorious/shared";
 import { backupApi } from "../lib/api/resources.js";
 import { ApiError } from "../lib/api/client.js";
@@ -26,22 +27,15 @@ function formatFileSize(bytes: number | null): string | null {
   return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
-const WEEKDAY_LABELS: { value: number; label: string }[] = [
-  { value: 1, label: "Mon" },
-  { value: 2, label: "Tue" },
-  { value: 3, label: "Wed" },
-  { value: 4, label: "Thu" },
-  { value: 5, label: "Fri" },
-  { value: 6, label: "Sat" },
-  { value: 0, label: "Sun" },
+const WEEKDAYS: { value: number; key: string }[] = [
+  { value: 1, key: "mon" },
+  { value: 2, key: "tue" },
+  { value: 3, key: "wed" },
+  { value: 4, key: "thu" },
+  { value: 5, key: "fri" },
+  { value: 6, key: "sat" },
+  { value: 0, key: "sun" },
 ];
-
-const DESTINATION_TYPE_LABELS: Record<BackupDestinationType, string> = {
-  local: "Local disk",
-  sftp: "SFTP",
-  ftp: "FTP",
-  samba: "Samba / SMB",
-};
 
 interface DestinationFormState {
   type: BackupDestinationType;
@@ -103,6 +97,7 @@ function buildConfig(form: DestinationFormState): Record<string, unknown> {
 
 /** Lets a workspace owner manage encrypted, scheduled backups to one or more destinations. See docs/DEPLOYMENT.md for the backup model. */
 export function BackupSettings({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
@@ -143,18 +138,18 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
     try {
       const blob = await promise;
       downloadBlob(blob, filename);
-      downloadTransfer.finish("Backup downloaded.");
+      downloadTransfer.finish(t("settings.workspace.backup.downloadedToast"));
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      downloadTransfer.fail(err instanceof ApiError ? err.message : "Download failed");
+      downloadTransfer.fail(err instanceof ApiError ? err.message : t("settings.workspace.backup.downloadFailed"));
     }
   }
 
   async function handleRestoreFile(destinationId: string, filename: string) {
     const confirmed = await confirm({
-      title: "Restore this backup as a new workspace?",
-      description: "This creates a brand-new workspace from this backup file - your current workspace is never changed or overwritten.",
-      confirmLabel: "Restore",
+      title: t("settings.workspace.backup.restoreConfirmTitle"),
+      description: t("settings.workspace.backup.restoreConfirmDescription"),
+      confirmLabel: t("settings.workspace.backup.restoreConfirmLabel"),
     });
     if (!confirmed) return;
 
@@ -165,10 +160,10 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
     try {
       await promise;
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      restoreTransfer.finish("Restored as a new workspace - check the workspace picker.");
+      restoreTransfer.finish(t("settings.workspace.backup.restoredToast"));
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      restoreTransfer.fail(err instanceof ApiError ? err.message : "Could not restore this backup");
+      restoreTransfer.fail(err instanceof ApiError ? err.message : t("settings.workspace.backup.restoreFailed"));
     }
   }
 
@@ -181,9 +176,9 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
 
   async function handleDeleteFile(destinationId: string, filename: string) {
     const confirmed = await confirm({
-      title: "Delete this backup file?",
-      description: "This permanently removes it from the destination. This cannot be undone.",
-      confirmLabel: "Delete",
+      title: t("settings.workspace.backup.deleteFileConfirmTitle"),
+      description: t("settings.workspace.backup.deleteFileConfirmDescription"),
+      confirmLabel: t("settings.workspace.backup.deleteFileConfirmLabel"),
       danger: true,
     });
     if (!confirmed) return;
@@ -221,10 +216,9 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
 
   async function handleRegenerate() {
     const confirmed = await confirm({
-      title: "Generate a new backup code?",
-      description:
-        "Every backup already made with the current code will become permanently unreadable - there is no way to recover them without the old code. Make sure you don't still need one before continuing.",
-      confirmLabel: "Generate new code",
+      title: t("settings.workspace.backup.regenerateConfirmTitle"),
+      description: t("settings.workspace.backup.regenerateConfirmDescription"),
+      confirmLabel: t("settings.workspace.backup.regenerateConfirmLabel"),
       danger: true,
     });
     if (confirmed) regenerateMutation.mutate();
@@ -302,50 +296,45 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
     <div className="mt-4 space-y-6">
       {/* Encryption code */}
       <div className="rounded-lg border border-border p-3">
-        <p className="text-sm font-medium">Encryption code</p>
-        <p className="mt-1 text-xs text-ink-muted">
-          Every backup (manual download or scheduled) is encrypted with this code. Store it somewhere safe - without
-          it, a backup cannot be restored, and there is no recovery if it's lost.
-        </p>
+        <p className="text-sm font-medium">{t("settings.workspace.backup.encryptionCode")}</p>
+        <p className="mt-1 text-xs text-ink-muted">{t("settings.workspace.backup.encryptionCodeDescription")}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {revealedKey ? (
             <>
               <code className="flex-1 overflow-x-auto rounded-md bg-surface px-2 py-1 text-xs">{revealedKey}</code>
               <Button variant="secondary" onClick={() => navigator.clipboard.writeText(revealedKey)}>
-                Copy
+                {t("settings.workspace.backup.copy")}
               </Button>
             </>
           ) : (
             <Button variant="secondary" onClick={() => revealKeyMutation.mutate()} disabled={revealKeyMutation.isPending}>
-              Show code
+              {t("settings.workspace.backup.showCode")}
             </Button>
           )}
           <Button variant="secondary" onClick={handleRegenerate} disabled={regenerateMutation.isPending}>
-            Generate new code
+            {t("settings.workspace.backup.generateNewCode")}
           </Button>
         </div>
         {regenerateMutation.isSuccess && (
-          <p className="mt-2 text-xs text-amber-500">
-            A new code was generated. Backups made with the previous code can no longer be restored.
-          </p>
+          <p className="mt-2 text-xs text-amber-500">{t("settings.workspace.backup.codeRegeneratedWarning")}</p>
         )}
       </div>
 
       {/* Schedule */}
       <div className="rounded-lg border border-border p-3">
-        <p className="text-sm font-medium">Schedule</p>
+        <p className="text-sm font-medium">{t("settings.workspace.backup.schedule")}</p>
         <form onSubmit={handleSaveSchedule} className="mt-2 space-y-3">
           <div className="flex flex-wrap gap-3">
-            {WEEKDAY_LABELS.map(({ value, label }) => (
+            {WEEKDAYS.map(({ value, key }) => (
               <label key={value} className="flex items-center gap-1.5 text-xs text-ink-muted">
                 <input type="checkbox" checked={weekdays.includes(value)} onChange={() => toggleWeekday(value)} />
-                {label}
+                {t(`settings.workspace.backup.weekday.${key}`)}
               </label>
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-              Time
+              {t("settings.workspace.backup.time")}
               <input
                 type="time"
                 value={time}
@@ -358,7 +347,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
               <span className="text-[11px] text-ink-muted">({BROWSER_TIMEZONE})</span>
             </label>
             <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-              Every
+              {t("settings.workspace.backup.every")}
               <input
                 type="number"
                 min={1}
@@ -370,7 +359,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 }}
                 className="w-14 rounded-lg border border-border bg-surface px-2 py-1 text-xs"
               />
-              week(s)
+              {t("settings.workspace.backup.weeks")}
             </label>
             <label className="flex items-center gap-1.5 text-xs text-ink-muted">
               <input
@@ -381,24 +370,31 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                   setScheduleDirty(true);
                 }}
               />
-              Enabled
+              {t("settings.workspace.backup.enabled")}
             </label>
           </div>
           <Button type="submit" variant="secondary" disabled={saveScheduleMutation.isPending || weekdays.length === 0}>
-            Save schedule
+            {t("settings.workspace.backup.saveSchedule")}
           </Button>
         </form>
         <div className="mt-2 space-y-0.5 text-xs text-ink-muted">
           {schedule && !scheduleDirty && schedule.timezone !== BROWSER_TIMEZONE && (
             <p className="text-amber-500">
-              This schedule's time was set in {schedule.timezone}, not your current timezone ({BROWSER_TIMEZONE}) - save
-              again to switch it to your local time.
+              {t("settings.workspace.backup.timezoneMismatch", {
+                timezone: schedule.timezone,
+                browserTimezone: BROWSER_TIMEZONE,
+              })}
             </p>
           )}
-          {schedule?.nextRunAt && schedule.enabled && <p>Next run: {new Date(schedule.nextRunAt).toLocaleString()}</p>}
+          {schedule?.nextRunAt && schedule.enabled && (
+            <p>{t("settings.workspace.backup.nextRun", { time: new Date(schedule.nextRunAt).toLocaleString() })}</p>
+          )}
           {schedule?.lastRunAt && (
             <p className={schedule.lastRunStatus === "failure" ? "text-red-500" : "text-emerald-500"}>
-              Last run {new Date(schedule.lastRunAt).toLocaleString()} - {schedule.lastRunStatus}
+              {t("settings.workspace.backup.lastRun", {
+                time: new Date(schedule.lastRunAt).toLocaleString(),
+                status: schedule.lastRunStatus,
+              })}
               {schedule.lastError ? ` (${schedule.lastError})` : ""}
             </p>
           )}
@@ -408,14 +404,14 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
       {/* Destinations */}
       <div className="rounded-lg border border-border p-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Destinations</p>
+          <p className="text-sm font-medium">{t("settings.workspace.backup.destinations")}</p>
           <Button variant="secondary" onClick={() => runNowMutation.mutate()} disabled={runNowMutation.isPending || destinations.length === 0}>
-            Back up now
+            {t("settings.workspace.backup.backupNow")}
           </Button>
         </div>
         {runNowMutation.isError && (
           <p className="mt-2 text-xs text-red-500">
-            {runNowMutation.error instanceof Error ? runNowMutation.error.message : "Backup run failed to start"}
+            {runNowMutation.error instanceof Error ? runNowMutation.error.message : t("settings.workspace.backup.runFailed")}
           </p>
         )}
 
@@ -425,24 +421,30 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm">
-                    {destination.name} <span className="text-xs text-ink-muted">({DESTINATION_TYPE_LABELS[destination.type]})</span>
+                    {destination.name}{" "}
+                    <span className="text-xs text-ink-muted">({t(`settings.workspace.backup.destinationType.${destination.type}`)})</span>
                   </p>
-                  <p className="mt-1 text-[11px] text-ink-muted">Keeps the last {destination.retentionCount} backups</p>
+                  <p className="mt-1 text-[11px] text-ink-muted">
+                    {t("settings.workspace.backup.keepsLast", { count: destination.retentionCount })}
+                  </p>
                   <p className="mt-1 text-[11px] text-ink-muted">
                     {destination.lastRunAt ? (
                       <span className={destination.lastRunStatus === "failure" ? "text-red-500" : "text-emerald-500"}>
-                        Last run {new Date(destination.lastRunAt).toLocaleString()} - {destination.lastRunStatus}
+                        {t("settings.workspace.backup.lastRun", {
+                          time: new Date(destination.lastRunAt).toLocaleString(),
+                          status: destination.lastRunStatus,
+                        })}
                         {destination.lastError ? ` (${destination.lastError})` : ""}
                       </span>
                     ) : (
-                      "Never run yet"
+                      t("settings.workspace.backup.neverRun")
                     )}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => setExpandedDestinationId((current) => (current === destination.id ? null : destination.id))}
-                    title="Backup files at this destination"
+                    title={t("settings.workspace.backup.backupFilesTitle")}
                     className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
                   >
                     <Icon name={expandedDestinationId === destination.id ? "chevron-down" : "chevron-right"} className="h-3.5 w-3.5" />
@@ -450,7 +452,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                   <button
                     onClick={() => testDestinationMutation.mutate(destination.id)}
                     disabled={testDestinationMutation.isPending}
-                    title="Test connection"
+                    title={t("settings.workspace.backup.testConnection")}
                     className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50"
                   >
                     <Icon name="play" className="h-3.5 w-3.5" />
@@ -461,11 +463,11 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                       checked={destination.enabled}
                       onChange={(e) => toggleEnabledMutation.mutate({ id: destination.id, enabled: e.target.checked })}
                     />
-                    Enabled
+                    {t("settings.workspace.backup.enabled")}
                   </label>
                   <button
                     onClick={() => removeDestinationMutation.mutate(destination.id)}
-                    title="Delete this destination"
+                    title={t("settings.workspace.backup.deleteDestination")}
                     className="rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
                   >
                     <Icon name="trash" className="h-3.5 w-3.5" />
@@ -474,14 +476,18 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
               </div>
               {testResult?.id === destination.id && (
                 <p className={`mt-1 text-xs ${testResult.ok ? "text-emerald-500" : "text-red-500"}`}>
-                  {testResult.ok ? "Connection OK." : (testResult.error ?? "Test failed.")}
+                  {testResult.ok
+                    ? t("settings.workspace.backup.connectionOk")
+                    : (testResult.error ?? t("settings.workspace.backup.testFailed"))}
                 </p>
               )}
               {expandedDestinationId === destination.id && (
                 <div className="mt-2 space-y-1 border-t border-border pt-2">
-                  {filesQuery.isLoading && <p className="text-xs text-ink-muted">Loading backup files...</p>}
-                  {filesQuery.isError && <p className="text-xs text-red-500">Could not load backup files.</p>}
-                  {filesQuery.data?.length === 0 && <p className="text-xs text-ink-muted">No backup files at this destination yet.</p>}
+                  {filesQuery.isLoading && <p className="text-xs text-ink-muted">{t("settings.workspace.backup.loadingFiles")}</p>}
+                  {filesQuery.isError && <p className="text-xs text-red-500">{t("settings.workspace.backup.loadFilesError")}</p>}
+                  {filesQuery.data?.length === 0 && (
+                    <p className="text-xs text-ink-muted">{t("settings.workspace.backup.noFilesAtDestination")}</p>
+                  )}
                   {filesQuery.data?.map((file) => (
                     <div key={file.filename} className="flex items-center justify-between gap-2 rounded-md px-1 py-1 text-xs">
                       <div className="min-w-0 flex-1">
@@ -494,21 +500,21 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                       <div className="flex shrink-0 items-center gap-1">
                         <button
                           onClick={() => void handleDownloadFile(destination.id, file.filename)}
-                          title="Download"
+                          title={t("settings.workspace.backup.download")}
                           className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
                         >
                           <Icon name="download" className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => void handleRestoreFile(destination.id, file.filename)}
-                          title="Restore as a new workspace"
+                          title={t("settings.workspace.backup.restoreAsNewWorkspace")}
                           className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink"
                         >
                           <Icon name="history" className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => void handleDeleteFile(destination.id, file.filename)}
-                          title="Delete this backup file"
+                          title={t("settings.workspace.backup.deleteBackupFile")}
                           className="rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
                         >
                           <Icon name="trash" className="h-3.5 w-3.5" />
@@ -520,7 +526,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
               )}
             </div>
           ))}
-          {destinations.length === 0 && <p className="text-sm text-ink-muted">No backup destinations yet.</p>}
+          {destinations.length === 0 && <p className="text-sm text-ink-muted">{t("settings.workspace.backup.noDestinations")}</p>}
         </div>
 
         {showAddForm ? (
@@ -533,12 +539,12 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
               >
                 {BACKUP_DESTINATION_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {DESTINATION_TYPE_LABELS[type]}
+                    {t(`settings.workspace.backup.destinationType.${type}`)}
                   </option>
                 ))}
               </select>
               <TextField
-                placeholder="Name"
+                placeholder={t("settings.workspace.backup.namePlaceholder")}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
@@ -550,7 +556,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 max={365}
                 value={form.retentionCount}
                 onChange={(e) => setForm({ ...form, retentionCount: Number(e.target.value) })}
-                title="Number of backups to keep"
+                title={t("settings.workspace.backup.retentionCountTitle")}
                 className="w-16 rounded-lg border border-border bg-surface px-2 py-1 text-xs"
               />
             </div>
@@ -558,7 +564,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
             {form.type !== "local" && (
               <div className="flex flex-wrap gap-2">
                 <TextField
-                  placeholder="Host"
+                  placeholder={t("settings.workspace.backup.hostPlaceholder")}
                   value={form.host}
                   onChange={(e) => setForm({ ...form, host: e.target.value })}
                   required
@@ -567,7 +573,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 {form.type !== "samba" && (
                   <input
                     type="number"
-                    placeholder="Port"
+                    placeholder={t("settings.workspace.backup.portPlaceholder")}
                     value={form.port}
                     onChange={(e) => setForm({ ...form, port: e.target.value })}
                     className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-xs"
@@ -575,7 +581,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 )}
                 {form.type === "samba" && (
                   <TextField
-                    placeholder="Share"
+                    placeholder={t("settings.workspace.backup.sharePlaceholder")}
                     value={form.share}
                     onChange={(e) => setForm({ ...form, share: e.target.value })}
                     required
@@ -583,7 +589,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                   />
                 )}
                 <TextField
-                  placeholder="Remote path"
+                  placeholder={t("settings.workspace.backup.remotePathPlaceholder")}
                   value={form.remotePath}
                   onChange={(e) => setForm({ ...form, remotePath: e.target.value })}
                   className="max-w-[160px]"
@@ -594,7 +600,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
             {form.type !== "local" && (
               <div className="flex flex-wrap gap-2">
                 <TextField
-                  placeholder="Username"
+                  placeholder={t("settings.workspace.backup.usernamePlaceholder")}
                   value={form.username}
                   onChange={(e) => setForm({ ...form, username: e.target.value })}
                   required
@@ -602,7 +608,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 />
                 <TextField
                   type="password"
-                  placeholder="Password"
+                  placeholder={t("settings.workspace.backup.passwordPlaceholder")}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   required
@@ -610,7 +616,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 />
                 {form.type === "samba" && (
                   <TextField
-                    placeholder="Domain (optional)"
+                    placeholder={t("settings.workspace.backup.domainPlaceholder")}
                     value={form.domain}
                     onChange={(e) => setForm({ ...form, domain: e.target.value })}
                     className="max-w-[140px]"
@@ -619,7 +625,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
                 {form.type === "ftp" && (
                   <label className="flex items-center gap-1.5 text-xs text-ink-muted">
                     <input type="checkbox" checked={form.secure} onChange={(e) => setForm({ ...form, secure: e.target.checked })} />
-                    FTPS
+                    {t("settings.workspace.backup.ftps")}
                   </label>
                 )}
               </div>
@@ -627,23 +633,23 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
 
             <div className="flex gap-2">
               <Button type="submit" variant="primary" disabled={createDestinationMutation.isPending}>
-                <Icon name="plus" className="h-3.5 w-3.5" /> Add destination
+                <Icon name="plus" className="h-3.5 w-3.5" /> {t("settings.workspace.backup.addDestination")}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setShowAddForm(false)}>
-                Cancel
+                {t("settings.workspace.backup.cancel")}
               </Button>
             </div>
           </form>
         ) : (
           <Button variant="secondary" className="mt-3" onClick={() => setShowAddForm(true)}>
-            <Icon name="plus" className="h-3.5 w-3.5" /> Add destination
+            <Icon name="plus" className="h-3.5 w-3.5" /> {t("settings.workspace.backup.addDestination")}
           </Button>
         )}
       </div>
 
       <ProgressPopup
         open={downloadTransfer.open}
-        title="Downloading backup"
+        title={t("settings.workspace.backup.downloadingTitle")}
         state={downloadTransfer.state}
         onCancel={downloadTransfer.cancel}
         onClose={downloadTransfer.close}
@@ -651,7 +657,7 @@ export function BackupSettings({ workspaceId }: { workspaceId: string }) {
       />
       <ProgressPopup
         open={restoreTransfer.open}
-        title="Restoring backup"
+        title={t("settings.workspace.backup.restoringTitle")}
         state={restoreTransfer.state}
         onCancel={restoreTransfer.cancel}
         onClose={restoreTransfer.close}

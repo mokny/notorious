@@ -196,10 +196,74 @@
         "activeLinks": "Aktive Freigabelinks (Workspace und einzelne Objekte)"
       },
       "ai": {
-        "description": "Konfiguriere einen API-Schlüssel eines KI-Anbieters, der von allen in diesem Workspace gemeinsam genutzt wird - verwendet vom Agent-Chat und den KI-Blöcken. Optional kannst du die gesamte Token-Nutzung begrenzen und festlegen, wie oft sie zurückgesetzt wird."
+        "description": "Konfiguriere einen API-Schlüssel eines KI-Anbieters, der von allen in diesem Workspace gemeinsam genutzt wird - verwendet vom Agent-Chat und den KI-Blöcken. Optional kannst du die gesamte Token-Nutzung begrenzen und festlegen, wie oft sie zurückgesetzt wird.",
+        "provider": {
+          "openai": "OpenAI",
+          "anthropic": "Anthropic",
+          "google": "Google (Gemini)",
+          "openai-compatible": "OpenAI-kompatibel (Ollama, lokale Modelle, ...)"
+        },
+        "interval": {
+          "hourly": "Stündlich",
+          "daily": "Täglich",
+          "weekly": "Wöchentlich",
+          "monthly": "Monatlich"
+        },
+        "resetOption": "Zurücksetzen: {{interval}}",
+        "replaceCurrentConfig": "Aktuelle Konfiguration ersetzen:",
+        "setupProvider": "Richte einen KI-Anbieter ein, der von allen in diesem Workspace genutzt wird:",
+        "modelPlaceholderGoogle": "Modell (z. B. gemini-3.5-flash-lite)",
+        "modelPlaceholderDefault": "Modell (z. B. gpt-4o, claude-sonnet-5)",
+        "baseUrlPlaceholder": "Basis-URL (z. B. http://localhost:11434/v1)",
+        "apiKeyPlaceholder": "API-Schlüssel",
+        "maxTokensPlaceholder": "Max. Tokens pro Zeitraum (leer = unbegrenzt)",
+        "save": "Speichern",
+        "saveConfigError": "Diese KI-Konfiguration konnte nicht gespeichert werden - prüfe die Werte und versuche es erneut.",
+        "quickSaveError": "Konnte nicht gespeichert werden - prüfe die Werte und versuche es erneut.",
+        "remove": "Entfernen",
+        "modelLabel": "Modell: {{model}}",
+        "tokenUsagePeriod": "Token-Nutzung in diesem Zeitraum",
+        "unlimited": "(unbegrenzt)",
+        "resetsAt": "Setzt sich zurück: {{interval}} - nächster Reset {{date}}",
+        "quickEdit": "Schnellbearbeitung",
+        "replaceConfig": "Konfiguration ersetzen",
+        "adjustTokenLimit": "Passe das Token-Limit und den Reset-Rhythmus an, ohne den API-Schlüssel zu ändern:",
+        "agentChatContext": "Agent-Chat-Kontext",
+        "agentChatContextDescription": "Legt fest, was der Agent-Chat beim Beantworten weiß - nicht die KI-Blöcke, die direkt auf Seiten verwendet werden.",
+        "purposeLabel": "Workspace-Zweck & Verhalten",
+        "purposePlaceholder": "z. B. „Dieser Workspace verwaltet unsere Support-Tickets - sei knapp und frage immer nach, bevor du etwas archivierst.“",
+        "purposeHelp": "Wird den Anweisungen des Agenten für alle in diesem Workspace hinzugefügt.",
+        "chatHistoryLabel": "An den Agenten gesendeter Chat-Verlauf",
+        "chatHistoryNone": "Keiner",
+        "chatHistoryLast": "Letzte {{count}} Nachrichten",
+        "chatHistoryHelp": "Wie viel deiner eigenen bisherigen Unterhaltung der Agent bei jeder neuen Nachricht sieht.",
+        "activityFeedLabel": "Dem Agenten erlauben, kürzliche Workspace-Aktivität nachzuschlagen",
+        "activityFeedDescription": "Ermöglicht Antworten wie „was hat sich kürzlich geändert?“, indem das Aktivitätsprotokoll gelesen wird (von allen im Workspace erstellte/aktualisierte/archivierte Objekte). Standardmäßig deaktiviert.",
+        "saved": "Gespeichert.",
+        "contextSaveError": "Konnte nicht gespeichert werden - versuche es erneut."
       },
       "webhooks": {
-        "description": "Erhalte einen HTTP-POST mit dem vollständigen Objekt, sobald sich in diesem Workspace etwas ändert - nützlich zum Synchronisieren mit einem anderen System oder zum Auslösen eigener Automatisierungen."
+        "description": "Erhalte einen HTTP-POST mit dem vollständigen Objekt, sobald sich in diesem Workspace etwas ändert - nützlich zum Synchronisieren mit einem anderen System oder zum Auslösen eigener Automatisierungen.",
+        "event": {
+          "created": "Erstellt",
+          "updated": "Aktualisiert",
+          "archived": "Archiviert",
+          "restored": "Wiederhergestellt",
+          "deleted": "Gelöscht"
+        },
+        "secretWarningPrefix": "Kopiere dieses Signatur-Geheimnis jetzt - es wird nicht erneut angezeigt. Verwende es, um den",
+        "secretWarningSuffix": "Header bei jeder Zustellung zu verifizieren.",
+        "copy": "Kopieren",
+        "dismiss": "Verwerfen",
+        "lastDelivery": "Letzte Zustellung {{time}} - {{status}}",
+        "neverTriggered": "Noch nie ausgelöst",
+        "sendTestDelivery": "Testzustellung senden",
+        "enabled": "Aktiviert",
+        "deleteWebhook": "Diesen Webhook löschen",
+        "testSent": "Testzustellung gesendet - Status oben prüfen, sobald sie ankommt.",
+        "testFailed": "Die Testzustellung konnte nicht gesendet werden.",
+        "noWebhooks": "Noch keine Webhooks.",
+        "addWebhook": "Webhook hinzufügen"
       },
       "backup": {
         "description": "Jedes Backup wird mit dem unten stehenden Code dieses Workspace verschlüsselt. Lade eines manuell herunter, stelle eines als brandneuen Workspace wieder her oder richte automatische geplante Backups zu einem oder mehreren Zielen ein.",
@@ -214,7 +278,75 @@
         "codePlaceholder": "Backup-Code",
         "restore": "Wiederherstellen",
         "downloadingTitle": "Backup wird heruntergeladen",
-        "restoringTitle": "Backup wird wiederhergestellt"
+        "restoringTitle": "Backup wird wiederhergestellt",
+        "encryptionCode": "Verschlüsselungscode",
+        "encryptionCodeDescription": "Jedes Backup (manueller Download oder geplant) wird mit diesem Code verschlüsselt. Bewahre ihn sicher auf - ohne ihn kann ein Backup nicht wiederhergestellt werden, und es gibt keine Möglichkeit zur Wiederherstellung, falls er verloren geht.",
+        "copy": "Kopieren",
+        "showCode": "Code anzeigen",
+        "generateNewCode": "Neuen Code generieren",
+        "codeRegeneratedWarning": "Ein neuer Code wurde generiert. Backups, die mit dem vorherigen Code erstellt wurden, können nicht mehr wiederhergestellt werden.",
+        "schedule": "Zeitplan",
+        "weekday": {
+          "mon": "Mo",
+          "tue": "Di",
+          "wed": "Mi",
+          "thu": "Do",
+          "fri": "Fr",
+          "sat": "Sa",
+          "sun": "So"
+        },
+        "time": "Uhrzeit",
+        "every": "Alle",
+        "weeks": "Woche(n)",
+        "enabled": "Aktiviert",
+        "saveSchedule": "Zeitplan speichern",
+        "timezoneMismatch": "Die Uhrzeit dieses Zeitplans wurde in {{timezone}} festgelegt, nicht in deiner aktuellen Zeitzone ({{browserTimezone}}) - speichere erneut, um auf deine lokale Zeit umzustellen.",
+        "nextRun": "Nächster Lauf: {{time}}",
+        "lastRun": "Letzter Lauf {{time}} - {{status}}",
+        "destinations": "Ziele",
+        "backupNow": "Jetzt sichern",
+        "runFailed": "Backup-Lauf konnte nicht gestartet werden",
+        "destinationType": {
+          "local": "Lokale Festplatte",
+          "sftp": "SFTP",
+          "ftp": "FTP",
+          "samba": "Samba / SMB"
+        },
+        "keepsLast": "Behält die letzten {{count}} Backups",
+        "neverRun": "Noch nie ausgeführt",
+        "backupFilesTitle": "Backup-Dateien an diesem Ziel",
+        "testConnection": "Verbindung testen",
+        "deleteDestination": "Dieses Ziel löschen",
+        "connectionOk": "Verbindung OK.",
+        "testFailed": "Test fehlgeschlagen.",
+        "loadingFiles": "Backup-Dateien werden geladen...",
+        "loadFilesError": "Backup-Dateien konnten nicht geladen werden.",
+        "noFilesAtDestination": "Noch keine Backup-Dateien an diesem Ziel.",
+        "download": "Herunterladen",
+        "restoreAsNewWorkspace": "Als neuen Workspace wiederherstellen",
+        "deleteBackupFile": "Diese Backup-Datei löschen",
+        "noDestinations": "Noch keine Backup-Ziele.",
+        "namePlaceholder": "Name",
+        "hostPlaceholder": "Host",
+        "portPlaceholder": "Port",
+        "sharePlaceholder": "Freigabe",
+        "remotePathPlaceholder": "Remote-Pfad",
+        "usernamePlaceholder": "Benutzername",
+        "passwordPlaceholder": "Passwort",
+        "domainPlaceholder": "Domäne (optional)",
+        "ftps": "FTPS",
+        "addDestination": "Ziel hinzufügen",
+        "cancel": "Abbrechen",
+        "retentionCountTitle": "Anzahl aufzubewahrender Backups",
+        "restoreConfirmTitle": "Dieses Backup als neuen Workspace wiederherstellen?",
+        "restoreConfirmDescription": "Dies erstellt einen brandneuen Workspace aus dieser Backup-Datei - dein aktueller Workspace wird nie verändert oder überschrieben.",
+        "restoreConfirmLabel": "Wiederherstellen",
+        "deleteFileConfirmTitle": "Diese Backup-Datei löschen?",
+        "deleteFileConfirmDescription": "Dies entfernt sie dauerhaft vom Ziel. Dies kann nicht rückgängig gemacht werden.",
+        "deleteFileConfirmLabel": "Löschen",
+        "regenerateConfirmTitle": "Einen neuen Backup-Code generieren?",
+        "regenerateConfirmDescription": "Jedes Backup, das bereits mit dem aktuellen Code erstellt wurde, wird dauerhaft unlesbar - es gibt keine Möglichkeit, sie ohne den alten Code wiederherzustellen. Stelle sicher, dass du keinen davon mehr brauchst, bevor du fortfährst.",
+        "regenerateConfirmLabel": "Neuen Code generieren"
       },
       "dangerZone": {
         "description": "Löscht diesen Workspace endgültig für alle - jedes Objekt, jeden Block, jede Datei, jede Ansicht und den Zugriff aller Mitglieder. Nicht rückgängig zu machen; lade zuerst ein Backup herunter, falls du das später noch brauchen könntest.",
@@ -330,34 +462,118 @@
     },
     "slashCommand": {
       "items": {
-        "paragraph": { "label": "Text", "description": "Einfacher Absatz" },
-        "heading": { "label": "Überschrift", "description": "Abschnittsüberschrift" },
-        "quote": { "label": "Zitat", "description": "Hervorgehobenes Zitat" },
-        "callout": { "label": "Callout", "description": "Hervorgehobener Hinweis mit Symbol" },
-        "checklist": { "label": "Checkliste", "description": "Aufgaben mit Kontrollkästchen" },
-        "table": { "label": "Tabelle", "description": "Einfache Zeilen und Spalten" },
-        "code": { "label": "Code", "description": "Code-Block mit Syntaxhervorhebung" },
-        "image": { "label": "Bild", "description": "Bild hochladen oder einbetten" },
-        "video": { "label": "Video", "description": "Video einbetten" },
-        "embed": { "label": "Einbettung", "description": "Link einbetten" },
-        "pdf": { "label": "PDF", "description": "PDF hochladen, aufklappbar zur Ansicht direkt im Dokument" },
-        "audio": { "label": "Audio", "description": "Audiodatei mit Player hochladen" },
-        "file": { "label": "Datei", "description": "Beliebige andere Datei als Download-Karte hochladen" },
-        "maps": { "label": "Karte", "description": "Google-Maps-Adresse, Koordinaten oder Route einbetten" },
-        "math": { "label": "Mathe", "description": "LaTeX-Formel" },
-        "mermaid": { "label": "Mermaid-Diagramm", "description": "Flussdiagramme und Diagramme" },
-        "toggle": { "label": "Umschaltbereich", "description": "Ausklappbarer Abschnitt" },
-        "secret": { "label": "Geheimnis", "description": "Versteckter Text, nur durch Kopieren in die Zwischenablage sichtbar" },
-        "divider": { "label": "Trennlinie", "description": "Horizontale Linie" },
-        "columns": { "label": "Spalten", "description": "Nebeneinander-Layout" },
-        "database_view": { "label": "Verknüpfte Ansicht", "description": "Gespeicherte Ansicht von Objekten einbetten" },
-        "sub_object": { "label": "Vorhandenes Objekt", "description": "Vorhandenes Objekt verknüpfen, aufklappbar zu dessen eigenen Unterobjekten" },
-        "bookmark": { "label": "Lesezeichen", "description": "Link mit Titel und Beschreibung speichern" },
-        "whiteboard": { "label": "Whiteboard", "description": "Skizzieren mit Formen, Pfeilen und Freihandzeichnung" },
-        "calendar": { "label": "Kalender", "description": "Jahres-/Monats-/Wochen-/Tages-/Agenda-Kalender über einen oder mehrere Objekttypen" },
-        "voting": { "label": "Abstimmung", "description": "Liste im Reddit-Stil mit Up-/Downvotes für jeden Eintrag" },
-        "ai": { "label": "KI", "description": "KI mit einem Prompt aufrufen und durch die Antwort ersetzen" },
-        "rssFeed": { "label": "RSS-Feed", "description": "Einen oder mehrere RSS/Atom-Feeds abonnieren" }
+        "paragraph": {
+          "label": "Text",
+          "description": "Einfacher Absatz"
+        },
+        "heading": {
+          "label": "Überschrift",
+          "description": "Abschnittsüberschrift"
+        },
+        "quote": {
+          "label": "Zitat",
+          "description": "Hervorgehobenes Zitat"
+        },
+        "callout": {
+          "label": "Callout",
+          "description": "Hervorgehobener Hinweis mit Symbol"
+        },
+        "checklist": {
+          "label": "Checkliste",
+          "description": "Aufgaben mit Kontrollkästchen"
+        },
+        "table": {
+          "label": "Tabelle",
+          "description": "Einfache Zeilen und Spalten"
+        },
+        "code": {
+          "label": "Code",
+          "description": "Code-Block mit Syntaxhervorhebung"
+        },
+        "image": {
+          "label": "Bild",
+          "description": "Bild hochladen oder einbetten"
+        },
+        "video": {
+          "label": "Video",
+          "description": "Video einbetten"
+        },
+        "embed": {
+          "label": "Einbettung",
+          "description": "Link einbetten"
+        },
+        "pdf": {
+          "label": "PDF",
+          "description": "PDF hochladen, aufklappbar zur Ansicht direkt im Dokument"
+        },
+        "audio": {
+          "label": "Audio",
+          "description": "Audiodatei mit Player hochladen"
+        },
+        "file": {
+          "label": "Datei",
+          "description": "Beliebige andere Datei als Download-Karte hochladen"
+        },
+        "maps": {
+          "label": "Karte",
+          "description": "Google-Maps-Adresse, Koordinaten oder Route einbetten"
+        },
+        "math": {
+          "label": "Mathe",
+          "description": "LaTeX-Formel"
+        },
+        "mermaid": {
+          "label": "Mermaid-Diagramm",
+          "description": "Flussdiagramme und Diagramme"
+        },
+        "toggle": {
+          "label": "Umschaltbereich",
+          "description": "Ausklappbarer Abschnitt"
+        },
+        "secret": {
+          "label": "Geheimnis",
+          "description": "Versteckter Text, nur durch Kopieren in die Zwischenablage sichtbar"
+        },
+        "divider": {
+          "label": "Trennlinie",
+          "description": "Horizontale Linie"
+        },
+        "columns": {
+          "label": "Spalten",
+          "description": "Nebeneinander-Layout"
+        },
+        "database_view": {
+          "label": "Verknüpfte Ansicht",
+          "description": "Gespeicherte Ansicht von Objekten einbetten"
+        },
+        "sub_object": {
+          "label": "Vorhandenes Objekt",
+          "description": "Vorhandenes Objekt verknüpfen, aufklappbar zu dessen eigenen Unterobjekten"
+        },
+        "bookmark": {
+          "label": "Lesezeichen",
+          "description": "Link mit Titel und Beschreibung speichern"
+        },
+        "whiteboard": {
+          "label": "Whiteboard",
+          "description": "Skizzieren mit Formen, Pfeilen und Freihandzeichnung"
+        },
+        "calendar": {
+          "label": "Kalender",
+          "description": "Jahres-/Monats-/Wochen-/Tages-/Agenda-Kalender über einen oder mehrere Objekttypen"
+        },
+        "voting": {
+          "label": "Abstimmung",
+          "description": "Liste im Reddit-Stil mit Up-/Downvotes für jeden Eintrag"
+        },
+        "ai": {
+          "label": "KI",
+          "description": "KI mit einem Prompt aufrufen und durch die Antwort ersetzen"
+        },
+        "rssFeed": {
+          "label": "RSS-Feed",
+          "description": "Einen oder mehrere RSS/Atom-Feeds abonnieren"
+        }
       },
       "createAndEmbed": "Neues „{{name}}“ erstellen und hier einbetten"
     },

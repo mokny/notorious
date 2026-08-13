@@ -196,10 +196,74 @@
         "activeLinks": "Active share links (workspace and individual objects)"
       },
       "ai": {
-        "description": "Configure one AI provider API key shared by everyone in this workspace, used by the Agent Chat and AI blocks. Optionally cap total token usage and pick how often it resets."
+        "description": "Configure one AI provider API key shared by everyone in this workspace, used by the Agent Chat and AI blocks. Optionally cap total token usage and pick how often it resets.",
+        "provider": {
+          "openai": "OpenAI",
+          "anthropic": "Anthropic",
+          "google": "Google (Gemini)",
+          "openai-compatible": "OpenAI-compatible (Ollama, local models, ...)"
+        },
+        "interval": {
+          "hourly": "Hourly",
+          "daily": "Daily",
+          "weekly": "Weekly",
+          "monthly": "Monthly"
+        },
+        "resetOption": "{{interval}} reset",
+        "replaceCurrentConfig": "Replace the current configuration:",
+        "setupProvider": "Set up an AI provider to share with everyone in this workspace:",
+        "modelPlaceholderGoogle": "Model (e.g. gemini-3.5-flash-lite)",
+        "modelPlaceholderDefault": "Model (e.g. gpt-4o, claude-sonnet-5)",
+        "baseUrlPlaceholder": "Base URL (e.g. http://localhost:11434/v1)",
+        "apiKeyPlaceholder": "API key",
+        "maxTokensPlaceholder": "Max tokens per period (blank = unlimited)",
+        "save": "Save",
+        "saveConfigError": "Could not save this AI configuration - check the values and try again.",
+        "quickSaveError": "Could not save - check the values and try again.",
+        "remove": "Remove",
+        "modelLabel": "Model: {{model}}",
+        "tokenUsagePeriod": "Token usage this period",
+        "unlimited": "(unlimited)",
+        "resetsAt": "Resets {{interval}} - next reset {{date}}",
+        "quickEdit": "Quick edit",
+        "replaceConfig": "Replace configuration",
+        "adjustTokenLimit": "Adjust the token limit and reset cadence without touching the API key:",
+        "agentChatContext": "Agent Chat context",
+        "agentChatContextDescription": "Controls what the Agent Chat knows about when answering - not the AI blocks used inline on pages.",
+        "purposeLabel": "Workspace purpose & behavior",
+        "purposePlaceholder": "e.g. \"This workspace tracks our support tickets - be terse, and always ask before archiving anything.\"",
+        "purposeHelp": "Added to the agent's instructions for everyone in this workspace.",
+        "chatHistoryLabel": "Chat history sent to the agent",
+        "chatHistoryNone": "None",
+        "chatHistoryLast": "Last {{count}} messages",
+        "chatHistoryHelp": "How much of your own past conversation the agent sees on each new message.",
+        "activityFeedLabel": "Let the agent look up recent workspace activity",
+        "activityFeedDescription": "Lets it answer things like \"what changed recently?\" by reading the activity log (objects created/updated/archived by anyone in this workspace). Off by default.",
+        "saved": "Saved.",
+        "contextSaveError": "Could not save - try again."
       },
       "webhooks": {
-        "description": "Get an HTTP POST with the full object whenever something changes in this workspace - useful for syncing to another system or triggering your own automation."
+        "description": "Get an HTTP POST with the full object whenever something changes in this workspace - useful for syncing to another system or triggering your own automation.",
+        "event": {
+          "created": "Created",
+          "updated": "Updated",
+          "archived": "Archived",
+          "restored": "Restored",
+          "deleted": "Deleted"
+        },
+        "secretWarningPrefix": "Copy this signing secret now - it won't be shown again. Use it to verify the",
+        "secretWarningSuffix": "header on each delivery.",
+        "copy": "Copy",
+        "dismiss": "Dismiss",
+        "lastDelivery": "Last delivery {{time}} - {{status}}",
+        "neverTriggered": "Never triggered yet",
+        "sendTestDelivery": "Send a test delivery",
+        "enabled": "Enabled",
+        "deleteWebhook": "Delete this webhook",
+        "testSent": "Test delivery sent - check the status above once it lands.",
+        "testFailed": "Could not send the test delivery.",
+        "noWebhooks": "No webhooks yet.",
+        "addWebhook": "Add webhook"
       },
       "backup": {
         "description": "Every backup is encrypted with this workspace's code below. Download one manually, restore one as a brand-new workspace, or set up automatic scheduled backups to one or more destinations.",
@@ -214,7 +278,75 @@
         "codePlaceholder": "Backup code",
         "restore": "Restore",
         "downloadingTitle": "Downloading backup",
-        "restoringTitle": "Restoring backup"
+        "restoringTitle": "Restoring backup",
+        "encryptionCode": "Encryption code",
+        "encryptionCodeDescription": "Every backup (manual download or scheduled) is encrypted with this code. Store it somewhere safe - without it, a backup cannot be restored, and there is no recovery if it's lost.",
+        "copy": "Copy",
+        "showCode": "Show code",
+        "generateNewCode": "Generate new code",
+        "codeRegeneratedWarning": "A new code was generated. Backups made with the previous code can no longer be restored.",
+        "schedule": "Schedule",
+        "weekday": {
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat",
+          "sun": "Sun"
+        },
+        "time": "Time",
+        "every": "Every",
+        "weeks": "week(s)",
+        "enabled": "Enabled",
+        "saveSchedule": "Save schedule",
+        "timezoneMismatch": "This schedule's time was set in {{timezone}}, not your current timezone ({{browserTimezone}}) - save again to switch it to your local time.",
+        "nextRun": "Next run: {{time}}",
+        "lastRun": "Last run {{time}} - {{status}}",
+        "destinations": "Destinations",
+        "backupNow": "Back up now",
+        "runFailed": "Backup run failed to start",
+        "destinationType": {
+          "local": "Local disk",
+          "sftp": "SFTP",
+          "ftp": "FTP",
+          "samba": "Samba / SMB"
+        },
+        "keepsLast": "Keeps the last {{count}} backups",
+        "neverRun": "Never run yet",
+        "backupFilesTitle": "Backup files at this destination",
+        "testConnection": "Test connection",
+        "deleteDestination": "Delete this destination",
+        "connectionOk": "Connection OK.",
+        "testFailed": "Test failed.",
+        "loadingFiles": "Loading backup files...",
+        "loadFilesError": "Could not load backup files.",
+        "noFilesAtDestination": "No backup files at this destination yet.",
+        "download": "Download",
+        "restoreAsNewWorkspace": "Restore as a new workspace",
+        "deleteBackupFile": "Delete this backup file",
+        "noDestinations": "No backup destinations yet.",
+        "namePlaceholder": "Name",
+        "hostPlaceholder": "Host",
+        "portPlaceholder": "Port",
+        "sharePlaceholder": "Share",
+        "remotePathPlaceholder": "Remote path",
+        "usernamePlaceholder": "Username",
+        "passwordPlaceholder": "Password",
+        "domainPlaceholder": "Domain (optional)",
+        "ftps": "FTPS",
+        "addDestination": "Add destination",
+        "cancel": "Cancel",
+        "retentionCountTitle": "Number of backups to keep",
+        "restoreConfirmTitle": "Restore this backup as a new workspace?",
+        "restoreConfirmDescription": "This creates a brand-new workspace from this backup file - your current workspace is never changed or overwritten.",
+        "restoreConfirmLabel": "Restore",
+        "deleteFileConfirmTitle": "Delete this backup file?",
+        "deleteFileConfirmDescription": "This permanently removes it from the destination. This cannot be undone.",
+        "deleteFileConfirmLabel": "Delete",
+        "regenerateConfirmTitle": "Generate a new backup code?",
+        "regenerateConfirmDescription": "Every backup already made with the current code will become permanently unreadable - there is no way to recover them without the old code. Make sure you don't still need one before continuing.",
+        "regenerateConfirmLabel": "Generate new code"
       },
       "dangerZone": {
         "description": "Permanently deletes this workspace for everyone - every object, block, file, view and member's access. Not reversible; download a backup first if you might want any of this later.",
@@ -330,34 +462,118 @@
     },
     "slashCommand": {
       "items": {
-        "paragraph": { "label": "Text", "description": "Plain paragraph" },
-        "heading": { "label": "Heading", "description": "Section heading" },
-        "quote": { "label": "Quote", "description": "Highlighted quote" },
-        "callout": { "label": "Callout", "description": "Emphasized note with an icon" },
-        "checklist": { "label": "Checklist", "description": "To-do items with checkboxes" },
-        "table": { "label": "Table", "description": "Simple rows and columns" },
-        "code": { "label": "Code", "description": "Syntax-highlighted code block" },
-        "image": { "label": "Image", "description": "Upload or embed an image" },
-        "video": { "label": "Video", "description": "Embed a video" },
-        "embed": { "label": "Embed", "description": "Embed a link" },
-        "pdf": { "label": "PDF", "description": "Upload a PDF, expandable to view inline" },
-        "audio": { "label": "Audio", "description": "Upload an audio file with a player" },
-        "file": { "label": "File", "description": "Upload any other file as a download card" },
-        "maps": { "label": "Maps", "description": "Embed a Google Maps address, coordinates, or route" },
-        "math": { "label": "Math", "description": "LaTeX formula" },
-        "mermaid": { "label": "Mermaid diagram", "description": "Flowcharts and diagrams" },
-        "toggle": { "label": "Toggle", "description": "Collapsible section" },
-        "secret": { "label": "Secret", "description": "Hidden text, revealed only by copying to the clipboard" },
-        "divider": { "label": "Divider", "description": "Horizontal rule" },
-        "columns": { "label": "Columns", "description": "Side-by-side layout" },
-        "database_view": { "label": "Linked view", "description": "Embed a saved view of objects" },
-        "sub_object": { "label": "Existing Object", "description": "Link an existing object, expandable to its own sub-objects" },
-        "bookmark": { "label": "Bookmark", "description": "Save a link with a title and description" },
-        "whiteboard": { "label": "Whiteboard", "description": "Sketch with shapes, arrows and freehand drawing" },
-        "calendar": { "label": "Calendar", "description": "Year/month/week/day/agenda calendar over one or more object types" },
-        "voting": { "label": "Voting", "description": "Reddit-style list with upvotes/downvotes on each item" },
-        "ai": { "label": "AI", "description": "Prompt an AI and replace it with the answer" },
-        "rssFeed": { "label": "RSS Feed", "description": "Follow one or more RSS/Atom feeds" }
+        "paragraph": {
+          "label": "Text",
+          "description": "Plain paragraph"
+        },
+        "heading": {
+          "label": "Heading",
+          "description": "Section heading"
+        },
+        "quote": {
+          "label": "Quote",
+          "description": "Highlighted quote"
+        },
+        "callout": {
+          "label": "Callout",
+          "description": "Emphasized note with an icon"
+        },
+        "checklist": {
+          "label": "Checklist",
+          "description": "To-do items with checkboxes"
+        },
+        "table": {
+          "label": "Table",
+          "description": "Simple rows and columns"
+        },
+        "code": {
+          "label": "Code",
+          "description": "Syntax-highlighted code block"
+        },
+        "image": {
+          "label": "Image",
+          "description": "Upload or embed an image"
+        },
+        "video": {
+          "label": "Video",
+          "description": "Embed a video"
+        },
+        "embed": {
+          "label": "Embed",
+          "description": "Embed a link"
+        },
+        "pdf": {
+          "label": "PDF",
+          "description": "Upload a PDF, expandable to view inline"
+        },
+        "audio": {
+          "label": "Audio",
+          "description": "Upload an audio file with a player"
+        },
+        "file": {
+          "label": "File",
+          "description": "Upload any other file as a download card"
+        },
+        "maps": {
+          "label": "Maps",
+          "description": "Embed a Google Maps address, coordinates, or route"
+        },
+        "math": {
+          "label": "Math",
+          "description": "LaTeX formula"
+        },
+        "mermaid": {
+          "label": "Mermaid diagram",
+          "description": "Flowcharts and diagrams"
+        },
+        "toggle": {
+          "label": "Toggle",
+          "description": "Collapsible section"
+        },
+        "secret": {
+          "label": "Secret",
+          "description": "Hidden text, revealed only by copying to the clipboard"
+        },
+        "divider": {
+          "label": "Divider",
+          "description": "Horizontal rule"
+        },
+        "columns": {
+          "label": "Columns",
+          "description": "Side-by-side layout"
+        },
+        "database_view": {
+          "label": "Linked view",
+          "description": "Embed a saved view of objects"
+        },
+        "sub_object": {
+          "label": "Existing Object",
+          "description": "Link an existing object, expandable to its own sub-objects"
+        },
+        "bookmark": {
+          "label": "Bookmark",
+          "description": "Save a link with a title and description"
+        },
+        "whiteboard": {
+          "label": "Whiteboard",
+          "description": "Sketch with shapes, arrows and freehand drawing"
+        },
+        "calendar": {
+          "label": "Calendar",
+          "description": "Year/month/week/day/agenda calendar over one or more object types"
+        },
+        "voting": {
+          "label": "Voting",
+          "description": "Reddit-style list with upvotes/downvotes on each item"
+        },
+        "ai": {
+          "label": "AI",
+          "description": "Prompt an AI and replace it with the answer"
+        },
+        "rssFeed": {
+          "label": "RSS Feed",
+          "description": "Follow one or more RSS/Atom feeds"
+        }
       },
       "createAndEmbed": "Create a new {{name}} and embed it here"
     },

@@ -1,21 +1,23 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "@notorious/shared";
 import { webhookApi } from "../lib/api/resources.js";
 import { Button } from "./ui/Button.js";
 import { TextField } from "./ui/TextField.js";
 import { Icon } from "./ui/Icon.js";
 
-const EVENT_LABELS: Record<WebhookEvent, string> = {
-  "object.created": "Created",
-  "object.updated": "Updated",
-  "object.archived": "Archived",
-  "object.restored": "Restored",
-  "object.deleted": "Deleted",
+const EVENT_LABEL_KEYS: Record<WebhookEvent, string> = {
+  "object.created": "created",
+  "object.updated": "updated",
+  "object.archived": "archived",
+  "object.restored": "restored",
+  "object.deleted": "deleted",
 };
 
 /** Lets a workspace owner manage outbound HTTP notifications for object changes - see docs/API.md for the payload shape and signature header. */
 export function WebhooksSettings({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [url, setUrl] = useState("");
   const [events, setEvents] = useState<WebhookEvent[]>([...WEBHOOK_EVENTS]);
@@ -69,17 +71,17 @@ export function WebhooksSettings({ workspaceId }: { workspaceId: string }) {
       {freshSecret && (
         <div className="rounded-lg border border-accent/40 bg-accent/5 p-3">
           <p className="text-xs font-medium text-accent">
-            Copy this signing secret now - it won't be shown again. Use it to verify the
+            {t("settings.workspace.webhooks.secretWarningPrefix")}
             <code className="mx-1 rounded bg-surface px-1 py-0.5">X-Notorious-Signature</code>
-            header on each delivery.
+            {t("settings.workspace.webhooks.secretWarningSuffix")}
           </p>
           <div className="mt-1.5 flex items-center gap-2">
             <code className="flex-1 overflow-x-auto rounded-md bg-surface px-2 py-1 text-xs">{freshSecret}</code>
             <Button variant="secondary" onClick={() => navigator.clipboard.writeText(freshSecret)}>
-              Copy
+              {t("settings.workspace.webhooks.copy")}
             </Button>
             <Button variant="ghost" onClick={() => setFreshSecret(null)}>
-              Dismiss
+              {t("settings.workspace.webhooks.dismiss")}
             </Button>
           </div>
         </div>
@@ -91,15 +93,20 @@ export function WebhooksSettings({ workspaceId }: { workspaceId: string }) {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <code className="block truncate text-sm">{hook.url}</code>
-                <p className="mt-1 text-xs capitalize text-ink-muted">{hook.events.map((e) => EVENT_LABELS[e]).join(", ")}</p>
+                <p className="mt-1 text-xs capitalize text-ink-muted">
+                  {hook.events.map((e) => t(`settings.workspace.webhooks.event.${EVENT_LABEL_KEYS[e]}`)).join(", ")}
+                </p>
                 <p className="mt-1 text-[11px] text-ink-muted">
                   {hook.lastTriggeredAt ? (
                     <span className={hook.lastStatus === "failure" ? "text-red-500" : "text-emerald-500"}>
-                      Last delivery {new Date(hook.lastTriggeredAt).toLocaleString()} - {hook.lastStatus}
+                      {t("settings.workspace.webhooks.lastDelivery", {
+                        time: new Date(hook.lastTriggeredAt).toLocaleString(),
+                        status: hook.lastStatus,
+                      })}
                       {hook.lastError ? ` (${hook.lastError})` : ""}
                     </span>
                   ) : (
-                    "Never triggered yet"
+                    t("settings.workspace.webhooks.neverTriggered")
                   )}
                 </p>
               </div>
@@ -107,7 +114,7 @@ export function WebhooksSettings({ workspaceId }: { workspaceId: string }) {
                 <button
                   onClick={() => testMutation.mutate(hook.id)}
                   disabled={testMutation.isPending}
-                  title="Send a test delivery"
+                  title={t("settings.workspace.webhooks.sendTestDelivery")}
                   className="rounded-md p-1.5 text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50"
                 >
                   <Icon name="play" className="h-3.5 w-3.5" />
@@ -118,11 +125,11 @@ export function WebhooksSettings({ workspaceId }: { workspaceId: string }) {
                     checked={hook.enabled}
                     onChange={(e) => toggleEnabledMutation.mutate({ id: hook.id, enabled: e.target.checked })}
                   />
-                  Enabled
+                  {t("settings.workspace.webhooks.enabled")}
                 </label>
                 <button
                   onClick={() => removeMutation.mutate(hook.id)}
-                  title="Delete this webhook"
+                  title={t("settings.workspace.webhooks.deleteWebhook")}
                   className="rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500"
                 >
                   <Icon name="trash" className="h-3.5 w-3.5" />
@@ -131,12 +138,12 @@ export function WebhooksSettings({ workspaceId }: { workspaceId: string }) {
             </div>
             {testResult?.id === hook.id && (
               <p className={`mt-1 text-xs ${testResult.ok ? "text-emerald-500" : "text-red-500"}`}>
-                {testResult.ok ? "Test delivery sent - check the status above once it lands." : "Could not send the test delivery."}
+                {testResult.ok ? t("settings.workspace.webhooks.testSent") : t("settings.workspace.webhooks.testFailed")}
               </p>
             )}
           </div>
         ))}
-        {hooks?.length === 0 && <p className="text-sm text-ink-muted">No webhooks yet.</p>}
+        {hooks?.length === 0 && <p className="text-sm text-ink-muted">{t("settings.workspace.webhooks.noWebhooks")}</p>}
       </div>
 
       <form onSubmit={handleCreate} className="space-y-2 rounded-lg border border-dashed border-border p-3">
@@ -151,12 +158,12 @@ export function WebhooksSettings({ workspaceId }: { workspaceId: string }) {
           {WEBHOOK_EVENTS.map((value) => (
             <label key={value} className="flex items-center gap-1.5 text-xs text-ink-muted">
               <input type="checkbox" checked={events.includes(value)} onChange={() => toggleEvent(value)} />
-              {EVENT_LABELS[value]}
+              {t(`settings.workspace.webhooks.event.${EVENT_LABEL_KEYS[value]}`)}
             </label>
           ))}
         </div>
         <Button type="submit" variant="primary" disabled={createMutation.isPending || events.length === 0}>
-          <Icon name="plus" className="h-3.5 w-3.5" /> Add webhook
+          <Icon name="plus" className="h-3.5 w-3.5" /> {t("settings.workspace.webhooks.addWebhook")}
         </Button>
       </form>
     </div>
