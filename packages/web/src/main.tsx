@@ -68,21 +68,6 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-// Actively locks orientation when running as an installed PWA (standalone
-// display mode) - only Android/Chrome implements Screen Orientation lock
-// outside of fullscreen video/canvas contexts, and even there it silently
-// rejects while the browser considers the document "not fullscreen enough"
-// (a regular tab, iOS Safari/home-screen web app, or a browser that lacks
-// the API entirely). This makes locking a no-op there, which is why the
-// CSS overlay in globals.css/index.html still exists as the actual fallback
-// for those cases rather than being replaced by this call.
-const orientation = screen.orientation as (ScreenOrientation & { lock?: (o: string) => Promise<void> }) | undefined;
-if (window.matchMedia("(display-mode: standalone)").matches && orientation?.lock) {
-  orientation.lock("portrait").catch(() => {
-    // Unsupported/rejected - the CSS overlay covers this device instead.
-  });
-}
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
