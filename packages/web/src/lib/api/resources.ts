@@ -679,6 +679,11 @@ export const adminApi = {
           if (dataLine) onLine(JSON.parse(dataLine.slice("data: ".length)) as string);
         }
       }
+    } catch {
+      // The connection already succeeded (response.ok above), so a read failure here means the
+      // server process itself just got restarted mid-stream - the expected end of a successful
+      // update, not a real error. Swallow it; onDone()'s polling is what tells the caller whether
+      // the new server actually came back up.
     } finally {
       onDone();
     }
