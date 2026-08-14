@@ -67,6 +67,30 @@ async function anyWindowFocused(): Promise<boolean> {
   return windowClients.some((client) => client.focused && client.visibilityState === "visible");
 }
 
+function pathnameOf(url: string): string {
+  try {
+    return new URL(url, self.location.origin).pathname;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Same idea as `anyWindowFocused`, but scoped to a tab actually showing the
+ * specific object a `mention`/`comment-reply` push belongs to (comparing
+ * pathnames only - `payload.url` carries a `?block=`/`?comment=`/`?field=`
+ * deep-link suffix that shouldn't affect the match). Being mentioned in
+ * document A while actively looking at unrelated document B is exactly the
+ * case that should still notify - the blanket "any tab of the app is open"
+ * check `anyWindowFocused` does for other push types would otherwise
+ * needlessly suppress it just because the app happens to be open somewhere.
+ */
+async function anyWindowFocusedOnDocument(url: string): Promise<boolean> {
+  const target = pathnameOf(url);
+  const windowClients = (await self.clients.matchAll({ type: "window", includeUncontrolled: true })) as WindowClient[];
+  return windowClients.some((client) => client.focused && client.visibilityState === "visible" && pathnameOf(client.url) === target);
+}
+
 async function updateBadge(payload: PushNotificationPayload): Promise<void> {
   // Best-effort: this is what makes the app-icon badge update while the app
   // is backgrounded/fully closed, not just live via the WS-driven path in
@@ -96,10 +120,20 @@ async function handlePush(payload: PushNotificationPayload): Promise<void> {
 
   // The recipient's "also notify me while the app is open" setting (see
   // AuthContext's `User.pushShowWhenOpen`) - `notifyUser` on the server only
-  // sets this for types other than `call`, which always rings.
-  if (payload.type !== "call" && payload.suppressWhenFocused && (await anyWindowFocused())) {
-    await updateBadge(payload);
-    return;
+  // sets this for types other than `call`, which always rings. `mention`/
+  // `comment-reply` use the document-scoped check (see its own doc comment)
+  // instead of the blanket "any tab of the app is open" one every other type
+  // uses - being mentioned/replied-to in one document while looking at a
+  // different one should still notify.
+  if (payload.type !== "call" && payload.suppressWhenFocused) {
+    const focused =
+      payload.type === "mention" || payload.type === "comment-reply"
+        ? await anyWindowFocusedOnDocument(payload.url)
+        : await anyWindowFocused();
+    if (focused) {
+      await updateBadge(payload);
+      return;
+    }
   }
 
   const isCall = payload.type === "call";
