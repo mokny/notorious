@@ -15,10 +15,6 @@ export default defineConfig({
         theme_color: "#0f172a",
         background_color: "#0f172a",
         display: "standalone",
-        // Locks the installed PWA to portrait on platforms that honor this
-        // (Android/Chrome). Browsers ignore it for regular tabbed browsing,
-        // so the CSS overlay in globals.css handles that case instead.
-        orientation: "portrait",
         start_url: "/",
         icons: [
           { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
