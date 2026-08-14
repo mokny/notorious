@@ -235,7 +235,24 @@ export async function checkForUpdate(currentVersion: string): Promise<VersionChe
  * outlives the HTTP request that triggered it.
  */
 export function runUpdateScript() {
-  return spawn("bash", ["scripts/update.sh"], { cwd: repoRoot, detached: true });
+  return spawn("bash", ["scripts/update.sh"], { cwd: repoRoot, detached: true, env: updateScriptEnv() });
+}
+
+/**
+ * `spawn` inherits the calling process's env by default - which, for the
+ * running server, includes `NODE_ENV=production` (set via `.env`, see
+ * env.ts). `npm install` treats a `NODE_ENV=production` in its own
+ * environment as "skip devDependencies", which breaks the `npm run build`
+ * step that follows (needs `typescript` and the `@types/*` packages) - a
+ * failure mode that only shows up when the update is triggered from inside
+ * the app itself, not when run manually from a plain SSH shell (which never
+ * had `NODE_ENV` set to begin with). Stripping it here makes the two paths
+ * behave the same.
+ */
+function updateScriptEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.NODE_ENV;
+  return env;
 }
 
 /** Restarts the systemd service directly (no rebuild/migration) - used after writing new calls `.env` values, which only take effect on process restart. No-op (just reports it) if no systemd unit is installed, same fallback as scripts/update.sh. */
