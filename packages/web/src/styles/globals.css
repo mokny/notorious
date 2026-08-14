@@ -161,6 +161,14 @@ body {
   @apply rounded-full bg-accent/10 px-1 py-0.5 font-medium text-accent;
 }
 
+/* The raw `@[Name|id]` text underneath a `.mention-pill` widget in the live
+   block editor (see MentionHighlight.ts) - kept in the doc (so the mention
+   stays part of the actual editable/saved text) but hidden from view, since
+   the widget right next to it is what's actually shown. */
+.mention-source {
+  display: none;
+}
+
 /* A native checkbox's default size (or the app's own previous h-4/w-4) is a
    fiddly target to tap accurately with a finger - sized here once, app-wide
    (checklist items, property values, settings toggles, ...) rather than in

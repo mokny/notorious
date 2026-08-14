@@ -9,6 +9,7 @@ import { useDragSelectGuard } from "../../../hooks/useDragSelectGuard.js";
 import { useHasHover } from "../../../hooks/useHasHover.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { useKeepInViewport } from "../../../hooks/useKeepInViewport.js";
+import { useMentionAutocomplete } from "../../../hooks/useMentionAutocomplete.js";
 import { randomId } from "../../../lib/randomId.js";
 import { resizeTextarea } from "../../../lib/resizeTextarea.js";
 import { Icon } from "../../ui/Icon.js";
@@ -17,6 +18,7 @@ import { useTemplatableField } from "../useTemplatableField.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGestures.js";
 import { UndoToast } from "../UndoToast.js";
 import { HighlightedText } from "../HighlightedText.js";
+import { MentionDropdown } from "../MentionDropdown.js";
 
 /** Delay before a checked-off item slides to the bottom - see ChecklistContent.sortCheckedToBottom. */
 const CHECKED_MOVE_DELAY_MS = 2000;
@@ -65,6 +67,7 @@ function ChecklistItemRow({
   blockId,
   field,
   item,
+  workspaceId,
   onToggle,
   onToggleItem,
   onChangeText,
@@ -82,6 +85,8 @@ function ChecklistItemRow({
   blockId: string;
   field: string;
   item: ChecklistItem;
+  /** For the @mention autocomplete below - see useMentionAutocomplete.ts. */
+  workspaceId: string;
   onToggle: (checked: boolean) => void;
   /** Exempt-from-lock path (see ChecklistBlock's own doc comment) - used instead of `onToggle` whenever the item has a stable id to address. */
   onToggleItem?: (itemId: string, checked: boolean) => Promise<void>;
@@ -149,6 +154,17 @@ function ChecklistItemRow({
   // focus from whatever else is on the page whenever a templated item first
   // renders in its rendered state.
   const focusOnEditRef = useRef(false);
+  // Checklist items aren't a TipTap instance (see this file's own textarea
+  // below), so they use the plain-text `useMentionAutocomplete` hook - same
+  // one CommentsPanel.tsx/MentionableTextInput.tsx use - instead of Mention.ts.
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mention = useMentionAutocomplete({
+    workspaceId,
+    elementRef: textareaRef,
+    value: item.markdown,
+    onChange: onChangeText,
+    enabled: !readOnly,
+  });
 
   return (
     <div className="relative" data-flip-id={sortableId}>
@@ -220,46 +236,59 @@ function ChecklistItemRow({
             <HighlightedText text={item.markdown || ""} terms={searchTerms} />
           </div>
         ) : (
-          <textarea
-            ref={(el) => {
-              registerInputRef(el);
-              if (el && focusOnEditRef.current) {
-                el.focus();
-                focusOnEditRef.current = false;
-              }
-            }}
-            value={item.markdown}
-            onChange={(e) => {
-              onChangeText(e.target.value);
-              resizeTextarea(e.target);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                onEnter();
-              }
-            }}
-            // Without this, a *brand-new* item (never opened via clicking a
-            // rendered value, so `editing` never otherwise turns true) could
-            // have its debounced save+refetch land while still focused and
-            // being typed into - `showRendered` would flip true right out
-            // from under the cursor the instant a rendered value first
-            // appears, exactly the "focus jumps out of a checklist item
-            // right after creating it" bug this fixes.
-            onFocus={startEditing}
-            onBlur={() => {
-              onFlush();
-              stopEditing();
-              setSearchPreviewOverridden(false);
-            }}
-            readOnly={readOnly}
-            placeholder={t("editor.blocks.checklist.placeholder")}
-            autoComplete="off"
-            rows={1}
-            className={`flex-1 resize-none overflow-hidden border-none bg-transparent py-0.5 text-sm outline-none ${
-              item.checked ? "text-ink-muted line-through" : ""
-            }`}
-          />
+          <div className="relative flex-1">
+            <textarea
+              ref={(el) => {
+                registerInputRef(el);
+                textareaRef.current = el;
+                if (el && focusOnEditRef.current) {
+                  el.focus();
+                  focusOnEditRef.current = false;
+                }
+              }}
+              value={item.markdown}
+              onChange={(e) => {
+                onChangeText(e.target.value);
+                resizeTextarea(e.target);
+              }}
+              onKeyDown={(e) => {
+                if (mention.onKeyDown(e)) return;
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onEnter();
+                }
+              }}
+              onSelect={mention.onSelect}
+              // Without this, a *brand-new* item (never opened via clicking a
+              // rendered value, so `editing` never otherwise turns true) could
+              // have its debounced save+refetch land while still focused and
+              // being typed into - `showRendered` would flip true right out
+              // from under the cursor the instant a rendered value first
+              // appears, exactly the "focus jumps out of a checklist item
+              // right after creating it" bug this fixes.
+              onFocus={startEditing}
+              onBlur={() => {
+                onFlush();
+                stopEditing();
+                setSearchPreviewOverridden(false);
+              }}
+              readOnly={readOnly}
+              placeholder={t("editor.blocks.checklist.placeholder")}
+              autoComplete="off"
+              rows={1}
+              className={`w-full resize-none overflow-hidden border-none bg-transparent py-0.5 text-sm outline-none ${
+                item.checked ? "text-ink-muted line-through" : ""
+              }`}
+            />
+            {mention.isOpen && (
+              <MentionDropdown
+                items={mention.items}
+                selectedIndex={mention.selectedIndex}
+                onPick={mention.pick}
+                className="left-0 top-full mt-1 w-64"
+              />
+            )}
+          </div>
         )}
         {hasHover && (
           <button
@@ -303,7 +332,7 @@ export function ChecklistBlock({
   onAutoFocused?: () => void;
 }) {
   const { t } = useTranslation();
-  const { readOnly, searchHighlight } = useBlockEditor();
+  const { readOnly, searchHighlight, workspaceId } = useBlockEditor();
   const [content, save, flushSave] = useDebouncedSave(externalContent, onSave);
   const items = useMemo(() => content.items ?? [], [content.items]);
   const hasHover = useHasHover();
@@ -637,6 +666,7 @@ export function ChecklistBlock({
                 blockId={blockId}
                 field={`items.${index}`}
                 item={item}
+                workspaceId={workspaceId}
                 onToggle={(checked) => {
                   updateItem(index, { checked });
                   handleCheckedChange(item.id, checked);
