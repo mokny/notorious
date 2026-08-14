@@ -1,15 +1,22 @@
 /**
  * Shared @mention syntax embedded directly in markdown block content, plain-text
- * comment bodies, and text/long-text property values: `@[Display Name](user:userId)`.
- * A markdown link look-alike (not a real link) chosen so it round-trips safely
- * through markdown parsing/serialization without a custom TipTap node - see
+ * comment bodies, and text/long-text property values: `@[Display Name|userId]`.
+ *
+ * NOT `@[Display Name](user:userId)` (an earlier version of this syntax) - that
+ * shape is valid CommonMark link syntax (`[text](scheme:anything)` is a real
+ * link for ANY scheme, not just http/https), so tiptap-markdown's parser
+ * silently turned it into a real link mark on load, rendering as a literal
+ * `<a href="user:...">` in the editor instead of a mention. A bare `[Name|id]`
+ * with no following `(...)`/`[...]` isn't link syntax at all, so CommonMark
+ * always leaves it as plain literal text - safe to round-trip through markdown
+ * parsing/serialization without a custom TipTap node - see
  * packages/web/src/components/editor/Mention.ts and the mention-autocomplete hook
  * used for plain-text fields. The captured display name is a snapshot from
  * insertion time (renderers may still prefer a live name lookup when available);
  * the userId is the durable, rename-safe reference used for notification diffing
  * (see modules/notifications/service.ts's `notifyMentionedUsers` on the server).
  */
-export const MENTION_PATTERN = /@\[([^\]]+)\]\(user:([a-zA-Z0-9_-]+)\)/g;
+export const MENTION_PATTERN = /@\[([^|\]]+)\|([a-zA-Z0-9_-]+)\]/g;
 
 export interface ParsedMention {
   name: string;
@@ -17,7 +24,7 @@ export interface ParsedMention {
 }
 
 export function formatMention(name: string, userId: string): string {
-  return `@[${name}](user:${userId})`;
+  return `@[${name}|${userId}]`;
 }
 
 /** All mentions found in `text`, in order of appearance, duplicates included. */

@@ -1,6 +1,6 @@
 import { eq, and, desc, isNull, inArray } from "drizzle-orm";
 import type { Notification } from "@notorious/shared";
-import { diffNewMentionedUserIds } from "@notorious/shared";
+import { diffNewMentionedUserIds, MENTION_PATTERN } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { notifications, comments, workspaces, users, workspaceMembers } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -27,9 +27,9 @@ function toNotification(row: typeof notifications.$inferSelect): Notification {
   };
 }
 
-/** Strips `@[Display Name](user:userId)` mention syntax down to plain `@Display Name` - used for the human-readable bell/push preview, since the raw markdown syntax isn't meant to be read directly. */
+/** Strips `@[Display Name|userId]` mention syntax down to plain `@Display Name` - used for the human-readable bell/push preview, since the raw mention syntax isn't meant to be read directly. Reuses the shared pattern (see utils/mentions.ts) rather than a local copy so the two can't drift apart. */
 function stripMentionSyntax(text: string): string {
-  return text.replace(/@\[([^\]]+)\]\(user:[a-zA-Z0-9_-]+\)/g, "@$1");
+  return text.replace(MENTION_PATTERN, "@$1");
 }
 
 const PREVIEW_LENGTH = 140;
