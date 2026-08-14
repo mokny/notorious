@@ -1,10 +1,30 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isDesktop } from "../lib/platform.js";
 
 const MUTE_STORAGE_KEY = "chatSoundMuted";
 
 function readMuted(): boolean {
   return localStorage.getItem(MUTE_STORAGE_KEY) === "1";
+}
+
+/**
+ * Chrome (and other browsers) only let an `AudioContext` actually produce
+ * sound once the page has seen a genuine user gesture - creating/resuming it
+ * for the first time from a WS message handler (no gesture behind it) is
+ * silently blocked. Warming the context up on the very first pointerdown/
+ * keydown after page load - unrelated to chat - "unlocks" it for every later
+ * WS-triggered `playChatSound()` call, including ones long after this
+ * listener has removed itself.
+ */
+function unlockAudioContextOnFirstGesture(getContext: () => AudioContext): void {
+  const unlock = () => {
+    const ctx = getContext();
+    if (ctx.state === "suspended") void ctx.resume();
+    document.removeEventListener("pointerdown", unlock);
+    document.removeEventListener("keydown", unlock);
+  };
+  document.addEventListener("pointerdown", unlock);
+  document.addEventListener("keydown", unlock);
 }
 
 /**
@@ -25,14 +45,24 @@ export function useChatSound(): { playChatSound: () => void; muted: boolean; set
     setMutedState(value);
   }, []);
 
-  const playChatSound = useCallback(() => {
-    if (!isDesktop() || readMuted()) return;
-
+  const getOrCreateContext = useCallback((): AudioContext => {
     let ctx = audioContextRef.current;
     if (!ctx || ctx.state === "closed") {
       ctx = new AudioContext();
       audioContextRef.current = ctx;
     }
+    return ctx;
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop()) return;
+    unlockAudioContextOnFirstGesture(getOrCreateContext);
+  }, [getOrCreateContext]);
+
+  const playChatSound = useCallback(() => {
+    if (!isDesktop() || readMuted()) return;
+
+    const ctx = getOrCreateContext();
     if (ctx.state === "suspended") void ctx.resume();
 
     const now = ctx.currentTime;
@@ -48,7 +78,7 @@ export function useChatSound(): { playChatSound: () => void; muted: boolean; set
     gain.connect(ctx.destination);
     oscillator.start(now);
     oscillator.stop(now + 0.26);
-  }, []);
+  }, [getOrCreateContext]);
 
   return { playChatSound, muted, setMuted };
 }
