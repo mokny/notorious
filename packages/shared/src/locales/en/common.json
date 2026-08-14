@@ -47,6 +47,14 @@
       "enable": "Enable",
       "dismiss": "Dismiss"
     },
+    "systemUpdateBanner": {
+      "inProgressUpdate": "An update is being installed. This page will reload automatically once it's done.",
+      "inProgressRestart": "The server is restarting. This page will reload automatically once it's back.",
+      "finishing": "Update complete. Reloading in {{seconds}}s…",
+      "failed": "The update failed. Please contact an administrator.",
+      "stuck": "This is taking longer than expected. Please check that the server is still running, or contact an administrator.",
+      "dismiss": "Dismiss"
+    },
     "mobile": {
       "back": "Back",
       "more": "More",

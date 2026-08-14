@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { WebSocket } from "@fastify/websocket";
 import type {
   BackupFilesChangedMessage,
@@ -7,7 +10,15 @@ import type {
   NotificationMessage,
   PresenceSnapshotMessage,
   RealtimeEvent,
+  SystemUpdateStatusMessage,
 } from "@notorious/shared";
+
+// Same "repo root" resolution as system/routes.ts's own version read - kept
+// separate rather than imported from there since that module has no export
+// for it, and both independently just want the version string this process
+// booted with.
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
+const RUNNING_VERSION = (JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")) as { version: string }).version;
 
 interface RoomEntry {
   objectIdFilter: string | null;
@@ -261,6 +272,42 @@ export function sendToClientGlobal(userId: string, clientId: string, message: Ch
   const payload = JSON.stringify(message);
   for (const socket of sockets) {
     if (clientIdBySocket.get(socket) !== clientId) continue;
+    if (socket.readyState === socket.OPEN) socket.send(payload);
+  }
+}
+
+// Every other registry in this file is scoped to a workspace or a logged-in
+// user - this one deliberately isn't. An admin-triggered update/restart
+// needs to reach literally every open tab, including the login page,
+// WorkspacePickerPage, and anonymous share-link visitors, none of which join
+// `roomsByWorkspace` or `socketsByUserId`. Kept as its own flat Set rather
+// than piggybacking on either existing map for that reason - see
+// `realtime/routes.ts`'s `/ws/system` endpoint, which requires no auth at
+// all.
+const systemSockets = new Set<WebSocket>();
+
+// The last status broadcast, so a socket connecting *during* an in-progress
+// update (not just one that was already open when the admin clicked the
+// button) still gets shown the banner immediately on connect instead of
+// only on the next change - see `joinSystemChannel`. Resets to "idle" with
+// this process's own version on every server start, which is exactly the
+// signal a reconnecting client needs after a real restart: the old process
+// (and its "inProgress" state) is gone, replaced by a fresh one that has
+// never heard of the update that killed it.
+let lastSystemStatus: SystemUpdateStatusMessage = { type: "systemUpdate", status: "idle", version: RUNNING_VERSION };
+
+/** Registers a socket on the update/restart status channel and immediately sends it the current status (see `lastSystemStatus`'s doc comment for why "immediately" matters) - cleans up on disconnect. */
+export function joinSystemChannel(socket: WebSocket): void {
+  systemSockets.add(socket);
+  socket.on("close", () => systemSockets.delete(socket));
+  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(lastSystemStatus));
+}
+
+/** Broadcasts a new update/restart status to every connected device app-wide - see `SystemUpdateStatusMessage`'s doc comment. Also remembered as `lastSystemStatus` for sockets that connect after this point. */
+export function broadcastSystemStatus(message: SystemUpdateStatusMessage): void {
+  lastSystemStatus = message;
+  const payload = JSON.stringify(message);
+  for (const socket of systemSockets) {
     if (socket.readyState === socket.OPEN) socket.send(payload);
   }
 }

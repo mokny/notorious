@@ -46,6 +46,14 @@
       "enable": "Aktivieren",
       "dismiss": "Schließen"
     },
+    "systemUpdateBanner": {
+      "inProgressUpdate": "Ein Update wird installiert. Diese Seite lädt automatisch neu, sobald es fertig ist.",
+      "inProgressRestart": "Der Server wird neu gestartet. Diese Seite lädt automatisch neu, sobald er wieder erreichbar ist.",
+      "finishing": "Update abgeschlossen. Neuladen in {{seconds}}s…",
+      "failed": "Das Update ist fehlgeschlagen. Bitte kontaktiere einen Administrator.",
+      "stuck": "Das dauert ungewöhnlich lange. Bitte prüfe, ob der Server noch läuft, oder kontaktiere einen Administrator.",
+      "dismiss": "Schließen"
+    },
     "mobile": {
       "back": "Zurück",
       "more": "Mehr",

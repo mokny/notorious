@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { joinRoom, joinGlobalRoom, broadcastToConversation } from "./hub.js";
+import { joinRoom, joinGlobalRoom, joinSystemChannel, broadcastToConversation } from "./hub.js";
 import { getSessionId } from "../../plugins/session.js";
 import { getMemberRole } from "../workspaces/access.js";
 import { touchFocus, clearFocus } from "../chat/focusState.js";
@@ -113,5 +113,17 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
       // separate call rather than folded into leaveCallBySocket.
       cleanupParticipant(socket);
     });
+  });
+
+  /**
+   * `wss://host/ws/system` - the update/restart status banner's channel (see
+   * `SystemUpdateStatusMessage`). Deliberately unauthenticated and carries no
+   * query params at all, unlike every other endpoint here: it must reach the
+   * login page and anonymous share visitors too, and the message itself
+   * (an update is running) isn't sensitive - same reasoning as
+   * `/api/v1/version` being unauthenticated in system/routes.ts.
+   */
+  app.get("/ws/system", { websocket: true }, (socket) => {
+    joinSystemChannel(socket);
   });
 }

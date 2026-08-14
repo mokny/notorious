@@ -492,3 +492,33 @@ export interface NotificationMessage {
   workspaceId: string;
   notification: Notification;
 }
+
+/**
+ * Sent over the workspace-and-auth-agnostic `/ws/system` channel (see
+ * `modules/realtime/hub.ts`'s `joinSystemChannel`/`broadcastSystemStatus`)
+ * to every connected device, including the login page and anonymous share
+ * visitors - the one broadcast in the app that isn't scoped to a workspace
+ * or a logged-in user at all. The server also sends the current status
+ * immediately on connect (not just on change), so a tab opened mid-update
+ * still shows the banner instead of only tabs that were already connected
+ * when the admin clicked the button.
+ *
+ * `reason` distinguishes a full code update (`runUpdateScript` - pull,
+ * rebuild, migrate, restart) from a plain process restart (`restartServerProcess`
+ * - e.g. after an admin changes calls `.env` settings) - the two need
+ * different "did it finish" logic client-side: an update is done once the
+ * reconnected socket reports a newer `version` than when it started, while a
+ * restart alone never changes the version, so reconnecting at all is enough.
+ * Omitted once `status` is back to `"idle"` - nothing left to distinguish.
+ *
+ * `version` is always the sender's own currently-running version - the
+ * client's yardstick for detecting "the new process is now serving
+ * requests" after a `reason: "update"` restart severs and reconnects the
+ * socket.
+ */
+export interface SystemUpdateStatusMessage {
+  type: "systemUpdate";
+  status: "idle" | "inProgress" | "failed";
+  reason?: "update" | "restart";
+  version: string;
+}

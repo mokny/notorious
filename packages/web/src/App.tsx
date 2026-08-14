@@ -45,6 +45,7 @@ import { IncomingCallBanner } from "./components/calls/IncomingCallBanner.js";
 import { PreJoinLobby } from "./components/calls/PreJoinLobby.js";
 import { ChatListPage } from "./pages/ChatListPage.js";
 import { ChatThreadPage } from "./pages/ChatThreadPage.js";
+import { SystemUpdateBanner } from "./components/nav/SystemUpdateBanner.js";
 
 /**
  * `allowShareSession` lets an anonymous whole-workspace share visitor
@@ -82,6 +83,7 @@ export function App() {
     <ChatRealtimeProvider>
       <CallProvider>
         <ChatOverlayProvider>
+          <SystemUpdateBanner />
           <AppRoutes />
           <ChatBubble />
           <ChatSheet />

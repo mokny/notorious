@@ -41,6 +41,14 @@
       "enable": "Activer",
       "dismiss": "Ignorer"
     },
+    "systemUpdateBanner": {
+      "inProgressUpdate": "Une mise à jour est en cours d'installation. Cette page se rechargera automatiquement une fois terminée.",
+      "inProgressRestart": "Le serveur redémarre. Cette page se rechargera automatiquement une fois qu'il sera de nouveau disponible.",
+      "finishing": "Mise à jour terminée. Rechargement dans {{seconds}}s…",
+      "failed": "La mise à jour a échoué. Veuillez contacter un administrateur.",
+      "stuck": "Cela prend plus de temps que prévu. Vérifiez que le serveur fonctionne toujours, ou contactez un administrateur.",
+      "dismiss": "Ignorer"
+    },
     "mobile": {
       "back": "Retour",
       "more": "Plus",

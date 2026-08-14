@@ -41,6 +41,14 @@
       "enable": "Activar",
       "dismiss": "Descartar"
     },
+    "systemUpdateBanner": {
+      "inProgressUpdate": "Se está instalando una actualización. Esta página se recargará automáticamente cuando termine.",
+      "inProgressRestart": "El servidor se está reiniciando. Esta página se recargará automáticamente cuando vuelva a estar disponible.",
+      "finishing": "Actualización completa. Recargando en {{seconds}}s…",
+      "failed": "La actualización ha fallado. Ponte en contacto con un administrador.",
+      "stuck": "Esto está tardando más de lo esperado. Comprueba si el servidor sigue funcionando o ponte en contacto con un administrador.",
+      "dismiss": "Descartar"
+    },
     "mobile": {
       "back": "Atrás",
       "more": "Más",

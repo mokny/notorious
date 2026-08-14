@@ -19,6 +19,7 @@ import {
   restartServerProcess,
 } from "./service.js";
 import { setCallsEnabled } from "../instanceSettings/service.js";
+import { broadcastSystemStatus } from "../realtime/hub.js";
 import { detectPublicIp } from "../../lib/publicIp.js";
 import { upsertEnvVars } from "../../lib/envFile.js";
 import { repoRoot } from "../../env.js";
@@ -119,6 +120,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await logAdminAction(admin, "update.trigger", "Triggered a server update");
+    // See SystemUpdateStatusMessage's doc comment: every open tab/device
+    // app-wide (not just this admin's) needs to know an update is running
+    // before the service restart severs their sockets.
+    broadcastSystemStatus({ type: "systemUpdate", status: "inProgress", reason: "update", version: PACKAGE_VERSION });
 
     reply.hijack();
     reply.raw.writeHead(200, {
@@ -134,12 +139,20 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     child.stderr?.on("data", (chunk: Buffer) => send(chunk.toString()));
     child.on("error", (error) => {
       send(`Error: ${error.message}`);
+      broadcastSystemStatus({ type: "systemUpdate", status: "failed", reason: "update", version: PACKAGE_VERSION });
       reply.raw.end();
     });
     child.on("close", (code) => {
       if (needsSudo && input.sudoPassword) {
         send("Restarting the service…");
         restartWithSudoPassword(input.sudoPassword);
+      } else if (code !== 0) {
+        // A non-zero exit with no sudo restart pending means update.sh
+        // itself failed (or, without a systemd unit, never restarted at
+        // all) - the process that would otherwise flip this back to "idle"
+        // by simply booting fresh is never coming, so tell every banner
+        // explicitly rather than leaving them stuck on "inProgress" forever.
+        broadcastSystemStatus({ type: "systemUpdate", status: "failed", reason: "update", version: PACKAGE_VERSION });
       }
       send(`Update script exited with code ${code}.`);
       reply.raw.write(`event: done\ndata: {}\n\n`);
@@ -169,6 +182,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     await setCallsEnabled(true);
     await logAdminAction(admin, "calls.setup", `Configured calls (${input.mediaAnnouncedIp}:${input.mediaPort}) and restarted the server`);
 
+    broadcastSystemStatus({ type: "systemUpdate", status: "inProgress", reason: "restart", version: PACKAGE_VERSION });
     restartServerProcess().unref();
     return { restarting: true };
   });
@@ -176,6 +190,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/admin/restart", async (request) => {
     const admin = await requireInstanceAdmin(request);
     await logAdminAction(admin, "server.restart", "Manually restarted the server process");
+    broadcastSystemStatus({ type: "systemUpdate", status: "inProgress", reason: "restart", version: PACKAGE_VERSION });
     restartServerProcess().unref();
     return { restarting: true };
   });
