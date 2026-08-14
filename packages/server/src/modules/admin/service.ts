@@ -255,11 +255,27 @@ function updateScriptEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-/** Restarts the systemd service directly (no rebuild/migration) - used after writing new calls `.env` values, which only take effect on process restart. No-op (just reports it) if no systemd unit is installed, same fallback as scripts/update.sh. */
+/**
+ * Restarts the systemd service directly (no rebuild/migration) - used after
+ * writing new calls `.env` values, which only take effect on process
+ * restart. No-op (just reports it) if no systemd unit is installed, same
+ * fallback as scripts/update.sh - including the same `sudo` prefix when not
+ * already running as root (see scripts/install.sh, which sets up the
+ * service with `User=$APP_USER`, not necessarily root). Note this
+ * (correctly) fails outright rather than hanging if `sudo` would need an
+ * interactive password: this process has no TTY, and a passwordless
+ * `NOPASSWD` sudoers rule for this exact command is required for an
+ * unattended restart to actually work on a non-root install.
+ */
 export function restartServerProcess() {
   return spawn(
     "bash",
-    ["-c", "if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/notorious.service ]; then systemctl restart notorious; else echo 'No systemd service found - restart the app manually.'; fi"],
+    [
+      "-c",
+      `SUDO=""; if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi; ` +
+        `if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/notorious.service ]; then $SUDO systemctl restart notorious; ` +
+        `else echo 'No systemd service found - restart the app manually.'; fi`,
+    ],
     { cwd: repoRoot, detached: true },
   );
 }
