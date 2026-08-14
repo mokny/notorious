@@ -974,7 +974,10 @@
     "subtitle": "Les espaces de travail gardent vos objets, vues et collaborateurs séparés.",
     "newWorkspaceNamePlaceholder": "Nom du nouvel espace de travail",
     "create": "Créer",
-    "untitledWorkspace": "Espace de travail sans titre"
+    "untitledWorkspace": "Espace de travail sans titre",
+    "iconLabel": "Icône",
+    "iconRequired": "Choisissez une icône",
+    "iconUploadFailed": "Échec du téléchargement, veuillez réessayer"
   },
   "sharePage": {
     "linkExpiredTitle": "Ce lien ne fonctionne plus",

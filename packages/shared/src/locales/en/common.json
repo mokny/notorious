@@ -982,7 +982,10 @@
     "subtitle": "Workspaces keep your objects, views and collaborators separate.",
     "newWorkspaceNamePlaceholder": "New workspace name",
     "create": "Create",
-    "untitledWorkspace": "Untitled Workspace"
+    "untitledWorkspace": "Untitled Workspace",
+    "iconLabel": "Icon",
+    "iconRequired": "Choose an icon",
+    "iconUploadFailed": "Upload failed, please try again"
   },
   "sharePage": {
     "linkExpiredTitle": "This link doesn't work anymore",

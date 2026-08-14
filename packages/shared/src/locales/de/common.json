@@ -981,7 +981,10 @@
     "subtitle": "Workspaces halten deine Objekte, Ansichten und Mitarbeiter getrennt.",
     "newWorkspaceNamePlaceholder": "Name des neuen Workspace",
     "create": "Erstellen",
-    "untitledWorkspace": "Workspace ohne Titel"
+    "untitledWorkspace": "Workspace ohne Titel",
+    "iconLabel": "Icon",
+    "iconRequired": "Wähle ein Icon",
+    "iconUploadFailed": "Upload fehlgeschlagen, bitte erneut versuchen"
   },
   "sharePage": {
     "linkExpiredTitle": "Dieser Link funktioniert nicht mehr",
