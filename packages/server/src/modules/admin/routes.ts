@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
-import { adminCreateUserSchema, adminCallsSetupSchema } from "@notorious/shared";
+import { adminCreateUserSchema, adminCallsSetupSchema, adminTriggerUpdateSchema } from "@notorious/shared";
 import { requireInstanceAdmin } from "./access.js";
 import {
   listUsers,
@@ -12,13 +12,17 @@ import {
   listAuditLog,
   logAdminAction,
   checkForUpdate,
+  updateNeedsSudoPassword,
+  verifySudoPassword,
   runUpdateScript,
+  restartWithSudoPassword,
   restartServerProcess,
 } from "./service.js";
 import { setCallsEnabled } from "../instanceSettings/service.js";
 import { detectPublicIp } from "../../lib/publicIp.js";
 import { upsertEnvVars } from "../../lib/envFile.js";
 import { repoRoot } from "../../env.js";
+import { badRequest, unauthorized } from "../../lib/httpError.js";
 
 const PACKAGE_VERSION = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
 
@@ -84,17 +88,36 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     return checkForUpdate(PACKAGE_VERSION);
   });
 
+  // Lets the frontend decide whether to show a sudo-password field before
+  // the user even clicks "Update now" - see AdminUpdateTab.tsx.
+  app.get("/api/v1/admin/update/sudo-required", async (request) => {
+    await requireInstanceAdmin(request);
+    return { required: await updateNeedsSudoPassword() };
+  });
+
   /**
    * Streams `scripts/update.sh`'s output live as it runs (SSE-shaped, but
    * read via `fetch` + a streaming reader on the frontend rather than
    * `EventSource`, since browsers only let `EventSource` issue GET requests
-   * - see AdminUpdatePanel.tsx). The update script restarts the systemd
-   * service (and therefore this very Node process) partway through, which
-   * simply ends the stream from the client's point of view; the frontend
-   * falls back to polling `/api/v1/version` once the connection drops.
+   * - see AdminUpdateTab.tsx). When running as a non-root user with no
+   * passwordless sudo configured, a `sudoPassword` is required and is
+   * validated here - BEFORE `runUpdateScript` is ever called - so a wrong
+   * password fails fast instead of after several minutes of downloading and
+   * rebuilding. The update script restarts the systemd service (and
+   * therefore this very Node process) partway through, which simply ends the
+   * stream from the client's point of view; the frontend falls back to
+   * polling `/api/v1/version` once the connection drops.
    */
   app.post("/api/v1/admin/update", async (request, reply) => {
     const admin = await requireInstanceAdmin(request);
+    const input = adminTriggerUpdateSchema.parse(request.body ?? {});
+
+    const needsSudo = await updateNeedsSudoPassword();
+    if (needsSudo) {
+      if (!input.sudoPassword) throw badRequest("A sudo password is required to restart the service on this server");
+      if (!(await verifySudoPassword(input.sudoPassword))) throw unauthorized("Incorrect sudo password");
+    }
+
     await logAdminAction(admin, "update.trigger", "Triggered a server update");
 
     reply.hijack();
@@ -104,7 +127,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       Connection: "keep-alive",
     });
 
-    const child = runUpdateScript();
+    const child = runUpdateScript(needsSudo);
     const send = (line: string) => reply.raw.write(`data: ${JSON.stringify(line)}\n\n`);
 
     child.stdout?.on("data", (chunk: Buffer) => send(chunk.toString()));
@@ -114,6 +137,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       reply.raw.end();
     });
     child.on("close", (code) => {
+      if (needsSudo && input.sudoPassword) {
+        send("Restarting the service…");
+        restartWithSudoPassword(input.sudoPassword);
+      }
       send(`Update script exited with code ${code}.`);
       reply.raw.write(`event: done\ndata: {}\n\n`);
       reply.raw.end();

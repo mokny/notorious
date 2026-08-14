@@ -79,7 +79,13 @@ NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}" npm run build
 log "Running database migrations"
 npm run migrate
 
-if command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/notorious.service ]; then
+if [ "${NOTORIOUS_SKIP_RESTART:-}" = "1" ]; then
+  # Set by the admin UI's update trigger (see modules/admin/service.ts's
+  # `runUpdateScript`) when it already validated a sudo password up front and
+  # will restart the service itself right after this script exits - $SUDO
+  # here has no TTY to prompt on, so it can't do this non-interactively.
+  log "Skipping restart - the caller will restart the service itself"
+elif command -v systemctl >/dev/null 2>&1 && [ -f /etc/systemd/system/notorious.service ]; then
   log "Restarting the notorious systemd service"
   $SUDO systemctl restart notorious
   echo "Done. Check status with: sudo systemctl status notorious"

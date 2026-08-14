@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import argon2 from "argon2";
@@ -226,6 +227,50 @@ export async function checkForUpdate(currentVersion: string): Promise<VersionChe
 
 // ---- Update / restart -----------------------------------------------------
 
+const SYSTEMD_UNIT_PATH = "/etc/systemd/system/notorious.service";
+
+/** Whether `sudo -n` (non-interactive) already succeeds for this user - i.e. a `NOPASSWD` sudoers rule is already set up, so no password prompt is needed at all. */
+function canSudoWithoutPassword(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn("sudo", ["-n", "true"], { env: updateScriptEnv() });
+    child.on("close", (code) => resolve(code === 0));
+    child.on("error", () => resolve(false));
+  });
+}
+
+/**
+ * Whether the UI needs to collect a sudo password before an update can
+ * actually restart the service. False when: already running as root (no
+ * `sudo` needed at all); no systemd unit is installed (update.sh won't
+ * attempt a restart either way); or a `NOPASSWD` sudoers rule already covers
+ * this user. Only true for the "non-root, no passwordless sudo configured"
+ * case scripts/update.sh's own embedded `sudo` call would otherwise fail on
+ * silently (no TTY to prompt on) when triggered from this UI.
+ */
+export async function updateNeedsSudoPassword(): Promise<boolean> {
+  if (process.getuid && process.getuid() === 0) return false;
+  if (!fs.existsSync(SYSTEMD_UNIT_PATH)) return false;
+  return !(await canSudoWithoutPassword());
+}
+
+/**
+ * Validates a sudo password by actually attempting to authenticate with it -
+ * `-k` first discards any cached timestamp so a stale/unrelated cache can't
+ * produce a false positive, `-v` just authenticates/refreshes the timestamp
+ * without running a real command. Used to check the password *before*
+ * kicking off the (multi-minute, already-in-progress-is-hard-to-undo)
+ * update itself - see modules/admin/routes.ts's `POST /api/v1/admin/update`.
+ */
+export function verifySudoPassword(password: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn("sudo", ["-S", "-k", "-v"], { env: updateScriptEnv(), stdio: ["pipe", "ignore", "ignore"] });
+    child.stdin.write(`${password}\n`);
+    child.stdin.end();
+    child.on("close", (code) => resolve(code === 0));
+    child.on("error", () => resolve(false));
+  });
+}
+
 /**
  * Runs the exact same `scripts/update.sh` an operator would run over SSH -
  * downloads the latest `main` tarball, rebuilds, migrates, and restarts the
@@ -233,9 +278,40 @@ export async function checkForUpdate(currentVersion: string): Promise<VersionChe
  * (modules/admin/routes.ts) can stream its stdout/stderr to the admin UI
  * live; the process (and the Node server itself, once systemd restarts it)
  * outlives the HTTP request that triggered it.
+ *
+ * `skipRestart` is set when the caller already validated a sudo password via
+ * `verifySudoPassword` and will restart the service itself afterward (see
+ * `restartWithSudoPassword`) - update.sh's own embedded `sudo systemctl
+ * restart` has no way to prompt for a password here (no TTY), so doing the
+ * restart as a separate, explicitly-password-fed step is the only way to
+ * make it actually succeed non-interactively as a non-root user.
  */
-export function runUpdateScript() {
-  return spawn("bash", ["scripts/update.sh"], { cwd: repoRoot, detached: true, env: updateScriptEnv() });
+export function runUpdateScript(skipRestart: boolean) {
+  const env = updateScriptEnv();
+  if (skipRestart) env.NOTORIOUS_SKIP_RESTART = "1";
+  return spawn("bash", ["scripts/update.sh"], { cwd: repoRoot, detached: true, env });
+}
+
+/**
+ * Restarts the systemd service using a sudo password already validated by
+ * `verifySudoPassword`, piped only to this one `sudo` process's stdin -
+ * deliberately never set as an env var (unlike `NOTORIOUS_SKIP_RESTART`
+ * above), since an env var would be inherited by the whole `npm
+ * install`/`npm run build` process tree that update.sh just ran, including
+ * every dependency's install/build script - a much larger, far less trusted
+ * surface than this one dedicated `sudo systemctl restart` call. Detached
+ * and unref'd because the restart itself kills the very process making this
+ * call (see the "outlives" note on `runUpdateScript`).
+ */
+export function restartWithSudoPassword(password: string): void {
+  const child = spawn("sudo", ["-S", "systemctl", "restart", "notorious"], {
+    env: updateScriptEnv(),
+    detached: true,
+    stdio: ["pipe", "ignore", "ignore"],
+  });
+  child.stdin.write(`${password}\n`);
+  child.stdin.end();
+  child.unref();
 }
 
 /**

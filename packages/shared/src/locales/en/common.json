@@ -1126,7 +1126,10 @@
       "upToDate": "Up to date.",
       "updateButton": "Update now",
       "waitingForRestart": "Waiting for the server to come back online…",
-      "backOnline": "Server is back online."
+      "backOnline": "Server is back online.",
+      "restartUncertain": "The update finished, but the server hasn't come back online with the new version yet. Check its status manually.",
+      "sudoPasswordTitle": "Sudo password required",
+      "sudoPasswordDescription": "This server isn't running as root, so restarting the service needs your sudo password. It's used once, right before the restart, and never stored."
     },
     "auditLog": {
       "empty": "No admin actions logged yet."

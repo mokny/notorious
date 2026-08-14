@@ -118,6 +118,7 @@ import type {
   AdminCreateUserInput,
   AdminUpdateSettingsInput,
   AdminCallsSetupInput,
+  AdminTriggerUpdateInput,
 } from "@notorious/shared";
 import type {
   PublicKeyCredentialCreationOptionsJSON,
@@ -125,7 +126,7 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from "@simplewebauthn/browser";
-import { apiRequest, apiUpload, apiDownload, apiUploadWithProgress } from "./client.js";
+import { apiRequest, apiUpload, apiDownload, apiUploadWithProgress, ApiError } from "./client.js";
 import { randomId } from "../randomId.js";
 
 /** Returned by login when the account has 2FA enabled - a real session is only created once `twoFactorApi.verify` succeeds. */
@@ -633,16 +634,31 @@ export const adminApi = {
   auditLog: () => apiRequest<AdminAuditEntry[]>("/api/v1/admin/audit-log"),
 
   versionCheck: () => apiRequest<AdminVersionCheck>("/api/v1/admin/version-check"),
+  /** Whether `streamUpdate` needs a `sudoPassword` - see AdminUpdateTab.tsx. */
+  updateSudoRequired: () => apiRequest<{ required: boolean }>("/api/v1/admin/update/sudo-required"),
   /**
    * Streams `POST /api/v1/admin/update`'s output live - uses `fetch` +
    * a manual reader rather than `EventSource` (which can only issue GET
    * requests, and this needs a POST to actually trigger the update) - see
    * AdminUpdateTab.tsx. `onLine` fires once per emitted line, `onDone` once
    * the update script exits or the connection otherwise closes (including
-   * because the server process itself just got restarted mid-stream).
+   * because the server process itself just got restarted mid-stream). If
+   * the server rejects the request outright (missing/wrong sudo password -
+   * checked there before anything is actually downloaded/rebuilt), `onLine`
+   * is never called and this throws instead, same as any other `ApiError`.
    */
-  async streamUpdate(onLine: (line: string) => void, onDone: () => void): Promise<void> {
-    const response = await fetch("/api/v1/admin/update", { method: "POST", credentials: "include" });
+  async streamUpdate(input: AdminTriggerUpdateInput, onLine: (line: string) => void, onDone: () => void): Promise<void> {
+    const response = await fetch("/api/v1/admin/update", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      const message = data && typeof data === "object" && "message" in data ? String(data.message) : "Update failed to start";
+      throw new ApiError(response.status, message);
+    }
     const reader = response.body?.getReader();
     if (!reader) {
       onDone();
