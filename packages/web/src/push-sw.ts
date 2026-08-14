@@ -197,7 +197,15 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {
       const existing = clients.find((client) => client.url.includes(data.url));
-      if (existing) return existing.navigate(url).then((client) => client?.focus());
+      if (existing) {
+        // A same-moment service worker update can fire main.tsx's
+        // controllerchange reload before `navigate()` below actually lands,
+        // which would otherwise reload the tab back to whatever URL was
+        // current instead of this notification's target. Stash the target
+        // so that reload (if it happens) still lands here.
+        existing.postMessage({ type: "pending-push-nav", url });
+        return existing.navigate(url).then((client) => client?.focus());
+      }
       return self.clients.openWindow(url);
     }),
   );
