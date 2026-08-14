@@ -341,7 +341,12 @@ function WorkspaceLayoutInner() {
             push the cover down and break the "content reaches the very top"
             effect, but suppressing them there previously made the push-notify
             prompt only ever appear in landscape on phone (crossing the
-            isPhone breakpoint flips coverFullBleed off), which is worse. */}
+            isPhone breakpoint flips coverFullBleed off), which is worse.
+            Wrapped with the top-bar's own height as padding on phone+cover
+            (where <main> itself skips that padding so the cover can reach
+            the top edge) - otherwise this being <main>'s first flow content
+            would start right under the floating pill header/fade and get
+            visually swallowed by them. */}
         <main
           ref={mainRef}
           // `overscroll-none` (not just `-contain`) - without it, iOS's
@@ -366,8 +371,12 @@ function WorkspaceLayoutInner() {
             ...(isPhone && { paddingBottom: "var(--bottom-tab-bar-h)" }),
           }}
         >
-          {!shareToken && <InstallAppHint />}
-          {!shareToken && <PushNotificationBanner />}
+          {!shareToken && (
+            <div style={isPhone && coverActive ? { paddingTop: "var(--mobile-top-bar-h)" } : undefined}>
+              <InstallAppHint />
+              <PushNotificationBanner />
+            </div>
+          )}
           <Outlet />
         </main>
         {isPhone && (
