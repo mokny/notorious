@@ -37,16 +37,12 @@ export function SystemUpdateBanner() {
           ? t("nav.systemUpdateBanner.failed")
           : t("nav.systemUpdateBanner.stuck");
 
-  const tone = phase === "failed" || phase === "stuck" ? "border-red-500/30 bg-red-500/10 text-red-500" : "border-accent/30 bg-accent/10 text-accent";
-
   return (
-    <div
-      className={`fixed inset-x-0 top-[calc(env(safe-area-inset-top)+3.5rem)] z-50 flex items-center justify-center gap-2 border-b px-3 py-2 text-center text-xs font-medium md:top-0 ${tone}`}
-    >
+    <div className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+3.5rem)] z-50 flex items-center justify-center gap-2 border-b border-red-700 bg-red-600 px-3 py-2 text-center text-xs font-medium text-white md:top-0">
       <Icon name={dismissible ? "alert-triangle" : "refresh"} className={`h-4 w-4 shrink-0 ${phase === "inProgress" || phase === "finishing" ? "animate-spin" : ""}`} />
       <span>{message}</span>
       {dismissible && (
-        <button onClick={dismiss} title={t("nav.systemUpdateBanner.dismiss")} className="ml-1 shrink-0 rounded-md p-1 hover:bg-red-500/10">
+        <button onClick={dismiss} title={t("nav.systemUpdateBanner.dismiss")} className="ml-1 shrink-0 rounded-md p-1 hover:bg-white/10">
           <Icon name="close" className="h-3.5 w-3.5" />
         </button>
       )}
