@@ -368,6 +368,16 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                     navigate(`/w/${workspaceId}/settings`);
                   }}
                 />
+                {user?.isServerAdmin && (
+                  <IOSMenuItem
+                    icon="shield"
+                    label={t("nav.serverAdmin")}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/admin");
+                    }}
+                  />
+                )}
               </>
             )}
             <IOSMenuItem
