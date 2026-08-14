@@ -32,7 +32,13 @@ export function WorkspaceRail({ activeWorkspaceId }: WorkspaceRailProps) {
 
   return (
     <aside
-      className="relative z-0 flex w-16 shrink-0 flex-col items-center border-r border-border bg-surface"
+      // z-50, not z-0 - the sidebar `<aside>` next to this one is effectively
+      // z-40 (see WorkspaceLayout.tsx), and since that's a sibling stacking
+      // context, AccountMenuButton's own z-50 popup menu rendered *inside*
+      // this rail would still lose to the entire sidebar sitting above it
+      // otherwise - the popup's z-index only ranks within its own ancestor
+      // context, not against siblings of that ancestor.
+      className="relative z-50 flex w-16 shrink-0 flex-col items-center border-r border-border bg-surface"
       style={{
         paddingTop: "calc(0.75rem + env(safe-area-inset-top))",
         paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
