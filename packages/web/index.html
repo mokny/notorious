@@ -48,6 +48,12 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Blocks phone-landscape use (see .orientation-lock-overlay in
+         globals.css); sits outside #root so it survives regardless of app
+         render state. -->
+    <div id="orientation-lock-overlay" class="orientation-lock-overlay">
+      <p>Notorious is only available in portrait mode.<br />Please rotate your device.</p>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
