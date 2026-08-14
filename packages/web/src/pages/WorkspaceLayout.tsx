@@ -4,9 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { workspaceApi, authApi } from "../lib/api/resources.js";
-import { useAuth } from "../context/AuthContext.js";
-import { useConfirm } from "../context/ConfirmContext.js";
+import { workspaceApi } from "../lib/api/resources.js";
 import { useTheme } from "../context/ThemeContext.js";
 import { MobileChromeProvider, useMobileChrome } from "../context/MobileChromeContext.js";
 import { ObjectHistoryProvider } from "../context/ObjectHistoryContext.js";
@@ -14,12 +12,12 @@ import { SearchOverlayProvider } from "../context/SearchOverlayContext.js";
 import { useRealtime } from "../lib/ws/useRealtime.js";
 import { getShareToken } from "../lib/api/shareMode.js";
 import { useWorkspacePins } from "../hooks/useWorkspacePins.js";
-import { useRobustImage } from "../hooks/useRobustImage.js";
 import { useDragSelectGuard } from "../hooks/useDragSelectGuard.js";
 import { useBreakpoint, useIsLandscape } from "../hooks/useBreakpoint.js";
-import { isStandalone } from "../lib/platform.js";
 import { Icon } from "../components/ui/Icon.js";
 import { navLinkClass } from "../components/nav/navLinkClass.js";
+import { AccountMenuButton } from "../components/nav/AccountMenuButton.js";
+import { WorkspaceRail } from "../components/nav/WorkspaceRail.js";
 import { PinnedNavItem } from "../components/nav/PinnedNavItem.js";
 import { InstallAppHint } from "../components/nav/InstallAppHint.js";
 import { PushNotificationBanner } from "../components/nav/PushNotificationBanner.js";
@@ -27,7 +25,6 @@ import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 import { NotificationBell } from "../components/nav/NotificationBell.js";
-import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "../components/nav/IOSMenu.js";
 import { MobileTopBar } from "../components/nav/MobileTopBar.js";
 import { MobileBottomBar } from "../components/nav/MobileBottomBar.js";
 import { SearchSheet } from "../components/search/SearchSheet.js";
@@ -83,14 +80,10 @@ export function WorkspaceLayout() {
 function WorkspaceLayoutInner() {
   const { t } = useTranslation();
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const { user, refetch } = useAuth();
   const { theme, toggle } = useTheme();
-  const confirm = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
-  const sidebarAvatarImage = useRobustImage(user?.avatarUrl ?? null);
   const shareToken = getShareToken();
   const breakpoint = useBreakpoint();
   const isLandscape = useIsLandscape();
@@ -100,6 +93,13 @@ function WorkspaceLayoutInner() {
   // drawer there (see ObjectTypePage/SearchPage for the split-view panes
   // this pairs with).
   const sidebarPersistent = breakpoint === "desktop" || (breakpoint === "tablet" && isLandscape);
+  // The workspace-icon rail (WorkspaceRail.tsx) only fits the full "desktop"
+  // tier, not tablet-landscape's persistent-but-narrower sidebar - it takes
+  // over workspace switching and the sidebar header/footer account button
+  // from WorkspaceLayout below, so those are hidden here instead of
+  // duplicated. Never shown to an anonymous share visitor (no workspace list
+  // of their own to switch between).
+  const showRail = breakpoint === "desktop" && !shareToken;
   const { coverActive } = useMobileChrome();
   // Phone drops the top bar entirely - BottomTabBar's own "Menu" button
   // (rendered further down, phone-only) is the sole way to reach the
@@ -107,10 +107,6 @@ function WorkspaceLayoutInner() {
   // keeps this header as its only nav entry point.
   const isPhone = breakpoint === "phone";
   const showMobileHeader = !sidebarPersistent && !isPhone;
-  // Avatar + name in the sidebar footer button below is swapped for a plain
-  // Settings icon when installed as a PWA - display mode doesn't change
-  // without a fresh install, so no need to track this as reactive state.
-  const isPWA = isStandalone();
   // The header only overlays a cover when it's actually rendered at all.
   const showCoverOverlay = coverActive && showMobileHeader;
   // True wherever a cover reaches the very top edge - under the
@@ -160,23 +156,6 @@ function WorkspaceLayoutInner() {
   }, [location.pathname]);
 
 
-  async function handleLogout() {
-    const confirmed = await confirm({
-      title: t("nav.logOutConfirmTitle"),
-      description: t("nav.logOutConfirmDescription"),
-      confirmLabel: t("nav.logOut"),
-    });
-    if (!confirmed) return;
-    await authApi.logout();
-    // Without this, `user` in AuthContext stays the stale cached value from
-    // before logout - LoginPage immediately bounces back to "/" if it still
-    // sees a (stale) logged-in user, and WorkspacePickerPage then renders
-    // near-empty since its own queries now 401. Awaiting the refetch first
-    // guarantees LoginPage sees `user: null` on its very first render.
-    await refetch();
-    navigate("/login", { replace: true });
-  }
-
   return (
     // `position: fixed; inset: 0`, not `h-dvh`/`h-screen`/a JS-measured
     // height - iOS WKWebView's `window.innerHeight`/`visualViewport.height`/
@@ -195,6 +174,8 @@ function WorkspaceLayoutInner() {
         <div className="fixed inset-0 z-30 bg-black/30" onClick={() => setSidebarOpen(false)} />
       )}
 
+      {showRail && workspaceId && <WorkspaceRail activeWorkspaceId={workspaceId} />}
+
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface-raised transition-transform duration-200 ease-in-out ${
           sidebarPersistent ? "relative z-0 translate-x-0" : sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -209,7 +190,7 @@ function WorkspaceLayoutInner() {
             <span className="truncate font-medium">{workspace?.name ?? t("nav.loading")}</span>
             <span className="ml-auto shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs text-ink-muted">{t("nav.shared")}</span>
           </div>
-        ) : (
+        ) : showRail ? null : (
           <div className="border-b border-border" style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}>
             <button
               onClick={() => navigate("/workspaces")}
@@ -269,83 +250,13 @@ function WorkspaceLayoutInner() {
           className="flex items-center justify-between border-t border-border p-3"
           style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
         >
-          {shareToken ? (
-            <span className="truncate text-sm text-ink-muted">{t("nav.sharedViaLink")}</span>
-          ) : (
-            <div className="relative min-w-0">
-              <button
-                onClick={() => setAvatarMenuOpen((v) => !v)}
-                className="flex items-center gap-2 overflow-hidden rounded-lg p-1 -m-1 text-left hover:bg-surface"
-                title={t("nav.account")}
-              >
-                {isPWA ? (
-                  <Icon name="settings" className="h-5 w-5 shrink-0 text-ink-muted" />
-                ) : user?.avatarUrl && !sidebarAvatarImage.failed ? (
-                  <img
-                    src={sidebarAvatarImage.src}
-                    onError={sidebarAvatarImage.onError}
-                    alt=""
-                    className="h-7 w-7 shrink-0 rounded-full object-cover"
-                  />
-                ) : (
-                  <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                    style={{ backgroundColor: user?.avatarColor }}
-                  >
-                    {user?.name?.[0]}
-                  </span>
-                )}
-                <span className="truncate text-sm">{isPWA ? t("nav.settingsLabel") : user?.name}</span>
-              </button>
-              <IOSMenu open={avatarMenuOpen} onClose={() => setAvatarMenuOpen(false)} side="top" align="start" widthClassName="w-56">
-                <IOSMenuGroup>
-                  <IOSMenuItem
-                    icon="board"
-                    label={t("nav.switchWorkspace")}
-                    onClick={() => {
-                      setAvatarMenuOpen(false);
-                      navigate("/workspaces");
-                    }}
-                  />
-                  <IOSMenuItem
-                    icon="settings"
-                    label={t("nav.workspaceSettings")}
-                    onClick={() => {
-                      setAvatarMenuOpen(false);
-                      navigate(`/w/${workspaceId}/settings`);
-                    }}
-                  />
-                  <IOSMenuItem
-                    icon="user"
-                    label={t("nav.accountSettings")}
-                    onClick={() => {
-                      setAvatarMenuOpen(false);
-                      navigate("/settings");
-                    }}
-                  />
-                  {user?.isServerAdmin && (
-                    <IOSMenuItem
-                      icon="shield"
-                      label={t("nav.serverAdmin")}
-                      onClick={() => {
-                        setAvatarMenuOpen(false);
-                        navigate("/admin");
-                      }}
-                    />
-                  )}
-                  <IOSMenuItem
-                    icon="close"
-                    label={t("nav.logOut")}
-                    destructive
-                    onClick={() => {
-                      setAvatarMenuOpen(false);
-                      void handleLogout();
-                    }}
-                  />
-                </IOSMenuGroup>
-              </IOSMenu>
-            </div>
-          )}
+          <div className="min-w-0">
+            {shareToken ? (
+              <span className="truncate text-sm text-ink-muted">{t("nav.sharedViaLink")}</span>
+            ) : showRail ? null : (
+              <AccountMenuButton workspaceId={workspaceId!} variant="full" side="top" />
+            )}
+          </div>
           <div className="flex items-center gap-1">
             {!shareToken && workspaceId && <NotificationBell workspaceId={workspaceId} />}
             <button onClick={toggle} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title={t("nav.toggleTheme")}>
