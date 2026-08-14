@@ -41,6 +41,16 @@ function buildSuggestion(workspaceIdRef: { current: string }) {
     // simply won't have a whitespace/start-of-block prefix, so it never
     // matches at all.
     items: ({ query }: { query: string }) => (workspaceIdRef.current ? memberItems(workspaceIdRef.current, query) : []),
+    // Without this, someone else's still-in-progress "@" (synced in live via
+    // the normal WS-broadcast-then-refetch flow - see useMarkdownEditor.ts's/
+    // useMentionableTextEditor.ts's own "push external content in while
+    // idle" effect, which calls `setContent` on every other viewer's
+    // *unfocused* editor) would open the suggestion popup on every other
+    // viewer's screen too - `@tiptap/suggestion`'s own trigger detection runs
+    // on any doc-changing transaction, not just ones caused by this user's
+    // own typing. Gating on focus means the popup only ever opens for
+    // whoever is actually typing.
+    allow: ({ editor }: { editor: Editor }) => editor.isFocused,
     // Inserts the real atomic `mention` node (see MentionNode.ts), not raw
     // `@[Name|id]` text - a trailing space keeps it visually separated from
     // whatever's typed next.
