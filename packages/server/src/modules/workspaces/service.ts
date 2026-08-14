@@ -132,6 +132,8 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       pushShowWhenOpen: users.pushShowWhenOpen,
       passwordHash: users.passwordHash,
       locale: users.locale,
+      contentFontSizeMobile: users.contentFontSizeMobile,
+      contentFontSizeDesktop: users.contentFontSizeDesktop,
     })
     .from(workspaceMembers)
     .innerJoin(users, eq(workspaceMembers.userId, users.id))
@@ -162,6 +164,8 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       hasPassword: row.passwordHash !== null,
       hasPasskey: userIdsWithPasskey.has(row.userId),
       locale: row.locale,
+      contentFontSizeMobile: row.contentFontSizeMobile,
+      contentFontSizeDesktop: row.contentFontSizeDesktop,
     },
   }));
 }

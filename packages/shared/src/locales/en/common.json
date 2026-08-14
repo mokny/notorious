@@ -98,7 +98,13 @@
       "cancel": "Cancel",
       "saveAvatar": "Save avatar",
       "language": "Language",
-      "languageUpdateFailed": "Could not update your language"
+      "languageUpdateFailed": "Could not update your language",
+      "appearance": "Appearance",
+      "contentFontSize": "Content text size",
+      "contentFontSizeMobile": "Mobile",
+      "contentFontSizeDesktop": "Desktop",
+      "contentFontSizePreview": "This is what your notes and views will look like.",
+      "contentFontSizeUpdateFailed": "Could not update your content text size"
     },
     "security": {
       "password": "Password",

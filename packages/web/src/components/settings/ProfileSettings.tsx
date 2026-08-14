@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Cropper, { type Area } from "react-easy-crop";
@@ -54,6 +54,9 @@ export function ProfileSettings() {
   const { user, refetch } = useAuth();
   const [newEmail, setNewEmail] = useState(user?.email ?? "");
   const [localeError, setLocaleError] = useState<string | null>(null);
+  const [contentFontSizeError, setContentFontSizeError] = useState<string | null>(null);
+  const [contentFontSizeMobile, setContentFontSizeMobile] = useState(user?.contentFontSizeMobile ?? 100);
+  const [contentFontSizeDesktop, setContentFontSizeDesktop] = useState(user?.contentFontSizeDesktop ?? 100);
   const [emailPassword, setEmailPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailSuccess, setEmailSuccess] = useState(false);
@@ -121,6 +124,30 @@ export function ProfileSettings() {
       setEmailError(err instanceof ApiError ? err.message : t("settings.profile.emailUpdateFailed"));
     },
   });
+
+  const contentFontSizeMutation = useMutation({
+    mutationFn: (input: { contentFontSizeMobile: number; contentFontSizeDesktop: number }) => authApi.updateContentFontSize(input),
+    onSuccess: async () => {
+      setContentFontSizeError(null);
+      await refetch();
+    },
+    onError: (err) => {
+      setContentFontSizeError(err instanceof ApiError ? err.message : t("settings.profile.contentFontSizeUpdateFailed"));
+    },
+  });
+
+  function commitContentFontSize(mobile: number, desktop: number) {
+    contentFontSizeMutation.mutate({ contentFontSizeMobile: mobile, contentFontSizeDesktop: desktop });
+  }
+
+  // Keeps the sliders in sync when the value changes elsewhere (e.g. another
+  // tab/device via the `userSettingsUpdated` WS event) - safe to run
+  // unconditionally since a drag in progress here only commits (and thus
+  // only triggers a `user` change) on release, never mid-drag.
+  useEffect(() => {
+    if (user?.contentFontSizeMobile !== undefined) setContentFontSizeMobile(user.contentFontSizeMobile);
+    if (user?.contentFontSizeDesktop !== undefined) setContentFontSizeDesktop(user.contentFontSizeDesktop);
+  }, [user?.contentFontSizeMobile, user?.contentFontSizeDesktop]);
 
   function handleEmailSubmit(event: FormEvent) {
     event.preventDefault();
@@ -205,6 +232,57 @@ export function ProfileSettings() {
           ))}
         </select>
         {localeError && <p className="text-sm text-red-500">{localeError}</p>}
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-ink-muted">{t("settings.profile.appearance")}</p>
+        <p className="text-sm font-medium text-ink">{t("settings.profile.contentFontSize")}</p>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-ink-muted">
+            <span>{t("settings.profile.contentFontSizeMobile")}</span>
+            <span>{contentFontSizeMobile}%</span>
+          </div>
+          <input
+            type="range"
+            min={80}
+            max={150}
+            step={1}
+            value={contentFontSizeMobile}
+            onChange={(e) => setContentFontSizeMobile(Number(e.target.value))}
+            onMouseUp={() => commitContentFontSize(contentFontSizeMobile, contentFontSizeDesktop)}
+            onTouchEnd={() => commitContentFontSize(contentFontSizeMobile, contentFontSizeDesktop)}
+            onKeyUp={() => commitContentFontSize(contentFontSizeMobile, contentFontSizeDesktop)}
+            className="w-full max-w-xs accent-accent"
+          />
+          <p className="max-w-xs" style={{ fontSize: `${(contentFontSizeMobile / 100) * 0.875}rem` }}>
+            {t("settings.profile.contentFontSizePreview")}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-ink-muted">
+            <span>{t("settings.profile.contentFontSizeDesktop")}</span>
+            <span>{contentFontSizeDesktop}%</span>
+          </div>
+          <input
+            type="range"
+            min={80}
+            max={150}
+            step={1}
+            value={contentFontSizeDesktop}
+            onChange={(e) => setContentFontSizeDesktop(Number(e.target.value))}
+            onMouseUp={() => commitContentFontSize(contentFontSizeMobile, contentFontSizeDesktop)}
+            onTouchEnd={() => commitContentFontSize(contentFontSizeMobile, contentFontSizeDesktop)}
+            onKeyUp={() => commitContentFontSize(contentFontSizeMobile, contentFontSizeDesktop)}
+            className="w-full max-w-xs accent-accent"
+          />
+          <p className="max-w-xs" style={{ fontSize: `${(contentFontSizeDesktop / 100) * 0.875}rem` }}>
+            {t("settings.profile.contentFontSizePreview")}
+          </p>
+        </div>
+
+        {contentFontSizeError && <p className="text-sm text-red-500">{contentFontSizeError}</p>}
       </div>
 
       <Modal

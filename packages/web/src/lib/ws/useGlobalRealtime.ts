@@ -43,6 +43,9 @@ function handleChatMessage(payload: ChatRealtimeMessage, queryClient: QueryClien
       // `user` goes null. No separate "force logout" UI path needed.
       queryClient.invalidateQueries({ queryKey: ["me"] });
       break;
+    case "userSettingsUpdated":
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      break;
     case "chatTyping":
     case "callRing":
     case "callTaken":

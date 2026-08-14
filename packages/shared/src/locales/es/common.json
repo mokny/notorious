@@ -98,7 +98,13 @@
       "cancel": "Cancelar",
       "saveAvatar": "Guardar avatar",
       "language": "Idioma",
-      "languageUpdateFailed": "No se pudo actualizar tu idioma"
+      "languageUpdateFailed": "No se pudo actualizar tu idioma",
+      "appearance": "Apariencia",
+      "contentFontSize": "Tamaño de texto del contenido",
+      "contentFontSizeMobile": "Móvil",
+      "contentFontSizeDesktop": "Escritorio",
+      "contentFontSizePreview": "Así se verán tus notas y vistas.",
+      "contentFontSizeUpdateFailed": "No se pudo actualizar el tamaño del texto"
     },
     "security": {
       "password": "Contraseña",

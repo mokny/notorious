@@ -13,6 +13,15 @@
      `surface-raised`, since that's already used for popovers/menus and
      needs to stay free to change independently of chat bubble color. */
   --chat-bubble: 233 233 235;
+  /* User-adjustable content-area (block editor + views) font-size scale, a
+     unitless multiplier (1 = 100%) - set on <html> by
+     hooks/useContentFontScale.ts from Settings > Profile > "Darstellung".
+     The rules below re-derive every Tailwind text-size utility actually used
+     inside `.content-scale` content (see BlockEditor.tsx/ViewRenderer.tsx)
+     from this variable - deliberately unlayered (after @tailwind utilities)
+     so they win over the plain `.text-*` utilities regardless of selector
+     specificity, without needing `!important`. */
+  --content-font-scale: 1;
 }
 
 .dark {
@@ -151,6 +160,45 @@ body {
 input[type="checkbox"] {
   width: 1.25rem;
   height: 1.25rem;
+}
+
+/* Content-area font-size scaling (see --content-font-scale above) - scoped
+   to `.content-scale` (BlockEditor.tsx's block list, ViewRenderer.tsx's view
+   root) so it never touches sidebar/settings/dialog chrome that happens to
+   share the same Tailwind text-size classes. Covers both the compound case
+   (an element that itself carries e.g. `.tiptap.text-sm`, like
+   ParagraphBlock.tsx) and the descendant case (a `.text-2xl` ancestor like
+   HeadingBlock.tsx's wrapper, whose scaled font-size then cascades to its
+   `.tiptap` child normally via inheritance). */
+.content-scale.text-xs,
+.content-scale .text-xs {
+  font-size: calc(0.75rem * var(--content-font-scale));
+}
+.content-scale.text-sm,
+.content-scale .text-sm {
+  font-size: calc(0.875rem * var(--content-font-scale));
+}
+.content-scale.text-base,
+.content-scale .text-base {
+  font-size: calc(1rem * var(--content-font-scale));
+}
+.content-scale.text-lg,
+.content-scale .text-lg {
+  font-size: calc(1.125rem * var(--content-font-scale));
+}
+.content-scale.text-xl,
+.content-scale .text-xl {
+  font-size: calc(1.25rem * var(--content-font-scale));
+}
+.content-scale.text-2xl,
+.content-scale .text-2xl {
+  font-size: calc(1.5rem * var(--content-font-scale));
+}
+/* TipTap content with no explicit Tailwind text-size class at all (e.g.
+   ToggleBlock/QuoteBlock's `.tiptap` div) falls back to the browser default
+   1em paragraph size - scale that baseline too. */
+.content-scale .tiptap:not([class*="text-"]) {
+  font-size: calc(1rem * var(--content-font-scale));
 }
 
 .tiptap.ProseMirror-focused p.is-editor-empty:first-child::before {

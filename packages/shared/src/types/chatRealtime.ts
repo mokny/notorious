@@ -146,6 +146,11 @@ export interface SessionRevokedEvent {
   type: "sessionRevoked";
 }
 
+/** Sent to every one of a user's open tabs/devices when they change an account setting (currently just content font size) in Settings - see modules/auth/service.ts's `updateContentFontSize`. Carries no payload: the client just refetches `["me"]`, same as `sessionRevoked`. */
+export interface UserSettingsUpdatedEvent {
+  type: "userSettingsUpdated";
+}
+
 export type ChatRealtimeMessage =
   | ChatMessageEvent
   | ChatMessageDeletedEvent
@@ -160,4 +165,5 @@ export type ChatRealtimeMessage =
   | CallMediaNewProducerEvent
   | CallMediaProducerClosedEvent
   | CallEndedEvent
-  | SessionRevokedEvent;
+  | SessionRevokedEvent
+  | UserSettingsUpdatedEvent;

@@ -23,68 +23,72 @@ export function ViewRenderer({
 
   if (isLoading) return <div className="p-6 text-sm text-ink-muted">{t("nav.loading")}</div>;
 
-  switch (view.type) {
-    case "table":
-      return (
-        <TableView
-          workspaceId={workspaceId}
-          items={items}
-          properties={properties}
-          visiblePropertyIds={view.config.visiblePropertyIds}
-          onOpenObject={onOpenObject}
-        />
-      );
-    case "board":
-      return (
-        <BoardView
-          workspaceId={workspaceId}
-          items={items}
-          properties={properties}
-          pivotPropertyId={view.config.pivotPropertyId}
-          onOpenObject={onOpenObject}
-        />
-      );
-    case "list":
-      return (
-        <ListView
-          workspaceId={workspaceId}
-          items={items}
-          properties={properties}
-          visiblePropertyIds={view.config.visiblePropertyIds}
-          onOpenObject={onOpenObject}
-        />
-      );
-    case "gallery":
-      return (
-        <GalleryView
-          workspaceId={workspaceId}
-          items={items}
-          properties={properties}
-          visiblePropertyIds={view.config.visiblePropertyIds}
-          onOpenObject={onOpenObject}
-        />
-      );
-    case "calendar":
-      return (
-        <CalendarView
-          workspaceId={workspaceId}
-          items={items}
-          properties={properties}
-          datePropertyId={view.config.pivotPropertyId}
-          onOpenObject={onOpenObject}
-        />
-      );
-    case "timeline":
-      return (
-        <TimelineView
-          workspaceId={workspaceId}
-          items={items}
-          properties={properties}
-          datePropertyId={view.config.pivotPropertyId}
-          onOpenObject={onOpenObject}
-        />
-      );
-    default:
-      return null;
+  return <div className="content-scale">{renderView()}</div>;
+
+  function renderView() {
+    switch (view.type) {
+      case "table":
+        return (
+          <TableView
+            workspaceId={workspaceId}
+            items={items}
+            properties={properties}
+            visiblePropertyIds={view.config.visiblePropertyIds}
+            onOpenObject={onOpenObject}
+          />
+        );
+      case "board":
+        return (
+          <BoardView
+            workspaceId={workspaceId}
+            items={items}
+            properties={properties}
+            pivotPropertyId={view.config.pivotPropertyId}
+            onOpenObject={onOpenObject}
+          />
+        );
+      case "list":
+        return (
+          <ListView
+            workspaceId={workspaceId}
+            items={items}
+            properties={properties}
+            visiblePropertyIds={view.config.visiblePropertyIds}
+            onOpenObject={onOpenObject}
+          />
+        );
+      case "gallery":
+        return (
+          <GalleryView
+            workspaceId={workspaceId}
+            items={items}
+            properties={properties}
+            visiblePropertyIds={view.config.visiblePropertyIds}
+            onOpenObject={onOpenObject}
+          />
+        );
+      case "calendar":
+        return (
+          <CalendarView
+            workspaceId={workspaceId}
+            items={items}
+            properties={properties}
+            datePropertyId={view.config.pivotPropertyId}
+            onOpenObject={onOpenObject}
+          />
+        );
+      case "timeline":
+        return (
+          <TimelineView
+            workspaceId={workspaceId}
+            items={items}
+            properties={properties}
+            datePropertyId={view.config.pivotPropertyId}
+            onOpenObject={onOpenObject}
+          />
+        );
+      default:
+        return null;
+    }
   }
 }

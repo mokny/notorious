@@ -98,7 +98,13 @@
       "cancel": "Annuler",
       "saveAvatar": "Enregistrer l'avatar",
       "language": "Langue",
-      "languageUpdateFailed": "Impossible de mettre à jour votre langue"
+      "languageUpdateFailed": "Impossible de mettre à jour votre langue",
+      "appearance": "Apparence",
+      "contentFontSize": "Taille du texte du contenu",
+      "contentFontSizeMobile": "Mobile",
+      "contentFontSizeDesktop": "Bureau",
+      "contentFontSizePreview": "Voici à quoi ressembleront vos notes et vues.",
+      "contentFontSizeUpdateFailed": "Impossible de mettre à jour la taille du texte"
     },
     "security": {
       "password": "Mot de passe",

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./context/AuthContext.js";
+import { useContentFontScale } from "./hooks/useContentFontScale.js";
 import { ChatRealtimeProvider } from "./context/ChatRealtimeContext.js";
 import { ChatOverlayProvider } from "./context/ChatOverlayContext.js";
 import { CallProvider } from "./context/CallContext.js";
@@ -71,6 +72,7 @@ function FullScreenSpinner() {
 }
 
 export function App() {
+  useContentFontScale();
   return (
     <ChatRealtimeProvider>
       <CallProvider>

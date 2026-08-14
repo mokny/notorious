@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import { eq, and } from "drizzle-orm";
-import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, UpdatePushPreferencesInput, UpdateLocaleInput, User } from "@notorious/shared";
+import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, UpdatePushPreferencesInput, UpdateLocaleInput, UpdateContentFontSizeInput, User } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { users, workspaceInvites, workspaceMembers, webauthnCredentials } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
@@ -8,6 +8,7 @@ import { badRequest, unauthorized } from "../../lib/httpError.js";
 import { createWorkspace } from "../workspaces/service.js";
 import { getRegistrationEnabled } from "../instanceSettings/service.js";
 import { hasAnyCredential } from "../webauthn/service.js";
+import { sendToUserGlobal } from "../realtime/hub.js";
 
 const AVATAR_COLORS = ["#6366f1", "#22c55e", "#f97316", "#ec4899", "#0ea5e9", "#eab308"];
 
@@ -24,6 +25,8 @@ async function toUser(row: typeof users.$inferSelect): Promise<User> {
     hasPassword: row.passwordHash !== null,
     hasPasskey: await hasAnyCredential(row.id),
     locale: row.locale,
+    contentFontSizeMobile: row.contentFontSizeMobile,
+    contentFontSizeDesktop: row.contentFontSizeDesktop,
   };
 }
 
@@ -50,7 +53,21 @@ export async function registerUser(input: RegisterInput): Promise<User> {
   await createWorkspace(id, { name: `${input.name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, input.email);
 
-  return { id, email: input.email, name: input.name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: true, hasPasskey: false, locale: null };
+  return {
+    id,
+    email: input.email,
+    name: input.name,
+    avatarColor,
+    avatarUrl: null,
+    createdAt,
+    totpEnabled: false,
+    pushShowWhenOpen: true,
+    hasPassword: true,
+    hasPasskey: false,
+    locale: null,
+    contentFontSizeMobile: 100,
+    contentFontSizeDesktop: 100,
+  };
 }
 
 /**
@@ -89,7 +106,21 @@ export async function registerUserWithPasskey(
   await createWorkspace(id, { name: `${name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, email);
 
-  return { id, email, name, avatarColor, avatarUrl: null, createdAt, totpEnabled: false, pushShowWhenOpen: true, hasPassword: false, hasPasskey: true, locale: null };
+  return {
+    id,
+    email,
+    name,
+    avatarColor,
+    avatarUrl: null,
+    createdAt,
+    totpEnabled: false,
+    pushShowWhenOpen: true,
+    hasPassword: false,
+    hasPasskey: true,
+    locale: null,
+    contentFontSizeMobile: 100,
+    contentFontSizeDesktop: 100,
+  };
 }
 
 /**
@@ -197,5 +228,17 @@ export async function updateLocale(userId: string, input: UpdateLocaleInput): Pr
   await db.update(users).set({ locale: input.locale }).where(eq(users.id, userId));
   const user = await getUserById(userId);
   if (!user) throw unauthorized();
+  return user;
+}
+
+/** Persists the user's content-area font-size preference (block editor + views) - see the schema fields' doc comment. Broadcasts `userSettingsUpdated` over the workspace-agnostic `/ws/chat` channel so every other open tab/device of this user picks it up live, the same way `sessionRevoked` does. */
+export async function updateContentFontSize(userId: string, input: UpdateContentFontSizeInput): Promise<User> {
+  await db
+    .update(users)
+    .set({ contentFontSizeMobile: input.contentFontSizeMobile, contentFontSizeDesktop: input.contentFontSizeDesktop })
+    .where(eq(users.id, userId));
+  const user = await getUserById(userId);
+  if (!user) throw unauthorized();
+  sendToUserGlobal(userId, { type: "userSettingsUpdated" });
   return user;
 }

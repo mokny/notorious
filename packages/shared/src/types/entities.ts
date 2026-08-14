@@ -24,6 +24,9 @@ export interface User {
   hasPasskey: boolean;
   /** Preferred UI/push-notification language (an `@notorious/shared` `SUPPORTED_LOCALES` code, e.g. `"en"`/`"de"`) - null until either the user picks one in Settings or AuthContext.tsx's one-time browser-language detection finds a supported match. Null means "render in the default/English fallback", not "unset the language". */
   locale: string | null;
+  /** Content-area (block editor + views) font-size scale as a percent (80-150, default 100), applied depending on the current viewport - see web's `useBreakpoint` (phone -> mobile, tablet/desktop -> desktop). */
+  contentFontSizeMobile: number;
+  contentFontSizeDesktop: number;
 }
 
 /**

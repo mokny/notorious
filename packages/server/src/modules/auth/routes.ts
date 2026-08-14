@@ -1,6 +1,15 @@
 import type { FastifyInstance } from "fastify";
-import { registerSchema, loginSchema, changePasswordSchema, changeEmailSchema, updatePushPreferencesSchema, updateLocaleSchema, reverifyPasswordSchema } from "@notorious/shared";
-import { registerUser, verifyCredentials, getUserById, canRegisterEmail, changePassword, changeEmail, updatePushPreferences, updateLocale } from "./service.js";
+import {
+  registerSchema,
+  loginSchema,
+  changePasswordSchema,
+  changeEmailSchema,
+  updatePushPreferencesSchema,
+  updateLocaleSchema,
+  updateContentFontSizeSchema,
+  reverifyPasswordSchema,
+} from "@notorious/shared";
+import { registerUser, verifyCredentials, getUserById, canRegisterEmail, changePassword, changeEmail, updatePushPreferences, updateLocale, updateContentFontSize } from "./service.js";
 import { createSession, destroySession, requireUser, invalidateOtherSessions, listSessions, revokeSession } from "../../plugins/session.js";
 import { sendToSession } from "../realtime/hub.js";
 import { forbidden } from "../../lib/httpError.js";
@@ -124,6 +133,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const user = requireUser(request);
     const input = updateLocaleSchema.parse(request.body);
     return updateLocale(user.id, input);
+  });
+
+  app.patch("/api/v1/auth/content-font-size", async (request) => {
+    const user = requireUser(request);
+    const input = updateContentFontSizeSchema.parse(request.body);
+    return updateContentFontSize(user.id, input);
   });
 
   // The password branch of "sudo mode" reverification (see modules/reverify/service.ts)

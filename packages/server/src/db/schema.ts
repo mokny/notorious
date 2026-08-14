@@ -26,6 +26,11 @@ export const users = sqliteTable("users", {
   // one-time browser-language detection. Null means "render in the
   // default/English fallback", not "unset".
   locale: text("locale"),
+  // Content-area font-size preference (percent, 80-150) - the block editor
+  // and views scale text by this, separately for phone vs tablet/desktop
+  // viewports (see hooks/useBreakpoint.ts and lib/contentFontScale.ts).
+  contentFontSizeMobile: integer("content_font_size_mobile").notNull().default(100),
+  contentFontSizeDesktop: integer("content_font_size_desktop").notNull().default(100),
 });
 
 export const sessions = sqliteTable("sessions", {

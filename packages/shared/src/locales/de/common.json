@@ -98,7 +98,13 @@
       "cancel": "Abbrechen",
       "saveAvatar": "Avatar speichern",
       "language": "Sprache",
-      "languageUpdateFailed": "Deine Sprache konnte nicht aktualisiert werden"
+      "languageUpdateFailed": "Deine Sprache konnte nicht aktualisiert werden",
+      "appearance": "Darstellung",
+      "contentFontSize": "Schriftgröße für Inhalte",
+      "contentFontSizeMobile": "Mobil",
+      "contentFontSizeDesktop": "Desktop",
+      "contentFontSizePreview": "So werden deine Notizen und Ansichten aussehen.",
+      "contentFontSizeUpdateFailed": "Schriftgröße konnte nicht aktualisiert werden"
     },
     "security": {
       "password": "Passwort",

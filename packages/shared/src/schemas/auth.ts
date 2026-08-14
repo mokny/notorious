@@ -69,6 +69,12 @@ export const updateLocaleSchema = z.object({
 });
 export type UpdateLocaleInput = z.infer<typeof updateLocaleSchema>;
 
+export const updateContentFontSizeSchema = z.object({
+  contentFontSizeMobile: z.number().int().min(80).max(150),
+  contentFontSizeDesktop: z.number().int().min(80).max(150),
+});
+export type UpdateContentFontSizeInput = z.infer<typeof updateContentFontSizeSchema>;
+
 /** POST /api/v1/auth/reverify's password branch - see modules/reverify/service.ts. The passkey branch (POST /api/v1/webauthn/reverify/verify) carries a WebAuthn assertion instead, not a plain JSON body validated by zod. */
 export const reverifyPasswordSchema = z.object({
   password: z.string().min(1).max(200),

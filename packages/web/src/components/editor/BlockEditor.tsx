@@ -666,7 +666,7 @@ export function BlockEditor({
             dragSelectGuard.onDragCancel();
           }}
         >
-          <div className="group/editor">
+          <div className="group/editor content-scale">
             <BlockList blocks={tree} parentBlockId={null} />
           </div>
         </DndContext>
