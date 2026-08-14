@@ -27,6 +27,22 @@ function unlockAudioContextOnFirstGesture(getContext: () => AudioContext): void 
   document.addEventListener("keydown", unlock);
 }
 
+function emitPing(ctx: AudioContext): void {
+  const now = ctx.currentTime;
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(880, now);
+  oscillator.frequency.exponentialRampToValueAtTime(660, now + 0.12);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.2, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+  oscillator.start(now);
+  oscillator.stop(now + 0.26);
+}
+
 /**
  * Desktop-only "new chat message" ping - a short synthetic tone via the Web
  * Audio API (no audio file, no licensing concerns). Gated on `isDesktop()`
@@ -63,21 +79,15 @@ export function useChatSound(): { playChatSound: () => void; muted: boolean; set
     if (!isDesktop() || readMuted()) return;
 
     const ctx = getOrCreateContext();
-    if (ctx.state === "suspended") void ctx.resume();
-
-    const now = ctx.currentTime;
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, now);
-    oscillator.frequency.exponentialRampToValueAtTime(660, now + 0.12);
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.2, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.26);
+    // If still suspended (the first-gesture unlock hadn't finished resuming
+    // yet), scheduling nodes now would silently produce no sound - the
+    // context's clock doesn't advance until `resume()` actually resolves.
+    // Wait for it, then play, instead of losing this first ping.
+    if (ctx.state === "suspended") {
+      void ctx.resume().then(() => emitPing(ctx));
+      return;
+    }
+    emitPing(ctx);
   }, [getOrCreateContext]);
 
   return { playChatSound, muted, setMuted };
