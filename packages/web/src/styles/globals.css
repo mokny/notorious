@@ -151,6 +151,16 @@ body {
   @apply rounded-sm bg-orange-500 font-semibold text-white shadow-[0_0_0_2px_rgb(249_115_22/0.5)] dark:bg-orange-500;
 }
 
+/* @mention pill - see MentionText.tsx (plain-string surfaces: comments, text
+   properties) and MentionHighlight.ts (the block editor's live ProseMirror
+   doc). Same tinted-accent convention as `.slash-item-active`/`.tpl-keyword`
+   above, just rounded-full like TagPicker.tsx's own pill styling. Purely
+   visual, no click action (see @mention feature's rationale doc comment on
+   `@notorious/shared`'s mentions.ts). */
+.mention-pill {
+  @apply rounded-full bg-accent/10 px-1 py-0.5 font-medium text-accent;
+}
+
 /* A native checkbox's default size (or the app's own previous h-4/w-4) is a
    fiddly target to tap accurately with a finger - sized here once, app-wide
    (checklist items, property values, settings toggles, ...) rather than in
@@ -374,4 +384,24 @@ body.notorious-exporting-print > *:not(#notorious-export-root) {
     left: auto;
     width: auto;
   }
+}
+
+/* Deep-link scroll-to-block flash (`?block=` - see ObjectDetailPage.tsx/
+   BlockEditor.tsx's `targetBlockId`), same idea as SearchMatchToolbar's
+   scroll-to-match but a one-shot flash instead of a persistent highlight
+   class, since there's no toolbar here to dismiss it. Removed by
+   BlockEditor.tsx ~2s after being applied. */
+@keyframes block-mention-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  25%,
+  75% {
+    background-color: rgb(var(--accent) / 0.15);
+  }
+}
+.block-mention-flash {
+  animation: block-mention-flash 2s ease-in-out;
+  border-radius: 0.375rem;
 }

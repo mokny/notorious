@@ -5,6 +5,7 @@ import { RelationPicker } from "./RelationPicker.js";
 import { RatingInput } from "./RatingInput.js";
 import { FilePropertyField } from "./FilePropertyField.js";
 import { DebouncedTextInput } from "./DebouncedTextInput.js";
+import { MentionableTextInput } from "./MentionableTextInput.js";
 import { externalLinkAttrs } from "../../lib/externalLink.js";
 
 interface PropertyFieldProps {
@@ -36,7 +37,7 @@ export function PropertyField({
 
   switch (config.type) {
     case "text":
-      return <DebouncedTextInput className={inputClass} value={(value as string) ?? ""} onSave={onChange} />;
+      return <MentionableTextInput className={inputClass} value={(value as string) ?? ""} onSave={onChange} workspaceId={workspaceId} />;
 
     case "url":
       return value ? (

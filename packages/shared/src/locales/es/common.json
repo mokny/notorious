@@ -24,7 +24,9 @@
       "title": "Notificaciones",
       "markAllRead": "Marcar todas como leídas",
       "empty": "Aún no hay notificaciones.",
-      "commentedOn": "{{actor}} comentó en «{{title}}»"
+      "commentedOn": "{{actor}} comentó en «{{title}}»",
+      "mentionedInComment": "{{actor}} te mencionó en un comentario de «{{title}}»",
+      "mentionedIn": "{{actor}} te mencionó en «{{title}}»"
     },
     "installHint": {
       "prompt": "Instala Notorious en tu móvil para un acceso rápido a pantalla completa.",
@@ -389,8 +391,11 @@
     "createOne": "Crea una"
   },
   "push": {
-    "mention": {
+    "commentReply": {
       "title": "{{actor}} comentó en «{{title}}»"
+    },
+    "mention": {
+      "title": "{{actor}} te mencionó en «{{title}}»"
     },
     "chat": {
       "attachment": "Envió un archivo adjunto",

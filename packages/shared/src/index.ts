@@ -14,6 +14,7 @@ export * from "./types/calls.js";
 export * from "./types/media.js";
 export * from "./types/push.js";
 export * from "./utils/tableDoc.js";
+export * from "./utils/mentions.js";
 
 export * from "./schemas/auth.js";
 export * from "./schemas/workspace.js";

@@ -353,7 +353,10 @@ export const comments = sqliteTable("comments", {
 // modules/notifications/. `commentId` cascades with its comment (see
 // migrations/0030_notifications.sql); `objectTitle`/`actorName` are
 // denormalized at write time so a notification still reads correctly even
-// after the object is renamed or the actor's account is gone.
+// after the object is renamed or the actor's account is gone. `source`/
+// `blockId`/`fieldKey` were added by migrations/0047_mention_notifications.sql
+// for real @mentions (see utils/mentions.ts) alongside the pre-existing
+// "you're part of this comment thread" rows (`source: "comment"`).
 export const notifications = sqliteTable("notifications", {
   id: text("id").primaryKey(),
   userId: text("user_id")
@@ -367,6 +370,9 @@ export const notifications = sqliteTable("notifications", {
     .references(() => objects.id, { onDelete: "cascade" }),
   objectTitle: text("object_title").notNull(),
   commentId: text("comment_id").references(() => comments.id, { onDelete: "cascade" }),
+  source: text("source").notNull().default("comment"),
+  blockId: text("block_id").references(() => blocks.id, { onDelete: "cascade" }),
+  fieldKey: text("field_key"),
   actorName: text("actor_name").notNull(),
   body: text("body").notNull(),
   createdAt: text("created_at").notNull(),

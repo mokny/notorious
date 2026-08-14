@@ -24,7 +24,9 @@
       "title": "Notifications",
       "markAllRead": "Mark all read",
       "empty": "No notifications yet.",
-      "commentedOn": "{{actor}} commented on \"{{title}}\""
+      "commentedOn": "{{actor}} commented on \"{{title}}\"",
+      "mentionedInComment": "{{actor}} mentioned you in a comment on \"{{title}}\"",
+      "mentionedIn": "{{actor}} mentioned you in \"{{title}}\""
     },
     "installHint": {
       "prompt": "Install Notorious on your phone for quick, full-screen access.",
@@ -389,8 +391,11 @@
     "createOne": "Create one"
   },
   "push": {
-    "mention": {
+    "commentReply": {
       "title": "{{actor}} commented on \"{{title}}\""
+    },
+    "mention": {
+      "title": "{{actor}} mentioned you in \"{{title}}\""
     },
     "chat": {
       "attachment": "Sent an attachment",

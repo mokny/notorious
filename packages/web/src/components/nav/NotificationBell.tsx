@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import type { Notification } from "@notorious/shared";
 import { notificationApi } from "../../lib/api/resources.js";
 import { Icon } from "../ui/Icon.js";
 
@@ -36,10 +37,41 @@ export function NotificationBell({ workspaceId }: { workspaceId: string }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] }),
   });
 
-  function handleClickNotification(id: string, objectId: string, alreadyRead: boolean) {
-    if (!alreadyRead) markReadMutation.mutate(id);
+  // Appends the deep-link query param ObjectDetailPage.tsx reads (`?block=`/
+  // `?comment=`/`?field=` - see its own `targetBlockId`/`targetCommentId`/
+  // `targetFieldKey`) matching this notification's own source, so clicking a
+  // mention notification lands scrolled to the actual mention instead of just
+  // the top of the object. `"comment"` (a plain reply notification, not a
+  // mention) keeps the pre-existing no-query-param behavior.
+  function deepLinkSuffix(notification: Notification): string {
+    switch (notification.source) {
+      case "mention-comment":
+        return notification.commentId ? `?comment=${notification.commentId}` : "";
+      case "mention-block":
+        return notification.blockId ? `?block=${notification.blockId}` : "";
+      case "mention-field":
+        return notification.fieldKey ? `?field=${notification.fieldKey}` : "";
+      default:
+        return "";
+    }
+  }
+
+  function notificationTitleKey(source: Notification["source"]): string {
+    switch (source) {
+      case "mention-comment":
+        return "nav.notifications.mentionedInComment";
+      case "mention-block":
+      case "mention-field":
+        return "nav.notifications.mentionedIn";
+      default:
+        return "nav.notifications.commentedOn";
+    }
+  }
+
+  function handleClickNotification(notification: Notification) {
+    if (!notification.readAt) markReadMutation.mutate(notification.id);
     setOpen(false);
-    navigate(`/w/${workspaceId}/objects/${objectId}`);
+    navigate(`/w/${workspaceId}/objects/${notification.objectId}${deepLinkSuffix(notification)}`);
   }
 
   return (
@@ -84,13 +116,13 @@ export function NotificationBell({ workspaceId }: { workspaceId: string }) {
               {notifications.map((notification) => (
                 <li key={notification.id}>
                   <button
-                    onClick={() => handleClickNotification(notification.id, notification.objectId, Boolean(notification.readAt))}
+                    onClick={() => handleClickNotification(notification)}
                     className={`w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface ${notification.readAt ? "" : "bg-accent/5"}`}
                   >
                     <div className="flex items-center gap-1.5">
                       {!notification.readAt && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
                       <span className="truncate font-medium text-ink">
-                        {t("nav.notifications.commentedOn", { actor: notification.actorName, title: notification.objectTitle })}
+                        {t(notificationTitleKey(notification.source), { actor: notification.actorName, title: notification.objectTitle })}
                       </span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-ink-muted">{notification.body}</p>

@@ -9,6 +9,8 @@ import type { EditorView } from "@tiptap/pm/view";
 import { SlashCommand, slashCommandPluginKey } from "./SlashCommand.js";
 import { TemplateHighlight } from "./TemplateHighlight.js";
 import { TemplateSuggestion, templateSuggestionPluginKey } from "./TemplateSuggestion.js";
+import { Mention, mentionPluginKey } from "./Mention.js";
+import { MentionHighlight } from "./MentionHighlight.js";
 import { SearchHighlight } from "./SearchHighlight.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 import { externalLinkAttrs } from "../../lib/externalLink.js";
@@ -174,6 +176,13 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
           ]
         : []),
       ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, objectIdRef, schemaRef: templateSchemaRef })] : []),
+      // Unconditional (unlike the templateAware-gated pair above) - every
+      // markdown field, not just template-aware ones, should offer @mention
+      // autocomplete and render already-saved mention syntax as a pill. Cheap
+      // no-op decoration-wise when the field's text has no `@[...](user:...)`
+      // - see MentionHighlight.ts.
+      Mention.configure({ workspaceIdRef }),
+      MentionHighlight,
       // Always included (cheap no-op when there are no active search terms) -
       // see SearchHighlight.ts's own doc comment for why it only ever tracks
       // *which words* to highlight, not which occurrence is "active".
@@ -192,7 +201,7 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       // ever reaching SlashCommand/TemplateSuggestion's own Enter-accepts-
       // the-highlighted-item handling while one of those popups is open.
       handleKeyDown: (view: EditorView, event: KeyboardEvent) => {
-        const suggestionOpen = [slashCommandPluginKey, templateSuggestionPluginKey].some(
+        const suggestionOpen = [slashCommandPluginKey, templateSuggestionPluginKey, mentionPluginKey].some(
           (key) => (key.getState(view.state) as { active?: boolean } | undefined)?.active,
         );
         if (suggestionOpen) return false;

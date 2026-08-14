@@ -81,6 +81,8 @@ interface BlockEditorProps {
   highlightQuery?: string | null;
   /** Called when the user dismisses the search-match toolbar - ObjectDetailPage.tsx clears the `?highlight=` param. */
   onCloseHighlight?: () => void;
+  /** Set from `?block=` (see ObjectDetailPage.tsx and the @mention notification deep-link it drives) - scrolls that block into view and briefly flashes it once, independent of `highlightQuery`'s own search-match scanning above. A block id that no longer exists (deleted since the notification was sent) just silently does nothing, per product decision - no error shown. */
+  targetBlockId?: string | null;
 }
 
 export function BlockEditor({
@@ -94,6 +96,7 @@ export function BlockEditor({
   renderedBlocksLoading = false,
   highlightQuery = null,
   onCloseHighlight,
+  targetBlockId = null,
 }: BlockEditorProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -195,6 +198,34 @@ export function BlockEditor({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMatch?.blockId, activeMatch?.occurrenceIndexInBlock, blocks]);
+
+  // `?block=` deep-link (see `targetBlockId` above) - independent of the
+  // `highlightQuery` match-scanning above (a mention deep-link isn't a search
+  // result), so this is its own smaller effect: force-open any collapsed
+  // toggle ancestor same as the match-scroll effect does, scroll the block
+  // into view, then flash it once via `.block-mention-flash` (globals.css).
+  useEffect(() => {
+    if (!targetBlockId || !blocks) return;
+    for (const ancestor of ancestorChain(blocks, targetBlockId)) {
+      if (ancestor.type === "toggle") forceOpenBlock(ancestor.id);
+    }
+    let flashed = false;
+    function scrollAndFlash(): void {
+      if (flashed) return;
+      const blockEl = document.querySelector(`[data-block-id="${targetBlockId}"]`);
+      if (!blockEl) return;
+      blockEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      blockEl.classList.add("block-mention-flash");
+      flashed = true;
+      setTimeout(() => blockEl.classList.remove("block-mention-flash"), 2000);
+    }
+    const raf = requestAnimationFrame(scrollAndFlash);
+    const timers = [100, 250, 500].map((ms) => setTimeout(scrollAndFlash, ms));
+    return () => {
+      cancelAnimationFrame(raf);
+      timers.forEach(clearTimeout);
+    };
+  }, [targetBlockId, blocks]);
 
   // Same query key ObjectDetailPage.tsx and SubObjectBlock.tsx's picker
   // already use for this workspace's object types - shares their cache

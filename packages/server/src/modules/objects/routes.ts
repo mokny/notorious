@@ -83,9 +83,8 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     const workspaceId = await objectService.getObjectWorkspaceId(id);
     const access = await requireAccess(request, workspaceId, "editor", { objectId: id });
     const input = updateObjectSchema.parse(request.body);
-    const object = await objectService.updateObject(id, input);
-
     const { actorId, actorName } = resolveActor(request, access);
+    const object = await objectService.updateObject(id, input, { actorId, actorName });
     await recordAndBroadcast({
       workspaceId,
       objectId: id,

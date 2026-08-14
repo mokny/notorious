@@ -21,6 +21,7 @@ import { reindexObjectBody, removeFromIndex } from "../search/indexer.js";
 import { listFilesForObject, deleteFile } from "../files/service.js";
 import { positionBetween } from "../../lib/position.js";
 import { assertVariableNameAvailable, isVariableObjectType, getVariableValue } from "../variables/service.js";
+import { notifyMentionedUsers } from "../notifications/service.js";
 
 function toRecord(row: typeof objects.$inferSelect, values: Record<string, unknown>): ObjectRecord {
   return {
@@ -194,7 +195,7 @@ export async function createObject(
   });
 
   if (Object.keys(input.values).length > 0) {
-    await writeStoredValues(id, input.objectTypeId, input.values);
+    await writeStoredValues(id, input.objectTypeId, workspaceId, input.title, input.values);
   }
 
   await seedWhiteboardBlockIfNeeded(id, input.objectTypeId, now);
@@ -263,6 +264,7 @@ export async function getObject(objectId: string): Promise<ObjectRecord> {
 export async function updateObject(
   objectId: string,
   input: UpdateObjectInput,
+  actor?: { actorId: string; actorName: string },
 ): Promise<ObjectRecord> {
   const existing = await db.select().from(objects).where(eq(objects.id, objectId)).limit(1);
   const row = existing[0];
@@ -285,17 +287,34 @@ export async function updateObject(
   await db.update(objects).set(patch).where(eq(objects.id, objectId));
 
   if (input.values && Object.keys(input.values).length > 0) {
-    await writeStoredValues(objectId, row.objectTypeId, input.values);
+    await writeStoredValues(objectId, row.objectTypeId, row.workspaceId, input.title ?? row.title, input.values, actor);
   }
 
   await reindexObjectBody(objectId, input.title ?? row.title);
   return getObject(objectId);
 }
 
+/** Text/long-text value, JSON-parsed back to a raw string - `""` for anything else (absent, non-string, etc). Only these property types carry free text a `@[Name](user:id)` mention can appear in. */
+function textValueOf(rawJson: string | undefined): string {
+  if (!rawJson) return "";
+  try {
+    const parsed: unknown = JSON.parse(rawJson);
+    return typeof parsed === "string" ? parsed : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Property types whose value is free text a `@[Name](user:id)` mention could appear in - just "text" today (there's no separate "longtext"/multiline property type in this codebase, see constants/propertyTypes.ts). */
+const MENTIONABLE_PROPERTY_TYPES = new Set(["text"]);
+
 async function writeStoredValues(
   objectId: string,
   objectTypeId: string,
+  workspaceId: string,
+  objectTitle: string,
   values: Record<string, unknown>,
+  actor?: { actorId: string; actorName: string },
 ): Promise<void> {
   const props = await listProperties(objectTypeId);
   const propertyByKey = new Map(props.map((p) => [p.key, p]));
@@ -304,6 +323,16 @@ async function writeStoredValues(
     const property = propertyByKey.get(key);
     if (!property || ["relation", "formula", "rollup"].includes(property.type)) continue;
 
+    let previousRawValue: string | undefined;
+    if (actor && MENTIONABLE_PROPERTY_TYPES.has(property.type)) {
+      const existing = await db
+        .select({ value: objectValues.value })
+        .from(objectValues)
+        .where(and(eq(objectValues.objectId, objectId), eq(objectValues.propertyId, property.id)))
+        .limit(1);
+      previousRawValue = existing[0]?.value ?? undefined;
+    }
+
     await db
       .insert(objectValues)
       .values({ objectId, propertyId: property.id, value: JSON.stringify(value) })
@@ -311,6 +340,26 @@ async function writeStoredValues(
         target: [objectValues.objectId, objectValues.propertyId],
         set: { value: JSON.stringify(value) },
       });
+
+    if (actor && MENTIONABLE_PROPERTY_TYPES.has(property.type)) {
+      const previousText = textValueOf(previousRawValue);
+      const nextText = textValueOf(JSON.stringify(value));
+      if (nextText !== previousText) {
+        // Best-effort: an @mention notification failing must never block
+        // saving the property value itself.
+        notifyMentionedUsers({
+          workspaceId,
+          objectId,
+          objectTitle,
+          actorId: actor.actorId,
+          actorName: actor.actorName,
+          source: "mention-field",
+          previousText,
+          nextText,
+          fieldKey: property.key,
+        }).catch(() => {});
+      }
+    }
   }
 }
 

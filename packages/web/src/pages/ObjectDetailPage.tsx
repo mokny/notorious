@@ -89,6 +89,15 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // alongside this one - see SearchPage.tsx).
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightQuery = searchParams.get("highlight");
+  // `@mention` notification deep-links (see NotificationBell.tsx's
+  // `handleClickNotification`) - at most one of these is ever set on a given
+  // navigation (mirrors the three `Notification.source` variants server-side:
+  // `mention-block`/`mention-field`/`mention-comment`). A target that no
+  // longer exists (block deleted, property removed from the type, comment
+  // deleted) is a silent no-op wherever each is consumed below, not an error.
+  const targetBlockId = searchParams.get("block");
+  const targetCommentId = searchParams.get("comment");
+  const targetFieldKey = searchParams.get("field");
   // Same word-splitting BlockEditor.tsx feeds into its own content matching
   // (see searchHighlight.ts) - reused here so the title and any linked-
   // object titles on this page highlight the exact same words.
@@ -128,6 +137,22 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     queryFn: () => schemaApi.properties(object!.objectTypeId),
     enabled: Boolean(object),
   });
+
+  // `?field=` deep-link (see `targetFieldKey` above) - same one-shot
+  // scroll+flash as BlockEditor.tsx's `?block=` handling and
+  // CommentsPanel.tsx's `?comment=` handling, just targeting a property row
+  // (see the `id={`property-${property.key}`}` added to each row below).
+  // Silently does nothing if the property no longer exists on this object
+  // type (e.g. removed since the notification was sent).
+  useEffect(() => {
+    if (!targetFieldKey || !properties) return;
+    const el = document.getElementById(`property-${targetFieldKey}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("block-mention-flash");
+    const timer = setTimeout(() => el.classList.remove("block-mention-flash"), 2000);
+    return () => clearTimeout(timer);
+  }, [targetFieldKey, properties]);
 
   const { data: objectTypes } = useQuery({
     queryKey: ["objectTypes", workspaceId],
@@ -537,6 +562,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               renderedBlocks={renderedBlocks?.rendered ?? null}
               renderedBlocksLoading={renderedBlocksLoading}
               highlightQuery={highlightQuery}
+              targetBlockId={targetBlockId}
               onCloseHighlight={() =>
                 setSearchParams((prev) => {
                   const next = new URLSearchParams(prev);
@@ -593,7 +619,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               kill-switch button above hides the whole section, not just the
               compose box, so there's nothing left down here to show. */}
           {!object.commentsDisabled && (
-            <CommentsPanel objectId={object.id} workspaceId={workspaceId} share={share} />
+            <CommentsPanel objectId={object.id} workspaceId={workspaceId} share={share} targetCommentId={targetCommentId} />
           )}
         </div>
 
@@ -620,7 +646,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 {properties
                   .filter((property) => property.key !== "sub_objects")
                   .map((property) => (
-                    <div key={property.id}>
+                    <div key={property.id} id={`property-${property.key}`} data-property-key={property.key}>
                       <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
                       <PropertyCell workspaceId={workspaceId} object={object} property={property} />
                     </div>

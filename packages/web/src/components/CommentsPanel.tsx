@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { commentApi, workspaceApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useConfirm } from "../context/ConfirmContext.js";
+import { useMentionAutocomplete } from "../hooks/useMentionAutocomplete.js";
 import { CollapsibleSection } from "./ui/CollapsibleSection.js";
 import { Button } from "./ui/Button.js";
 import { Icon } from "./ui/Icon.js";
+import { MentionText } from "./editor/MentionText.js";
+import { MentionDropdown } from "./editor/MentionDropdown.js";
 import type { SharedObjectContext } from "../pages/ObjectDetailPage.js";
 
 const MAX_LENGTH = 4000;
@@ -15,6 +18,8 @@ interface CommentsPanelProps {
   objectId: string;
   workspaceId: string;
   share?: SharedObjectContext;
+  /** Set from `?comment=` (see ObjectDetailPage.tsx) - scrolls the matching comment into view and briefly highlights it once the comment list has loaded. `undefined`/not found: no-op, no error shown (broken-link deep-link is a silent no-op by design). */
+  targetCommentId?: string | null;
 }
 
 /**
@@ -30,16 +35,33 @@ interface CommentsPanelProps {
  * and `body` renders with `white-space: pre-wrap` and nothing else - line
  * breaks are the only structure a comment can carry.
  */
-export function CommentsPanel({ objectId, workspaceId, share }: CommentsPanelProps) {
+export function CommentsPanel({ objectId, workspaceId, share, targetCommentId }: CommentsPanelProps) {
   const { user } = useAuth();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
+  const draftRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: comments } = useQuery({
     queryKey: ["comments", objectId],
     queryFn: () => commentApi.list(objectId),
   });
+
+  // Deep-link scroll-to-comment (see `targetCommentId` above) - same
+  // "briefly flash, then remove" one-shot approach as BlockEditor.tsx's
+  // `?block=` handling, reusing the same `.block-mention-flash` keyframe
+  // (globals.css) since visually it's the same affordance on a different
+  // element. Guarded on the target actually existing in the DOM, so a
+  // deleted/no-longer-visible comment just silently does nothing.
+  useEffect(() => {
+    if (!targetCommentId || !comments) return;
+    const el = document.getElementById(`comment-${targetCommentId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("block-mention-flash");
+    const timer = setTimeout(() => el.classList.remove("block-mention-flash"), 2000);
+    return () => clearTimeout(timer);
+  }, [targetCommentId, comments]);
 
   // A share link's role is already known from its own token; a real member's
   // isn't carried anywhere else on this page, so it's looked up here - same
@@ -55,6 +77,18 @@ export function CommentsPanel({ objectId, workspaceId, share }: CommentsPanelPro
   const myRole: WorkspaceRole | undefined = share ? share.role : members?.find((m) => m.userId === user?.id)?.role;
   const canComment = Boolean(myRole && roleAtLeast(myRole, "commenter"));
   const isModerator = Boolean(myRole && roleAtLeast(myRole, "editor"));
+
+  // Mentions aren't offered to anonymous share visitors (product decision -
+  // see the module's own doc comment above) - `enabled: !share` keeps the
+  // hook's own members query gated the same way the panel's own `members`
+  // query already is above.
+  const mention = useMentionAutocomplete({
+    workspaceId,
+    elementRef: draftRef,
+    value: draft,
+    onChange: setDraft,
+    enabled: !share,
+  });
 
   const createMutation = useMutation({
     mutationFn: () => commentApi.create(objectId, { body: draft }),
@@ -94,7 +128,7 @@ export function CommentsPanel({ objectId, workspaceId, share }: CommentsPanelPro
             const isOwnComment = Boolean(user && comment.authorId === user.id);
             const canDelete = !comment.deletedAt && (isModerator || isOwnComment);
             return (
-              <li key={comment.id} className="group rounded-md border border-border px-3 py-2">
+              <li id={`comment-${comment.id}`} key={comment.id} className="group rounded-md border border-border px-3 py-2">
                 {comment.deletedAt ? (
                   <p className="text-xs italic text-ink-muted">
                     {comment.authorName}'s comment was deleted by {comment.deletedByName}.
@@ -116,7 +150,9 @@ export function CommentsPanel({ objectId, workspaceId, share }: CommentsPanelPro
                         )}
                       </div>
                     </div>
-                    <p className="whitespace-pre-wrap break-words text-sm text-ink">{comment.body}</p>
+                    <p className="whitespace-pre-wrap break-words text-sm text-ink">
+                      <MentionText text={comment.body} />
+                    </p>
                   </>
                 )}
               </li>
@@ -126,14 +162,27 @@ export function CommentsPanel({ objectId, workspaceId, share }: CommentsPanelPro
 
         {canComment ? (
           <div className="space-y-2">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Write a comment…"
-              maxLength={MAX_LENGTH}
-              rows={3}
-              className="w-full resize-y rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent"
-            />
+            <div className="relative">
+              <textarea
+                ref={draftRef}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => mention.onKeyDown(e)}
+                onSelect={mention.onSelect}
+                placeholder="Write a comment…"
+                maxLength={MAX_LENGTH}
+                rows={3}
+                className="w-full resize-y rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent"
+              />
+              {mention.isOpen && (
+                <MentionDropdown
+                  items={mention.items}
+                  selectedIndex={mention.selectedIndex}
+                  onPick={mention.pick}
+                  className="bottom-full left-0 mb-1 w-64"
+                />
+              )}
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-ink-muted">{draft.length}/{MAX_LENGTH}</span>
               <Button

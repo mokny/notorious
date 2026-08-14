@@ -23,6 +23,13 @@ import { listProperties } from "../schema/service.js";
 import { SUB_OBJECTS_PROPERTY_KEY } from "../schema/subObjects.js";
 import { generateBlockAnswer } from "../ai/agent.js";
 import { blocksToMarkdown } from "./markdown.js";
+import { notifyMentionedUsers } from "../notifications/service.js";
+
+/** The markdown string carried by a block's content, for the handful of block types that have one (paragraph/heading/quote/callout) - `""` for every other type, since e.g. a table's content is a ProseMirror doc, not markdown. Used only to diff for newly-added @mentions. */
+function markdownOf(content: string): string {
+  const parsed = JSON.parse(content) as { markdown?: unknown };
+  return typeof parsed.markdown === "string" ? parsed.markdown : "";
+}
 
 function toBlock(row: typeof blocks.$inferSelect): Block {
   return {
@@ -215,7 +222,11 @@ export async function getBlockObjectId(blockId: string): Promise<string> {
   return row.objectId;
 }
 
-export async function updateBlock(blockId: string, input: UpdateBlockInput): Promise<Block> {
+export async function updateBlock(
+  blockId: string,
+  input: UpdateBlockInput,
+  actor?: { actorId: string; actorName: string },
+): Promise<Block> {
   const rows = await db.select().from(blocks).where(eq(blocks.id, blockId)).limit(1);
   const row = rows[0];
   if (!row) throw notFound("Block not found");
@@ -243,7 +254,38 @@ export async function updateBlock(blockId: string, input: UpdateBlockInput): Pro
     await syncSubObjectRelation(row.objectId, subObjectTargetOf(row.content), subObjectTargetOf(content), blockId);
   }
 
+  if (actor) {
+    // Best-effort: an @mention notification failing (bad locale lookup,
+    // push subscription hiccup, etc) must never block the block save itself.
+    notifyMentionForBlockUpdate(row.objectId, blockId, actor, row.content, content).catch(() => {});
+  }
+
   return toBlock({ ...row, content, updatedAt, slug });
+}
+
+async function notifyMentionForBlockUpdate(
+  objectId: string,
+  blockId: string,
+  actor: { actorId: string; actorName: string },
+  previousContent: string,
+  nextContent: string,
+): Promise<void> {
+  const previousText = markdownOf(previousContent);
+  const nextText = markdownOf(nextContent);
+  if (nextText === previousText) return;
+
+  const [workspaceId, object] = await Promise.all([getObjectWorkspaceId(objectId), getObject(objectId)]);
+  await notifyMentionedUsers({
+    workspaceId,
+    objectId,
+    objectTitle: object.title,
+    actorId: actor.actorId,
+    actorName: actor.actorName,
+    source: "mention-block",
+    previousText,
+    nextText,
+    blockId,
+  });
 }
 
 /**

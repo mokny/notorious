@@ -441,7 +441,18 @@ export interface BackupScheduleChangedMessage {
   workspaceId: string;
 }
 
-/** One entry in a registered user's notification bell (see modules/notifications/) - currently only ever created for a new comment, hence no `type` field of its own the way `ActivityEntry.action` has (nothing else produces one yet). `body` is a truncated preview of the comment, not the full text - see modules/notifications/service.ts. */
+/**
+ * One entry in a registered user's notification bell (see modules/notifications/).
+ * `source` distinguishes the "you're part of this comment thread" notification
+ * (`comment`, `commentId` set, pre-existing behavior) from a real @mention
+ * (`mention-comment`/`mention-block`/`mention-field`, see `notifyMentionedUsers`
+ * in modules/notifications/service.ts) - the web bell picks its text/icon off
+ * this field. `blockId`/`fieldKey` are the deep-link anchor for a mention inside
+ * block content or a text property respectively (`?block=`/`?field=` on the
+ * object detail route); both are null for `comment`/`mention-comment`, which
+ * anchor via `commentId` instead (`?comment=`). `body` is a truncated preview of
+ * the comment/content, not the full text - see modules/notifications/service.ts.
+ */
 export interface Notification {
   id: string;
   userId: string;
@@ -449,6 +460,9 @@ export interface Notification {
   objectId: string;
   objectTitle: string;
   commentId: string | null;
+  source: "comment" | "mention-comment" | "mention-block" | "mention-field";
+  blockId: string | null;
+  fieldKey: string | null;
   actorName: string;
   body: string;
   createdAt: ISODateString;

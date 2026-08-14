@@ -94,9 +94,8 @@ export async function registerBlockRoutes(app: FastifyInstance): Promise<void> {
     const workspaceId = await getObjectWorkspaceId(objectId);
     const access = await requireAccess(request, workspaceId, "editor", { objectId });
     const input = updateBlockSchema.parse(request.body);
-    const block = await blockService.updateBlock(id, input);
-
     const updated = resolveActor(request, access);
+    const block = await blockService.updateBlock(id, input, { actorId: updated.actorId, actorName: updated.actorName });
     await recordAndBroadcast({
       workspaceId,
       objectId,

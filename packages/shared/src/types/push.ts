@@ -14,10 +14,16 @@
  * reads it to decide whether to skip `showNotification` when one of the
  * user's tabs is focused/visible. Never set on `call`, which always rings
  * regardless of the setting.
+ *
+ * `comment-reply` is the "you're part of this comment thread" push sent by
+ * `notifyCommentParticipants` (modules/notifications/service.ts) - it used to
+ * be named `mention` before real @mentions existed; that name is now reserved
+ * for `mention` below, sent by `notifyMentionedUsers` when someone is actually
+ * @mentioned via `@[Name](user:id)` syntax (see utils/mentions.ts).
  */
 export type PushNotificationPayload =
   | { type: "call"; title: string; body: string; callId: string; conversationId: string; tag: string; url: string }
   | { type: "call-closed"; tag: string }
   | { type: "chat-message"; title: string; body: string; conversationId: string; url: string; badge?: number; suppressWhenFocused?: boolean }
   | { type: "chat-reaction"; title: string; body: string; conversationId: string; url: string; suppressWhenFocused?: boolean }
-  | { type: "mention" | "ai-budget" | "backup-failed" | "reminder"; title: string; body: string; url: string; suppressWhenFocused?: boolean };
+  | { type: "comment-reply" | "mention" | "ai-budget" | "backup-failed" | "reminder"; title: string; body: string; url: string; suppressWhenFocused?: boolean };

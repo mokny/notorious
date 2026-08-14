@@ -24,7 +24,9 @@
       "title": "Benachrichtigungen",
       "markAllRead": "Alle als gelesen markieren",
       "empty": "Noch keine Benachrichtigungen.",
-      "commentedOn": "{{actor}} hat „{{title}}“ kommentiert"
+      "commentedOn": "{{actor}} hat „{{title}}“ kommentiert",
+      "mentionedInComment": "{{actor}} hat dich in einem Kommentar zu „{{title}}“ erwähnt",
+      "mentionedIn": "{{actor}} hat dich in „{{title}}“ erwähnt"
     },
     "installHint": {
       "prompt": "Installiere Notorious auf deinem Handy für schnellen Vollbildzugriff.",
@@ -389,8 +391,11 @@
     "createOne": "Konto erstellen"
   },
   "push": {
-    "mention": {
+    "commentReply": {
       "title": "{{actor}} hat „{{title}}“ kommentiert"
+    },
+    "mention": {
+      "title": "{{actor}} hat dich in „{{title}}“ erwähnt"
     },
     "chat": {
       "attachment": "Anhang gesendet",
