@@ -109,10 +109,6 @@ function WorkspaceLayoutInner() {
   const showMobileHeader = !sidebarPersistent && !isPhone;
   // The header only overlays a cover when it's actually rendered at all.
   const showCoverOverlay = coverActive && showMobileHeader;
-  // True wherever a cover reaches the very top edge - under the
-  // tablet-portrait header's transparent overlay, or (with no header at all)
-  // straight under the phone's status bar/Dynamic Island.
-  const coverFullBleed = showCoverOverlay || (isPhone && coverActive);
   // Where ObjectDetailPage.tsx's sticky action-toolbar should stop when
   // scrolling. A sticky element's own `top` stacks *on top of* its
   // scrolling ancestor's padding-top (the padding already shifts the
@@ -339,12 +335,13 @@ function WorkspaceLayoutInner() {
           />
         )}
         {/* Only for a real member - an anonymous share visitor has no
-            account to "install their copy" of the app for. Hidden while a
-            cover is full-bleed under the top edge (tablet-portrait's overlay
-            header, or phone's bare safe-area - see coverFullBleed below) -
-            it's in main's normal flow, so left up it would push the cover
-            down and break the "content reaches the very top" effect on its
-            first (undismissed) showing. */}
+            account to "install their copy" of the app for. Deliberately shown
+            even when a cover is full-bleed under the top edge - these are in
+            main's normal flow, so on their first (undismissed) showing they
+            push the cover down and break the "content reaches the very top"
+            effect, but suppressing them there previously made the push-notify
+            prompt only ever appear in landscape on phone (crossing the
+            isPhone breakpoint flips coverFullBleed off), which is worse. */}
         <main
           ref={mainRef}
           // `overscroll-none` (not just `-contain`) - without it, iOS's
@@ -369,8 +366,8 @@ function WorkspaceLayoutInner() {
             ...(isPhone && { paddingBottom: "var(--bottom-tab-bar-h)" }),
           }}
         >
-          {!shareToken && !coverFullBleed && <InstallAppHint />}
-          {!shareToken && !coverFullBleed && <PushNotificationBanner />}
+          {!shareToken && <InstallAppHint />}
+          {!shareToken && <PushNotificationBanner />}
           <Outlet />
         </main>
         {isPhone && (
