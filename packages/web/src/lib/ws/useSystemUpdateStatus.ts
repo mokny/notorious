@@ -32,20 +32,24 @@ export interface SystemUpdateBannerState {
  * Finish detection has to survive the socket dying when the server process
  * actually restarts (see hub.ts's `broadcastSystemStatus` doc comment): a
  * disconnect while `phase === "inProgress"` just triggers the normal
- * reconnect-with-backoff below, and the *next* status this client receives -
- * either a fresh "idle" from the new process's default state, or another
- * live broadcast if the old process was still alive (e.g. a failed update
- * that never restarted) - is what actually resolves the phase. For
- * `reason: "update"`, "idle" only counts as finished once the reported
- * `version` differs from what it was when the update started (a plain
- * restart never changes it, so reconnecting is enough on its own there).
+ * reconnect-with-backoff below, and the *next* status this client receives
+ * is what actually resolves the phase. Any "idle" received while
+ * `phase === "inProgress"` counts as finished, regardless of `reason` or
+ * `version` - the server's in-memory status (see `lastSystemStatus` in
+ * hub.ts) only ever defaults back to "idle" on a fresh process boot, it's
+ * never explicitly re-broadcast by a still-running process, so there is no
+ * scenario where a reconnecting client sees "idle" *without* the process
+ * having actually restarted. (An earlier version of this hook additionally
+ * required the reported `version` to differ for `reason: "update"`, which
+ * broke whenever an update was triggered with no new commits to pull - the
+ * script still rebuilds/restarts, but the version string never changes, so
+ * the banner got stuck until the stuck-timeout below.)
  */
 export function useSystemUpdateStatus(): SystemUpdateBannerState {
   const [phase, setPhase] = useState<SystemUpdatePhase>("idle");
   const [reason, setReason] = useState<"update" | "restart" | undefined>();
   const [countdown, setCountdown] = useState(RELOAD_COUNTDOWN_S);
   const dismissedRef = useRef(false);
-  const startedVersionRef = useRef<string | undefined>();
   const stuckTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const reloadIntervalRef = useRef<ReturnType<typeof setInterval>>();
 
@@ -60,7 +64,6 @@ export function useSystemUpdateStatus(): SystemUpdateBannerState {
     // would only ever see their value from the initial render, since this
     // effect intentionally runs once (see the eslint-disable below).
     let currentPhase: SystemUpdatePhase = "idle";
-    let currentReason: "update" | "restart" | undefined;
 
     function clearStuckTimeout(): void {
       clearTimeout(stuckTimeoutRef.current);
@@ -96,12 +99,8 @@ export function useSystemUpdateStatus(): SystemUpdateBannerState {
       if (dismissedRef.current && message.status === "inProgress") dismissedRef.current = false;
 
       if (message.status === "inProgress") {
-        if (currentPhase !== "inProgress") {
-          startedVersionRef.current = message.version;
-          armStuckTimeout();
-        }
+        if (currentPhase !== "inProgress") armStuckTimeout();
         currentPhase = "inProgress";
-        currentReason = message.reason;
         setReason(message.reason);
         setPhase("inProgress");
         return;
@@ -110,7 +109,6 @@ export function useSystemUpdateStatus(): SystemUpdateBannerState {
       if (message.status === "failed") {
         clearStuckTimeout();
         currentPhase = "failed";
-        currentReason = message.reason;
         setReason(message.reason);
         setPhase("failed");
         return;
@@ -119,14 +117,10 @@ export function useSystemUpdateStatus(): SystemUpdateBannerState {
       // status === "idle" - only a meaningful "finished" signal if we were
       // actually waiting on one; the very first message a freshly opened tab
       // ever receives is also "idle" and must not be treated as a finish.
+      // See this hook's doc comment for why no further check (e.g. on
+      // `version`) is needed here.
       if (currentPhase !== "inProgress") return;
-
-      const versionChanged = message.version !== startedVersionRef.current;
-      if (currentReason === "restart" || versionChanged) {
-        startFinishing();
-      }
-      // else: reconnected but the update reason's version hasn't moved yet -
-      // keep waiting (stuck timeout above still covers a real hang).
+      startFinishing();
     }
 
     function connect(): void {
