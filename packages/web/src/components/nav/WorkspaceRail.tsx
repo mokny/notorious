@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { workspaceApi } from "../../lib/api/resources.js";
 import { Icon } from "../ui/Icon.js";
 import { AccountMenuButton } from "./AccountMenuButton.js";
+import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog.js";
 
 interface WorkspaceRailProps {
   activeWorkspaceId: string;
@@ -19,16 +21,8 @@ interface WorkspaceRailProps {
 export function WorkspaceRail({ activeWorkspaceId }: WorkspaceRailProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { data: workspaces } = useQuery({ queryKey: ["workspaces"], queryFn: workspaceApi.list });
-
-  const createWorkspace = useMutation({
-    mutationFn: () => workspaceApi.create({ name: t("workspacePicker.untitledWorkspace"), icon: "sparkles" }),
-    onSuccess: async (workspace) => {
-      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      navigate(`/w/${workspace.id}`);
-    },
-  });
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   return (
     <aside
@@ -61,8 +55,7 @@ export function WorkspaceRail({ activeWorkspaceId }: WorkspaceRailProps) {
           );
         })}
         <button
-          onClick={() => createWorkspace.mutate()}
-          disabled={createWorkspace.isPending}
+          onClick={() => setCreateDialogOpen(true)}
           title={t("workspacePicker.create")}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-ink-muted hover:bg-surface-raised hover:text-ink"
         >
@@ -70,6 +63,11 @@ export function WorkspaceRail({ activeWorkspaceId }: WorkspaceRailProps) {
         </button>
       </nav>
       <AccountMenuButton workspaceId={activeWorkspaceId} variant="compact" side="top" />
+      <CreateWorkspaceDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onCreated={(workspaceId) => navigate(`/w/${workspaceId}`)}
+      />
     </aside>
   );
 }
