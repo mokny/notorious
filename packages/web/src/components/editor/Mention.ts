@@ -37,14 +37,13 @@ function buildSuggestion(workspaceIdRef: { current: string }) {
     // `matchPrefixIsAllowed` check treats "nothing before the trigger" (start
     // of block) the same as an allowed prefix character, so no custom
     // `findSuggestionMatch`/regex is needed here. An `@` mid-word (e.g. an
-    // email-looking string, or landing inside an already-saved
-    // `@[Name](user:id)` mention) simply won't have a whitespace/start-of-
-    // block prefix, so it never matches at all.
+    // email-looking string, or landing inside an already-saved mention node)
+    // simply won't have a whitespace/start-of-block prefix, so it never
+    // matches at all.
     items: ({ query }: { query: string }) => (workspaceIdRef.current ? memberItems(workspaceIdRef.current, query) : []),
     // Inserts the real atomic `mention` node (see MentionNode.ts), not raw
     // `@[Name|id]` text - a trailing space keeps it visually separated from
-    // whatever's typed next, matching useMentionAutocomplete.ts's plain-text
-    // equivalent.
+    // whatever's typed next.
     command: ({ editor, range, props }: { editor: Editor; range: Range; props: WorkspaceMember }) => {
       editor
         .chain()

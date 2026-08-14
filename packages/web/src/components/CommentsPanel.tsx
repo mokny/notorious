@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roleAtLeast, type WorkspaceRole } from "@notorious/shared";
 import { commentApi, workspaceApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useConfirm } from "../context/ConfirmContext.js";
-import { useMentionAutocomplete } from "../hooks/useMentionAutocomplete.js";
 import { CollapsibleSection } from "./ui/CollapsibleSection.js";
 import { Button } from "./ui/Button.js";
 import { Icon } from "./ui/Icon.js";
 import { MentionText } from "./editor/MentionText.js";
-import { MentionDropdown } from "./editor/MentionDropdown.js";
+import { MentionableEditor } from "./editor/MentionableEditor.js";
 import type { SharedObjectContext } from "../pages/ObjectDetailPage.js";
 
 const MAX_LENGTH = 4000;
@@ -30,17 +29,17 @@ interface CommentsPanelProps {
  * enforces by not rendering this component at all rather than passing the
  * flag down - a disabled object shows no comments section whatsoever, not
  * even its already-posted comments.
- * Plain text only: the
- * textarea below is the entire authoring surface, no formatting toolbar,
- * and `body` renders with `white-space: pre-wrap` and nothing else - line
- * breaks are the only structure a comment can carry.
+ * Plain text only: MentionableEditor below (a minimal TipTap instance, see
+ * its own doc comment) is the entire authoring surface, no formatting
+ * toolbar beyond the @mention pill it renders live - `body` is saved/
+ * rendered as plain text (`white-space: pre-wrap`, via MentionText.tsx),
+ * line breaks are the only other structure a comment can carry.
  */
 export function CommentsPanel({ objectId, workspaceId, share, targetCommentId }: CommentsPanelProps) {
   const { user } = useAuth();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
-  const draftRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: comments } = useQuery({
     queryKey: ["comments", objectId],
@@ -77,18 +76,6 @@ export function CommentsPanel({ objectId, workspaceId, share, targetCommentId }:
   const myRole: WorkspaceRole | undefined = share ? share.role : members?.find((m) => m.userId === user?.id)?.role;
   const canComment = Boolean(myRole && roleAtLeast(myRole, "commenter"));
   const isModerator = Boolean(myRole && roleAtLeast(myRole, "editor"));
-
-  // Mentions aren't offered to anonymous share visitors (product decision -
-  // see the module's own doc comment above) - `enabled: !share` keeps the
-  // hook's own members query gated the same way the panel's own `members`
-  // query already is above.
-  const mention = useMentionAutocomplete({
-    workspaceId,
-    elementRef: draftRef,
-    value: draft,
-    onChange: setDraft,
-    enabled: !share,
-  });
 
   const createMutation = useMutation({
     mutationFn: () => commentApi.create(objectId, { body: draft }),
@@ -162,33 +149,19 @@ export function CommentsPanel({ objectId, workspaceId, share, targetCommentId }:
 
         {canComment ? (
           <div className="space-y-2">
-            <div className="relative">
-              <textarea
-                ref={draftRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => mention.onKeyDown(e)}
-                onSelect={mention.onSelect}
-                placeholder="Write a comment…"
-                maxLength={MAX_LENGTH}
-                rows={3}
-                className="w-full resize-y rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent"
-              />
-              {mention.isOpen && (
-                <MentionDropdown
-                  items={mention.items}
-                  selectedIndex={mention.selectedIndex}
-                  onPick={mention.pick}
-                  className="bottom-full left-0 mb-1 w-64"
-                />
-              )}
-            </div>
+            <MentionableEditor
+              value={draft}
+              onChange={setDraft}
+              workspaceId={workspaceId}
+              placeholder="Write a comment…"
+              className="w-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm outline-none focus-within:border-accent"
+            />
             <div className="flex items-center justify-between">
               <span className="text-xs text-ink-muted">{draft.length}/{MAX_LENGTH}</span>
               <Button
                 variant="primary"
                 onClick={() => createMutation.mutate()}
-                disabled={!trimmed || createMutation.isPending}
+                disabled={!trimmed || draft.length > MAX_LENGTH || createMutation.isPending}
               >
                 Post
               </Button>
