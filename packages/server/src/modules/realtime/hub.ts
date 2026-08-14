@@ -157,15 +157,38 @@ export function getSocketForClient(userId: string, clientId: string): WebSocket 
   return undefined;
 }
 
+/** Returns whether a user has at least one open `/ws/chat` socket right now - the source of truth for "online" used by the chat status gray-dot override (see `onUserOnlineChange`). */
+export function isUserOnline(userId: string): boolean {
+  return (socketsByUserId.get(userId)?.size ?? 0) > 0;
+}
+
+type OnlineChangeListener = (userId: string, online: boolean) => void;
+
+// Fired only on the 0<->1 transition of a user's `/ws/chat` socket count (not
+// on every extra tab connecting/closing) - chat/service.ts subscribes here to
+// broadcast a `userStatusChanged` event to that user's chat contacts, since
+// the hub itself has no DB access to look up who those contacts are.
+const onlineChangeListeners = new Set<OnlineChangeListener>();
+
+export function onUserOnlineChange(listener: OnlineChangeListener): void {
+  onlineChangeListeners.add(listener);
+}
+
+function notifyOnlineChange(userId: string, online: boolean): void {
+  for (const listener of onlineChangeListeners) listener(userId, online);
+}
+
 /** Registers a socket on the workspace-agnostic chat channel for one user and cleans up on disconnect. `clientId` identifies the browser tab/device (see lib/ws/clientId.ts on the frontend) - required (not optional like the older per-workspace `joinRoom`) since calls need every `/ws/chat` socket addressable. `sessionId` (the login session backing this connection, see plugins/session.ts's `getSessionId`) is optional only because a socket could theoretically authenticate some other way in the future - every real login always has one. */
 export function joinGlobalRoom(userId: string, socket: WebSocket, clientId: string, sessionId?: string): void {
   let sockets = socketsByUserId.get(userId);
+  const wasOnline = (sockets?.size ?? 0) > 0;
   if (!sockets) {
     sockets = new Set();
     socketsByUserId.set(userId, sockets);
   }
   sockets.add(socket);
   clientIdBySocket.set(socket, clientId);
+  if (!wasOnline) notifyOnlineChange(userId, true);
 
   let sessionSockets: Set<WebSocket> | undefined;
   if (sessionId) {
@@ -179,7 +202,10 @@ export function joinGlobalRoom(userId: string, socket: WebSocket, clientId: stri
 
   socket.on("close", () => {
     sockets?.delete(socket);
-    if (sockets && sockets.size === 0) socketsByUserId.delete(userId);
+    if (sockets && sockets.size === 0) {
+      socketsByUserId.delete(userId);
+      notifyOnlineChange(userId, false);
+    }
     clientIdBySocket.delete(socket);
     if (sessionId && sessionSockets) {
       sessionSockets.delete(socket);

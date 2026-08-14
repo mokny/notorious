@@ -8,6 +8,8 @@ export interface ConversationParticipantSummary {
   avatarColor: string;
   avatarUrl?: string | null;
   chatStatus: ChatStatus;
+  /** Whether this participant currently has at least one open `/ws/chat` socket - see `modules/realtime/hub.ts`'s `isUserOnline`. `false` overrides `chatStatus` to a gray dot client-side (see `ChatAvatar.tsx`), since a manually-set status conveys nothing about a user who isn't around to see the message live. */
+  online: boolean;
 }
 
 /**

@@ -21,13 +21,15 @@ function useCurrentWorkspaceId(): string | null {
   return location.pathname.match(/^\/w\/([^/]+)/)?.[1] ?? null;
 }
 
-function conversationInitial(conversation: ConversationSummary): { name: string; color: string; url: string | null; status?: ChatStatus } {
-  if (conversation.type === "workspace_channel") return { name: conversation.name, color: "#6366f1", url: null };
+function conversationInitial(
+  conversation: ConversationSummary,
+): { name: string; color: string; url: string | null; status?: ChatStatus; online: boolean } {
+  if (conversation.type === "workspace_channel") return { name: conversation.name, color: "#6366f1", url: null, online: true };
   const first = conversation.otherParticipants[0];
   // Only a real 1:1 DM has an unambiguous "this avatar's status" - a group DM shows the first
   // participant's avatar as a stand-in, and their status alone would misleadingly imply the group's.
   const status = conversation.otherParticipants.length === 1 ? first?.chatStatus : undefined;
-  return { name: conversation.name, color: first?.avatarColor ?? "#6366f1", url: first?.avatarUrl ?? null, status };
+  return { name: conversation.name, color: first?.avatarColor ?? "#6366f1", url: first?.avatarUrl ?? null, status, online: first?.online ?? true };
 }
 
 /**
@@ -130,7 +132,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
             return (
               <li key={conversation.id} className="relative flex items-center">
                 <button onClick={() => onSelect(conversation.id)} className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-3 text-left hover:bg-surface">
-                  <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} chatStatus={avatar.status} size={11} />
+                  <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} chatStatus={avatar.status} online={avatar.online} size={11} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-base font-medium text-ink">

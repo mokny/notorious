@@ -28,7 +28,7 @@ import { env } from "../../env.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { writeUploadedBytes, deleteUploadedSubpath, deleteUploadedBytes } from "../../lib/storage.js";
-import { sendToUserGlobal, broadcastToConversation } from "../realtime/hub.js";
+import { sendToUserGlobal, broadcastToConversation, isUserOnline, onUserOnlineChange } from "../realtime/hub.js";
 import { notifyUser } from "../push/service.js";
 import { translate } from "../../lib/i18n.js";
 import { isFocused } from "./focusState.js";
@@ -101,7 +101,14 @@ export async function listUnifiedConversations(userId: string): Promise<Conversa
   for (const row of allParticipantRows) {
     if (row.userId === userId) continue;
     const list = otherParticipantsByConversation.get(row.conversationId) ?? [];
-    list.push({ userId: row.userId, name: row.name, avatarColor: row.avatarColor, avatarUrl: row.avatarUrl, chatStatus: row.chatStatus });
+    list.push({
+      userId: row.userId,
+      name: row.name,
+      avatarColor: row.avatarColor,
+      avatarUrl: row.avatarUrl,
+      chatStatus: row.chatStatus,
+      online: isUserOnline(row.userId),
+    });
     otherParticipantsByConversation.set(row.conversationId, list);
   }
 
@@ -618,8 +625,22 @@ export async function getChatContactUserIds(userId: string): Promise<string[]> {
 export async function updateChatStatus(userId: string, status: "green" | "yellow" | "red"): Promise<void> {
   await db.update(users).set({ chatStatus: status }).where(eq(users.id, userId));
   const contactIds = await getChatContactUserIds(userId);
-  for (const id of [userId, ...contactIds]) sendToUserGlobal(id, { type: "userStatusChanged", userId, status });
+  const online = isUserOnline(userId);
+  for (const id of [userId, ...contactIds]) sendToUserGlobal(id, { type: "userStatusChanged", userId, status, online });
 }
+
+// Fires a `userStatusChanged` broadcast (with the user's current persisted
+// status) to their chat contacts whenever they connect/disconnect entirely -
+// see `onUserOnlineChange`'s doc comment on the hub side for why this lives
+// here rather than in the hub itself (no DB access there).
+onUserOnlineChange((userId, online) => {
+  void (async () => {
+    const [row] = await db.select({ chatStatus: users.chatStatus }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!row) return;
+    const contactIds = await getChatContactUserIds(userId);
+    for (const id of contactIds) sendToUserGlobal(id, { type: "userStatusChanged", userId, status: row.chatStatus, online });
+  })();
+});
 
 export async function getMessageConversationId(messageId: string): Promise<string> {
   const rows = await db.select({ conversationId: messages.conversationId }).from(messages).where(eq(messages.id, messageId)).limit(1);

@@ -7,13 +7,15 @@ const STATUS_DOT_COLOR: Record<ChatStatus, string> = {
   red: "#ef4444",
 };
 
-/** Small colored dot overlaying the bottom-right corner of an avatar - see `ChatStatus`'s doc comment. Omitted entirely when `chatStatus` isn't known/set. */
-function StatusDot({ status, avatarSize }: { status: ChatStatus; avatarSize: number }) {
+const OFFLINE_DOT_COLOR = "#9ca3af";
+
+/** Small colored dot overlaying the bottom-right corner of an avatar - see `ChatStatus`'s doc comment. Omitted entirely when `chatStatus` isn't known/set. `online: false` overrides the color to gray regardless of `status` - a manually-set status conveys nothing about someone who isn't around to see the message live. */
+function StatusDot({ status, online, avatarSize }: { status: ChatStatus; online: boolean; avatarSize: number }) {
   const dotSize = `${Math.max(avatarSize * 0.09, 0.5)}rem`;
   return (
     <span
       className="absolute right-0 bottom-0 rounded-full ring-2 ring-surface"
-      style={{ width: dotSize, height: dotSize, backgroundColor: STATUS_DOT_COLOR[status] }}
+      style={{ width: dotSize, height: dotSize, backgroundColor: online ? STATUS_DOT_COLOR[status] : OFFLINE_DOT_COLOR }}
     />
   );
 }
@@ -24,6 +26,7 @@ export function ChatAvatar({
   avatarColor,
   avatarUrl,
   chatStatus,
+  online = true,
   size = 8,
 }: {
   name: string;
@@ -31,6 +34,8 @@ export function ChatAvatar({
   avatarUrl?: string | null;
   /** This participant's chat status (see `ChatStatus`) - omit to render the avatar with no status dot. */
   chatStatus?: ChatStatus;
+  /** Whether this participant currently has an open connection (see `modules/realtime/hub.ts`'s `isUserOnline`). Defaults to true so callers that don't track presence (e.g. the current user's own avatar) don't need to pass it. */
+  online?: boolean;
   size?: number;
 }) {
   const dimension = `${size * 0.25}rem`;
@@ -39,7 +44,7 @@ export function ChatAvatar({
     return (
       <span className="relative inline-flex shrink-0" style={{ width: dimension, height: dimension }}>
         <img src={image.src} onError={image.onError} alt="" className="h-full w-full rounded-full object-cover" />
-        {chatStatus && <StatusDot status={chatStatus} avatarSize={size} />}
+        {chatStatus && <StatusDot status={chatStatus} online={online} avatarSize={size} />}
       </span>
     );
   }
@@ -51,7 +56,7 @@ export function ChatAvatar({
       >
         {name[0]?.toUpperCase()}
       </span>
-      {chatStatus && <StatusDot status={chatStatus} avatarSize={size} />}
+      {chatStatus && <StatusDot status={chatStatus} online={online} avatarSize={size} />}
     </span>
   );
 }

@@ -353,6 +353,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
               avatarColor={otherParticipant.avatarColor}
               avatarUrl={otherParticipant.avatarUrl}
               chatStatus={otherParticipant.chatStatus}
+              online={otherParticipant.online}
               size={7}
             />
           )

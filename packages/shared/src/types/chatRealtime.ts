@@ -152,11 +152,12 @@ export interface UserSettingsUpdatedEvent {
   type: "userSettingsUpdated";
 }
 
-/** Sent to a user's own other devices plus every one of their chat contacts (see modules/chat/service.ts's `getChatContactUserIds`) when they change their chat status in the sidebar avatar menu - lets any already-rendered `ChatAvatar`/`PresenceViewer` status dot update live instead of waiting for a refetch. */
+/** Sent to a user's own other devices plus every one of their chat contacts (see modules/chat/service.ts's `getChatContactUserIds`) when they change their chat status in the sidebar avatar menu, OR when their online/offline state flips (see `modules/realtime/hub.ts`'s `onUserOnlineChange`) - lets any already-rendered `ChatAvatar`/`PresenceViewer` status dot update live instead of waiting for a refetch. `online: false` overrides `status` to gray client-side regardless of its value - see `ChatAvatar.tsx`. */
 export interface UserStatusChangedEvent {
   type: "userStatusChanged";
   userId: string;
   status: ChatStatus;
+  online: boolean;
 }
 
 export type ChatRealtimeMessage =
