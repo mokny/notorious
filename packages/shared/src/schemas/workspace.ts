@@ -45,6 +45,11 @@ export const movePinSchema = z.object({
 });
 export type MovePinInput = z.infer<typeof movePinSchema>;
 
+export const reorderWorkspaceSchema = z.object({
+  afterWorkspaceId: z.string().min(1).nullable(),
+});
+export type ReorderWorkspaceInput = z.infer<typeof reorderWorkspaceSchema>;
+
 export const touchRecentlyViewedSchema = z.object({
   objectId: z.string().min(1),
 });

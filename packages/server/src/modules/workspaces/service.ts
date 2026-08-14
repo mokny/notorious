@@ -27,6 +27,17 @@ import { positionBetween } from "../../lib/position.js";
 import { deleteWorkspaceFilesFromDisk } from "../files/service.js";
 import { removeWorkspaceFromIndex } from "../search/indexer.js";
 
+/** This user's own workspace list position for a newly-added membership - appended after their current last workspace (see reorderWorkspace/movePin for the same pattern). Exported for the other call sites that insert a workspace_members row directly (auth/service.ts's invite redemption, backup/service.ts's import). */
+export async function nextMemberPosition(userId: string): Promise<string> {
+  const existing = await db
+    .select({ position: workspaceMembers.position })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.userId, userId))
+    .orderBy(desc(workspaceMembers.position))
+    .limit(1);
+  return positionBetween(existing[0]?.position ?? null, null);
+}
+
 export async function createWorkspace(
   ownerId: string,
   input: CreateWorkspaceInput,
@@ -35,7 +46,13 @@ export async function createWorkspace(
   const createdAt = nowIso();
 
   await db.insert(workspaces).values({ id, name: input.name, icon: input.icon, ownerId, createdAt });
-  await db.insert(workspaceMembers).values({ workspaceId: id, userId: ownerId, role: "owner", joinedAt: createdAt });
+  await db.insert(workspaceMembers).values({
+    workspaceId: id,
+    userId: ownerId,
+    role: "owner",
+    joinedAt: createdAt,
+    position: await nextMemberPosition(ownerId),
+  });
   await seedSystemObjectTypes(id);
 
   const dashboardObjectId = await seedDashboardNote(id, ownerId);
@@ -79,9 +96,38 @@ export async function listWorkspacesForUser(userId: string): Promise<Workspace[]
     })
     .from(workspaceMembers)
     .innerJoin(workspaces, eq(workspaceMembers.workspaceId, workspaces.id))
-    .where(eq(workspaceMembers.userId, userId));
+    .where(eq(workspaceMembers.userId, userId))
+    .orderBy(workspaceMembers.position);
 
   return rows;
+}
+
+/** Repositions one of this user's workspaces to just after `afterWorkspaceId` (or first, if null) in their own list - see BlockEditor.tsx's handleDragEnd for why the caller resolves this from a client-side `arrayMove` rather than passing a raw drop target. Personal to this user, unlike movePin. */
+export async function reorderWorkspace(
+  userId: string,
+  workspaceId: string,
+  afterWorkspaceId: string | null,
+): Promise<void> {
+  const rows = await db
+    .select({ workspaceId: workspaceMembers.workspaceId, position: workspaceMembers.position })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.userId, userId))
+    .orderBy(workspaceMembers.position);
+
+  let newPosition: string;
+  if (!afterWorkspaceId) {
+    newPosition = positionBetween(null, rows[0]?.position ?? null);
+  } else {
+    const index = rows.findIndex((row) => row.workspaceId === afterWorkspaceId);
+    const after = rows[index];
+    const before = rows[index + 1];
+    newPosition = positionBetween(after?.position ?? null, before?.position ?? null);
+  }
+
+  await db
+    .update(workspaceMembers)
+    .set({ position: newPosition })
+    .where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.workspaceId, workspaceId)));
 }
 
 export async function getWorkspace(workspaceId: string): Promise<Workspace> {
@@ -207,6 +253,7 @@ export async function inviteMember(
       userId: existingUser[0].id,
       role: input.role,
       joinedAt: createdAt,
+      position: await nextMemberPosition(existingUser[0].id),
     });
     return { status: "added" };
   }

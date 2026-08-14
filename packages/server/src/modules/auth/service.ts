@@ -5,7 +5,7 @@ import { db } from "../../db/client.js";
 import { users, workspaceInvites, workspaceMembers, webauthnCredentials } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, unauthorized } from "../../lib/httpError.js";
-import { createWorkspace } from "../workspaces/service.js";
+import { createWorkspace, nextMemberPosition } from "../workspaces/service.js";
 import { getRegistrationEnabled } from "../instanceSettings/service.js";
 import { hasAnyCredential } from "../webauthn/service.js";
 import { sendToUserGlobal } from "../realtime/hub.js";
@@ -164,7 +164,7 @@ async function redeemPendingInvites(userId: string, email: string): Promise<void
     if (invite.status !== "pending") continue;
     await db
       .insert(workspaceMembers)
-      .values({ workspaceId: invite.workspaceId, userId, role: invite.role, joinedAt: nowIso() })
+      .values({ workspaceId: invite.workspaceId, userId, role: invite.role, joinedAt: nowIso(), position: await nextMemberPosition(userId) })
       .onConflictDoNothing();
     await db
       .update(workspaceInvites)

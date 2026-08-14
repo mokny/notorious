@@ -169,6 +169,11 @@ export const workspaceMembers = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").notNull().$type<"viewer" | "commenter" | "editor" | "owner">(),
     joinedAt: text("joined_at").notNull(),
+    // This user's personal position for this workspace in their own rail/picker
+    // list - a fractional-indexing key (see lib/position.ts), not shared with
+    // other members. Distinct from workspacePins.position, which is workspace-
+    // wide.
+    position: text("position").notNull(),
   },
   (table) => [primaryKey({ columns: [table.workspaceId, table.userId] })],
 );

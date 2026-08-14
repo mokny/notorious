@@ -160,6 +160,11 @@ export interface UserStatusChangedEvent {
   online: boolean;
 }
 
+/** Sent to a user's own other devices when they drag-reorder their workspace list (left rail / workspace picker) - see modules/workspaces/service.ts's `reorderWorkspace`. Carries no payload beyond the type, same as `userSettingsUpdated`: the client just refetches `["workspaces"]`, workspace-agnostic since the reordered list itself spans every workspace this user belongs to. */
+export interface WorkspaceOrderChangedEvent {
+  type: "workspaceOrderChanged";
+}
+
 export type ChatRealtimeMessage =
   | ChatMessageEvent
   | ChatMessageDeletedEvent
@@ -176,4 +181,5 @@ export type ChatRealtimeMessage =
   | CallEndedEvent
   | SessionRevokedEvent
   | UserSettingsUpdatedEvent
-  | UserStatusChangedEvent;
+  | UserStatusChangedEvent
+  | WorkspaceOrderChangedEvent;

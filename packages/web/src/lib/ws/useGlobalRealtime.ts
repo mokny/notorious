@@ -61,6 +61,9 @@ function handleChatMessage(
     case "userSettingsUpdated":
       queryClient.invalidateQueries({ queryKey: ["me"] });
       break;
+    case "workspaceOrderChanged":
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      break;
     case "chatTyping":
     case "callRing":
     case "callTaken":

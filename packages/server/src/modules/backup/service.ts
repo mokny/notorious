@@ -41,6 +41,7 @@ import { generateBackupKey, encryptBackup, decryptBackup, isEncryptedBackup } fr
 import { createDestinationClient, type BackupDestinationClient, type ResolvedDestinationConfig } from "./destinations/index.js";
 import { computeNextRunAt, currentWeekMonday } from "./scheduling.js";
 import { notifyUser } from "../push/service.js";
+import { nextMemberPosition } from "../workspaces/service.js";
 import { broadcastBackupFilesChanged, broadcastBackupScheduleChanged, sendToClient } from "../realtime/hub.js";
 
 const BACKUP_FORMAT_VERSION = 1;
@@ -139,7 +140,7 @@ export async function importWorkspace(ownerId: string, zipBuffer: Buffer, backup
     ownerId,
     createdAt,
   });
-  await db.insert(workspaceMembers).values({ workspaceId, userId: ownerId, role: "owner", joinedAt: createdAt });
+  await db.insert(workspaceMembers).values({ workspaceId, userId: ownerId, role: "owner", joinedAt: createdAt, position: await nextMemberPosition(ownerId) });
 
   const objectTypeIds = new Map<string, string>();
   for (const row of manifest.objectTypes) {

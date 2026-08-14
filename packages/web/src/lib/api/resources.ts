@@ -214,6 +214,8 @@ export const workspaceApi = {
   touchRecentlyViewed: (id: string, objectId: string) =>
     apiRequest<void>(`/api/v1/workspaces/${id}/recently-viewed`, { method: "POST", body: { objectId } }),
   lastVisited: () => apiRequest<{ workspaceId: string; objectId: string } | null>("/api/v1/workspaces/last-visited"),
+  reorder: (id: string, afterWorkspaceId: string | null) =>
+    apiRequest<void>(`/api/v1/workspaces/${id}/reorder`, { method: "POST", body: { afterWorkspaceId } }),
 };
 
 export const schemaApi = {

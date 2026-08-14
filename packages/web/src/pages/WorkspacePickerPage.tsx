@@ -1,9 +1,15 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type PointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { Workspace } from "@notorious/shared";
 import { workspaceApi } from "../lib/api/resources.js";
 import { useAuth } from "../context/AuthContext.js";
+import { useReorderWorkspaces } from "../hooks/useReorderWorkspaces.js";
+import { useDragSelectGuard } from "../hooks/useDragSelectGuard.js";
 import { Button } from "../components/ui/Button.js";
 import { TextField } from "../components/ui/TextField.js";
 import { Icon } from "../components/ui/Icon.js";
@@ -16,6 +22,21 @@ export function WorkspacePickerPage() {
   const [name, setName] = useState("");
 
   const { data: workspaces } = useQuery({ queryKey: ["workspaces"], queryFn: workspaceApi.list });
+  const workspaceIds = useMemo(() => workspaces?.map((workspace) => workspace.id) ?? [], [workspaces]);
+  const { reorder } = useReorderWorkspaces();
+  const dragSelectGuard = useDragSelectGuard();
+  // Same mouse-distance / touch-long-press split as WorkspaceRail.tsx - see
+  // that file's doc comment.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    dragSelectGuard.onDragEnd();
+    if (!event.over || event.active.id === event.over.id) return;
+    reorder(workspaceIds, String(event.active.id), String(event.over.id));
+  }
 
   const createWorkspace = useMutation({
     mutationFn: () => workspaceApi.create({ name: name || t("workspacePicker.untitledWorkspace"), icon: "sparkles" }),
@@ -44,16 +65,23 @@ export function WorkspacePickerPage() {
       <p className="mt-1 text-sm text-ink-muted">{t("workspacePicker.subtitle")}</p>
 
       <div className="mt-8 space-y-2">
-        {workspaces?.map((workspace) => (
-          <button
-            key={workspace.id}
-            onClick={() => openWorkspace(workspace.id)}
-            className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface-raised p-4 text-left transition hover:ring-2 hover:ring-accent/30"
-          >
-            <Icon name={workspace.icon} className="h-5 w-5 text-accent" />
-            <span className="font-medium">{workspace.name}</span>
-          </button>
-        ))}
+        <DndContext
+          sensors={sensors}
+          onDragStart={dragSelectGuard.onDragStart}
+          onDragCancel={dragSelectGuard.onDragCancel}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={workspaceIds} strategy={verticalListSortingStrategy}>
+            {workspaces?.map((workspace) => (
+              <PickerWorkspaceButton
+                key={workspace.id}
+                workspace={workspace}
+                onOpen={() => openWorkspace(workspace.id)}
+                onTouchArmStart={dragSelectGuard.onTouchArmStart}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
 
       <form onSubmit={handleCreate} className="mt-8 flex gap-2">
@@ -63,5 +91,31 @@ export function WorkspacePickerPage() {
         </Button>
       </form>
     </div>
+  );
+}
+
+interface PickerWorkspaceButtonProps {
+  workspace: Workspace;
+  onOpen: () => void;
+  onTouchArmStart: (event: PointerEvent) => void;
+}
+
+function PickerWorkspaceButton({ workspace, onOpen, onTouchArmStart }: PickerWorkspaceButtonProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: workspace.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onPointerDownCapture={onTouchArmStart}
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface-raised p-4 text-left transition hover:ring-2 hover:ring-accent/30"
+    >
+      <Icon name={workspace.icon} className="h-5 w-5 text-accent" />
+      <span className="font-medium">{workspace.name}</span>
+    </button>
   );
 }

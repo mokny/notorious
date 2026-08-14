@@ -6,11 +6,13 @@ import {
   updateMemberRoleSchema,
   pinObjectSchema,
   movePinSchema,
+  reorderWorkspaceSchema,
   touchRecentlyViewedSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess } from "./access.js";
 import { recordAndBroadcast } from "../realtime/activity.js";
+import { sendToUserGlobal } from "../realtime/hub.js";
 import { getObjectWorkspaceId } from "../objects/service.js";
 import { badRequest } from "../../lib/httpError.js";
 import * as workspaceService from "./service.js";
@@ -23,6 +25,23 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
   app.get("/api/v1/workspaces", async (request) => {
     const user = requireUser(request);
     return workspaceService.listWorkspacesForUser(user.id);
+  });
+
+  // Personal to the acting user - reorders their own workspace list (left
+  // rail + workspace picker), not something other members see or need edit
+  // rights to change, so "viewer" (mere membership) is enough. Broadcast is
+  // over the workspace-agnostic `/ws/chat` channel (see
+  // `WorkspaceOrderChangedEvent`'s doc comment), not `recordAndBroadcast` -
+  // this isn't workspace activity other members care about, and the acting
+  // user may be sitting on WorkspacePickerPage with no workspace room joined.
+  app.post("/api/v1/workspaces/:id/reorder", async (request, reply) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    await requireWorkspaceRole(id, user.id, "viewer");
+    const input = reorderWorkspaceSchema.parse(request.body);
+    await workspaceService.reorderWorkspace(user.id, id, input.afterWorkspaceId);
+    sendToUserGlobal(user.id, { type: "workspaceOrderChanged" });
+    reply.code(204);
   });
 
   app.post("/api/v1/workspaces", async (request, reply) => {
