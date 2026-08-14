@@ -152,21 +152,14 @@ body {
 }
 
 /* @mention pill - see MentionText.tsx (plain-string surfaces: comments, text
-   properties) and MentionHighlight.ts (the block editor's live ProseMirror
-   doc). Same tinted-accent convention as `.slash-item-active`/`.tpl-keyword`
-   above, just rounded-full like TagPicker.tsx's own pill styling. Purely
-   visual, no click action (see @mention feature's rationale doc comment on
+   properties) and MentionNode.ts (the block editor's real atomic ProseMirror
+   node - not a decoration, so this class comes straight from its renderHTML).
+   Same tinted-accent convention as `.slash-item-active`/`.tpl-keyword` above,
+   just rounded-full like TagPicker.tsx's own pill styling. Purely visual, no
+   click action (see @mention feature's rationale doc comment on
    `@notorious/shared`'s mentions.ts). */
 .mention-pill {
   @apply rounded-full bg-accent/10 px-1 py-0.5 font-medium text-accent;
-}
-
-/* The raw `@[Name|id]` text underneath a `.mention-pill` widget in the live
-   block editor (see MentionHighlight.ts) - kept in the doc (so the mention
-   stays part of the actual editable/saved text) but hidden from view, since
-   the widget right next to it is what's actually shown. */
-.mention-source {
-  display: none;
 }
 
 /* A native checkbox's default size (or the app's own previous h-4/w-4) is a

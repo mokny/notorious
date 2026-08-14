@@ -10,7 +10,7 @@ import { SlashCommand, slashCommandPluginKey } from "./SlashCommand.js";
 import { TemplateHighlight } from "./TemplateHighlight.js";
 import { TemplateSuggestion, templateSuggestionPluginKey } from "./TemplateSuggestion.js";
 import { Mention, mentionPluginKey } from "./Mention.js";
-import { MentionHighlight } from "./MentionHighlight.js";
+import { MentionNode } from "./MentionNode.js";
 import { SearchHighlight } from "./SearchHighlight.js";
 import { unescapeTemplateRegions } from "../../lib/templateMarkdown.js";
 import { externalLinkAttrs } from "../../lib/externalLink.js";
@@ -178,11 +178,12 @@ export function useMarkdownEditor(options: UseMarkdownEditorOptions) {
       ...(templateAware ? [TemplateHighlight, TemplateSuggestion.configure({ workspaceIdRef, objectIdRef, schemaRef: templateSchemaRef })] : []),
       // Unconditional (unlike the templateAware-gated pair above) - every
       // markdown field, not just template-aware ones, should offer @mention
-      // autocomplete and render already-saved mention syntax as a pill. Cheap
-      // no-op decoration-wise when the field's text has no `@[...](user:...)`
-      // - see MentionHighlight.ts.
+      // autocomplete (Mention.ts) over the real atomic mention node type
+      // (MentionNode.ts, needed in the schema regardless of whether this
+      // particular field's content has any mentions yet, same as any other
+      // node type).
+      MentionNode,
       Mention.configure({ workspaceIdRef }),
-      MentionHighlight,
       // Always included (cheap no-op when there are no active search terms) -
       // see SearchHighlight.ts's own doc comment for why it only ever tracks
       // *which words* to highlight, not which occurrence is "active".

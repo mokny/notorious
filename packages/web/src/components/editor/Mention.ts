@@ -2,7 +2,7 @@ import { Extension, type Editor, type Range } from "@tiptap/core";
 import Suggestion, { type SuggestionProps } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance as TippyInstance } from "tippy.js";
-import { formatMention, type WorkspaceMember } from "@notorious/shared";
+import type { WorkspaceMember } from "@notorious/shared";
 import { workspaceApi } from "../../lib/api/resources.js";
 import { popupPopperOptions } from "./popupPositioning.js";
 
@@ -41,8 +41,19 @@ function buildSuggestion(workspaceIdRef: { current: string }) {
     // `@[Name](user:id)` mention) simply won't have a whitespace/start-of-
     // block prefix, so it never matches at all.
     items: ({ query }: { query: string }) => (workspaceIdRef.current ? memberItems(workspaceIdRef.current, query) : []),
+    // Inserts the real atomic `mention` node (see MentionNode.ts), not raw
+    // `@[Name|id]` text - a trailing space keeps it visually separated from
+    // whatever's typed next, matching useMentionAutocomplete.ts's plain-text
+    // equivalent.
     command: ({ editor, range, props }: { editor: Editor; range: Range; props: WorkspaceMember }) => {
-      editor.chain().focus().insertContentAt(range, formatMention(props.user.name, props.userId)).run();
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(range, [
+          { type: "mention", attrs: { userId: props.userId, name: props.user.name } },
+          { type: "text", text: " " },
+        ])
+        .run();
     },
     render: () => {
       // Same zero-length-range clientRect fallback as TemplateSuggestion.ts -

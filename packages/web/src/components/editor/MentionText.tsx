@@ -2,14 +2,14 @@ import { Fragment } from "react";
 import { MENTION_PATTERN } from "@notorious/shared";
 
 /**
- * Renders a plain string with any `@[Name](user:id)` mention syntax (see
+ * Renders a plain string with any `@[Name|id]` mention syntax (see
  * `@notorious/shared`'s mentions.ts) shown as a visual "pill" instead of the
  * raw bracket syntax - everything else is preserved as plain text, including
  * whitespace (the caller wraps this in its own `whitespace-pre-wrap`, same as
  * before this component existed). For plain-string surfaces only (comment
  * bodies, text property values) - the live block editor's ProseMirror doc
- * uses MentionHighlight.ts instead, since that's real parsed doc content by
- * render time, not a raw string to regex-split.
+ * uses MentionNode.ts instead, a real atomic node rather than raw text to
+ * regex-split.
  */
 export function MentionText({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
