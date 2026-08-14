@@ -12,6 +12,7 @@
     "settingsLabel": "Settings",
     "switchWorkspace": "Switch workspace",
     "accountSettings": "Account settings",
+    "serverAdmin": "Server administration",
     "workspaceSettings": "Workspace settings",
     "logOut": "Log out",
     "logOutConfirmTitle": "Log out?",
@@ -1058,6 +1059,77 @@
       "retry": "Retry",
       "close": "Close",
       "genericError": "Something went wrong."
+    }
+  },
+  "admin": {
+    "title": "Server administration",
+    "cancel": "Cancel",
+    "done": "Done",
+    "tabs": {
+      "settings": "Settings",
+      "users": "Users",
+      "update": "Update",
+      "auditLog": "Audit log"
+    },
+    "settings": {
+      "registration": {
+        "label": "Allow self-registration",
+        "description": "Anyone can create an account without an invite."
+      },
+      "require2fa": {
+        "label": "Require two-factor authentication",
+        "description": "Every account must set up 2FA before using the app."
+      },
+      "templateHttp": {
+        "label": "Allow template HTTP requests",
+        "description": "Lets templates call the http.*() builtin to reach external URLs."
+      },
+      "calls": {
+        "label": "Enable audio/video calls",
+        "description": "Requires a reachable public IP/domain and one forwarded TCP port.",
+        "reconfigure": "Reconfigure calls network settings",
+        "setupTitle": "Calls setup",
+        "setupDescription": "Detects this server’s public IP, writes it to .env, and restarts the server to apply it.",
+        "ipLabel": "Domain or public IP this server is reachable at",
+        "portLabel": "TCP port for call media",
+        "portForwardHint": "Forward this one port ({{port}}) to this machine on your router - no range, no UDP.",
+        "enableAndRestart": "Enable calls and restart",
+        "restarting": "Restarting the server…",
+        "restartingHint": "This page will keep working once the server is back - no action needed."
+      }
+    },
+    "users": {
+      "createButton": "New user",
+      "you": "(you)",
+      "adminBadge": "Admin",
+      "promote": "Make admin",
+      "demote": "Remove admin",
+      "delete": "Delete",
+      "createTitle": "Create a new user",
+      "nameLabel": "Full name",
+      "emailLabel": "Email",
+      "createHint": "A random initial password will be generated - share it with the new user yourself.",
+      "createdTitle": "User created",
+      "createdHint": "{{email}} has been created. Copy their initial password now - it won’t be shown again.",
+      "copyPassword": "Copy",
+      "deleteTitle": "Delete {{email}}?",
+      "deleteButton": "Delete user",
+      "ownsNoWorkspaces": "Owns no workspaces.",
+      "ownedWorkspacesWarning": "Owns {{count}} workspace(s), which will be deleted ENTIRELY, including for any other members:",
+      "workspaceSummary": "\"{{name}}\": {{members}} member(s), {{objects}} object(s)",
+      "reattributedHint": "{{count}} item(s) created in other workspaces will be kept, reattributed to \"Deleted User\".",
+      "confirmTypeEmail": "Type {{email}} to confirm"
+    },
+    "update": {
+      "currentVersion": "Current version: {{version}}",
+      "available": "Update available: v{{version}}",
+      "upToDate": "Up to date.",
+      "updateButton": "Update now",
+      "waitingForRestart": "Waiting for the server to come back online…",
+      "backOnline": "Server is back online."
+    },
+    "auditLog": {
+      "empty": "No admin actions logged yet."
     }
   }
 }

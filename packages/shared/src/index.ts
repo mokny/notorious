@@ -38,6 +38,7 @@ export * from "./schemas/chat.js";
 export * from "./schemas/calls.js";
 export * from "./schemas/webauthn.js";
 export * from "./schemas/feed.js";
+export * from "./schemas/admin.js";
 
 export * from "./templates/lexer.js";
 export * from "./templates/parser.js";

@@ -27,6 +27,8 @@ export interface User {
   /** Content-area (block editor + views) font-size scale as a percent (80-150, default 100), applied depending on the current viewport - see web's `useBreakpoint` (phone -> mobile, tablet/desktop -> desktop). */
   contentFontSizeMobile: number;
   contentFontSizeDesktop: number;
+  /** Instance-wide admin role (see modules/admin/) - not a workspace role. Gates the /admin UI and every server-admin endpoint. The first-ever registered account gets this automatically. */
+  isServerAdmin: boolean;
 }
 
 /**

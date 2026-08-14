@@ -19,6 +19,11 @@ import { ObjectTypePage } from "./pages/ObjectTypePage.js";
 import { ObjectDetailPage } from "./pages/ObjectDetailPage.js";
 import { SearchPage } from "./pages/SearchPage.js";
 import { AccountSettingsPage } from "./pages/AccountSettingsPage.js";
+import { AdminPage } from "./pages/AdminPage.js";
+import { AdminSettingsTab } from "./components/admin/AdminSettingsTab.js";
+import { AdminUsersTab } from "./components/admin/AdminUsersTab.js";
+import { AdminUpdateTab } from "./components/admin/AdminUpdateTab.js";
+import { AdminAuditLogTab } from "./components/admin/AdminAuditLogTab.js";
 import { WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage.js";
 import { SharePage, SharedIndexRoute, SharedObjectRoute } from "./pages/SharePage.js";
 import { ProfileSettings } from "./components/settings/ProfileSettings.js";
@@ -143,6 +148,20 @@ function AppRoutes() {
         <Route path="notifications" element={<NotificationSettingsTab />} />
         <Route path="api-keys" element={<ApiKeysSettingsTab />} />
         <Route path="integrations" element={<IntegrationsSettings />} />
+      </Route>
+      <Route
+        path="/admin"
+        element={
+          <RequireAuth>
+            <AdminPage />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Navigate to="settings" replace />} />
+        <Route path="settings" element={<AdminSettingsTab />} />
+        <Route path="users" element={<AdminUsersTab />} />
+        <Route path="update" element={<AdminUpdateTab />} />
+        <Route path="audit-log" element={<AdminAuditLogTab />} />
       </Route>
       <Route
         path="/messages"

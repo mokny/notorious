@@ -31,6 +31,12 @@ export const users = sqliteTable("users", {
   // viewports (see hooks/useBreakpoint.ts and lib/contentFontScale.ts).
   contentFontSizeMobile: integer("content_font_size_mobile").notNull().default(100),
   contentFontSizeDesktop: integer("content_font_size_desktop").notNull().default(100),
+  // Instance-wide admin role (see modules/admin/) - a single boolean, not a
+  // multi-level role, since instance administration is all-or-nothing. The
+  // first-ever registered account gets this automatically (see
+  // modules/auth/service.ts's `registerUser`); scripts/makeAdmin.ts and the
+  // admin UI itself are the other two ways to grant/revoke it.
+  isServerAdmin: integer("is_server_admin", { mode: "boolean" }).notNull().default(false),
 });
 
 export const sessions = sqliteTable("sessions", {
@@ -590,6 +596,20 @@ export const instanceSettings = sqliteTable("instance_settings", {
   // that port forwarded. See scripts/setupCalls.ts, which flips this on only
   // after that's confirmed.
   callsEnabled: integer("calls_enabled", { mode: "boolean" }).notNull().default(false),
+});
+
+// Append-only log of security-relevant admin actions - see modules/admin/service.ts's
+// `logAdminAction`. `actorName` is denormalized (same reasoning as activityLog/blockHistory)
+// so an entry still reads correctly after the acting admin's account is later deleted.
+export const adminAuditLog = sqliteTable("admin_audit_log", {
+  id: text("id").primaryKey(),
+  actorId: text("actor_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  actorName: text("actor_name").notNull(),
+  action: text("action").notNull(),
+  summary: text("summary").notNull(),
+  createdAt: text("created_at").notNull(),
 });
 
 export const pushSubscriptions = sqliteTable("push_subscriptions", {

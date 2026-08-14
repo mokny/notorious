@@ -27,6 +27,7 @@ async function toUser(row: typeof users.$inferSelect): Promise<User> {
     locale: row.locale,
     contentFontSizeMobile: row.contentFontSizeMobile,
     contentFontSizeDesktop: row.contentFontSizeDesktop,
+    isServerAdmin: row.isServerAdmin,
   };
 }
 
@@ -48,8 +49,9 @@ export async function registerUser(input: RegisterInput): Promise<User> {
   const id = newId();
   const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)] ?? "#6366f1";
   const createdAt = nowIso();
+  const isServerAdmin = await isFirstUser();
 
-  await db.insert(users).values({ id, email: input.email, passwordHash, name: input.name, avatarColor, createdAt });
+  await db.insert(users).values({ id, email: input.email, passwordHash, name: input.name, avatarColor, createdAt, isServerAdmin });
   await createWorkspace(id, { name: `${input.name}'s Workspace`, icon: "sparkles" });
   await redeemPendingInvites(id, input.email);
 
@@ -67,7 +69,14 @@ export async function registerUser(input: RegisterInput): Promise<User> {
     locale: null,
     contentFontSizeMobile: 100,
     contentFontSizeDesktop: 100,
+    isServerAdmin,
   };
+}
+
+/** Whether no account exists yet - the very next registration (via any path: UI, CLI create-user, or passkey signup) becomes the instance's first server admin automatically, see modules/admin/'s doc comment. */
+async function isFirstUser(): Promise<boolean> {
+  const rows = await db.select({ id: users.id }).from(users).limit(1);
+  return rows.length === 0;
 }
 
 /**
@@ -90,8 +99,9 @@ export async function registerUserWithPasskey(
   const id = newId();
   const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)] ?? "#6366f1";
   const createdAt = nowIso();
+  const isServerAdmin = await isFirstUser();
 
-  await db.insert(users).values({ id, email, passwordHash: null, name, avatarColor, createdAt });
+  await db.insert(users).values({ id, email, passwordHash: null, name, avatarColor, createdAt, isServerAdmin });
   await db.insert(webauthnCredentials).values({
     id: newId(),
     userId: id,
@@ -120,6 +130,7 @@ export async function registerUserWithPasskey(
     locale: null,
     contentFontSizeMobile: 100,
     contentFontSizeDesktop: 100,
+    isServerAdmin,
   };
 }
 

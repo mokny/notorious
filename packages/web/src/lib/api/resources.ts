@@ -115,6 +115,9 @@ import type {
   ConsumerInfo,
   MediaKind,
   ProducerSource,
+  AdminCreateUserInput,
+  AdminUpdateSettingsInput,
+  AdminCallsSetupInput,
 } from "@notorious/shared";
 import type {
   PublicKeyCredentialCreationOptionsJSON,
@@ -578,6 +581,96 @@ export const systemApi = {
   twoFactorRequired: () => apiRequest<{ required: boolean }>("/api/v1/system/2fa-required"),
   callsStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/calls-status"),
   passkeysStatus: () => apiRequest<{ enabled: boolean }>("/api/v1/system/passkeys-status"),
+};
+
+export interface AdminSettings {
+  registrationEnabled: boolean;
+  require2faEnabled: boolean;
+  allowTemplateHttpRequests: boolean;
+  callsEnabled: boolean;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+  isServerAdmin: boolean;
+}
+
+export interface AdminUserDeletionPreview {
+  user: { id: string; email: string; name: string };
+  ownedWorkspaces: { id: string; name: string; memberCount: number; objectCount: number }[];
+  reattributedItemCount: number;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  summary: string;
+  createdAt: string;
+}
+
+export interface AdminVersionCheck {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+}
+
+export const adminApi = {
+  getSettings: () => apiRequest<AdminSettings>("/api/v1/admin/settings"),
+  updateSettings: (input: AdminUpdateSettingsInput) => apiRequest<AdminSettings>("/api/v1/admin/settings", { method: "PATCH", body: input }),
+
+  listUsers: () => apiRequest<AdminUser[]>("/api/v1/admin/users"),
+  createUser: (input: AdminCreateUserInput) => apiRequest<{ user: AdminUser; password: string }>("/api/v1/admin/users", { method: "POST", body: input }),
+  promoteUser: (id: string) => apiRequest<AdminUser>(`/api/v1/admin/users/${id}/promote`, { method: "POST" }),
+  demoteUser: (id: string) => apiRequest<AdminUser>(`/api/v1/admin/users/${id}/demote`, { method: "POST" }),
+  deletionPreview: (id: string) => apiRequest<AdminUserDeletionPreview>(`/api/v1/admin/users/${id}/delete-preview`),
+  deleteUser: (id: string) => apiRequest<void>(`/api/v1/admin/users/${id}`, { method: "DELETE" }),
+
+  auditLog: () => apiRequest<AdminAuditEntry[]>("/api/v1/admin/audit-log"),
+
+  versionCheck: () => apiRequest<AdminVersionCheck>("/api/v1/admin/version-check"),
+  /**
+   * Streams `POST /api/v1/admin/update`'s output live - uses `fetch` +
+   * a manual reader rather than `EventSource` (which can only issue GET
+   * requests, and this needs a POST to actually trigger the update) - see
+   * AdminUpdateTab.tsx. `onLine` fires once per emitted line, `onDone` once
+   * the update script exits or the connection otherwise closes (including
+   * because the server process itself just got restarted mid-stream).
+   */
+  async streamUpdate(onLine: (line: string) => void, onDone: () => void): Promise<void> {
+    const response = await fetch("/api/v1/admin/update", { method: "POST", credentials: "include" });
+    const reader = response.body?.getReader();
+    if (!reader) {
+      onDone();
+      return;
+    }
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const event of events) {
+          if (event.startsWith("event: done")) continue;
+          const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+          if (dataLine) onLine(JSON.parse(dataLine.slice("data: ".length)) as string);
+        }
+      }
+    } finally {
+      onDone();
+    }
+  },
+
+  detectPublicIp: () => apiRequest<{ ip: string | null }>("/api/v1/admin/detect-public-ip"),
+  callsSetup: (input: AdminCallsSetupInput) => apiRequest<{ restarting: true }>("/api/v1/admin/calls-setup", { method: "POST", body: input }),
+  restart: () => apiRequest<{ restarting: true }>("/api/v1/admin/restart", { method: "POST" }),
 };
 
 export const presenceApi = {

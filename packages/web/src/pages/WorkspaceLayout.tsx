@@ -323,6 +323,16 @@ function WorkspaceLayoutInner() {
                       navigate("/settings");
                     }}
                   />
+                  {user?.isServerAdmin && (
+                    <IOSMenuItem
+                      icon="shield"
+                      label={t("nav.serverAdmin")}
+                      onClick={() => {
+                        setAvatarMenuOpen(false);
+                        navigate("/admin");
+                      }}
+                    />
+                  )}
                   <IOSMenuItem
                     icon="close"
                     label={t("nav.logOut")}

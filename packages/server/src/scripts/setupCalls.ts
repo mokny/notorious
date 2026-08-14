@@ -9,51 +9,13 @@
  * Usage:
  *   npm run setup-calls --workspace=packages/server
  */
-import fs from "node:fs";
 import readline from "node:readline/promises";
 import { setCallsEnabled } from "../modules/instanceSettings/service.js";
 import { sqlite } from "../db/client.js";
-import { envFilePath } from "../env.js";
+import { detectPublicIp } from "../lib/publicIp.js";
+import { upsertEnvVars } from "../lib/envFile.js";
 
 const DEFAULT_MEDIA_PORT = 4001;
-const IP_LOOKUP_TIMEOUT_MS = 5000;
-
-async function detectPublicIp(): Promise<string | null> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), IP_LOOKUP_TIMEOUT_MS);
-    const response = await fetch("https://api.ipify.org", { signal: controller.signal });
-    clearTimeout(timeout);
-    if (!response.ok) return null;
-    return (await response.text()).trim();
-  } catch {
-    return null;
-  }
-}
-
-/** Read-modify-write `.env`, preserving every existing line/comment/ordering - only touches the keys we're upserting. */
-function upsertEnvVars(values: Record<string, string>): void {
-  const existing = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, "utf8") : "";
-  const lines = existing.length > 0 ? existing.split("\n") : [];
-  const remainingKeys = new Set(Object.keys(values));
-
-  const updatedLines = lines.map((line) => {
-    const match = /^([A-Z0-9_]+)=/.exec(line);
-    if (!match) return line;
-    const key = match[1]!;
-    if (!remainingKeys.has(key)) return line;
-    remainingKeys.delete(key);
-    return `${key}=${values[key]}`;
-  });
-
-  if (remainingKeys.size > 0) {
-    if (updatedLines.length > 0 && updatedLines[updatedLines.length - 1] !== "") updatedLines.push("");
-    updatedLines.push("# Added by `npm run setup-calls` - see docs/DEPLOYMENT.md");
-    for (const key of remainingKeys) updatedLines.push(`${key}=${values[key]}`);
-  }
-
-  fs.writeFileSync(envFilePath, updatedLines.join("\n"));
-}
 
 async function main(): Promise<void> {
   console.warn("=== Notorious calls setup ===\n");
