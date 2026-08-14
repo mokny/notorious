@@ -31,7 +31,7 @@ const ChatRealtimeContext = createContext<ChatRealtimeContextValue | null>(null)
  */
 export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const realtime = useGlobalRealtime(Boolean(user));
+  const realtime = useGlobalRealtime(Boolean(user), user ? { id: user.id, chatStatus: user.chatStatus } : null);
 
   const { data: conversations } = useQuery({
     queryKey: ["chatConversations"],

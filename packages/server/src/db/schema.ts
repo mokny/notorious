@@ -37,6 +37,12 @@ export const users = sqliteTable("users", {
   // modules/auth/service.ts's `registerUser`); scripts/makeAdmin.ts and the
   // admin UI itself are the other two ways to grant/revoke it.
   isServerAdmin: integer("is_server_admin", { mode: "boolean" }).notNull().default(false),
+  // Manually-set chat availability ("traffic light") - green (default) behaves
+  // normally, yellow silences the client-side new-message sound only, red
+  // additionally suppresses chat push and call push/live-ring. See
+  // modules/chat/service.ts and modules/calls/service.ts for where each is
+  // enforced, and hooks/useChatSound.ts on the client.
+  chatStatus: text("chat_status").notNull().default("green").$type<"green" | "yellow" | "red">(),
 });
 
 export const sessions = sqliteTable("sessions", {

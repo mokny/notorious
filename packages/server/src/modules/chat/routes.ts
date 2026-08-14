@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import type { FastifyInstance } from "fastify";
-import { createChannelSchema, renameChannelSchema, createDmSchema, sendMessageSchema, reactSchema, markReadSchema } from "@notorious/shared";
+import { createChannelSchema, renameChannelSchema, createDmSchema, sendMessageSchema, reactSchema, markReadSchema, updateChatStatusSchema } from "@notorious/shared";
 import { requireUser } from "../../plugins/session.js";
 import { requireWorkspaceRole } from "../workspaces/access.js";
 import { requireConversationAccess, requireChannelManageAccess } from "./access.js";
@@ -15,6 +15,13 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/chat/conversations", async (request) => {
     const user = requireUser(request);
     return chatService.listUnifiedConversations(user.id);
+  });
+
+  app.patch("/api/v1/chat/status", async (request, reply) => {
+    const user = requireUser(request);
+    const input = updateChatStatusSchema.parse(request.body);
+    await chatService.updateChatStatus(user.id, input.status);
+    reply.code(204);
   });
 
   app.post("/api/v1/workspaces/:workspaceId/chat/channels", async (request, reply) => {

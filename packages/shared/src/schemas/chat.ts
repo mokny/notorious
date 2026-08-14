@@ -28,6 +28,11 @@ export const reactSchema = z.object({
 });
 export type ReactInput = z.infer<typeof reactSchema>;
 
+export const updateChatStatusSchema = z.object({
+  status: z.enum(["green", "yellow", "red"]),
+});
+export type UpdateChatStatusInput = z.infer<typeof updateChatStatusSchema>;
+
 export const markReadSchema = z.object({
   upToMessageId: z.string(),
 });

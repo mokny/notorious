@@ -135,6 +135,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       contentFontSizeMobile: users.contentFontSizeMobile,
       contentFontSizeDesktop: users.contentFontSizeDesktop,
       isServerAdmin: users.isServerAdmin,
+      chatStatus: users.chatStatus,
     })
     .from(workspaceMembers)
     .innerJoin(users, eq(workspaceMembers.userId, users.id))
@@ -168,6 +169,7 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
       contentFontSizeMobile: row.contentFontSizeMobile,
       contentFontSizeDesktop: row.contentFontSizeDesktop,
       isServerAdmin: row.isServerAdmin,
+      chatStatus: row.chatStatus,
     },
   }));
 }

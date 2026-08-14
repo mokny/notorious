@@ -11,3 +11,8 @@ export function isStandalone(): boolean {
     (navigator as unknown as { standalone?: boolean }).standalone === true
   );
 }
+
+/** True when the User-Agent isn't a mobile OS (iOS/Android) - regardless of whether this is a plain browser tab or an installed PWA. Used to gate desktop-only UI like the chat new-message sound (see hooks/useChatSound.ts). */
+export function isDesktop(): boolean {
+  return !/iphone|ipad|ipod|android/i.test(navigator.userAgent) && !(navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}

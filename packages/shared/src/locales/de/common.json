@@ -16,6 +16,11 @@
     "logOut": "Abmelden",
     "logOutConfirmTitle": "Abmelden?",
     "logOutConfirmDescription": "Du wirst auf diesem Gerät abgemeldet.",
+    "chatStatus": {
+      "green": "Erreichbar",
+      "yellow": "Abwesend (Nachrichtenton stumm)",
+      "red": "Nicht stören (Chat + Anrufe stumm)"
+    },
     "toggleTheme": "Design umschalten",
     "openMenu": "Menü öffnen",
     "loading": "Lädt…",
@@ -829,6 +834,8 @@
       "title": "Chats",
       "channels": "Kanäle",
       "newChat": "Neuer Chat",
+      "muteSound": "Nachrichtenton stummschalten",
+      "unmuteSound": "Nachrichtenton aktivieren",
       "loading": "Lädt…",
       "empty": "Noch keine Unterhaltungen.",
       "messageDeleted": "Nachricht gelöscht",

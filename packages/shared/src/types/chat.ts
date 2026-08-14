@@ -1,4 +1,4 @@
-import type { ISODateString } from "./entities.js";
+import type { ISODateString, ChatStatus } from "./entities.js";
 import type { CallSummary } from "./calls.js";
 
 /** A minimal, denormalized participant summary - enough to render an avatar/name without a separate lookup. */
@@ -7,6 +7,7 @@ export interface ConversationParticipantSummary {
   name: string;
   avatarColor: string;
   avatarUrl?: string | null;
+  chatStatus: ChatStatus;
 }
 
 /**

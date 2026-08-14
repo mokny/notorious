@@ -91,6 +91,7 @@ export async function listUnifiedConversations(userId: string): Promise<Conversa
       name: users.name,
       avatarColor: users.avatarColor,
       avatarUrl: users.avatarUrl,
+      chatStatus: users.chatStatus,
     })
     .from(conversationParticipants)
     .innerJoin(users, eq(conversationParticipants.userId, users.id))
@@ -100,7 +101,7 @@ export async function listUnifiedConversations(userId: string): Promise<Conversa
   for (const row of allParticipantRows) {
     if (row.userId === userId) continue;
     const list = otherParticipantsByConversation.get(row.conversationId) ?? [];
-    list.push({ userId: row.userId, name: row.name, avatarColor: row.avatarColor, avatarUrl: row.avatarUrl });
+    list.push({ userId: row.userId, name: row.name, avatarColor: row.avatarColor, avatarUrl: row.avatarUrl, chatStatus: row.chatStatus });
     otherParticipantsByConversation.set(row.conversationId, list);
   }
 
@@ -465,7 +466,9 @@ async function notifyNewMessage(conversationId: string, message: Message, sender
       const unreadConversationCount = await countUnreadConversations(userId);
       sendToUserGlobal(userId, { type: "chatUnreadCount", unreadConversationCount });
       if (isFocused(userId, conversationId)) return;
-      const [recipient] = await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId)).limit(1);
+      const [recipient] = await db.select({ locale: users.locale, chatStatus: users.chatStatus }).from(users).where(eq(users.id, userId)).limit(1);
+      // "Red" chat status = full do-not-disturb, suppress chat push entirely (see ChatStatus's doc comment). Yellow only silences the client-side sound, push still goes out.
+      if (recipient?.chatStatus === "red") return;
       await notifyUser(userId, {
         type: "chat-message",
         title: senderName,
@@ -593,6 +596,29 @@ export async function getParticipantUserIds(conversationId: string): Promise<str
     .from(conversationParticipants)
     .where(eq(conversationParticipants.conversationId, conversationId));
   return rows.map((r) => r.userId);
+}
+
+/** Every other user `userId` shares at least one conversation with - the audience for a `userStatusChanged` broadcast (see `updateChatStatus`), since there's no other notion of "who might see my avatar" for a workspace-agnostic chat status. */
+export async function getChatContactUserIds(userId: string): Promise<string[]> {
+  const ownConversationRows = await db
+    .select({ conversationId: conversationParticipants.conversationId })
+    .from(conversationParticipants)
+    .where(eq(conversationParticipants.userId, userId));
+  const conversationIds = ownConversationRows.map((r) => r.conversationId);
+  if (conversationIds.length === 0) return [];
+
+  const rows = await db
+    .select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(inArray(conversationParticipants.conversationId, conversationIds));
+  return [...new Set(rows.map((r) => r.userId).filter((id) => id !== userId))];
+}
+
+/** Persists the caller's chat status and broadcasts `userStatusChanged` to their own other devices plus every chat contact (see `getChatContactUserIds`), so any already-rendered status dot updates live. */
+export async function updateChatStatus(userId: string, status: "green" | "yellow" | "red"): Promise<void> {
+  await db.update(users).set({ chatStatus: status }).where(eq(users.id, userId));
+  const contactIds = await getChatContactUserIds(userId);
+  for (const id of [userId, ...contactIds]) sendToUserGlobal(id, { type: "userStatusChanged", userId, status });
 }
 
 export async function getMessageConversationId(messageId: string): Promise<string> {

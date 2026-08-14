@@ -1,5 +1,6 @@
 import type {
   User,
+  ChatStatus,
   Session,
   Workspace,
   WorkspaceMember,
@@ -412,6 +413,7 @@ export const chatApi = {
   },
   attachmentUrl: (id: string) => `/api/v1/chat/attachments/${id}`,
   search: (q: string, limit?: number) => apiRequest<MessageSearchResult[]>("/api/v1/chat/search", { query: { q, limit } }),
+  updateStatus: (status: ChatStatus) => apiRequest<void>("/api/v1/chat/status", { method: "PATCH", body: { status } }),
 };
 
 export const callApi = {

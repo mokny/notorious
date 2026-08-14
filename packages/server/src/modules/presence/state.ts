@@ -1,4 +1,4 @@
-import type { PresenceViewer } from "@notorious/shared";
+import type { PresenceViewer, ChatStatus } from "@notorious/shared";
 import { applyCollisionSuffixes, avatarLetterFor, composeAnonDisplayName } from "./naming.js";
 
 interface ObjectPresenceEntry {
@@ -9,6 +9,8 @@ interface ObjectPresenceEntry {
   name: string;
   avatarColor?: string;
   avatarUrl?: string | null;
+  /** Real members only - snapshotted at the last heartbeat, same staleness caveat as avatarColor/avatarUrl above. */
+  chatStatus?: ChatStatus;
   /**
    * tabId -> last heartbeat epoch ms. A single identity can have several
    * open tabs on the same object; they collapse into one avatar (see
@@ -47,6 +49,7 @@ export interface TouchIdentity {
   name: string;
   avatarColor?: string;
   avatarUrl?: string | null;
+  chatStatus?: ChatStatus;
 }
 
 /** Registers (or refreshes) one tab's presence on an object. */
@@ -66,6 +69,7 @@ export function touch(objectId: string, workspaceId: string, identityKey: string
       name: identity.name,
       avatarColor: identity.avatarColor,
       avatarUrl: identity.avatarUrl,
+      chatStatus: identity.chatStatus,
       tabs: new Map(),
     };
     room.viewers.set(identityKey, entry);
@@ -78,6 +82,7 @@ export function touch(objectId: string, workspaceId: string, identityKey: string
     entry.name = identity.name;
     entry.avatarColor = identity.avatarColor;
     entry.avatarUrl = identity.avatarUrl;
+    entry.chatStatus = identity.chatStatus;
   }
   entry.tabs.set(tabId, now);
 }
@@ -131,5 +136,6 @@ export function computeSnapshot(objectId: string): PresenceViewer[] {
     avatarColor: entry.avatarColor,
     avatarLetter: avatarLetterFor(entry.name),
     avatarUrl: entry.avatarUrl,
+    chatStatus: entry.chatStatus,
   }));
 }

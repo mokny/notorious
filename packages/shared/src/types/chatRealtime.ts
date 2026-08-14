@@ -1,5 +1,6 @@
 import type { Message, MessageReaction, ReadReceipt } from "./chat.js";
 import type { MediaKind, ProducerSource } from "./media.js";
+import type { ChatStatus } from "./entities.js";
 
 /**
  * All chat WebSocket payloads share the workspace-agnostic `/ws/chat`
@@ -151,6 +152,13 @@ export interface UserSettingsUpdatedEvent {
   type: "userSettingsUpdated";
 }
 
+/** Sent to a user's own other devices plus every one of their chat contacts (see modules/chat/service.ts's `getChatContactUserIds`) when they change their chat status in the sidebar avatar menu - lets any already-rendered `ChatAvatar`/`PresenceViewer` status dot update live instead of waiting for a refetch. */
+export interface UserStatusChangedEvent {
+  type: "userStatusChanged";
+  userId: string;
+  status: ChatStatus;
+}
+
 export type ChatRealtimeMessage =
   | ChatMessageEvent
   | ChatMessageDeletedEvent
@@ -166,4 +174,5 @@ export type ChatRealtimeMessage =
   | CallMediaProducerClosedEvent
   | CallEndedEvent
   | SessionRevokedEvent
-  | UserSettingsUpdatedEvent;
+  | UserSettingsUpdatedEvent
+  | UserStatusChangedEvent;

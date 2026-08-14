@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN chat_status TEXT NOT NULL DEFAULT 'green';

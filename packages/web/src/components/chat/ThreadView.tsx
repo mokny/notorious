@@ -347,7 +347,15 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
             <Icon name={conversation.workspaceIcon ?? "sparkles"} className="h-4 w-4 text-ink-muted" />
           </span>
         ) : (
-          otherParticipant && <ChatAvatar name={otherParticipant.name} avatarColor={otherParticipant.avatarColor} avatarUrl={otherParticipant.avatarUrl} size={7} />
+          otherParticipant && (
+            <ChatAvatar
+              name={otherParticipant.name}
+              avatarColor={otherParticipant.avatarColor}
+              avatarUrl={otherParticipant.avatarUrl}
+              chatStatus={otherParticipant.chatStatus}
+              size={7}
+            />
+          )
         )}
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {conversation ? (conversation.type === "workspace_channel" ? `# ${conversation.name}` : conversation.name) : t("chat.thread.chatFallback")}

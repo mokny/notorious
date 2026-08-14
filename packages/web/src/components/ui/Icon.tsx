@@ -92,6 +92,9 @@ import {
   CornerUpLeft,
   Rss,
   AlertTriangle,
+  Volume2,
+  VolumeX,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 
@@ -174,6 +177,9 @@ const ICONS: Record<string, LucideIcon> = {
   send: Send,
   smile: Smile,
   hash: Hash,
+  volume: Volume2,
+  "volume-off": VolumeX,
+  check: Check,
   mic: Mic,
   "mic-off": MicOff,
   video: Video,

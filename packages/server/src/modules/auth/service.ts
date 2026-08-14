@@ -28,6 +28,7 @@ async function toUser(row: typeof users.$inferSelect): Promise<User> {
     contentFontSizeMobile: row.contentFontSizeMobile,
     contentFontSizeDesktop: row.contentFontSizeDesktop,
     isServerAdmin: row.isServerAdmin,
+    chatStatus: row.chatStatus,
   };
 }
 
@@ -70,6 +71,7 @@ export async function registerUser(input: RegisterInput): Promise<User> {
     contentFontSizeMobile: 100,
     contentFontSizeDesktop: 100,
     isServerAdmin,
+    chatStatus: "green",
   };
 }
 
@@ -131,6 +133,7 @@ export async function registerUserWithPasskey(
     contentFontSizeMobile: 100,
     contentFontSizeDesktop: 100,
     isServerAdmin,
+    chatStatus: "green",
   };
 }
 

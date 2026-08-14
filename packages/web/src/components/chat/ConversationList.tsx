@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import type { ConversationSummary } from "@notorious/shared";
+import type { ConversationSummary, ChatStatus } from "@notorious/shared";
 import { chatApi, aiApi } from "../../lib/api/resources.js";
 import { useConfirm } from "../../context/ConfirmContext.js";
 import { ChatAvatar } from "./ChatAvatar.js";
 import { toAiConversationId } from "./aiConversation.js";
 import { Icon } from "../ui/Icon.js";
+import { useChatSound } from "../../hooks/useChatSound.js";
 
 /**
  * ConversationList is mounted once in App.tsx above the route tree (see
@@ -20,10 +21,13 @@ function useCurrentWorkspaceId(): string | null {
   return location.pathname.match(/^\/w\/([^/]+)/)?.[1] ?? null;
 }
 
-function conversationInitial(conversation: ConversationSummary): { name: string; color: string; url: string | null } {
+function conversationInitial(conversation: ConversationSummary): { name: string; color: string; url: string | null; status?: ChatStatus } {
   if (conversation.type === "workspace_channel") return { name: conversation.name, color: "#6366f1", url: null };
   const first = conversation.otherParticipants[0];
-  return { name: conversation.name, color: first?.avatarColor ?? "#6366f1", url: first?.avatarUrl ?? null };
+  // Only a real 1:1 DM has an unambiguous "this avatar's status" - a group DM shows the first
+  // participant's avatar as a stand-in, and their status alone would misleadingly imply the group's.
+  const status = conversation.otherParticipants.length === 1 ? first?.chatStatus : undefined;
+  return { name: conversation.name, color: first?.avatarColor ?? "#6366f1", url: first?.avatarUrl ?? null, status };
 }
 
 /**
@@ -36,6 +40,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
   const { t } = useTranslation();
   const { data: conversations, isLoading } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
   const currentWorkspaceId = useCurrentWorkspaceId();
+  const { muted, setMuted } = useChatSound();
   // Pinned "Notorious AI" row for the active workspace, if it has AI
   // configured - see modules/ai/service.ts's listAiConfiguredWorkspacesForUser.
   // Not part of the real conversations list above (different backend
@@ -79,6 +84,13 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <span className="text-sm font-semibold text-ink">{t("chat.conversationList.title")}</span>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setMuted(!muted)}
+            className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink"
+            title={muted ? t("chat.conversationList.unmuteSound") : t("chat.conversationList.muteSound")}
+          >
+            <Icon name={muted ? "volume-off" : "volume"} className="h-4 w-4" />
+          </button>
           <button onClick={onNewChannel} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title={t("chat.conversationList.channels")}>
             <Icon name="hash" className="h-4 w-4" />
           </button>
@@ -118,7 +130,7 @@ export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSele
             return (
               <li key={conversation.id} className="relative flex items-center">
                 <button onClick={() => onSelect(conversation.id)} className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-3 text-left hover:bg-surface">
-                  <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} size={11} />
+                  <ChatAvatar name={avatar.name} avatarColor={avatar.color} avatarUrl={avatar.url} chatStatus={avatar.status} size={11} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-base font-medium text-ink">

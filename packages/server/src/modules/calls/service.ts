@@ -1,4 +1,4 @@
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, inArray } from "drizzle-orm";
 import type { WebSocket } from "@fastify/websocket";
 import type { Call, CallStatus, CallSummary, ActiveCallSummary, IncomingCallSummary } from "@notorious/shared";
 import { db } from "../../db/client.js";
@@ -113,7 +113,13 @@ export async function startCall(conversationId: string, initiatorId: string, ini
   const startedAt = nowIso();
   await db.insert(calls).values({ id, conversationId, initiatorId, status: "ringing", startedAt, answeredAt: null, endedAt: null, participantIds: "[]" });
 
-  const recipientUserIds = (await getParticipantUserIds(conversationId)).filter((userId) => userId !== initiatorId);
+  const allRecipientUserIds = (await getParticipantUserIds(conversationId)).filter((userId) => userId !== initiatorId);
+  // "Red" chat status is full do-not-disturb: skip both the live ring and the push for that callee entirely. Yellow doesn't affect calls at all (see ChatStatus's doc comment).
+  const statusRows = allRecipientUserIds.length
+    ? await db.select({ id: users.id, chatStatus: users.chatStatus }).from(users).where(inArray(users.id, allRecipientUserIds))
+    : [];
+  const doNotDisturbIds = new Set(statusRows.filter((row) => row.chatStatus === "red").map((row) => row.id));
+  const recipientUserIds = allRecipientUserIds.filter((userId) => !doNotDisturbIds.has(userId));
   for (const userId of recipientUserIds) {
     sendToUserGlobal(userId, { type: "callRing", callId: id, conversationId, initiatorId, initiatorName });
     await notifyUser(userId, {

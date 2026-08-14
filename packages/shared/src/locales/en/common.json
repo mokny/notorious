@@ -17,6 +17,11 @@
     "logOut": "Log out",
     "logOutConfirmTitle": "Log out?",
     "logOutConfirmDescription": "You'll be signed out of this device.",
+    "chatStatus": {
+      "green": "Available",
+      "yellow": "Away (mutes new-message sound)",
+      "red": "Do not disturb (mutes chat + calls)"
+    },
     "toggleTheme": "Toggle theme",
     "openMenu": "Open menu",
     "loading": "Loading…",
@@ -830,6 +835,8 @@
       "title": "Chats",
       "channels": "Channels",
       "newChat": "New chat",
+      "muteSound": "Mute new-message sound",
+      "unmuteSound": "Unmute new-message sound",
       "loading": "Loading…",
       "empty": "No conversations yet.",
       "messageDeleted": "Message deleted",

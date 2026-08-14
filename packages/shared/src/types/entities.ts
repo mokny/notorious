@@ -6,6 +6,9 @@ import type { WorkspaceRole } from "../constants/roles.js";
 /** ISO-8601 timestamp string, as returned by the API (SQLite stores these as TEXT). */
 export type ISODateString = string;
 
+/** Manually-set chat "traffic light" - green = normal, yellow = silences the client-side new-message sound only, red = also suppresses chat push and call push/live-ring. See modules/chat/service.ts and modules/calls/service.ts on the server. */
+export type ChatStatus = "green" | "yellow" | "red";
+
 export interface User {
   id: string;
   email: string;
@@ -29,6 +32,8 @@ export interface User {
   contentFontSizeDesktop: number;
   /** Instance-wide admin role (see modules/admin/) - not a workspace role. Gates the /admin UI and every server-admin endpoint. The first-ever registered account gets this automatically. */
   isServerAdmin: boolean;
+  /** This user's own chat availability - see `ChatStatus`. Defaults to "green". */
+  chatStatus: ChatStatus;
 }
 
 /**
@@ -374,6 +379,8 @@ export interface PresenceViewer {
   avatarLetter: string;
   /** Real members only, when they've uploaded a profile picture - takes priority over avatarColor/avatarLetter when set. */
   avatarUrl?: string | null;
+  /** Real members only - see `ChatStatus`. Snapshotted at the time this viewer last sent a presence heartbeat, so it can lag a live status change until their next heartbeat. */
+  chatStatus?: ChatStatus;
 }
 
 /**

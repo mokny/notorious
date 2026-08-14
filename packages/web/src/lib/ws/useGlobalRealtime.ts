@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import type { ChatRealtimeMessage, MediaKind, ProducerSource } from "@notorious/shared";
+import type { ChatRealtimeMessage, MediaKind, ProducerSource, ChatStatus } from "@notorious/shared";
 import { clientId as myClientId } from "./clientId.js";
 import { updateAppBadge } from "../chatBadge.js";
+import { useChatSound } from "../../hooks/useChatSound.js";
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15_000;
@@ -15,11 +16,25 @@ type MediaNewProducerListener = (callId: string, producerId: string, userId: str
 type MediaProducerClosedListener = (callId: string, producerId: string) => void;
 type CallEndedListener = (callId: string, conversationId: string, reason: "hangup" | "declined" | "missed") => void;
 
-function handleChatMessage(payload: ChatRealtimeMessage, queryClient: QueryClient): void {
+function handleChatMessage(
+  payload: ChatRealtimeMessage,
+  queryClient: QueryClient,
+  ctx: { currentUserId?: string; currentUserChatStatus?: ChatStatus; playChatSound: () => void },
+): void {
   switch (payload.type) {
     case "chatMessage":
       queryClient.invalidateQueries({ queryKey: ["chatConversations"] });
       queryClient.invalidateQueries({ queryKey: ["chatMessages", payload.conversationId] });
+      // Desktop-only sound, regardless of tab focus or whether the conversation is open - see
+      // useChatSound.ts. Never for our own messages, and "yellow"/"red" chat status silences it.
+      if (payload.message.authorId !== ctx.currentUserId && ctx.currentUserChatStatus === "green") ctx.playChatSound();
+      break;
+    case "userStatusChanged":
+      // Refetch rather than patch in place - the changed user's status can appear in several
+      // different cached shapes (conversation participant summaries, workspace member lists),
+      // and a status change is rare enough that a refetch is simpler than patching every one.
+      queryClient.invalidateQueries({ queryKey: ["chatConversations"] });
+      queryClient.invalidateQueries({ queryKey: ["me"] });
       break;
     case "chatMessageDeleted":
       queryClient.invalidateQueries({ queryKey: ["chatMessages", payload.conversationId] });
@@ -75,7 +90,7 @@ function handleChatMessage(payload: ChatRealtimeMessage, queryClient: QueryClien
  * actual mediasoup handshake (transports/produce/consume) is REST, not WS -
  * see CallContext.tsx and the calls feature plan for why.
  */
-export function useGlobalRealtime(enabled: boolean): {
+export function useGlobalRealtime(enabled: boolean, currentUser?: { id: string; chatStatus: ChatStatus } | null): {
   sendTyping: (conversationId: string) => void;
   setFocusedConversation: (conversationId: string | null) => void;
   onTyping: (listener: TypingListener) => () => void;
@@ -87,7 +102,12 @@ export function useGlobalRealtime(enabled: boolean): {
   onCallEnded: (listener: CallEndedListener) => () => void;
 } {
   const queryClient = useQueryClient();
+  const { playChatSound } = useChatSound();
   const socketRef = useRef<WebSocket | null>(null);
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+  const playChatSoundRef = useRef(playChatSound);
+  playChatSoundRef.current = playChatSound;
   const typingListenersRef = useRef<Set<TypingListener>>(new Set());
   const callRingListenersRef = useRef<Set<CallRingListener>>(new Set());
   const callTakenListenersRef = useRef<Set<CallTakenListener>>(new Set());
@@ -148,7 +168,11 @@ export function useGlobalRealtime(enabled: boolean): {
             for (const listener of callEndedListenersRef.current) listener(payload.callId, payload.conversationId, payload.reason);
             return;
           default:
-            handleChatMessage(payload, queryClient);
+            handleChatMessage(payload, queryClient, {
+              currentUserId: currentUserRef.current?.id,
+              currentUserChatStatus: currentUserRef.current?.chatStatus,
+              playChatSound: () => playChatSoundRef.current(),
+            });
         }
       };
 
