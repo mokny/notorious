@@ -8,6 +8,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Workspace } from "@notorious/shared";
 import { workspaceApi } from "../../lib/api/resources.js";
 import { useReorderWorkspaces } from "../../hooks/useReorderWorkspaces.js";
+import { useWorkspaceUnreadCounts } from "../../hooks/useWorkspaceUnreadCounts.js";
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
 import { useWorkspaceRole } from "../../hooks/useWorkspaceRole.js";
 import { useObjectRowContextMenu } from "../../hooks/useObjectRowContextMenu.js";
@@ -36,6 +37,7 @@ export function WorkspaceRail({ activeWorkspaceId }: WorkspaceRailProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const workspaceIds = useMemo(() => workspaces?.map((workspace) => workspace.id) ?? [], [workspaces]);
   const { reorder } = useReorderWorkspaces();
+  const unreadCounts = useWorkspaceUnreadCounts(activeWorkspaceId);
   const dragSelectGuard = useDragSelectGuard();
   // Mouse keeps the near-instant 4px-movement drag start; touch needs a
   // short long-press first (mirrors BlockEditor.tsx) so a plain tap doesn't
@@ -79,6 +81,7 @@ export function WorkspaceRail({ activeWorkspaceId }: WorkspaceRailProps) {
                 key={workspace.id}
                 workspace={workspace}
                 isActive={workspace.id === activeWorkspaceId}
+                unreadCount={unreadCounts[workspace.id] ?? 0}
                 onNavigate={() => navigate(`/w/${workspace.id}`)}
                 onTouchArmStart={dragSelectGuard.onTouchArmStart}
               />
@@ -106,6 +109,7 @@ export function WorkspaceRail({ activeWorkspaceId }: WorkspaceRailProps) {
 interface RailWorkspaceButtonProps {
   workspace: Workspace;
   isActive: boolean;
+  unreadCount: number;
   onNavigate: () => void;
   onTouchArmStart: (event: PointerEvent) => void;
 }
@@ -117,7 +121,7 @@ interface RailWorkspaceButtonProps {
  * dialog, closest match to "transform the row into an editable field" for
  * something this compact.
  */
-function RailWorkspaceButton({ workspace, isActive, onNavigate, onTouchArmStart }: RailWorkspaceButtonProps) {
+function RailWorkspaceButton({ workspace, isActive, unreadCount, onNavigate, onTouchArmStart }: RailWorkspaceButtonProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -209,11 +213,16 @@ function RailWorkspaceButton({ workspace, isActive, onNavigate, onTouchArmStart 
         onClick={onNavigate}
         onContextMenu={rowMenu.openFromMouseEvent}
         title={workspace.name}
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
+        className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
           isActive ? "bg-accent/15 text-accent" : "text-ink-muted hover:bg-surface-raised hover:text-ink"
         }`}
       >
         <Icon name={workspace.icon} className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-white">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
       </button>
       {rowMenu.position && <ContextMenu x={rowMenu.position.x} y={rowMenu.position.y} items={items} onClose={rowMenu.close} />}
     </>

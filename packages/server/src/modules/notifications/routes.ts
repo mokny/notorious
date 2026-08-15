@@ -12,6 +12,13 @@ export async function registerNotificationRoutes(app: FastifyInstance): Promise<
     return notificationService.listNotifications(user.id, workspaceId);
   });
 
+  app.get("/api/v1/workspaces/:workspaceId/notifications/unread-count", async (request) => {
+    const user = requireUser(request);
+    const { workspaceId } = request.params as { workspaceId: string };
+    await requireWorkspaceRole(workspaceId, user.id, "viewer");
+    return { count: await notificationService.countUnreadNotifications(user.id, workspaceId) };
+  });
+
   app.post("/api/v1/workspaces/:workspaceId/notifications/:id/read", async (request, reply) => {
     const user = requireUser(request);
     const { workspaceId, id } = request.params as { workspaceId: string; id: string };

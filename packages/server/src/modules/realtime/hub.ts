@@ -26,6 +26,8 @@ interface RoomEntry {
   clientId?: string;
   /** The real member's user id, absent for an anonymous share visitor - used only to target `sendToUser` (notifications), which a share visitor (no account, nothing to notify) never needs to receive. */
   userId?: string;
+  /** Set for the rail/WorkspacePickerPage's background per-workspace sockets (`?scope=notifications`, see realtime/routes.ts) - they only want `sendToUser` notification pushes, not the full per-workspace firehose of block/object/presence/backup events a normally-open workspace tab gets, so `sendToRoom` skips them entirely. */
+  notificationsOnly?: boolean;
 }
 
 // Value is the socket's object-id filter: null for a real member or a
@@ -41,13 +43,14 @@ export function joinRoom(
   objectIdFilter: string | null = null,
   clientId?: string,
   userId?: string,
+  notificationsOnly?: boolean,
 ): void {
   let room = roomsByWorkspace.get(workspaceId);
   if (!room) {
     room = new Map();
     roomsByWorkspace.set(workspaceId, room);
   }
-  room.set(socket, { objectIdFilter, clientId, userId });
+  room.set(socket, { objectIdFilter, clientId, userId, notificationsOnly });
 
   socket.on("close", () => {
     room?.delete(socket);
@@ -62,6 +65,7 @@ function sendToRoom(workspaceId: string, objectIdFilter: string | null | undefin
 
   const message = JSON.stringify(payload);
   for (const [socket, entry] of room) {
+    if (entry.notificationsOnly) continue;
     if (entry.objectIdFilter !== null && objectIdFilter !== entry.objectIdFilter) continue;
     if (socket.readyState === socket.OPEN) socket.send(message);
   }

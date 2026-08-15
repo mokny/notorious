@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, isNull, inArray, sql } from "drizzle-orm";
 import type { Notification } from "@notorious/shared";
 import { diffNewMentionedUserIds, MENTION_PATTERN } from "@notorious/shared";
 import { db } from "../../db/client.js";
@@ -48,6 +48,15 @@ export async function listNotifications(userId: string, workspaceId: string): Pr
     .orderBy(desc(notifications.createdAt))
     .limit(50);
   return rows.map(toNotification);
+}
+
+/** Same filter as `listNotifications`, but a bare count for badges (rail icons, WorkspacePickerPage) that don't need the actual rows. */
+export async function countUnreadNotifications(userId: string, workspaceId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(notifications)
+    .where(and(eq(notifications.userId, userId), eq(notifications.workspaceId, workspaceId), isNull(notifications.readAt)));
+  return Number(rows[0]?.count ?? 0);
 }
 
 export async function markNotificationRead(id: string, userId: string): Promise<void> {

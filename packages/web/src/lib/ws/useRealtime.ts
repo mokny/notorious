@@ -139,6 +139,7 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
           queryClient.invalidateQueries({ queryKey: ["backlinks"] });
           queryClient.invalidateQueries({ queryKey: ["comments"] });
           queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] });
+          queryClient.invalidateQueries({ queryKey: ["notificationUnreadCount", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["workspaceMembers", workspaceId] });
           queryClient.invalidateQueries({ queryKey: ["workspaces"] });
           queryClient.invalidateQueries({ queryKey: ["pins", workspaceId] });
@@ -184,6 +185,11 @@ export function useRealtime(workspaceId: string | undefined, shareToken?: string
             // receives this one is meant to act on it, no self-echo or
             // ownership check needed.
             queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] });
+            // Drives the rail/WorkspacePickerPage badge for *this* (the
+            // active) workspace - see useWorkspaceUnreadCounts.ts, which
+            // deliberately doesn't open its own second socket here and
+            // instead piggybacks on this same invalidation.
+            queryClient.invalidateQueries({ queryKey: ["notificationUnreadCount", workspaceId] });
             return;
           }
           // usePresence.ts owns the actual viewer list via its own query -

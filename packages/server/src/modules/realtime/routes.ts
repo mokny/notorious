@@ -16,10 +16,18 @@ import { cleanupParticipant } from "../calls/sfu.js";
  * into `request.shareAccess` by the same session-plugin hook that resolves
  * the `X-Share-Token` header for the REST API, see plugins/session.ts) -
  * see `useRealtime.ts`.
+ *
+ * A logged-in member may also pass `&scope=notifications` - a background
+ * socket for a workspace they're *not* currently viewing (see
+ * `useWorkspaceUnreadCounts.ts`, which opens one per other workspace to keep
+ * the rail/WorkspacePickerPage's unread badges live). Joins the same room
+ * but flagged `notificationsOnly` (hub.ts's `sendToRoom`), so it only ever
+ * receives `sendToUser` notification pushes, never the full block/object/
+ * presence/backup event stream a normally-open workspace tab gets.
  */
 export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void> {
   app.get("/ws", { websocket: true }, async (socket, request) => {
-    const { workspaceId, clientId } = request.query as { workspaceId?: string; clientId?: string };
+    const { workspaceId, clientId, scope } = request.query as { workspaceId?: string; clientId?: string; scope?: string };
     if (!workspaceId) {
       socket.close(4001, "Unauthorized");
       return;
@@ -32,7 +40,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
         socket.close(4003, "Forbidden");
         return;
       }
-      joinRoom(workspaceId, socket, null, clientId, user.id);
+      joinRoom(workspaceId, socket, null, clientId, user.id, scope === "notifications");
       return;
     }
 
