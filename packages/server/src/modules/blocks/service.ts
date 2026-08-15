@@ -25,10 +25,14 @@ import { generateBlockAnswer } from "../ai/agent.js";
 import { blocksToMarkdown } from "./markdown.js";
 import { notifyMentionedUsers } from "../notifications/service.js";
 
-/** The markdown string carried by a block's content, for the handful of block types that have one (paragraph/heading/quote/callout) - `""` for every other type, since e.g. a table's content is a ProseMirror doc, not markdown. Used only to diff for newly-added @mentions. */
+/** The markdown text carried by a block's content, for the block types that have one (paragraph/heading/quote/callout, plus checklist's per-item markdown) - `""` for every other type, since e.g. a table's content is a ProseMirror doc, not markdown. Used only to diff for newly-added @mentions. */
 function markdownOf(content: string): string {
-  const parsed = JSON.parse(content) as { markdown?: unknown };
-  return typeof parsed.markdown === "string" ? parsed.markdown : "";
+  const parsed = JSON.parse(content) as { markdown?: unknown; items?: Array<{ markdown?: unknown }> };
+  if (typeof parsed.markdown === "string") return parsed.markdown;
+  if (Array.isArray(parsed.items)) {
+    return parsed.items.map((item) => (typeof item.markdown === "string" ? item.markdown : "")).join("\n");
+  }
+  return "";
 }
 
 function toBlock(row: typeof blocks.$inferSelect): Block {
