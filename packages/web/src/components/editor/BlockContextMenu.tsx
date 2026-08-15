@@ -8,6 +8,7 @@ import { ApiError } from "../../lib/api/client.js";
 import { ContextMenu, useClampedPosition, type ContextMenuEntry } from "../ui/ContextMenu.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { buildFixedSlashCommandItems } from "./SlashCommand.js";
+import { getTableEditor } from "./blocks/tableEditorRegistry.js";
 
 /** True while the given block currently owns a non-collapsed browser text selection - Copy/Cut act on that selection (native `document.execCommand`, preserving exactly what's highlighted) instead of the whole block when one exists. Read once at mount: a right-click/long-press preserves whatever was already selected, and this menu's own presence doesn't itself change the selection. */
 function hasSelectionWithin(blockId: string): boolean {
@@ -56,6 +57,23 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
         .map((item) => ({ key: item.type, label: item.label, onSelect: () => turnIntoBlock(blockId, item.type) })),
     },
     { key: "select-all", label: t("editor.blockMenu.selectAll"), icon: "select-all", onSelect: () => selectAllInEditor() },
+    // Table-only: clears bold/italic/color/alignment on the current
+    // selection inside the cell's own TipTap editor (see
+    // tableEditorRegistry.ts) - a plain `document.execCommand` (used above
+    // for Copy/Cut when there's a selection) mutates the DOM directly and
+    // risks desyncing it from ProseMirror's document model, which every
+    // other block-level command here avoids by going through TipTap/the
+    // block editor's own mutations instead.
+    ...(type === "table"
+      ? [
+          {
+            key: "clear-formatting",
+            label: t("editor.blockMenu.clearFormatting"),
+            icon: "eraser",
+            onSelect: () => getTableEditor(blockId)?.chain().focus().unsetAllMarks().setTextAlign("left").run(),
+          },
+        ]
+      : []),
     { key: "sep-1", separator: true },
     { key: "set-slug", label: t("editor.blockMenu.setBlockId"), icon: "braces", onSelect: () => setSlugEditorOpen(true) },
     { key: "sep-2", separator: true },

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -19,6 +19,7 @@ import { Icon } from "../../ui/Icon.js";
 import { TableCell, TableHeader } from "./tableExtensions.js";
 import { TableFormatToolbar } from "./TableFormatToolbar.js";
 import { TableGridControls } from "./TableGridControls.js";
+import { registerTableEditor, unregisterTableEditor } from "./tableEditorRegistry.js";
 
 /** `templateAware` mirrors RichTextEditor.tsx's prop of the same name - only ever true for the live-editable table (see EditableTable below), never the read-only/rendered variant, which shows already-evaluated cell text, not template source. */
 function buildExtensions(
@@ -57,6 +58,7 @@ function buildExtensions(
 
 /** One TipTap editor instance over the whole table doc (see blockContent.ts's TableContent) - editable live view, debounced-saved like every other block. */
 function EditableTable({
+  blockId,
   doc,
   editable,
   onChange,
@@ -64,6 +66,7 @@ function EditableTable({
   onFocus,
   onBlur,
 }: {
+  blockId: string;
   doc: TableDoc;
   editable: boolean;
   onChange: (doc: TableDoc) => void;
@@ -100,6 +103,17 @@ function EditableTable({
     },
     onCreate: ({ editor: created }) => setEditor(created),
   });
+
+  // Registers this table's live editor for BlockContextMenu.tsx's "Clear
+  // formatting" item (see tableEditorRegistry.ts) - keyed by `editor`
+  // identity, not just `blockId`, since a search-highlight change remounts
+  // this component with a fresh editor instance under the same block id
+  // (see the `key={...searchTermsKey}` on EditableTable's call site below).
+  useEffect(() => {
+    if (!editor) return;
+    registerTableEditor(blockId, editor);
+    return () => unregisterTableEditor(blockId, editor);
+  }, [blockId, editor]);
 
   return (
     <div className="group relative overflow-x-auto rounded-lg border border-border p-1 pl-4 pt-4">
@@ -165,6 +179,7 @@ export function TableBlock({
     table = (
       <EditableTable
         key={`edit-${searchTermsKey}`}
+        blockId={blockId}
         doc={doc}
         editable
         onChange={(nextDoc) => save({ ...content, doc: nextDoc })}

@@ -465,6 +465,7 @@
       "duplicate": "Duplicar",
       "turnInto": "Convertir en",
       "selectAll": "Seleccionar todo",
+      "clearFormatting": "Borrar formato",
       "setBlockId": "Establecer ID del bloque"
     },
     "slugButton": {

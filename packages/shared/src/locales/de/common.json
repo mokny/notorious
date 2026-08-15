@@ -470,6 +470,7 @@
       "duplicate": "Duplizieren",
       "turnInto": "Umwandeln in",
       "selectAll": "Alles auswählen",
+      "clearFormatting": "Formatierung entfernen",
       "setBlockId": "Block-ID festlegen"
     },
     "slugButton": {

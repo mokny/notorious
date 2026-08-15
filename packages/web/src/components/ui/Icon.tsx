@@ -99,6 +99,7 @@ import {
   CopyPlus,
   Repeat,
   TextSelect,
+  Eraser,
   type LucideIcon,
 } from "lucide-react";
 
@@ -200,6 +201,7 @@ const ICONS: Record<string, LucideIcon> = {
   duplicate: CopyPlus,
   "turn-into": Repeat,
   "select-all": TextSelect,
+  eraser: Eraser,
 };
 
 function isImageUrl(value: string): boolean {

@@ -471,6 +471,7 @@
       "duplicate": "Duplicate",
       "turnInto": "Turn into",
       "selectAll": "Select all",
+      "clearFormatting": "Clear formatting",
       "setBlockId": "Set block id"
     },
     "slugButton": {
