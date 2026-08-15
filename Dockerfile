@@ -29,6 +29,12 @@ RUN npm run build
 # ---- Runtime stage: only the compiled output + production dependencies ----
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
+# tzdata is required for the TZ env var (see docker-compose.yml) to actually
+# shift Date's local-time getters - without it the container silently stays
+# in UTC regardless of TZ, which broke the auto-update scheduler's "HH:MM
+# local-server-time" comparison in modules/admin/autoUpdateScheduler.ts.
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+  && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV PORT=4000
 ENV DATABASE_PATH=/app/data/notorious.db

@@ -223,6 +223,11 @@ This builds a single image (multi-stage: compiles all three packages, then a sli
 runs it with a named volume (`notorious-data`) mounted at `/app/data` - that volume is exactly the
 SQLite file + uploaded files, so backing up the volume backs up everything.
 
+Unlike bare-metal, the container does not automatically inherit the host's timezone - it defaults to
+UTC unless `TZ` is set (see `.env.example`, default `Europe/Berlin`). This matters for the scheduled
+auto-update time in the Admin settings (a plain `HH:MM` compared against the container's local time),
+so set `TZ` to your actual timezone or auto-update will silently fire at the wrong hour.
+
 Self-registration through `/register` is disabled by default - create your first account from the
 shell instead:
 
