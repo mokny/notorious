@@ -175,6 +175,21 @@ NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}" npm run build
 log "Running database migrations"
 npm run migrate
 
+# Record this update in the history log (and, for an unattended auto-update,
+# notify server admins) BEFORE restarting - the restart below kills the very
+# Node process that triggered this script, so any write attempted only after
+# it exits would never happen. NOTORIOUS_UPDATE_TRIGGER/_STARTED_AT are set
+# by the caller (modules/admin/service.ts's `runUpdateScript`); non-fatal if
+# it fails, since the actual update already succeeded at this point.
+log "Recording update history"
+npm run --silent record-update-outcome -- \
+  --trigger="${NOTORIOUS_UPDATE_TRIGGER:-manual}" \
+  --channel="$CHANNEL" \
+  --from="$LOCAL_VERSION" \
+  --to="$REMOTE_VERSION" \
+  --started-at="${NOTORIOUS_UPDATE_STARTED_AT:-$(date -u +%Y-%m-%dT%H:%M:%S.000Z)}" \
+  || echo "Warning: failed to record update history" >&2
+
 if [ "${NOTORIOUS_SKIP_RESTART:-}" = "1" ]; then
   # Set by the admin UI's update trigger (see modules/admin/service.ts's
   # `runUpdateScript`) when it already validated a sudo password up front and

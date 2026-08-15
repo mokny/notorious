@@ -18,6 +18,8 @@
     "delete-user:prod": "node dist/scripts/deleteUser.js",
     "make-admin": "tsx src/scripts/makeAdmin.ts",
     "make-admin:prod": "node dist/scripts/makeAdmin.js",
+    "record-update-outcome": "tsx src/scripts/recordUpdateOutcome.ts",
+    "record-update-outcome:prod": "node dist/scripts/recordUpdateOutcome.js",
     "revoke-admin": "tsx src/scripts/revokeAdmin.ts",
     "revoke-admin:prod": "node dist/scripts/revokeAdmin.js",
     "set-registration": "tsx src/scripts/setRegistration.ts",

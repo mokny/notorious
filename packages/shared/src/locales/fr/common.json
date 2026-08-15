@@ -28,6 +28,10 @@
       "mentionedInComment": "{{actor}} t'a mentionné dans un commentaire sur « {{title}} »",
       "mentionedIn": "{{actor}} t'a mentionné dans « {{title}} »"
     },
+    "adminNotifications": {
+      "title": "Notifications d'administration du serveur",
+      "empty": "Aucune notification d'administration pour l'instant."
+    },
     "installHint": {
       "prompt": "Installez Notorious sur votre téléphone pour un accès rapide en plein écran.",
       "ios": "Installer Notorious : appuyez sur <icon></icon> puis « Sur l'écran d'accueil ».",

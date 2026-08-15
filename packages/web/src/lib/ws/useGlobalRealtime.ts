@@ -64,6 +64,10 @@ function handleChatMessage(
     case "workspaceOrderChanged":
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       break;
+    case "adminNotification":
+      queryClient.invalidateQueries({ queryKey: ["adminNotifications"] });
+      queryClient.invalidateQueries({ queryKey: ["adminNotifications", "unread-count"] });
+      break;
     case "chatTyping":
     case "callRing":
     case "callTaken":

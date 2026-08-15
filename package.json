@@ -1,7 +1,7 @@
 {
   "name": "notorious",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Self-hosted, multi-user notes and knowledge base application",
   "workspaces": [
@@ -19,6 +19,7 @@
     "start": "npm run start --workspace=packages/server",
     "start:prod": "npm run migrate:prod --workspace=packages/server && npm run start --workspace=packages/server",
     "migrate": "npm run migrate --workspace=packages/server",
+    "record-update-outcome": "npm run record-update-outcome --workspace=packages/server --",
     "create-user": "npm run create-user:prod --workspace=packages/server --",
     "delete-user": "npm run delete-user:prod --workspace=packages/server --",
     "make-admin": "npm run make-admin:prod --workspace=packages/server --",

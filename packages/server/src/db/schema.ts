@@ -651,6 +651,23 @@ export const updateRuns = sqliteTable("update_runs", {
   errorMessage: text("error_message"),
 });
 
+// Admin-only, workspace-agnostic notification bell (see
+// modules/admin/service.ts's `notifyAllAdmins`) - the `notifications` table
+// above requires a `workspaceId`/`objectId`, which system-level events like
+// an auto-update outcome don't have, hence this separate table.
+export const adminNotifications = sqliteTable("admin_notifications", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  url: text("url").notNull(),
+  createdAt: text("created_at").notNull(),
+  readAt: text("read_at"),
+});
+
 export const pushSubscriptions = sqliteTable("push_subscriptions", {
   id: text("id").primaryKey(),
   userId: text("user_id")

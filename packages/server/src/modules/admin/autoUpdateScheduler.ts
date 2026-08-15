@@ -11,10 +11,10 @@ function currentVersion(): string {
   return (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
 }
 
-/** Runs `scripts/update.sh` to completion and resolves with its exit code - unlike modules/admin/service.ts's other callers of `runUpdateScript`, which stream output live to an HTTP client and don't wait, the scheduler has no client to stream to and needs to know the outcome before deciding whether/how to restart. */
-function runUpdateScriptAndWait(skipRestart: boolean, channel: "nightly" | "release"): Promise<number> {
+/** Runs `scripts/update.sh` to completion and resolves with its exit code - unlike modules/admin/service.ts's other callers of `runUpdateScript`, which stream output live to an HTTP client and don't wait, the scheduler has no client to stream to and needs to know the outcome before deciding whether/how to restart. Note a *successful* run's exit code is never actually observed here in practice - see `runUpdateScript`'s doc comment on why the history/notification write happens inside update.sh itself, before the restart that kills this very process. */
+function runUpdateScriptAndWait(skipRestart: boolean, channel: "nightly" | "release", startedAt: string): Promise<number> {
   return new Promise((resolve) => {
-    const child = runUpdateScript(skipRestart, channel);
+    const child = runUpdateScript(skipRestart, channel, "auto", startedAt);
     // Nothing reads stdout/stderr here (no admin UI attached to this run) -
     // drain both so a chatty update.sh can't fill the pipe buffer and stall.
     child.stdout?.resume();
@@ -88,7 +88,7 @@ async function attemptScheduledUpdate(channel: "nightly" | "release"): Promise<v
 
   let exitCode: number;
   try {
-    exitCode = await runUpdateScriptAndWait(needsSudo, channel);
+    exitCode = await runUpdateScriptAndWait(needsSudo, channel, startedAt);
   } catch (error: unknown) {
     broadcastSystemStatus({ type: "systemUpdate", status: "failed", reason: "update", version: fromVersion });
     await fail(error instanceof Error ? error.message : String(error));
@@ -105,22 +105,11 @@ async function attemptScheduledUpdate(channel: "nightly" | "release"): Promise<v
     restartWithSudoPassword(sudoPassword);
   }
 
-  await recordUpdateRun({
-    startedAt,
-    finishedAt: nowIso(),
-    trigger: "auto",
-    channel,
-    fromVersion,
-    toVersion: check.latest,
-    status: "success",
-    errorMessage: null,
-  });
-  await notifyAllAdmins({
-    type: "auto-update",
-    title: "Notorious wurde automatisch aktualisiert",
-    body: `Notorious wurde automatisch von ${fromVersion} auf ${check.latest} aktualisiert.`,
-    url: "/admin",
-  });
+  // No success-path recordUpdateRun/notifyAllAdmins here: update.sh already
+  // ran `record-update-outcome` (see runUpdateScript's doc comment) right
+  // before triggering the restart above, which is the only point a
+  // successful run's outcome can still be written - by the time control
+  // would return here, the restart has usually already killed this process.
 }
 
 async function tick(): Promise<void> {

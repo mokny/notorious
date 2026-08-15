@@ -14,6 +14,7 @@ import type {
   CreateCommentInput,
   SetCommentsDisabledInput,
   Notification,
+  AdminNotification,
   View,
   SavedSearch,
   FileAsset,
@@ -343,6 +344,14 @@ export const notificationApi = {
     apiRequest<void>(`/api/v1/workspaces/${workspaceId}/notifications/${id}/read`, { method: "POST" }),
   markAllRead: (workspaceId: string) =>
     apiRequest<void>(`/api/v1/workspaces/${workspaceId}/notifications/read-all`, { method: "POST" }),
+};
+
+/** Server-admins-only, workspace-agnostic - see modules/admin/routes.ts's admin notification bell endpoints. */
+export const adminNotificationApi = {
+  list: () => apiRequest<AdminNotification[]>("/api/v1/admin/notifications"),
+  unreadCount: () => apiRequest<{ count: number }>("/api/v1/admin/notifications/unread-count"),
+  markRead: (id: string) => apiRequest<void>(`/api/v1/admin/notifications/${id}/read`, { method: "POST" }),
+  markAllRead: () => apiRequest<void>("/api/v1/admin/notifications/read-all", { method: "POST" }),
 };
 
 export const templateApi = {

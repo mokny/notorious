@@ -18,8 +18,11 @@ import {
   restartWithSudoPassword,
   restartServerProcess,
   listUpdateHistory,
-  checkChannelForUpdate,
   recordUpdateRun,
+  listAdminNotifications,
+  countUnreadAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
 } from "./service.js";
 import { setCallsEnabled } from "../instanceSettings/service.js";
 import { broadcastSystemStatus } from "../realtime/hub.js";
@@ -137,7 +140,6 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     broadcastSystemStatus({ type: "systemUpdate", status: "inProgress", reason: "update", version: PACKAGE_VERSION });
 
     const startedAt = nowIso();
-    const preCheck = await checkChannelForUpdate(input.channel, PACKAGE_VERSION);
 
     reply.hijack();
     reply.raw.writeHead(200, {
@@ -146,7 +148,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       Connection: "keep-alive",
     });
 
-    const child = runUpdateScript(needsSudo, input.channel);
+    const child = runUpdateScript(needsSudo, input.channel, "manual", startedAt);
     const send = (line: string) => reply.raw.write(`data: ${JSON.stringify(line)}\n\n`);
 
     child.stdout?.on("data", (chunk: Buffer) => send(chunk.toString()));
@@ -168,16 +170,23 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     });
     child.on("close", (code) => {
       const success = code === 0;
-      recordUpdateRun({
-        startedAt,
-        finishedAt: nowIso(),
-        trigger: "manual",
-        channel: input.channel,
-        fromVersion: PACKAGE_VERSION,
-        toVersion: success ? preCheck.latest : null,
-        status: success ? "success" : "failure",
-        errorMessage: success ? null : `update.sh exited with code ${code}`,
-      }).catch((e: unknown) => console.error("[admin] Failed to record update run:", e));
+      // Only the failure case is recorded here - a successful run already
+      // wrote its own `update_runs` row (and, if this were an auto-update,
+      // its admin notifications) from inside update.sh via
+      // `record-update-outcome`, right before the restart that's about to
+      // sever this very connection - see runUpdateScript's doc comment.
+      if (!success) {
+        recordUpdateRun({
+          startedAt,
+          finishedAt: nowIso(),
+          trigger: "manual",
+          channel: input.channel,
+          fromVersion: PACKAGE_VERSION,
+          toVersion: null,
+          status: "failure",
+          errorMessage: `update.sh exited with code ${code}`,
+        }).catch((e: unknown) => console.error("[admin] Failed to record update run:", e));
+      }
       if (needsSudo && input.sudoPassword) {
         send("Restarting the service…");
         restartWithSudoPassword(input.sudoPassword);
@@ -194,6 +203,31 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       reply.raw.end();
     });
     child.unref();
+  });
+
+  // ---- Admin notification bell (see modules/admin/service.ts's `notifyAllAdmins`) ----
+
+  app.get("/api/v1/admin/notifications", async (request) => {
+    const admin = await requireInstanceAdmin(request);
+    return listAdminNotifications(admin.id);
+  });
+
+  app.get("/api/v1/admin/notifications/unread-count", async (request) => {
+    const admin = await requireInstanceAdmin(request);
+    return { count: await countUnreadAdminNotifications(admin.id) };
+  });
+
+  app.post("/api/v1/admin/notifications/:id/read", async (request, reply) => {
+    const admin = await requireInstanceAdmin(request);
+    const { id } = request.params as { id: string };
+    await markAdminNotificationRead(id, admin.id);
+    reply.code(204);
+  });
+
+  app.post("/api/v1/admin/notifications/read-all", async (request, reply) => {
+    const admin = await requireInstanceAdmin(request);
+    await markAllAdminNotificationsRead(admin.id);
+    reply.code(204);
   });
 
   // ---- Calls setup wizard ----

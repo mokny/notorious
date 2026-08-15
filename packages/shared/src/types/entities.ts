@@ -479,6 +479,25 @@ export interface Notification {
 }
 
 /**
+ * One entry in a server admin's admin-only notification bell (see
+ * modules/admin/service.ts's `notifyAllAdmins`) - the workspace-agnostic
+ * counterpart to `Notification` above, for system-level events (currently
+ * just auto-update outcomes) that have no workspace or object to attach to.
+ * `type` mirrors `PushNotificationPayload`'s discriminant so the same event
+ * can be described once and sent through both channels (bell + Web Push).
+ */
+export interface AdminNotification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  url: string;
+  createdAt: ISODateString;
+  readAt: ISODateString | null;
+}
+
+/**
  * Sent to exactly one user's connected sockets (see `sendToUser` in
  * modules/realtime/hub.ts) whenever a `Notification` is created for them -
  * distinguished from `RealtimeEvent` by `type`, same pattern as

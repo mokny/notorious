@@ -34,6 +34,10 @@
       "mentionedInComment": "{{actor}} mentioned you in a comment on \"{{title}}\"",
       "mentionedIn": "{{actor}} mentioned you in \"{{title}}\""
     },
+    "adminNotifications": {
+      "title": "Server admin notifications",
+      "empty": "No admin notifications yet."
+    },
     "installHint": {
       "prompt": "Install Notorious on your phone for quick, full-screen access.",
       "ios": "Install Notorious: tap <icon></icon> then \"Add to Home Screen\".",

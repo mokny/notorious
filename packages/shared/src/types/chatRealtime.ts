@@ -1,6 +1,6 @@
 import type { Message, MessageReaction, ReadReceipt } from "./chat.js";
 import type { MediaKind, ProducerSource } from "./media.js";
-import type { ChatStatus } from "./entities.js";
+import type { ChatStatus, AdminNotification } from "./entities.js";
 
 /**
  * All chat WebSocket payloads share the workspace-agnostic `/ws/chat`
@@ -165,6 +165,12 @@ export interface WorkspaceOrderChangedEvent {
   type: "workspaceOrderChanged";
 }
 
+/** Sent to a server admin's connected devices whenever a new `AdminNotification` is created for them (see modules/admin/service.ts's `notifyAllAdmins`) - workspace-agnostic, same channel as everything else in this file, since admin notifications (e.g. auto-update outcomes) have no workspace to attach to. */
+export interface AdminNotificationEvent {
+  type: "adminNotification";
+  notification: AdminNotification;
+}
+
 export type ChatRealtimeMessage =
   | ChatMessageEvent
   | ChatMessageDeletedEvent
@@ -182,4 +188,5 @@ export type ChatRealtimeMessage =
   | SessionRevokedEvent
   | UserSettingsUpdatedEvent
   | UserStatusChangedEvent
-  | WorkspaceOrderChangedEvent;
+  | WorkspaceOrderChangedEvent
+  | AdminNotificationEvent;

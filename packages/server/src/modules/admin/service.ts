@@ -2,9 +2,9 @@ import fs from "node:fs";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import argon2 from "argon2";
-import { eq, and, notInArray, desc } from "drizzle-orm";
+import { eq, and, notInArray, desc, isNull, sql } from "drizzle-orm";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
-import type { ChannelVersionCheck, UpdateChannel, UpdateRun, VersionCheckResult, PushNotificationPayload } from "@notorious/shared";
+import type { ChannelVersionCheck, UpdateChannel, UpdateRun, VersionCheckResult, PushNotificationPayload, AdminNotification } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import {
   users,
@@ -20,12 +20,14 @@ import {
   workspaceInvites,
   adminAuditLog,
   updateRuns,
+  adminNotifications,
 } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, conflict, notFound } from "../../lib/httpError.js";
 import { registerUser } from "../auth/service.js";
 import { deleteWorkspace } from "../workspaces/service.js";
 import { notifyUser } from "../push/service.js";
+import { sendToUserGlobal } from "../realtime/hub.js";
 import { countServerAdmins } from "./access.js";
 import { repoRoot } from "../../env.js";
 
@@ -334,10 +336,20 @@ export function verifySudoPassword(password: string): Promise<boolean> {
  *
  * `channel` is forwarded as `--channel=<nightly|release>` - update.sh
  * requires it (see scripts/update.sh's usage check).
+ *
+ * `trigger`/`startedAt` are forwarded as env vars
+ * (`NOTORIOUS_UPDATE_TRIGGER`/`NOTORIOUS_UPDATE_STARTED_AT`) that update.sh
+ * passes straight through to the `record-update-outcome` script it runs
+ * right before restarting the service - see that script's doc comment for
+ * why the history/notification write has to happen there, before the
+ * restart, rather than after this child process's `close` event (which a
+ * successful update's own restart never lives to fire).
  */
-export function runUpdateScript(skipRestart: boolean, channel: UpdateChannel) {
+export function runUpdateScript(skipRestart: boolean, channel: UpdateChannel, trigger: "manual" | "auto", startedAt: string) {
   const env = updateScriptEnv();
   if (skipRestart) env.NOTORIOUS_SKIP_RESTART = "1";
+  env.NOTORIOUS_UPDATE_TRIGGER = trigger;
+  env.NOTORIOUS_UPDATE_STARTED_AT = startedAt;
   return spawn("bash", ["scripts/update.sh", `--channel=${channel}`], { cwd: repoRoot, detached: true, env });
 }
 
@@ -407,10 +419,53 @@ export function restartServerProcess() {
 
 // ---- Update history / notifications ---------------------------------------
 
-/** Sends a Web Push notification to every account with `users.is_server_admin` set - used by modules/admin/autoUpdateScheduler.ts to report an unattended update's outcome (nobody is watching the admin panel when it runs). */
+/** Sends a Web Push notification to every account with `users.is_server_admin` set - used by modules/admin/autoUpdateScheduler.ts (and scripts/recordUpdateOutcome.ts) to report an unattended update's outcome (nobody is watching the admin panel when it runs). Also writes an `admin_notifications` row and pushes it live over `/ws/chat` for each admin - see `toAdminNotification`'s doc comment for why this and Web Push are sent together rather than one implying the other. */
 export async function notifyAllAdmins(payload: PushNotificationPayload): Promise<void> {
   const admins = await db.select({ id: users.id }).from(users).where(eq(users.isServerAdmin, true));
-  await Promise.all(admins.map((admin) => notifyUser(admin.id, payload)));
+  await Promise.all(
+    admins.map(async (admin) => {
+      await notifyUser(admin.id, payload);
+      if ("url" in payload) await createAdminNotification(admin.id, { type: payload.type, title: payload.title, body: payload.body, url: payload.url });
+    }),
+  );
+}
+
+function toAdminNotification(row: typeof adminNotifications.$inferSelect): AdminNotification {
+  return { id: row.id, userId: row.userId, type: row.type, title: row.title, body: row.body, url: row.url, createdAt: row.createdAt, readAt: row.readAt };
+}
+
+/**
+ * Writes one admin-bell row and pushes it live to the recipient's connected
+ * devices - the in-app counterpart to `notifyUser`'s Web Push, sent from the
+ * same call sites (currently only `notifyAllAdmins` above) so a bell entry
+ * and a push notification always go out together for the same event.
+ */
+async function createAdminNotification(userId: string, input: { type: string; title: string; body: string; url: string }): Promise<void> {
+  const notification = toAdminNotification({ id: newId(), userId, createdAt: nowIso(), readAt: null, ...input });
+  await db.insert(adminNotifications).values(notification);
+  sendToUserGlobal(userId, { type: "adminNotification", notification });
+}
+
+/** Most-recent-first, capped at 50 - a bell dropdown, not a full archive. Mirrors modules/notifications/service.ts's `listNotifications`. */
+export async function listAdminNotifications(userId: string): Promise<AdminNotification[]> {
+  const rows = await db.select().from(adminNotifications).where(eq(adminNotifications.userId, userId)).orderBy(desc(adminNotifications.createdAt)).limit(50);
+  return rows.map(toAdminNotification);
+}
+
+export async function countUnreadAdminNotifications(userId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(adminNotifications)
+    .where(and(eq(adminNotifications.userId, userId), isNull(adminNotifications.readAt)));
+  return Number(rows[0]?.count ?? 0);
+}
+
+export async function markAdminNotificationRead(id: string, userId: string): Promise<void> {
+  await db.update(adminNotifications).set({ readAt: nowIso() }).where(and(eq(adminNotifications.id, id), eq(adminNotifications.userId, userId)));
+}
+
+export async function markAllAdminNotificationsRead(userId: string): Promise<void> {
+  await db.update(adminNotifications).set({ readAt: nowIso() }).where(and(eq(adminNotifications.userId, userId), isNull(adminNotifications.readAt)));
 }
 
 export interface RecordUpdateRunInput {

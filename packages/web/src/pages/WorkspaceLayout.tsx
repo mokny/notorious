@@ -25,6 +25,7 @@ import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
 import { NotificationBell } from "../components/nav/NotificationBell.js";
+import { AdminNotificationBell } from "../components/nav/AdminNotificationBell.js";
 import { MobileTopBar } from "../components/nav/MobileTopBar.js";
 import { MobileBottomBar } from "../components/nav/MobileBottomBar.js";
 import { SearchSheet } from "../components/search/SearchSheet.js";
@@ -255,6 +256,7 @@ function WorkspaceLayoutInner() {
           </div>
           <div className="flex items-center gap-1">
             {!shareToken && workspaceId && <NotificationBell workspaceId={workspaceId} />}
+            {!shareToken && <AdminNotificationBell />}
             <button onClick={toggle} className="rounded-md p-1.5 text-ink-muted hover:bg-surface hover:text-ink" title={t("nav.toggleTheme")}>
               <Icon name={theme === "dark" ? "sun" : "moon"} />
             </button>
