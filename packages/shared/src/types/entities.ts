@@ -522,3 +522,46 @@ export interface SystemUpdateStatusMessage {
   reason?: "update" | "restart";
   version: string;
 }
+
+// ---- Self-update (see modules/admin/service.ts, modules/admin/autoUpdateScheduler.ts) ----
+
+/** `release` = the latest published GitHub Release (`vMAJOR.MINOR.0`, cut via `npm run release`); `nightly` = the tip of `main`. */
+export type UpdateChannel = "nightly" | "release";
+
+/** Per-channel result of comparing the running version against that channel's latest - see `modules/admin/service.ts`'s `checkChannelForUpdate`. */
+export interface ChannelVersionCheck {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+  /** True if `latest` is actually older than `current` - lets the UI grey out "Update" on a channel that would downgrade the instance without a second round-trip. */
+  wouldDowngrade: boolean;
+  /** False only for `release` when no GitHub Release has been published yet (falls back to nightly behavior server-side). */
+  hasRelease: boolean;
+}
+
+/** `GET /api/v1/admin/version-check` response shape. */
+export interface VersionCheckResult {
+  nightly: ChannelVersionCheck;
+  release: ChannelVersionCheck;
+}
+
+/** `GET /api/v1/admin/auto-update` response shape - never includes the sudo password itself, see modules/admin/sudoCrypto.ts. */
+export interface AutoUpdateSettings {
+  enabled: boolean;
+  channel: UpdateChannel;
+  time: string | null;
+  hasSudoPassword: boolean;
+}
+
+/** One row of `update_runs` - see `GET /api/v1/admin/update/history`. */
+export interface UpdateRun {
+  id: string;
+  startedAt: string;
+  finishedAt: string | null;
+  trigger: "manual" | "auto";
+  channel: UpdateChannel;
+  fromVersion: string;
+  toVersion: string | null;
+  status: "success" | "failure";
+  errorMessage: string | null;
+}

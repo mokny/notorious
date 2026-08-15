@@ -1171,15 +1171,41 @@
       "confirmTypeEmail": "Type {{email}} to confirm"
     },
     "update": {
+      "channelRelease": "Release",
+      "channelNightly": "Nightly",
       "currentVersion": "Current version: {{version}}",
+      "latestVersion": "Latest version: {{version}}",
+      "noRelease": "No release available yet",
       "available": "Update available: v{{version}}",
-      "upToDate": "Up to date.",
+      "upToDate": "Already up to date",
+      "wouldDowngrade": "Installing this would downgrade the instance",
       "updateButton": "Update now",
+      "nightlyWarning": "Nightly builds can be unstable and may contain bugs.",
       "waitingForRestart": "Waiting for the server to come back online…",
       "backOnline": "Server is back online.",
       "restartUncertain": "The update finished, but the server hasn't come back online with the new version yet. Check its status manually.",
       "sudoPasswordTitle": "Sudo password required",
-      "sudoPasswordDescription": "This server isn't running as root, so restarting the service needs your sudo password. It's used once, right before the restart, and never stored."
+      "sudoPasswordDescription": "This server isn't running as root, so restarting the service needs your sudo password. It's used once, right before the restart, and never stored.",
+      "autoUpdate": {
+        "title": "Automatic updates",
+        "enableLabel": "Enable automatic updates",
+        "channelLabel": "Channel",
+        "timeLabel": "Time",
+        "sudoPasswordLabel": "Sudo password",
+        "sudoPasswordStored": "A password is already stored.",
+        "clearSudoPassword": "Remove password",
+        "sudoPasswordMissingWarning": "No sudo password is stored - automatic updates won't be able to restart the service until one is provided.",
+        "saveButton": "Save",
+        "saved": "Saved."
+      },
+      "history": {
+        "title": "Update history",
+        "empty": "No update runs yet.",
+        "triggerManual": "Manual",
+        "triggerAuto": "Automatic",
+        "statusSuccess": "Success",
+        "statusFailure": "Failure"
+      }
     },
     "auditLog": {
       "empty": "No admin actions logged yet."

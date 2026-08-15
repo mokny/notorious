@@ -16,7 +16,9 @@ curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/instal
 ```
 
 No git required - this one-liner downloads the code as a tarball (via curl, falling back to wget) into
-`./notorious` and runs the installer. `scripts/install.sh` does everything below in one pass:
+`./notorious` and runs the installer. It installs the latest published GitHub Release (see
+"Versioning" below); if none has been published yet, it falls back to the tip of `main` and prints a
+notice. `scripts/install.sh` does everything below in one pass:
 checks/installs Node.js 20+ and (on Debian/Ubuntu) the build tools needed if `better-sqlite3`/`argon2`
 have to compile from source, `npm install`, sets up `.env` (generates `SESSION_SECRET`, optionally a
 VAPID key pair), builds, migrates, offers to create your first user account, and asks whether to
@@ -146,22 +148,42 @@ sudo systemctl enable --now notorious
 
 ```bash
 cd /opt/notorious
-curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash -s -- --channel=release
+```
+
+`--channel` is required - `release` updates to the latest published GitHub Release (falling back to
+`main` with a notice if none exists yet); `nightly` always updates to the tip of `main`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash -s -- --channel=nightly
 ```
 
 No git required, either - `scripts/update.sh` downloads the latest code as a tarball and syncs it in
 (`.env` and `data/` are untouched - neither is part of the download), runs `npm install`, rebuilds, runs
-any pending migrations, and restarts the systemd service if `install.sh` set one up. Equivalent by
-hand:
+any pending migrations, and restarts the systemd service if `install.sh` set one up. Before downloading
+anything it compares the remote channel's `package.json` version against the local one and refuses to
+run if that would be a downgrade (exits with an error), and exits immediately with "already up to date"
+if the versions match. Equivalent by hand (release channel, substitute the tag you want):
 
 ```bash
 cd /opt/notorious
-curl -fsSL https://github.com/mokny/notorious/archive/refs/heads/main.tar.gz | tar xz --strip-components=1
+curl -fsSL https://github.com/mokny/notorious/archive/refs/tags/vX.Y.0.tar.gz | tar xz --strip-components=1
 npm install            # picks up any new/updated dependencies
 npm run build
 npm run migrate
 sudo systemctl restart notorious
 ```
+
+### Auto-Update
+
+The admin panel's Update tab (`/admin` -> Update) can also schedule unattended updates: pick a
+channel (`nightly`/`release`), a daily local-server time, and - on a systemd install without
+passwordless `sudo` configured - a sudo password (stored encrypted at rest, see
+`modules/admin/sudoCrypto.ts`, never exposed back to the browser). Once a day at the configured time
+the server checks the chosen channel and, if a newer non-downgrade version is available, runs the same
+update flow `scripts/update.sh` uses and restarts the service. Every attempted auto-update (success or
+failure) is logged to the update history and triggers a Web Push notification to every server admin;
+a check that finds nothing new logs nothing.
 
 Migrations are additive and tracked in a `_migrations` table (see `packages/server/src/db/migrate.ts`),
 so re-running them is always safe - already-applied migrations are skipped.

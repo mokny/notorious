@@ -121,6 +121,10 @@ import type {
   AdminUpdateSettingsInput,
   AdminCallsSetupInput,
   AdminTriggerUpdateInput,
+  AdminUpdateAutoUpdateInput,
+  VersionCheckResult,
+  AutoUpdateSettings,
+  UpdateRun,
 } from "@notorious/shared";
 import type {
   PublicKeyCredentialCreationOptionsJSON,
@@ -619,12 +623,6 @@ export interface AdminAuditEntry {
   createdAt: string;
 }
 
-export interface AdminVersionCheck {
-  current: string;
-  latest: string | null;
-  updateAvailable: boolean;
-}
-
 export const adminApi = {
   getSettings: () => apiRequest<AdminSettings>("/api/v1/admin/settings"),
   updateSettings: (input: AdminUpdateSettingsInput) => apiRequest<AdminSettings>("/api/v1/admin/settings", { method: "PATCH", body: input }),
@@ -638,9 +636,13 @@ export const adminApi = {
 
   auditLog: () => apiRequest<AdminAuditEntry[]>("/api/v1/admin/audit-log"),
 
-  versionCheck: () => apiRequest<AdminVersionCheck>("/api/v1/admin/version-check"),
+  versionCheck: () => apiRequest<VersionCheckResult>("/api/v1/admin/version-check"),
   /** Whether `streamUpdate` needs a `sudoPassword` - see AdminUpdateTab.tsx. */
   updateSudoRequired: () => apiRequest<{ required: boolean }>("/api/v1/admin/update/sudo-required"),
+  updateHistory: (limit = 10) => apiRequest<UpdateRun[]>("/api/v1/admin/update/history", { query: { limit } }),
+  getAutoUpdateSettings: () => apiRequest<AutoUpdateSettings>("/api/v1/admin/auto-update"),
+  updateAutoUpdateSettings: (input: AdminUpdateAutoUpdateInput) =>
+    apiRequest<AutoUpdateSettings>("/api/v1/admin/auto-update", { method: "PATCH", body: input }),
   /**
    * Streams `POST /api/v1/admin/update`'s output live - uses `fetch` +
    * a manual reader rather than `EventSource` (which can only issue GET

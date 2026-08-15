@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/mokny/notorious"
-BRANCH="main"
+GITHUB_LATEST_RELEASE_API="https://api.github.com/repos/mokny/notorious/releases/latest"
 
 # `curl ... | bash` has no real script file on disk - BASH_SOURCE[0] is just
 # the literal string "bash" in that case, which doesn't resolve to a path.
@@ -25,12 +25,34 @@ if [ ! -f "${BASH_SOURCE[0]:-/nonexistent}" ]; then
     exit 1
   fi
 
-  echo "==> Downloading Notorious ($BRANCH)"
+  # Prefer the latest published GitHub Release (see `npm run release` /
+  # scripts/release.mjs); fall back to the tip of main if none exists yet
+  # (e.g. a fresh fork, or before the first release was ever cut) - same
+  # resolution scripts/update.sh's --channel=release does.
+  ARCHIVE_REF="refs/heads/main"
+  DISPLAY_REF="main (nightly)"
+  if command -v curl >/dev/null 2>&1; then
+    RELEASE_JSON="$(curl -fsSL "$GITHUB_LATEST_RELEASE_API" 2>/dev/null || true)"
+  elif command -v wget >/dev/null 2>&1; then
+    RELEASE_JSON="$(wget -qO- "$GITHUB_LATEST_RELEASE_API" 2>/dev/null || true)"
+  else
+    echo "Need curl or wget to download Notorious - install either and try again." >&2
+    exit 1
+  fi
+  TAG="$(printf '%s' "${RELEASE_JSON:-}" | grep -o '"tag_name": *"[^"]*"' | head -n1 | sed -E 's/.*"tag_name": *"([^"]*)".*/\1/')"
+  if [ -n "$TAG" ]; then
+    ARCHIVE_REF="refs/tags/$TAG"
+    DISPLAY_REF="$TAG"
+  else
+    echo "Noch kein Release vorhanden - installiere Nightly von main"
+  fi
+
+  echo "==> Downloading Notorious ($DISPLAY_REF)"
   mkdir -p "$TARGET_DIR"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$REPO_URL/archive/refs/heads/$BRANCH.tar.gz" | tar xz -C "$TARGET_DIR" --strip-components=1
+    curl -fsSL "$REPO_URL/archive/$ARCHIVE_REF.tar.gz" | tar xz -C "$TARGET_DIR" --strip-components=1
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO- "$REPO_URL/archive/refs/heads/$BRANCH.tar.gz" | tar xz -C "$TARGET_DIR" --strip-components=1
+    wget -qO- "$REPO_URL/archive/$ARCHIVE_REF.tar.gz" | tar xz -C "$TARGET_DIR" --strip-components=1
   else
     echo "Need curl or wget to download Notorious - install either and try again." >&2
     exit 1

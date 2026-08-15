@@ -183,3 +183,9 @@ version per commit - by a `pre-commit` git hook (`.githooks/pre-commit`, running
 the same commit. `npm install` wires this up for you (via the `prepare` script, which runs
 `git config core.hooksPath .githooks`); after cloning the repo, running `npm install` once is enough -
 no extra setup step required.
+
+On top of that per-commit patch counter, `npm run release` (`scripts/release.mjs`) cuts a real
+GitHub Release: it bumps to the next `vMAJOR.MINOR.0`, runs typecheck/lint/build, commits, tags, pushes,
+and publishes the release via the `gh` CLI. Deployments can then track either the `release` channel
+(the latest published release) or the `nightly` channel (the tip of `main`) - see
+`docs/DEPLOYMENT.md`'s "Updating" and "Auto-Update" sections.

@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import argon2 from "argon2";
 import { eq, and, notInArray, desc } from "drizzle-orm";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
+import type { ChannelVersionCheck, UpdateChannel, UpdateRun, VersionCheckResult, PushNotificationPayload } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import {
   users,
@@ -18,17 +19,18 @@ import {
   webhooks,
   workspaceInvites,
   adminAuditLog,
+  updateRuns,
 } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, conflict, notFound } from "../../lib/httpError.js";
 import { registerUser } from "../auth/service.js";
 import { deleteWorkspace } from "../workspaces/service.js";
+import { notifyUser } from "../push/service.js";
 import { countServerAdmins } from "./access.js";
 import { repoRoot } from "../../env.js";
 
 const PLACEHOLDER_USER_ID = "system-deleted-user";
 const PLACEHOLDER_USER_EMAIL = "deleted-user@system.notorious.local";
-const GITHUB_PACKAGE_JSON_URL = "https://raw.githubusercontent.com/mokny/notorious/main/package.json";
 
 // ---- Audit log --------------------------------------------------------
 
@@ -197,32 +199,76 @@ function isNewerVersion(current: string, latest: string): boolean {
   return false;
 }
 
-export interface VersionCheckResult {
-  current: string;
-  latest: string | null;
-  updateAvailable: boolean;
-}
+const GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/mokny/notorious/releases/latest";
+const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/mokny/notorious";
 
-/**
- * Compares the running `package.json` version against `main`'s on GitHub.
- * There are no git tags/releases in this repo - but the pre-commit hook
- * (`.githooks/pre-commit` -> `scripts/bump-version.mjs`) bumps the patch
- * version on every commit, so the version string itself is effectively a
- * monotonic build counter, good enough to detect "main has moved on".
- */
-export async function checkForUpdate(currentVersion: string): Promise<VersionCheckResult> {
+/** Fetches `package.json`'s `version` field from a given ref (branch name or tag) on GitHub, or `null` on any failure/timeout. */
+async function fetchRemoteVersion(ref: string): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(GITHUB_PACKAGE_JSON_URL, { signal: controller.signal });
+    const response = await fetch(`${GITHUB_RAW_BASE}/${ref}/package.json`, { signal: controller.signal });
     clearTimeout(timeout);
-    if (!response.ok) return { current: currentVersion, latest: null, updateAvailable: false };
+    if (!response.ok) return null;
     const remote = (await response.json()) as { version?: string };
-    if (!remote.version) return { current: currentVersion, latest: null, updateAvailable: false };
-    return { current: currentVersion, latest: remote.version, updateAvailable: isNewerVersion(currentVersion, remote.version) };
+    return remote.version ?? null;
   } catch {
-    return { current: currentVersion, latest: null, updateAvailable: false };
+    return null;
   }
+}
+
+/** The `tag_name` of the latest published GitHub Release (see `scripts/release.mjs`), or `null` if none exists yet/the API call fails. */
+async function fetchLatestReleaseTag(): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(GITHUB_LATEST_RELEASE_URL, {
+      signal: controller.signal,
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    clearTimeout(timeout);
+    if (!response.ok) return null;
+    const data = (await response.json()) as { tag_name?: string };
+    return data.tag_name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The ref a channel currently resolves to - `release` falls back to `main` (same as nightly) when no GitHub Release has been published yet, mirroring scripts/update.sh's fallback. */
+async function resolveChannelRef(channel: UpdateChannel): Promise<{ ref: string; hasRelease: boolean }> {
+  if (channel === "nightly") return { ref: "main", hasRelease: true };
+  const tag = await fetchLatestReleaseTag();
+  return tag ? { ref: tag, hasRelease: true } : { ref: "main", hasRelease: false };
+}
+
+/**
+ * Compares the running `package.json` version against a single channel's
+ * latest on GitHub. There are no version numbers in tags for nightly - the
+ * pre-commit hook (`.githooks/pre-commit` -> `scripts/bump-version.mjs`)
+ * bumps the patch version on every commit, so `main`'s version string is
+ * effectively a monotonic build counter, good enough to detect "main has
+ * moved on". `release` compares against the latest GitHub Release cut by
+ * `npm run release` (see scripts/release.mjs).
+ */
+export async function checkChannelForUpdate(channel: UpdateChannel, currentVersion: string): Promise<ChannelVersionCheck> {
+  const { ref, hasRelease } = await resolveChannelRef(channel);
+  const latest = hasRelease || channel === "nightly" ? await fetchRemoteVersion(ref) : null;
+  return {
+    current: currentVersion,
+    latest,
+    updateAvailable: latest !== null && isNewerVersion(currentVersion, latest),
+    wouldDowngrade: latest !== null && isNewerVersion(latest, currentVersion),
+    hasRelease,
+  };
+}
+
+export async function checkForUpdate(currentVersion: string): Promise<VersionCheckResult> {
+  const [nightly, release] = await Promise.all([
+    checkChannelForUpdate("nightly", currentVersion),
+    checkChannelForUpdate("release", currentVersion),
+  ]);
+  return { nightly, release };
 }
 
 // ---- Update / restart -----------------------------------------------------
@@ -285,11 +331,14 @@ export function verifySudoPassword(password: string): Promise<boolean> {
  * restart` has no way to prompt for a password here (no TTY), so doing the
  * restart as a separate, explicitly-password-fed step is the only way to
  * make it actually succeed non-interactively as a non-root user.
+ *
+ * `channel` is forwarded as `--channel=<nightly|release>` - update.sh
+ * requires it (see scripts/update.sh's usage check).
  */
-export function runUpdateScript(skipRestart: boolean) {
+export function runUpdateScript(skipRestart: boolean, channel: UpdateChannel) {
   const env = updateScriptEnv();
   if (skipRestart) env.NOTORIOUS_SKIP_RESTART = "1";
-  return spawn("bash", ["scripts/update.sh"], { cwd: repoRoot, detached: true, env });
+  return spawn("bash", ["scripts/update.sh", `--channel=${channel}`], { cwd: repoRoot, detached: true, env });
 }
 
 /**
@@ -354,5 +403,34 @@ export function restartServerProcess() {
     ],
     { cwd: repoRoot, detached: true },
   );
+}
+
+// ---- Update history / notifications ---------------------------------------
+
+/** Sends a Web Push notification to every account with `users.is_server_admin` set - used by modules/admin/autoUpdateScheduler.ts to report an unattended update's outcome (nobody is watching the admin panel when it runs). */
+export async function notifyAllAdmins(payload: PushNotificationPayload): Promise<void> {
+  const admins = await db.select({ id: users.id }).from(users).where(eq(users.isServerAdmin, true));
+  await Promise.all(admins.map((admin) => notifyUser(admin.id, payload)));
+}
+
+export interface RecordUpdateRunInput {
+  startedAt: string;
+  finishedAt: string;
+  trigger: "manual" | "auto";
+  channel: UpdateChannel;
+  fromVersion: string;
+  toVersion: string | null;
+  status: "success" | "failure";
+  errorMessage: string | null;
+}
+
+/** Writes one `update_runs` row - see modules/admin/autoUpdateScheduler.ts, which always writes one (success or failure) for every genuinely attempted update. */
+export async function recordUpdateRun(input: RecordUpdateRunInput): Promise<void> {
+  await db.insert(updateRuns).values({ id: newId(), ...input });
+}
+
+export async function listUpdateHistory(limit = 10): Promise<UpdateRun[]> {
+  const rows = await db.select().from(updateRuns).orderBy(desc(updateRuns.startedAt)).limit(limit);
+  return rows as UpdateRun[];
 }
 

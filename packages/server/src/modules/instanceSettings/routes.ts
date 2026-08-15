@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { adminUpdateSettingsSchema } from "@notorious/shared";
+import { adminUpdateSettingsSchema, adminUpdateAutoUpdateSchema } from "@notorious/shared";
 import { requireInstanceAdmin } from "../admin/access.js";
 import { logAdminAction } from "../admin/service.js";
+import { encryptSudoPassword } from "../admin/sudoCrypto.js";
 import {
   getRegistrationEnabled,
   setRegistrationEnabled,
@@ -11,6 +12,8 @@ import {
   setAllowTemplateHttpRequests,
   getCallsEnabled,
   setCallsEnabled,
+  getAutoUpdateSettings,
+  setAutoUpdateSettings,
 } from "./service.js";
 
 /** Admin-only read/write for the instance-wide toggles that used to be CLI-only (see scripts/setRegistration.ts and friends) - now available from the /admin UI too. The CLI scripts remain as-is for headless/first-time setup. */
@@ -58,5 +61,32 @@ export async function registerInstanceSettingsRoutes(app: FastifyInstance): Prom
       getCallsEnabled(),
     ]);
     return { registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled };
+  });
+
+  // ---- Auto-update ----
+
+  app.get("/api/v1/admin/auto-update", async (request) => {
+    await requireInstanceAdmin(request);
+    return getAutoUpdateSettings();
+  });
+
+  /** `sudoPassword: undefined` leaves the stored password unchanged; `null`/`""` clears it; any other string replaces it (encrypted here, never stored/returned in plaintext - see modules/admin/sudoCrypto.ts). */
+  app.patch("/api/v1/admin/auto-update", async (request) => {
+    const admin = await requireInstanceAdmin(request);
+    const input = adminUpdateAutoUpdateSchema.parse(request.body);
+
+    let sudoPasswordEncrypted: string | null | undefined;
+    if (input.sudoPassword !== undefined) {
+      sudoPasswordEncrypted = input.sudoPassword ? encryptSudoPassword(input.sudoPassword) : null;
+    }
+
+    await setAutoUpdateSettings({ enabled: input.enabled, channel: input.channel, time: input.time, sudoPasswordEncrypted });
+    await logAdminAction(
+      admin,
+      "settings.auto-update",
+      `Configured auto-update: ${input.enabled ? "enabled" : "disabled"}, channel ${input.channel}${input.time ? `, time ${input.time}` : ""}`,
+    );
+
+    return getAutoUpdateSettings();
   });
 }

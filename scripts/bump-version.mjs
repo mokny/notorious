@@ -6,6 +6,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Set by scripts/release.mjs on the one commit that cuts a real release
+// (`chore(release): vX.Y.0`) - that script already wrote the correct
+// major.minor.0 version itself, so this hook must not tack on another +1.
+if (process.env.NOTORIOUS_RELEASE === "1") {
+  process.exit(0);
+}
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJsonPath = path.join(repoRoot, "package.json");
 

@@ -607,6 +607,17 @@ export const instanceSettings = sqliteTable("instance_settings", {
   // that port forwarded. See scripts/setupCalls.ts, which flips this on only
   // after that's confirmed.
   callsEnabled: integer("calls_enabled", { mode: "boolean" }).notNull().default(false),
+  // Scheduled unattended self-update (see modules/admin/autoUpdateScheduler.ts) -
+  // off by default. `autoUpdateTime` is a "HH:MM" 24h local-server-time string,
+  // nullable until the admin picks one. `autoUpdateSudoPasswordEncrypted` is
+  // only ever populated/read by the server (AES-256-GCM via
+  // modules/admin/sudoCrypto.ts) - never returned to a client, see
+  // modules/instanceSettings/service.ts's `getAutoUpdateSettings`, which only
+  // exposes a `hasSudoPassword` boolean.
+  autoUpdateEnabled: integer("auto_update_enabled", { mode: "boolean" }).notNull().default(false),
+  autoUpdateChannel: text("auto_update_channel").notNull().default("nightly"),
+  autoUpdateTime: text("auto_update_time"),
+  autoUpdateSudoPasswordEncrypted: text("auto_update_sudo_password_encrypted"),
 });
 
 // Append-only log of security-relevant admin actions - see modules/admin/service.ts's
@@ -621,6 +632,23 @@ export const adminAuditLog = sqliteTable("admin_audit_log", {
   action: text("action").notNull(),
   summary: text("summary").notNull(),
   createdAt: text("created_at").notNull(),
+});
+
+// History log of self-update attempts (manual admin-triggered or scheduled
+// auto-update) - see modules/admin/autoUpdateScheduler.ts and
+// modules/admin/routes.ts's `GET /api/v1/admin/update/history`. Text `id`
+// via newId(), same convention as adminAuditLog above, rather than an
+// autoincrement integer PK (no other table in this schema uses one).
+export const updateRuns = sqliteTable("update_runs", {
+  id: text("id").primaryKey(),
+  startedAt: text("started_at").notNull(),
+  finishedAt: text("finished_at"),
+  trigger: text("trigger").notNull(), // 'manual' | 'auto'
+  channel: text("channel").notNull(), // 'nightly' | 'release'
+  fromVersion: text("from_version").notNull(),
+  toVersion: text("to_version"),
+  status: text("status").notNull(), // 'success' | 'failure'
+  errorMessage: text("error_message"),
 });
 
 export const pushSubscriptions = sqliteTable("push_subscriptions", {

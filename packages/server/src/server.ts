@@ -6,6 +6,7 @@ import { initScriptEngine } from "./modules/scripting/engine.js";
 import { startBackupScheduler } from "./modules/backup/scheduler.js";
 import { startAiUsageScheduler } from "./modules/ai/scheduler.js";
 import { startFeedScheduler } from "./modules/feeds/scheduler.js";
+import { startAutoUpdateScheduler } from "./modules/admin/autoUpdateScheduler.js";
 
 const app = await buildApp();
 
@@ -14,6 +15,7 @@ startShareInboxCleanup();
 startBackupScheduler();
 startAiUsageScheduler();
 startFeedScheduler();
+startAutoUpdateScheduler();
 await initScriptEngine();
 
 app

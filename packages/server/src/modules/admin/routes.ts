@@ -17,12 +17,16 @@ import {
   runUpdateScript,
   restartWithSudoPassword,
   restartServerProcess,
+  listUpdateHistory,
+  checkChannelForUpdate,
+  recordUpdateRun,
 } from "./service.js";
 import { setCallsEnabled } from "../instanceSettings/service.js";
 import { broadcastSystemStatus } from "../realtime/hub.js";
 import { detectPublicIp } from "../../lib/publicIp.js";
 import { upsertEnvVars } from "../../lib/envFile.js";
 import { repoRoot } from "../../env.js";
+import { nowIso } from "../../lib/ids.js";
 import { badRequest, unauthorized } from "../../lib/httpError.js";
 
 const PACKAGE_VERSION = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
@@ -96,6 +100,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     return { required: await updateNeedsSudoPassword() };
   });
 
+  app.get("/api/v1/admin/update/history", async (request) => {
+    await requireInstanceAdmin(request);
+    const { limit } = request.query as { limit?: string };
+    const parsedLimit = limit ? Number(limit) : 10;
+    return listUpdateHistory(Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 10);
+  });
+
   /**
    * Streams `scripts/update.sh`'s output live as it runs (SSE-shaped, but
    * read via `fetch` + a streaming reader on the frontend rather than
@@ -119,11 +130,14 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       if (!(await verifySudoPassword(input.sudoPassword))) throw unauthorized("Incorrect sudo password");
     }
 
-    await logAdminAction(admin, "update.trigger", "Triggered a server update");
+    await logAdminAction(admin, "update.trigger", `Triggered a server update (${input.channel})`);
     // See SystemUpdateStatusMessage's doc comment: every open tab/device
     // app-wide (not just this admin's) needs to know an update is running
     // before the service restart severs their sockets.
     broadcastSystemStatus({ type: "systemUpdate", status: "inProgress", reason: "update", version: PACKAGE_VERSION });
+
+    const startedAt = nowIso();
+    const preCheck = await checkChannelForUpdate(input.channel, PACKAGE_VERSION);
 
     reply.hijack();
     reply.raw.writeHead(200, {
@@ -132,7 +146,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       Connection: "keep-alive",
     });
 
-    const child = runUpdateScript(needsSudo);
+    const child = runUpdateScript(needsSudo, input.channel);
     const send = (line: string) => reply.raw.write(`data: ${JSON.stringify(line)}\n\n`);
 
     child.stdout?.on("data", (chunk: Buffer) => send(chunk.toString()));
@@ -140,9 +154,30 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     child.on("error", (error) => {
       send(`Error: ${error.message}`);
       broadcastSystemStatus({ type: "systemUpdate", status: "failed", reason: "update", version: PACKAGE_VERSION });
+      recordUpdateRun({
+        startedAt,
+        finishedAt: nowIso(),
+        trigger: "manual",
+        channel: input.channel,
+        fromVersion: PACKAGE_VERSION,
+        toVersion: null,
+        status: "failure",
+        errorMessage: error.message,
+      }).catch((e: unknown) => console.error("[admin] Failed to record update run:", e));
       reply.raw.end();
     });
     child.on("close", (code) => {
+      const success = code === 0;
+      recordUpdateRun({
+        startedAt,
+        finishedAt: nowIso(),
+        trigger: "manual",
+        channel: input.channel,
+        fromVersion: PACKAGE_VERSION,
+        toVersion: success ? preCheck.latest : null,
+        status: success ? "success" : "failure",
+        errorMessage: success ? null : `update.sh exited with code ${code}`,
+      }).catch((e: unknown) => console.error("[admin] Failed to record update run:", e));
       if (needsSudo && input.sudoPassword) {
         send("Restarting the service…");
         restartWithSudoPassword(input.sudoPassword);
