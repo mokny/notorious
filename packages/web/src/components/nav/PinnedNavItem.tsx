@@ -8,9 +8,11 @@ import { useObjectTitle } from "../../hooks/useObjectTitle.js";
 import { useWorkspacePins } from "../../hooks/useWorkspacePins.js";
 import { useHasHover } from "../../hooks/useHasHover.js";
 import { useTouchReveal } from "../../hooks/useTouchReveal.js";
+import { useObjectRowContextMenu } from "../../hooks/useObjectRowContextMenu.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { Icon } from "../ui/Icon.js";
 import { navLinkClass } from "./navLinkClass.js";
+import { ObjectRowContextMenuButton } from "./ObjectRowContextMenuButton.js";
 
 interface PinnedNavItemProps {
   workspaceId: string;
@@ -40,6 +42,7 @@ export function PinnedNavItem({ workspaceId, objectId, onTouchArmStart }: Pinned
   // link itself would need a second tap too, not just the buttons.
   const hasHover = useHasHover();
   const { touched, containerRef, onTouchStart } = useTouchReveal<HTMLDivElement>();
+  const rowMenu = useObjectRowContextMenu();
 
   const { data: object } = useQuery({
     queryKey: ["object", objectId],
@@ -85,6 +88,7 @@ export function PinnedNavItem({ workspaceId, objectId, onTouchArmStart }: Pinned
       <div
         ref={containerRef}
         onTouchStart={onTouchStart}
+        onContextMenu={canCurate ? rowMenu.openFromMouseEvent : undefined}
         className={`group flex items-center gap-0.5 rounded-lg pr-1 ${hasHover ? "hover:bg-surface" : touched ? "bg-surface" : ""}`}
       >
         {canCurate && (
@@ -111,6 +115,20 @@ export function PinnedNavItem({ workspaceId, objectId, onTouchArmStart }: Pinned
           <Icon name={icon} className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{title}</span>
         </NavLink>
+        {canCurate && (
+          <ObjectRowContextMenuButton
+            workspaceId={workspaceId}
+            objectId={objectId}
+            object={object}
+            pinned
+            onTogglePin={() => togglePin(objectId)}
+            position={rowMenu.position}
+            onOpen={rowMenu.openFromButton}
+            onClose={rowMenu.close}
+            hasHover={hasHover}
+            touched={touched}
+          />
+        )}
         {canCurate && (
           <button
             onClick={() => togglePin(objectId)}

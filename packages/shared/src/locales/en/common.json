@@ -87,6 +87,25 @@
       "removeReverifyConfirmTitle": "Remove reverify protection?",
       "removeReverifyConfirmDescription": "This object will become accessible without re-verification, same as any other object.",
       "removeReverifyConfirmLabel": "Remove protection"
+    },
+    "contextMenu": {
+      "moreActions": "More actions",
+      "openInNewTab": "Open in new tab",
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "lock": "Lock",
+      "unlock": "Unlock",
+      "archive": "Archive",
+      "restore": "Restore",
+      "share": "Share...",
+      "delete": "Delete"
+    },
+    "railContextMenu": {
+      "rename": "Rename",
+      "renamePlaceholder": "Workspace name",
+      "workspaceSettings": "Workspace settings...",
+      "inviteMembers": "Invite members...",
+      "deleteWorkspace": "Delete workspace..."
     }
   },
   "settings": {

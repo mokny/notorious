@@ -1,7 +1,7 @@
-import { useMemo, useState, type PointerEvent } from "react";
+import { useMemo, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -9,6 +9,9 @@ import type { Workspace } from "@notorious/shared";
 import { workspaceApi } from "../../lib/api/resources.js";
 import { useReorderWorkspaces } from "../../hooks/useReorderWorkspaces.js";
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
+import { useWorkspaceRole } from "../../hooks/useWorkspaceRole.js";
+import { useObjectRowContextMenu } from "../../hooks/useObjectRowContextMenu.js";
+import { ContextMenu, type ContextMenuEntry } from "../ui/ContextMenu.js";
 import { Icon } from "../ui/Icon.js";
 import { AccountMenuButton } from "./AccountMenuButton.js";
 import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog.js";
@@ -107,24 +110,112 @@ interface RailWorkspaceButtonProps {
   onTouchArmStart: (event: PointerEvent) => void;
 }
 
+/**
+ * Right-click only (no hover "..." button - see grill-me spec, the rail is
+ * too narrow at w-16 for a second icon per row). Rename happens inline: the
+ * icon button itself swaps for a text input rather than opening a separate
+ * dialog, closest match to "transform the row into an editable field" for
+ * something this compact.
+ */
 function RailWorkspaceButton({ workspace, isActive, onNavigate, onTouchArmStart }: RailWorkspaceButtonProps) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: workspace.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const rowMenu = useObjectRowContextMenu();
+  const { canEdit, isOwner } = useWorkspaceRole(workspace.id);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(workspace.name);
+
+  const renameMutation = useMutation({
+    mutationFn: (name: string) => workspaceApi.update(workspace.id, { name }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workspaces"] }),
+  });
+
+  function startRename() {
+    setRenameValue(workspace.name);
+    setRenaming(true);
+  }
+
+  function commitRename() {
+    setRenaming(false);
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== workspace.name) renameMutation.mutate(trimmed);
+  }
+
+  function handleRenameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") event.currentTarget.blur();
+    else if (event.key === "Escape") {
+      setRenameValue(workspace.name);
+      setRenaming(false);
+    }
+  }
+
+  const items: ContextMenuEntry[] = [
+    ...(canEdit ? [{ key: "rename", label: t("nav.railContextMenu.rename"), icon: "pencil", onSelect: startRename }] : []),
+    {
+      key: "settings",
+      label: t("nav.railContextMenu.workspaceSettings"),
+      icon: "settings",
+      onSelect: () => navigate(`/w/${workspace.id}/settings/general`),
+    },
+    {
+      key: "invite",
+      label: t("nav.railContextMenu.inviteMembers"),
+      icon: "user-plus",
+      onSelect: () => navigate(`/w/${workspace.id}/settings/members`),
+    },
+    ...(isOwner
+      ? ([
+          { key: "sep-delete", separator: true },
+          {
+            key: "delete",
+            label: t("nav.railContextMenu.deleteWorkspace"),
+            icon: "trash",
+            danger: true,
+            // Deliberately just links to the danger-zone tab rather than deleting inline from
+            // here - see grill-me spec: deleting a workspace is the single most destructive
+            // action in the app, not something a two-click right-click menu should shortcut.
+            onSelect: () => navigate(`/w/${workspace.id}/settings/danger-zone`),
+          },
+        ] satisfies ContextMenuEntry[])
+      : []),
+  ];
+
+  if (renaming) {
+    return (
+      <input
+        ref={setNodeRef}
+        style={style}
+        autoFocus
+        value={renameValue}
+        onChange={(event) => setRenameValue(event.target.value)}
+        onBlur={commitRename}
+        onKeyDown={handleRenameKeyDown}
+        className="h-10 w-14 shrink-0 rounded-xl border border-accent bg-surface px-1 text-center text-xs text-ink outline-none"
+      />
+    );
+  }
 
   return (
-    <button
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onPointerDownCapture={onTouchArmStart}
-      onClick={onNavigate}
-      title={workspace.name}
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
-        isActive ? "bg-accent/15 text-accent" : "text-ink-muted hover:bg-surface-raised hover:text-ink"
-      }`}
-    >
-      <Icon name={workspace.icon} className="h-5 w-5" />
-    </button>
+    <>
+      <button
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        onPointerDownCapture={onTouchArmStart}
+        onClick={onNavigate}
+        onContextMenu={rowMenu.openFromMouseEvent}
+        title={workspace.name}
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
+          isActive ? "bg-accent/15 text-accent" : "text-ink-muted hover:bg-surface-raised hover:text-ink"
+        }`}
+      >
+        <Icon name={workspace.icon} className="h-5 w-5" />
+      </button>
+      {rowMenu.position && <ContextMenu x={rowMenu.position.x} y={rowMenu.position.y} items={items} onClose={rowMenu.close} />}
+    </>
   );
 }

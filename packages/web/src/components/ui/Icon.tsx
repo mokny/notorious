@@ -100,6 +100,10 @@ import {
   Repeat,
   TextSelect,
   Eraser,
+  ExternalLink,
+  Archive,
+  ArchiveRestore,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -202,6 +206,10 @@ const ICONS: Record<string, LucideIcon> = {
   "turn-into": Repeat,
   "select-all": TextSelect,
   eraser: Eraser,
+  "external-link": ExternalLink,
+  archive: Archive,
+  "archive-restore": ArchiveRestore,
+  "user-plus": UserPlus,
 };
 
 function isImageUrl(value: string): boolean {

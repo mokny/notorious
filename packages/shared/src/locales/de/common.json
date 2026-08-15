@@ -86,6 +86,25 @@
       "removeReverifyConfirmTitle": "Verifizierungsschutz entfernen?",
       "removeReverifyConfirmDescription": "Dieses Objekt wird ohne erneute Verifizierung zugänglich, wie jedes andere Objekt auch.",
       "removeReverifyConfirmLabel": "Schutz entfernen"
+    },
+    "contextMenu": {
+      "moreActions": "Weitere Aktionen",
+      "openInNewTab": "In neuem Tab öffnen",
+      "pin": "Anheften",
+      "unpin": "Loslösen",
+      "lock": "Sperren",
+      "unlock": "Entsperren",
+      "archive": "Archivieren",
+      "restore": "Wiederherstellen",
+      "share": "Teilen...",
+      "delete": "Löschen"
+    },
+    "railContextMenu": {
+      "rename": "Umbenennen",
+      "renamePlaceholder": "Workspace-Name",
+      "workspaceSettings": "Workspace-Einstellungen...",
+      "inviteMembers": "Mitglieder einladen...",
+      "deleteWorkspace": "Workspace löschen..."
     }
   },
   "settings": {

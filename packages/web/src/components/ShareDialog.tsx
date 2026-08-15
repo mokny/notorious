@@ -24,8 +24,18 @@ interface ShareDialogProps {
   /** null shares the whole workspace; an object id scopes the share to just that object. */
   objectId: string | null;
   label: string;
-  /** "menuItem" renders the trigger as a full-width iOS-context-menu-style row (icon right, ~44px tap target) for embedding inside MobileTopBar.tsx's "…" menu (see IOSMenu.tsx) - the popover content itself is unchanged either way. Defaults to the compact toolbar-icon trigger used everywhere else. */
-  variant?: "toolbar" | "menuItem";
+  /**
+   * "menuItem" renders the trigger as a full-width iOS-context-menu-style row (icon right, ~44px tap target)
+   * for embedding inside MobileTopBar.tsx's "…" menu (see IOSMenu.tsx). "controlled" renders no trigger of its
+   * own at all - just the Modal, opened/closed via the `open`/`onOpenChange` props below - for a "Share..." row
+   * in some other already-open menu (see the sidebar's ContextMenu) that needs to open this dialog itself
+   * without also showing ShareDialog's own button. The popover/modal content itself is unchanged across variants.
+   * Defaults to the compact toolbar-icon trigger used everywhere else.
+   */
+  variant?: "toolbar" | "menuItem" | "controlled";
+  /** Only meaningful with variant="controlled" - otherwise this manages its own open state internally. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 function shareUrl(token: string): string {
@@ -67,8 +77,10 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /** Popover for creating/listing/revoking public share links - reused for both whole-workspace shares (Settings) and single-object shares (ObjectDetailPage). */
-export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar" }: ShareDialogProps) {
-  const [open, setOpen] = useState(false);
+export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar", open: openProp, onOpenChange }: ShareDialogProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
   const [role, setRole] = useState<ShareRole>("viewer");
   const [expiryMs, setExpiryMs] = useState<number | null>(null);
   const [copyState, setCopyState] = useState<{ linkId: string; ok: boolean } | null>(null);
@@ -214,6 +226,14 @@ export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar" 
   // it got visually clipped/squeezed into that panel's own bounds instead
   // of floating freely. A portaled Modal sidesteps that entirely - it's not
   // a descendant of the menu in the rendered DOM at all.
+  if (variant === "controlled") {
+    return (
+      <Modal open={open} onOpenChange={setOpen} title={title}>
+        {body}
+      </Modal>
+    );
+  }
+
   if (variant === "menuItem") {
     return (
       <>
@@ -234,7 +254,7 @@ export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar" 
   return (
     <div ref={containerRef} className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         title={label}
         className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
       >

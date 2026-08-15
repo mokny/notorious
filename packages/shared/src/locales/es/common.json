@@ -81,6 +81,25 @@
       "removeReverifyConfirmTitle": "¿Eliminar la protección de reverificación?",
       "removeReverifyConfirmDescription": "Este objeto será accesible sin reverificación, igual que cualquier otro objeto.",
       "removeReverifyConfirmLabel": "Eliminar protección"
+    },
+    "contextMenu": {
+      "moreActions": "Más acciones",
+      "openInNewTab": "Abrir en nueva pestaña",
+      "pin": "Fijar",
+      "unpin": "Desfijar",
+      "lock": "Bloquear",
+      "unlock": "Desbloquear",
+      "archive": "Archivar",
+      "restore": "Restaurar",
+      "share": "Compartir...",
+      "delete": "Eliminar"
+    },
+    "railContextMenu": {
+      "rename": "Renombrar",
+      "renamePlaceholder": "Nombre del espacio de trabajo",
+      "workspaceSettings": "Configuración del espacio de trabajo...",
+      "inviteMembers": "Invitar miembros...",
+      "deleteWorkspace": "Eliminar espacio de trabajo..."
     }
   },
   "settings": {
