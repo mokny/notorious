@@ -472,6 +472,8 @@
       "turnInto": "Turn into",
       "selectAll": "Select all",
       "clearFormatting": "Clear formatting",
+      "share": "Share",
+      "shareNoMembers": "No other workspace members",
       "setBlockId": "Set block id"
     },
     "slugButton": {

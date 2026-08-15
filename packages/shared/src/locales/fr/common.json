@@ -466,6 +466,8 @@
       "turnInto": "Convertir en",
       "selectAll": "Tout sélectionner",
       "clearFormatting": "Effacer la mise en forme",
+      "share": "Partager",
+      "shareNoMembers": "Aucun autre membre de l'espace de travail",
       "setBlockId": "Définir l'ID du bloc"
     },
     "slugButton": {

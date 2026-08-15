@@ -6,6 +6,7 @@ import { chatApi } from "../../lib/api/resources.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { Icon } from "../ui/Icon.js";
 import { Lightbox } from "../ui/Lightbox.js";
+import { linkifyText } from "../../lib/linkify.js";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -152,7 +153,7 @@ export function MessageBubble({
                   <div className="truncate opacity-70">{message.replyTo.deleted ? t("chat.messageBubble.messageDeleted") : message.replyTo.body || t("chat.messageBubble.attachment")}</div>
                 </button>
               )}
-              {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
+              {message.body && <p className="whitespace-pre-wrap break-words">{linkifyText(message.body)}</p>}
               {message.attachments.map((attachment) =>
                 attachment.mimeType.startsWith("image/") ? (
                   <button

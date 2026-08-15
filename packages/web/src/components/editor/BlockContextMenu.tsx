@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BlockType } from "@notorious/shared";
-import { blockApi } from "../../lib/api/resources.js";
+import { blockApi, chatApi, objectApi, workspaceApi } from "../../lib/api/resources.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
+import { useAuth } from "../../context/AuthContext.js";
+import { useChatOverlay } from "../../context/ChatOverlayContext.js";
 import { ApiError } from "../../lib/api/client.js";
 import { ContextMenu, useClampedPosition, type ContextMenuEntry } from "../ui/ContextMenu.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
@@ -30,10 +32,28 @@ function hasSelectionWithin(blockId: string): boolean {
  */
 export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: string; slug: string | null; type: BlockType; x: number; y: number }) {
   const { t } = useTranslation();
-  const { objectId, deleteBlock, copyBlock, cutBlock, duplicateBlock, turnIntoBlock, selectAllInEditor, closeBlockMenu } = useBlockEditor();
+  const { workspaceId, objectId, deleteBlock, copyBlock, cutBlock, duplicateBlock, turnIntoBlock, selectAllInEditor, closeBlockMenu } = useBlockEditor();
   const [slugEditorOpen, setSlugEditorOpen] = useState(false);
   const [hasSelection] = useState(() => hasSelectionWithin(blockId));
   const richTextEditor = getBlockEditor(blockId);
+  const { user: currentUser } = useAuth();
+  const chatOverlay = useChatOverlay();
+  // Cheap: ObjectDetailPage.tsx already fetches both under these same keys
+  // while this menu's object is open, so this just reads that cache instead
+  // of firing a fresh request.
+  const { data: object } = useQuery({ queryKey: ["object", objectId], queryFn: () => objectApi.get(objectId) });
+  const { data: members } = useQuery({ queryKey: ["workspaceMembers", workspaceId], queryFn: () => workspaceApi.members(workspaceId) });
+
+  /** Shares the currently open object with `email` via chat: finds/creates a DM, sends the object's title + a deep link back to this exact block (see BlockEditor.tsx's `?block=` target, the same mechanism NotificationBell.tsx's @mention deep links use), then opens the chat overlay on that conversation so the sender sees it went through. */
+  async function shareWithMember(email: string): Promise<void> {
+    const conversation = await chatApi.createDm({ emails: [email] });
+    const link = `${window.location.origin}/w/${workspaceId}/objects/${objectId}?block=${blockId}`;
+    const title = object?.title || t("nav.untitled");
+    await chatApi.sendMessage(conversation.id, { body: `${title}\n${link}` });
+    chatOverlay.open(conversation.id);
+  }
+
+  const shareTargets = (members ?? []).filter((member) => member.userId !== currentUser?.id);
 
   const items: ContextMenuEntry[] = [
     {
@@ -86,8 +106,22 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
         ]
       : []),
     { key: "sep-1", separator: true },
-    { key: "set-slug", label: t("editor.blockMenu.setBlockId"), icon: "braces", onSelect: () => setSlugEditorOpen(true) },
+    {
+      key: "share",
+      label: t("editor.blockMenu.share"),
+      icon: "share",
+      submenu:
+        shareTargets.length > 0
+          ? shareTargets.map((member) => ({
+              key: member.userId,
+              label: member.user.name,
+              onSelect: () => void shareWithMember(member.user.email),
+            }))
+          : [{ key: "no-members", label: t("editor.blockMenu.shareNoMembers"), disabled: true }],
+    },
     { key: "sep-2", separator: true },
+    { key: "set-slug", label: t("editor.blockMenu.setBlockId"), icon: "braces", onSelect: () => setSlugEditorOpen(true) },
+    { key: "sep-3", separator: true },
     { key: "delete", label: t("editor.blockMenu.deleteBlock"), icon: "trash", danger: true, onSelect: () => deleteBlock(blockId) },
   ];
 

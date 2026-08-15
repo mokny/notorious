@@ -471,6 +471,8 @@
       "turnInto": "Umwandeln in",
       "selectAll": "Alles auswählen",
       "clearFormatting": "Formatierung entfernen",
+      "share": "Teilen",
+      "shareNoMembers": "Keine weiteren Workspace-Mitglieder",
       "setBlockId": "Block-ID festlegen"
     },
     "slugButton": {
