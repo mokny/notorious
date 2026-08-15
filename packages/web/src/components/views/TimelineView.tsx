@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { useTwoFingerTap } from "../../hooks/useTwoFingerTap.js";
 import { ContextMenu } from "../ui/ContextMenu.js";
 import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
@@ -45,27 +46,26 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId, o
     <div className="space-y-3 p-4">
       <div className="relative h-1 rounded-full bg-border">
         {dated.map(({ item, date }) => (
-          <button
+          <TimelineViewAxisPoint
             key={item.id}
-            title={item.title}
-            onClick={() => openObject(item.id)}
+            item={item}
+            left={((new Date(date).getTime() - min) / span) * 100}
+            onOpen={() => openObject(item.id)}
             onContextMenu={(event) => rowContextMenu.openFromMouseEvent(item.id, event)}
-            style={{ left: `${((new Date(date).getTime() - min) / span) * 100}%` }}
-            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-surface hover:scale-125"
+            onTwoFingerTap={(x, y) => rowContextMenu.openAt(item.id, x, y)}
           />
         ))}
       </div>
       <div className="divide-y divide-border">
         {dated.map(({ item, date }) => (
-          <button
+          <TimelineViewListRow
             key={item.id}
-            onClick={() => openObject(item.id)}
+            item={item}
+            date={date}
+            onOpen={() => openObject(item.id)}
             onContextMenu={(event) => rowContextMenu.openFromMouseEvent(item.id, event)}
-            className="flex w-full items-center justify-between px-1 py-2 text-left text-sm hover:bg-surface-raised"
-          >
-            <span className="truncate">{item.title}</span>
-            <span className="shrink-0 text-xs text-ink-muted">{new Date(date).toLocaleDateString()}</span>
-          </button>
+            onTwoFingerTap={(x, y) => rowContextMenu.openAt(item.id, x, y)}
+          />
         ))}
       </div>
       {rowContextMenu.menu && (
@@ -77,5 +77,60 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId, o
         />
       )}
     </div>
+  );
+}
+
+function TimelineViewAxisPoint({
+  item,
+  left,
+  onOpen,
+  onContextMenu,
+  onTwoFingerTap,
+}: {
+  item: ObjectRecord;
+  left: number;
+  onOpen: () => void;
+  onContextMenu: (event: ReactMouseEvent) => void;
+  onTwoFingerTap: (x: number, y: number) => void;
+}) {
+  const twoFingerTap = useTwoFingerTap(onTwoFingerTap);
+
+  return (
+    <button
+      title={item.title}
+      onClick={onOpen}
+      onContextMenu={onContextMenu}
+      {...twoFingerTap}
+      style={{ left: `${left}%` }}
+      className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-surface hover:scale-125"
+    />
+  );
+}
+
+function TimelineViewListRow({
+  item,
+  date,
+  onOpen,
+  onContextMenu,
+  onTwoFingerTap,
+}: {
+  item: ObjectRecord;
+  date: string;
+  onOpen: () => void;
+  onContextMenu: (event: ReactMouseEvent) => void;
+  onTwoFingerTap: (x: number, y: number) => void;
+}) {
+  const twoFingerTap = useTwoFingerTap(onTwoFingerTap);
+
+  return (
+    <button
+      onClick={onOpen}
+      onContextMenu={onContextMenu}
+      {...twoFingerTap}
+      className="flex w-full items-center justify-between px-1 py-2 text-left text-sm hover:bg-surface-raised"
+    >
+      <span className="truncate">{item.title}</span>
+      <span className="shrink-0 text-xs text-ink-muted">{new Date(date).toLocaleDateString()}</span>
+    </button>
   );
 }

@@ -14,6 +14,7 @@ import { useHasHover } from "../../hooks/useHasHover.js";
 import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
 import { isNativeMenuOverride } from "../ui/ContextMenu.js";
 import { useLongPressToOpenMenu } from "../../hooks/useLongPressToOpenMenu.js";
+import { useTwoFingerTap } from "../../hooks/useTwoFingerTap.js";
 
 export function BlockItem({ block }: { block: BlockNode }) {
   const { t } = useTranslation();
@@ -61,6 +62,10 @@ export function BlockItem({ block }: { block: BlockNode }) {
   // itself hides every action that isn't safe while locked).
   const longPressToOpenMenu = useLongPressToOpenMenu((x, y) => openBlockMenu(block.id, x, y));
   const canLongPressOpenMenuOnly = !hasHover && readOnly && !isEditingContent;
+  // A quick two-finger tap opens the menu too - faster than a long-press,
+  // and independent of the drag/lock/editing state above since it's never
+  // ambiguous with any single-finger gesture (drag, swipe, text selection).
+  const twoFingerTap = useTwoFingerTap((x, y) => openBlockMenu(block.id, x, y));
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -141,6 +146,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // interactive content (text, checkboxes, ...).
         {...(canLongPressDrag ? listeners : {})}
         {...(canLongPressOpenMenuOnly ? longPressToOpenMenu : {})}
+        {...twoFingerTap}
         onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
         className={`group/item relative flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""

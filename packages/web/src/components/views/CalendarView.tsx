@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { Icon } from "../ui/Icon.js";
 import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { useTwoFingerTap } from "../../hooks/useTwoFingerTap.js";
 import { ContextMenu } from "../ui/ContextMenu.js";
 import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
@@ -74,14 +75,13 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
                 <>
                   <p className="mb-0.5 text-right text-ink-muted">{day}</p>
                   {dayItems.slice(0, 3).map((item) => (
-                    <button
+                    <CalendarViewDayItem
                       key={item.id}
-                      onClick={() => openObject(item.id)}
+                      item={item}
+                      onOpen={() => openObject(item.id)}
                       onContextMenu={(event) => rowContextMenu.openFromMouseEvent(item.id, event)}
-                      className="mb-0.5 block w-full truncate rounded bg-accent/10 px-1 py-0.5 text-left text-accent"
-                    >
-                      {item.title}
-                    </button>
+                      onTwoFingerTap={(x, y) => rowContextMenu.openAt(item.id, x, y)}
+                    />
                   ))}
                   {dayItems.length > 3 && (
                     <p className="text-ink-muted">{t("views.calendar.moreCount", { count: dayItems.length - 3 })}</p>
@@ -101,5 +101,30 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
         />
       )}
     </div>
+  );
+}
+
+function CalendarViewDayItem({
+  item,
+  onOpen,
+  onContextMenu,
+  onTwoFingerTap,
+}: {
+  item: ObjectRecord;
+  onOpen: () => void;
+  onContextMenu: (event: ReactMouseEvent) => void;
+  onTwoFingerTap: (x: number, y: number) => void;
+}) {
+  const twoFingerTap = useTwoFingerTap(onTwoFingerTap);
+
+  return (
+    <button
+      onClick={onOpen}
+      onContextMenu={onContextMenu}
+      {...twoFingerTap}
+      className="mb-0.5 block w-full truncate rounded bg-accent/10 px-1 py-0.5 text-left text-accent"
+    >
+      {item.title}
+    </button>
   );
 }

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -6,6 +6,7 @@ import type { ObjectRecord, Property } from "@notorious/shared";
 import { PropertyCell } from "../properties/PropertyCell.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { useTwoFingerTap } from "../../hooks/useTwoFingerTap.js";
 import { ContextMenu } from "../ui/ContextMenu.js";
 import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
@@ -36,27 +37,15 @@ function TableViewCards({ workspaceId, items, properties, visiblePropertyIds, on
   return (
     <div className="h-full space-y-2 overflow-auto p-3">
       {items.map((object) => (
-        <div
+        <TableViewCard
           key={object.id}
+          workspaceId={workspaceId}
+          object={object}
+          columns={columns}
+          onOpen={() => openObject(object.id)}
           onContextMenu={(event) => rowContextMenu.openFromMouseEvent(object.id, event)}
-          className="rounded-lg border border-border bg-surface-raised p-3"
-        >
-          <button onClick={() => openObject(object.id)} className="block w-full truncate text-left text-sm font-medium hover:underline">
-            {object.title || t("nav.untitled")}
-          </button>
-          {columns.length > 0 && (
-            <div className="mt-2 space-y-1.5 border-t border-border pt-2">
-              {columns.map((property) => (
-                <div key={property.id} className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="shrink-0 text-xs text-ink-muted">{property.name}</span>
-                  <span className="min-w-0 truncate text-right">
-                    <PropertyCell workspaceId={workspaceId} object={object} property={property} />
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          onTwoFingerTap={(x, y) => rowContextMenu.openAt(object.id, x, y)}
+        />
       ))}
       {items.length === 0 && <p className="p-6 text-center text-sm text-ink-muted">{t("views.common.noObjects")}</p>}
       {rowContextMenu.menu && (
@@ -66,6 +55,49 @@ function TableViewCards({ workspaceId, items, properties, visiblePropertyIds, on
           items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
           onClose={rowContextMenu.close}
         />
+      )}
+    </div>
+  );
+}
+
+function TableViewCard({
+  workspaceId,
+  object,
+  columns,
+  onOpen,
+  onContextMenu,
+  onTwoFingerTap,
+}: {
+  workspaceId: string;
+  object: ObjectRecord;
+  columns: Property[];
+  onOpen: () => void;
+  onContextMenu: (event: ReactMouseEvent) => void;
+  onTwoFingerTap: (x: number, y: number) => void;
+}) {
+  const { t } = useTranslation();
+  const twoFingerTap = useTwoFingerTap(onTwoFingerTap);
+
+  return (
+    <div
+      {...twoFingerTap}
+      onContextMenu={onContextMenu}
+      className="rounded-lg border border-border bg-surface-raised p-3"
+    >
+      <button onClick={onOpen} className="block w-full truncate text-left text-sm font-medium hover:underline">
+        {object.title || t("nav.untitled")}
+      </button>
+      {columns.length > 0 && (
+        <div className="mt-2 space-y-1.5 border-t border-border pt-2">
+          {columns.map((property) => (
+            <div key={property.id} className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="shrink-0 text-xs text-ink-muted">{property.name}</span>
+              <span className="min-w-0 truncate text-right">
+                <PropertyCell workspaceId={workspaceId} object={object} property={property} />
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -104,23 +136,16 @@ function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onO
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const object = items[virtualRow.index]!;
             return (
-              <tr
+              <TableViewGridRow
                 key={object.id}
-                style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${virtualRow.start}px)` }}
-                className="flex border-b border-border hover:bg-surface-raised"
+                workspaceId={workspaceId}
+                object={object}
+                columns={columns}
+                top={virtualRow.start}
+                onOpen={() => openObject(object.id)}
                 onContextMenu={(event) => rowContextMenu.openFromMouseEvent(object.id, event)}
-              >
-                <td className="flex-1 basis-56 p-2">
-                  <button className="truncate text-left hover:underline" onClick={() => openObject(object.id)}>
-                    {object.title || t("nav.untitled")}
-                  </button>
-                </td>
-                {columns.map((property) => (
-                  <td key={property.id} className="flex-1 basis-40 p-2">
-                    <PropertyCell workspaceId={workspaceId} object={object} property={property} />
-                  </td>
-                ))}
-              </tr>
+                onTwoFingerTap={(x, y) => rowContextMenu.openAt(object.id, x, y)}
+              />
             );
           })}
         </tbody>
@@ -134,5 +159,46 @@ function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onO
         />
       )}
     </div>
+  );
+}
+
+function TableViewGridRow({
+  workspaceId,
+  object,
+  columns,
+  top,
+  onOpen,
+  onContextMenu,
+  onTwoFingerTap,
+}: {
+  workspaceId: string;
+  object: ObjectRecord;
+  columns: Property[];
+  top: number;
+  onOpen: () => void;
+  onContextMenu: (event: ReactMouseEvent) => void;
+  onTwoFingerTap: (x: number, y: number) => void;
+}) {
+  const { t } = useTranslation();
+  const twoFingerTap = useTwoFingerTap(onTwoFingerTap);
+
+  return (
+    <tr
+      style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${top}px)` }}
+      className="flex border-b border-border hover:bg-surface-raised"
+      onContextMenu={onContextMenu}
+      {...twoFingerTap}
+    >
+      <td className="flex-1 basis-56 p-2">
+        <button className="truncate text-left hover:underline" onClick={onOpen}>
+          {object.title || t("nav.untitled")}
+        </button>
+      </td>
+      {columns.map((property) => (
+        <td key={property.id} className="flex-1 basis-40 p-2">
+          <PropertyCell workspaceId={workspaceId} object={object} property={property} />
+        </td>
+      ))}
+    </tr>
   );
 }

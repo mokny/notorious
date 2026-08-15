@@ -37,5 +37,10 @@ export function useRowContextMenu() {
     return true;
   }
 
-  return { menu, openFromMouseEvent, openFromDragEnd, close: () => setMenu(null) };
+  /** A quick two-finger tap (see useTwoFingerTap.ts) - a faster alternative to the long-press above, and unaffected by Board's dnd-kit drag sensor since it's never a single-finger gesture. */
+  function openAt(objectId: string, x: number, y: number): void {
+    setMenu({ objectId, x, y });
+  }
+
+  return { menu, openFromMouseEvent, openFromDragEnd, openAt, close: () => setMenu(null) };
 }

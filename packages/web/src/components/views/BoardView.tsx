@@ -7,6 +7,7 @@ import { useObjectMutations } from "../../hooks/useObjectMutations.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
 import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { useTwoFingerTap } from "../../hooks/useTwoFingerTap.js";
 import { ContextMenu } from "../ui/ContextMenu.js";
 import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
@@ -88,6 +89,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
           stacked={stacked}
           onTouchArmStart={dragSelectGuard.onTouchArmStart}
           onCardContextMenu={rowContextMenu.openFromMouseEvent}
+          onCardTwoFingerTap={rowContextMenu.openAt}
         />
         {options.map((option) => (
           <BoardColumn
@@ -100,6 +102,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
             stacked={stacked}
             onTouchArmStart={dragSelectGuard.onTouchArmStart}
             onCardContextMenu={rowContextMenu.openFromMouseEvent}
+            onCardTwoFingerTap={rowContextMenu.openAt}
           />
         ))}
       </div>
@@ -124,6 +127,7 @@ function BoardColumn({
   stacked,
   onTouchArmStart,
   onCardContextMenu,
+  onCardTwoFingerTap,
 }: {
   id: string;
   title: string;
@@ -133,6 +137,7 @@ function BoardColumn({
   stacked: boolean;
   onTouchArmStart: (event: PointerEvent) => void;
   onCardContextMenu: (objectId: string, event: ReactMouseEvent) => void;
+  onCardTwoFingerTap: (objectId: string, x: number, y: number) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
@@ -154,6 +159,7 @@ function BoardColumn({
             onOpen={() => onOpenObject(item.id)}
             onTouchArmStart={onTouchArmStart}
             onContextMenu={(event) => onCardContextMenu(item.id, event)}
+            onTwoFingerTap={(x, y) => onCardTwoFingerTap(item.id, x, y)}
           />
         ))}
       </div>
@@ -166,20 +172,24 @@ function BoardCard({
   onOpen,
   onTouchArmStart,
   onContextMenu,
+  onTwoFingerTap,
 }: {
   item: ObjectRecord;
   onOpen: () => void;
   onTouchArmStart: (event: PointerEvent) => void;
   onContextMenu: (event: ReactMouseEvent) => void;
+  onTwoFingerTap: (x: number, y: number) => void;
 }) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: item.id });
+  const twoFingerTap = useTwoFingerTap(onTwoFingerTap);
 
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      {...twoFingerTap}
       onPointerDownCapture={onTouchArmStart}
       onClick={onOpen}
       onContextMenu={onContextMenu}
