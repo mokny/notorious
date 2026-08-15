@@ -88,6 +88,7 @@ export function TemplatableMarkdown({
   return (
     <RichTextEditor
       key={`edit-${searchTermsKey}`}
+      blockId={blockId}
       markdown={markdown}
       placeholder={placeholder}
       className={className}

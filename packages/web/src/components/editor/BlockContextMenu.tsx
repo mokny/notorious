@@ -8,7 +8,7 @@ import { ApiError } from "../../lib/api/client.js";
 import { ContextMenu, useClampedPosition, type ContextMenuEntry } from "../ui/ContextMenu.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { buildFixedSlashCommandItems } from "./SlashCommand.js";
-import { getTableEditor } from "./blocks/tableEditorRegistry.js";
+import { getBlockEditor } from "./editorRegistry.js";
 
 /** True while the given block currently owns a non-collapsed browser text selection - Copy/Cut act on that selection (native `document.execCommand`, preserving exactly what's highlighted) instead of the whole block when one exists. Read once at mount: a right-click/long-press preserves whatever was already selected, and this menu's own presence doesn't itself change the selection. */
 function hasSelectionWithin(blockId: string): boolean {
@@ -33,6 +33,7 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
   const { objectId, deleteBlock, copyBlock, cutBlock, duplicateBlock, turnIntoBlock, selectAllInEditor, closeBlockMenu } = useBlockEditor();
   const [slugEditorOpen, setSlugEditorOpen] = useState(false);
   const [hasSelection] = useState(() => hasSelectionWithin(blockId));
+  const richTextEditor = getBlockEditor(blockId);
 
   const items: ContextMenuEntry[] = [
     {
@@ -57,20 +58,30 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
         .map((item) => ({ key: item.type, label: item.label, onSelect: () => turnIntoBlock(blockId, item.type) })),
     },
     { key: "select-all", label: t("editor.blockMenu.selectAll"), icon: "select-all", onSelect: () => selectAllInEditor() },
-    // Table-only: clears bold/italic/color/alignment on the current
-    // selection inside the cell's own TipTap editor (see
-    // tableEditorRegistry.ts) - a plain `document.execCommand` (used above
-    // for Copy/Cut when there's a selection) mutates the DOM directly and
-    // risks desyncing it from ProseMirror's document model, which every
-    // other block-level command here avoids by going through TipTap/the
-    // block editor's own mutations instead.
-    ...(type === "table"
+    // Only shown when this block actually has a registered rich-text editor
+    // (see editorRegistry.ts) - a block whose field has no formatting marks
+    // at all (checklist items, ...) never registers one, so there'd be
+    // nothing to clear. Clears bold/italic/color/alignment on the current
+    // selection inside that editor's own instance - a plain
+    // `document.execCommand` (used above for Copy/Cut when there's a
+    // selection) mutates the DOM directly and risks desyncing it from
+    // ProseMirror's document model, which every other command here avoids by
+    // going through TipTap/the block editor's own mutations instead.
+    // `setTextAlign` only exists on a table cell's editor (see
+    // TableFormatToolbar.tsx) - the markdown-based blocks never load that
+    // extension (see useMarkdownEditor.ts), so it's applied conditionally
+    // rather than assumed.
+    ...(richTextEditor
       ? [
           {
             key: "clear-formatting",
             label: t("editor.blockMenu.clearFormatting"),
             icon: "eraser",
-            onSelect: () => getTableEditor(blockId)?.chain().focus().unsetAllMarks().setTextAlign("left").run(),
+            onSelect: () => {
+              const chain = richTextEditor.chain().focus().unsetAllMarks();
+              if (typeof richTextEditor.commands.setTextAlign === "function") chain.setTextAlign("left");
+              chain.run();
+            },
           },
         ]
       : []),

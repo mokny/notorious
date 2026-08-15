@@ -4,8 +4,11 @@ import type { BlockType, ObjectType } from "@notorious/shared";
 import { useMarkdownEditor } from "./useMarkdownEditor.js";
 import { useBlockEditor } from "./BlockEditorContext.js";
 import { useTemplateAutocompleteSchema } from "../../hooks/useTemplateAutocompleteSchema.js";
+import { useRegisterBlockEditor } from "./editorRegistry.js";
 
 interface RichTextEditorProps {
+  /** Registers this instance for BlockContextMenu.tsx's "Clear formatting" item (see editorRegistry.ts) - omit for a read-only/rendered instance (see TemplatableMarkdown.tsx), which shouldn't be a clear-formatting target. */
+  blockId?: string;
   markdown: string;
   placeholder?: string;
   className?: string;
@@ -44,6 +47,7 @@ const SAVE_DEBOUNCE_MS = 500;
  * the older (shorter) one would win, silently reverting freshly typed text.
  */
 export function RichTextEditor({
+  blockId,
   markdown,
   placeholder,
   className,
@@ -119,6 +123,8 @@ export function RichTextEditor({
       saveTimeout.current = setTimeout(flush, SAVE_DEBOUNCE_MS);
     },
   });
+
+  useRegisterBlockEditor(blockId, editor);
 
   useEffect(() => () => clearTimeout(saveTimeout.current), []);
 
