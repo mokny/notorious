@@ -113,7 +113,7 @@ export function SharedIndexRoute() {
   );
 }
 
-/** `/share/:token/objects/:objectId` - reachable from a sub-object/relation link embedded within the shared object's content (see `objectHref` in shareMode.ts). Still scoped to the same single object server-side; anything else 403s with a friendly message (see ObjectDetailPage's error state). */
+/** `/share/:token/objects/:objectId` - reachable from a sub-object/relation link embedded within the shared object's content (see `objectHref` in shareMode.ts). Server-side, the share now also covers anything transitively reachable from the shared root via outgoing relations/embeds (see `objects/service.ts`'s `resolveReachableObjectIds`); an object outside that reachable set still 403s with a friendly message (see ObjectDetailPage's error state). */
 export function SharedObjectRoute() {
   const resolved = useShareResolution();
   const { objectId } = useParams<{ objectId: string }>();

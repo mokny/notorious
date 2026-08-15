@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { eq, and, isNull, or, gt } from "drizzle-orm";
-import type { ShareLink, ShareLinkSummary, CreateShareLinkInput, WorkspaceRole } from "@notorious/shared";
+import { eq, and, isNull, or, gt, inArray } from "drizzle-orm";
+import type { ShareLink, ShareLinkSummary, CreateShareLinkInput, WorkspaceRole, LinkedObjectSummary } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { shareLinks, objects } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { notFound } from "../../lib/httpError.js";
+import { resolveReachableObjectIds } from "../objects/service.js";
 
 function generateToken(): string {
   return randomBytes(24).toString("base64url");
@@ -81,6 +82,24 @@ export async function revokeShareLink(workspaceId: string, id: string): Promise<
   await db.delete(shareLinks).where(and(eq(shareLinks.id, id), eq(shareLinks.workspaceId, workspaceId)));
 }
 
+/**
+ * Every object transitively reachable from `objectId` (excluding itself) -
+ * i.e. everything a share link scoped to `objectId` would additionally grant
+ * access to. Title/icon only, for the "this also shares N linked objects"
+ * notice in ShareDialog.tsx.
+ */
+export async function listReachableLinkedObjects(objectId: string): Promise<LinkedObjectSummary[]> {
+  const reachable = [...(await resolveReachableObjectIds(objectId))].filter((id) => id !== objectId);
+  if (reachable.length === 0) return [];
+
+  const rows = await db
+    .select({ id: objects.id, title: objects.title, icon: objects.icon })
+    .from(objects)
+    .where(inArray(objects.id, reachable));
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return reachable.map((id) => byId.get(id)).filter((row): row is LinkedObjectSummary => row !== undefined);
+}
+
 export interface ResolvedShare {
   id: string;
   workspaceId: string;
@@ -100,12 +119,17 @@ export async function resolveShareToken(token: string): Promise<ResolvedShare | 
 
 /**
  * Throws unless `objectId` is something this share is allowed to touch: for a
- * single-object share, only that exact object; for a whole-workspace share,
- * anything belonging to that workspace.
+ * single-object share, that exact object or anything transitively reachable
+ * from it via outgoing relations/embeds (see `objects/service.ts`'s
+ * `resolveReachableObjectIds`); for a whole-workspace share, anything
+ * belonging to that workspace.
  */
 export async function assertShareCanAccessObject(share: ResolvedShare, objectId: string): Promise<void> {
   if (share.objectId !== null) {
-    if (share.objectId !== objectId) throw notFound("Object not found");
+    if (share.objectId !== objectId) {
+      const reachable = await resolveReachableObjectIds(share.objectId);
+      if (!reachable.has(objectId)) throw notFound("Object not found");
+    }
     return;
   }
   const rows = await db.select({ workspaceId: objects.workspaceId }).from(objects).where(eq(objects.id, objectId)).limit(1);

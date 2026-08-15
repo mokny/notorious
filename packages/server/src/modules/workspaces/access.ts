@@ -4,7 +4,7 @@ import type { FastifyRequest } from "fastify";
 import { db } from "../../db/client.js";
 import { workspaceMembers } from "../../db/schema.js";
 import { forbidden, unauthorized, reverifyRequired } from "../../lib/httpError.js";
-import { assertObjectEditable, isObjectReverifyProtected } from "../objects/service.js";
+import { assertObjectEditable, isObjectReverifyProtected, resolveReachableObjectIds } from "../objects/service.js";
 import { requireUser } from "../../plugins/session.js";
 import { isSudoActive } from "../reverify/service.js";
 
@@ -41,7 +41,7 @@ export interface AccessResult {
 }
 
 interface RequireAccessOptions {
-  /** When set, a single-object share must match this exact object to be allowed through. Whole-workspace shares always pass. Omit for endpoints where the resource itself isn't object-scoped (e.g. schema lookups). */
+  /** When set, a single-object share must match this exact object - or an object transitively reachable from it via outgoing relations/embeds, see `resolveReachableObjectIds` - to be allowed through. Whole-workspace shares always pass. Omit for endpoints where the resource itself isn't object-scoped (e.g. schema lookups). */
   objectId?: string;
   /** When true, only a real member or a whole-workspace share (never a single-object share) may pass - for endpoints that browse/list across the workspace. */
   requireWorkspaceScope?: boolean;
@@ -76,7 +76,10 @@ export async function requireAccess(
       share.workspaceId === workspaceId &&
       roleAtLeast(share.role, minRole) &&
       (!options.requireWorkspaceScope || share.objectId === null) &&
-      (options.objectId === undefined || share.objectId === null || share.objectId === options.objectId);
+      (options.objectId === undefined ||
+        share.objectId === null ||
+        share.objectId === options.objectId ||
+        (await resolveReachableObjectIds(share.objectId)).has(options.objectId));
 
     if (!scopeOk) throw unauthorized();
     result = { actorId: null, actorName: null };

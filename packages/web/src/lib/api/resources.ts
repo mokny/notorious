@@ -61,6 +61,7 @@ import type {
   ShareLinkSummary,
   CreateShareLinkInput,
   ResolvedShareLink,
+  LinkedObjectSummary,
   UpdateObjectScriptInput,
   SetScriptEnabledInput,
   ScriptRunResult,
@@ -718,4 +719,7 @@ export const shareLinkApi = {
   revoke: (workspaceId: string, id: string) =>
     apiRequest<void>(`/api/v1/workspaces/${workspaceId}/share-links/${id}`, { method: "DELETE" }),
   resolve: (token: string) => apiRequest<ResolvedShareLink>(`/api/v1/public/share/${token}`),
+  /** Objects a single-object share of `objectId` would additionally grant access to - see ShareDialog.tsx's notice. */
+  linkedPreview: (workspaceId: string, objectId: string) =>
+    apiRequest<LinkedObjectSummary[]>(`/api/v1/workspaces/${workspaceId}/objects/${objectId}/linked-share-preview`),
 };

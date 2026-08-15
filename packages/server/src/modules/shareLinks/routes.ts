@@ -41,6 +41,15 @@ export async function registerShareLinkRoutes(app: FastifyInstance): Promise<voi
     return shareLinkService.listActiveShareLinksForWorkspace(workspaceId);
   });
 
+  // For ShareDialog.tsx's "this also shares N linked objects" notice - same
+  // editor bar as creating a single-object share in the first place.
+  app.get("/api/v1/workspaces/:workspaceId/objects/:objectId/linked-share-preview", async (request) => {
+    const user = requireUser(request);
+    const { workspaceId, objectId } = request.params as { workspaceId: string; objectId: string };
+    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    return shareLinkService.listReachableLinkedObjects(objectId);
+  });
+
   app.delete("/api/v1/workspaces/:workspaceId/share-links/:id", async (request, reply) => {
     const user = requireUser(request);
     const { workspaceId, id } = request.params as { workspaceId: string; id: string };

@@ -83,6 +83,15 @@ export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar" 
     enabled: open,
   });
 
+  // Only meaningful for a single-object share - a whole-workspace share
+  // already grants access to everything, so there's nothing extra to warn
+  // about (see access.ts's requireAccess).
+  const { data: linkedObjects } = useQuery({
+    queryKey: ["shareLinkedPreview", workspaceId, objectId],
+    queryFn: () => shareLinkApi.linkedPreview(workspaceId, objectId!),
+    enabled: open && objectId !== null,
+  });
+
   const createMutation = useMutation({
     mutationFn: () =>
       shareLinkApi.create(workspaceId, {
@@ -110,6 +119,22 @@ export function ShareDialog({ workspaceId, objectId, label, variant = "toolbar" 
         Anyone with the link can access {objectId ? "this object" : "this workspace"} without an account, at the role you
         choose below.
       </p>
+
+      {objectId && linkedObjects && linkedObjects.length > 0 && (
+        <details className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+          <summary className="cursor-pointer font-medium">
+            This link also grants access to {linkedObjects.length} linked object{linkedObjects.length === 1 ? "" : "s"}
+          </summary>
+          <ul className="mt-1.5 space-y-0.5 pl-0.5">
+            {linkedObjects.map((linked) => (
+              <li key={linked.id} className="truncate text-ink-muted">
+                {linked.icon ? `${linked.icon} ` : ""}
+                {linked.title}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <div className="max-h-56 space-y-2 overflow-y-auto">
         {links?.map((link) => (

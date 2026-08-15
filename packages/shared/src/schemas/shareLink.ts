@@ -25,6 +25,13 @@ export interface ShareLinkSummary extends ShareLink {
   objectTitle: string | null;
 }
 
+/** One object transitively reachable from a would-be single-object share's target - see ShareDialog.tsx's "this also shares N linked objects" notice. */
+export interface LinkedObjectSummary {
+  id: string;
+  title: string;
+  icon: string | null;
+}
+
 /** What an anonymous visitor following a share link gets back to bootstrap the public view. */
 export interface ResolvedShareLink {
   role: WorkspaceRole;

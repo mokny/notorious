@@ -518,3 +518,35 @@ export async function listBacklinks(objectId: string): Promise<ObjectRecord[]> {
   }
   return results;
 }
+
+/**
+ * `rootObjectId` plus every object transitively reachable from it via
+ * outgoing relations (any property) - includes `sub_objects` relations,
+ * which `blocks/service.ts`'s `syncSubObjectRelation` keeps in lockstep with
+ * `SubObjectContent` blocks, so this doubles as "everything embedded/linked
+ * inline in this object's content, recursively" without needing to parse
+ * block content directly. Used to let a single-object share link cascade
+ * into whatever it links to (see `shareLinks/service.ts`'s
+ * `assertShareCanAccessObject` and `workspaces/access.ts`'s `requireAccess`).
+ * Cycle-safe via the visited set.
+ */
+export async function resolveReachableObjectIds(rootObjectId: string): Promise<Set<string>> {
+  const visited = new Set<string>([rootObjectId]);
+  const queue = [rootObjectId];
+
+  while (queue.length) {
+    const current = queue.shift()!;
+    const rows = await db
+      .select({ targetObjectId: relations.targetObjectId })
+      .from(relations)
+      .where(eq(relations.sourceObjectId, current));
+    for (const row of rows) {
+      if (!visited.has(row.targetObjectId)) {
+        visited.add(row.targetObjectId);
+        queue.push(row.targetObjectId);
+      }
+    }
+  }
+
+  return visited;
+}
