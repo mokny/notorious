@@ -16,7 +16,7 @@ import { useEditorHistory, type BlockSnapshot } from "./useEditorHistory.js";
 import { useKeepFocusedElementVisible } from "../../hooks/useKeepFocusedElementVisible.js";
 import { randomId } from "../../lib/randomId.js";
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
-import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "./blockGestures.js";
+import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
 import { UndoToast } from "./UndoToast.js";
 import { SearchMatchToolbar } from "./SearchMatchToolbar.js";
 import { ActiveMatchHighlight } from "./ActiveMatchHighlight.js";
@@ -600,18 +600,16 @@ export function BlockEditor({
 
     // Touch-only: the row itself is now the drag source (see BlockItem.tsx),
     // not just a small handle, so the same long-press gesture has to double
-    // as "open the block's menu" (no movement) and "delete" (swiped left far
-    // enough) before falling through to the desktop reorder logic below,
-    // which only ever runs from the dedicated grip handle and has no such
-    // ambiguity to resolve.
+    // as "delete" (swiped left far enough) before falling through to the
+    // desktop reorder logic below, which only ever runs from the dedicated
+    // grip handle and has no such ambiguity to resolve. A long-press that
+    // barely moved does nothing here - the block context menu is reachable
+    // only via a two-finger tap on touch (see useTwoFingerTap.ts), so a
+    // long-press stays free to mean "start dragging" without ever
+    // double-booking as "open the menu" for the same gesture.
     if (event.activatorEvent.type === "touchstart") {
       const absX = Math.abs(event.delta.x);
       const absY = Math.abs(event.delta.y);
-      if (absX < TAP_MOVEMENT_TOLERANCE_PX && absY < TAP_MOVEMENT_TOLERANCE_PX) {
-        const touch = (event.activatorEvent as TouchEvent).touches[0] ?? (event.activatorEvent as TouchEvent).changedTouches[0];
-        setContextMenu({ blockId, x: touch?.clientX ?? 0, y: touch?.clientY ?? 0 });
-        return;
-      }
       if (absX > SWIPE_DELETE_THRESHOLD_PX && absX > absY) {
         performSwipeDelete(blockId);
         return;

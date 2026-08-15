@@ -58,7 +58,6 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
   }, [items, options, pivot]);
 
   function handleDragEnd(event: DragEndEvent) {
-    if (rowContextMenu.openFromDragEnd(String(event.active.id), event.activatorEvent, event.delta)) return;
     if (!pivot || !event.over) return;
     const objectId = String(event.active.id);
     const columnId = String(event.over.id);

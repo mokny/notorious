@@ -13,8 +13,8 @@ import { Icon } from "../ui/Icon.js";
 import { useHasHover } from "../../hooks/useHasHover.js";
 import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
 import { isNativeMenuOverride } from "../ui/ContextMenu.js";
-import { useLongPressToOpenMenu } from "../../hooks/useLongPressToOpenMenu.js";
 import { useTwoFingerTap } from "../../hooks/useTwoFingerTap.js";
+import { wasLastPointerTouch } from "../../lib/pointerTracking.js";
 
 export function BlockItem({ block }: { block: BlockNode }) {
   const { t } = useTranslation();
@@ -55,16 +55,12 @@ export function BlockItem({ block }: { block: BlockNode }) {
   // surface (contentEditable, <textarea>, Excalidraw canvas, ...).
   const [isEditingContent, setIsEditingContent] = useState(false);
   const canLongPressDrag = !hasHover && !readOnly && !isEditingContent;
-  // Locked: still opens on a long-press, just via a plain timer instead of
-  // dnd-kit's drag machinery - arming that (see `canLongPressDrag` above)
-  // would also make the row draggable/swipeable, and reordering/deleting is
-  // exactly what a lock should block (see BlockContextMenu.tsx, which
-  // itself hides every action that isn't safe while locked).
-  const longPressToOpenMenu = useLongPressToOpenMenu((x, y) => openBlockMenu(block.id, x, y));
-  const canLongPressOpenMenuOnly = !hasHover && readOnly && !isEditingContent;
-  // A quick two-finger tap opens the menu too - faster than a long-press,
-  // and independent of the drag/lock/editing state above since it's never
-  // ambiguous with any single-finger gesture (drag, swipe, text selection).
+  // The menu's only touch trigger - a long-press stays free to mean "start
+  // dragging" wherever dragging exists (see `canLongPressDrag` above)
+  // instead of double-booking as "open the menu" for the same gesture (see
+  // BlockEditor.tsx's handleDragEnd, which no longer opens it either).
+  // Independent of drag/lock/editing state since it's never ambiguous with
+  // any single-finger gesture (drag, swipe, text selection).
   const twoFingerTap = useTwoFingerTap((x, y) => openBlockMenu(block.id, x, y));
 
   const style = {
@@ -129,8 +125,16 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // still work. Still opens while locked/read-only - BlockContextMenu.tsx
         // itself filters the item list down to whatever isn't affected by the
         // lock (Copy, Select all, Share, ...) rather than gating the trigger.
+        // A touch long-press also fires this same event (the browser
+        // synthesizes it), which this suppresses entirely - the menu's only
+        // touch trigger is a two-finger tap (see `twoFingerTap` below), so a
+        // long-press stays exclusively a drag gesture on touch.
         onContextMenu={(event) => {
           if (isNativeMenuOverride(event)) return;
+          if (wasLastPointerTouch()) {
+            event.preventDefault();
+            return;
+          }
           event.preventDefault();
           openBlockMenu(block.id, event.clientX, event.clientY);
         }}
@@ -145,7 +149,6 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // dedicated handle, not a row that already contains its own
         // interactive content (text, checkboxes, ...).
         {...(canLongPressDrag ? listeners : {})}
-        {...(canLongPressOpenMenuOnly ? longPressToOpenMenu : {})}
         {...twoFingerTap}
         onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
         className={`group/item relative flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60 ${!hasHover ? "bg-surface" : ""} ${
