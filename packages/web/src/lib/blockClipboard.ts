@@ -10,6 +10,17 @@ export interface NotoriousClipboardPayload {
 /** The markdown-based rich-text types (see blockContent.ts) - the only ones where carrying content across a copy/turn-into as plain text is lossless enough to attempt automatically. */
 const TEXT_LIKE_TYPES = new Set<BlockType>(["paragraph", "heading", "quote", "callout"]);
 
+/**
+ * The only types `turnIntoContent` below actually carries content between -
+ * the markdown-based rich-text types plus checklist (see `plainTextFor`'s
+ * identical checklist special-case). Exported for BlockContextMenu.tsx's
+ * "Turn into" submenu, which uses it to only offer targets a conversion from
+ * the current block type can meaningfully reach, instead of every block type
+ * that exists (most of which `turnIntoContent` would silently fall back to a
+ * blank `toDefaultContent` for).
+ */
+export const TURN_INTO_COMPATIBLE_TYPES: BlockType[] = ["paragraph", "heading", "quote", "callout", "checklist"];
+
 function plainTextFor(block: Pick<Block, "type" | "content">): string {
   const content = block.content;
   if (TEXT_LIKE_TYPES.has(block.type)) return String((content as { markdown?: string }).markdown ?? "");

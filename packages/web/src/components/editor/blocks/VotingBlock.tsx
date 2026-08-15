@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useRef, useState, type PointerEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -11,11 +11,14 @@ import { useDragSelectGuard } from "../../../hooks/useDragSelectGuard.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { useKeepInViewport } from "../../../hooks/useKeepInViewport.js";
 import { useHasHover } from "../../../hooks/useHasHover.js";
+import { useTwoFingerTap } from "../../../hooks/useTwoFingerTap.js";
 import { blockApi, workspaceApi } from "../../../lib/api/resources.js";
 import { getVisitorId } from "../../../lib/visitorIdentity.js";
 import { randomId } from "../../../lib/randomId.js";
 import { resizeTextarea } from "../../../lib/resizeTextarea.js";
+import { wasLastPointerTouch } from "../../../lib/pointerTracking.js";
 import { Icon } from "../../ui/Icon.js";
+import { ContextMenu, isNativeMenuOverride } from "../../ui/ContextMenu.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 import { HighlightedText } from "../HighlightedText.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGestures.js";
@@ -118,6 +121,7 @@ function VotingItemRow({
   onChangeTitle,
   onChangeDescription,
   onRemove,
+  onDuplicate,
   onTouchArmStart,
 }: {
   sortableId: string;
@@ -131,6 +135,8 @@ function VotingItemRow({
   onChangeTitle: (title: string) => void;
   onChangeDescription: (description: string) => void;
   onRemove: () => void;
+  /** Right-click / two-finger-tap item-level context menu - see ChecklistBlock.tsx's identical pattern. */
+  onDuplicate: () => void;
   /** Bind as `onPointerDownCapture` on whatever carries `listeners` below - see useDragSelectGuard.ts. */
   onTouchArmStart: (event: PointerEvent) => void;
 }) {
@@ -161,6 +167,18 @@ function VotingItemRow({
   const total = summary.up + summary.down;
   const upRatio = total > 0 ? Math.round((summary.up / total) * 100) : 0;
   const score = summary.up - summary.down;
+  // Item-level context menu - see ChecklistBlock.tsx's ChecklistItemRow for
+  // the identical pattern this mirrors (right-click/two-finger-tap on the
+  // option stops it reaching the block-level menu, unless read-only).
+  const [itemMenu, setItemMenu] = useState<{ x: number; y: number } | null>(null);
+  const itemTwoFingerTap = useTwoFingerTap((x, y) => {
+    if (!readOnly) setItemMenu({ x, y });
+  });
+  function handleItemTouchStart(event: ReactTouchEvent): void {
+    if (canLongPressDrag) listeners?.onTouchStart?.(event);
+    if (!readOnly) event.stopPropagation();
+    itemTwoFingerTap.onTouchStart(event);
+  }
 
   return (
     <div className="relative">
@@ -178,7 +196,21 @@ function VotingItemRow({
         onFocus={() => setIsEditingContent(true)}
         onBlur={() => setIsEditingContent(false)}
         {...(canLongPressDrag ? listeners : {})}
+        onTouchStart={handleItemTouchStart}
+        onTouchMove={itemTwoFingerTap.onTouchMove}
+        onTouchEnd={itemTwoFingerTap.onTouchEnd}
+        onTouchCancel={itemTwoFingerTap.onTouchCancel}
         onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
+        onContextMenu={(event) => {
+          if (readOnly || isNativeMenuOverride(event)) return;
+          if (wasLastPointerTouch()) {
+            event.preventDefault();
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          setItemMenu({ x: event.clientX, y: event.clientY });
+        }}
         className={`group/votingitem relative flex items-start gap-2 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""
         }`}
@@ -297,6 +329,14 @@ function VotingItemRow({
           </button>
         )}
       </div>
+      {itemMenu && (
+        <ContextMenu
+          x={itemMenu.x}
+          y={itemMenu.y}
+          items={[{ key: "duplicate", label: t("editor.blockMenu.duplicate"), icon: "duplicate", onSelect: onDuplicate }]}
+          onClose={() => setItemMenu(null)}
+        />
+      )}
     </div>
   );
 }
@@ -366,6 +406,14 @@ export function VotingBlock({
 
   function removeItem(index: number) {
     save({ ...content, items: items.filter((_, i) => i !== index) });
+  }
+
+  /** Item-level "Duplicate" (see VotingItemRow's context menu) - inserts an exact copy (new id, same title/description) directly after the original, mirroring ChecklistBlock.tsx's identical `duplicateItem`. */
+  function duplicateItem(index: number) {
+    const original = items[index];
+    if (!original) return;
+    const copy: VotingItem = { ...original, id: randomId() };
+    save({ ...content, items: [...items.slice(0, index + 1), copy, ...items.slice(index + 1)] });
   }
 
   /** Same delete, plus the "Item deleted / Undo" toast - see undoSnapshot above. */
@@ -443,6 +491,7 @@ export function VotingBlock({
               onChangeTitle={(title) => updateItem(index, { title })}
               onChangeDescription={(description) => updateItem(index, { description })}
               onRemove={() => removeItem(index)}
+              onDuplicate={() => duplicateItem(index)}
               onTouchArmStart={dragSelectGuard.onTouchArmStart}
             />
           ))}

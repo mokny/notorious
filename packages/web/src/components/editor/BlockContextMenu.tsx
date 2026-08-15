@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BlockType } from "@notorious/shared";
 import { blockApi, chatApi, objectApi, workspaceApi } from "../../lib/api/resources.js";
+import { TURN_INTO_COMPATIBLE_TYPES } from "../../lib/blockClipboard.js";
 import { useClickOutside } from "../../hooks/useClickOutside.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useChatOverlay } from "../../context/ChatOverlayContext.js";
@@ -76,8 +77,12 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
           key: "turn-into",
           label: t("editor.blockMenu.turnInto"),
           icon: "turn-into",
+          // Only the types `turnIntoContent` (blockClipboard.ts) actually
+          // carries content between - offering the rest would just replace
+          // this block with a blank one of that type, which reads as broken
+          // rather than as an intentional "turn into" action.
           submenu: buildFixedSlashCommandItems()
-            .filter((item) => item.type !== type)
+            .filter((item) => item.type !== type && TURN_INTO_COMPATIBLE_TYPES.includes(item.type))
             .map((item) => ({ key: item.type, label: item.label, onSelect: () => turnIntoBlock(blockId, item.type) })),
         },
       ];

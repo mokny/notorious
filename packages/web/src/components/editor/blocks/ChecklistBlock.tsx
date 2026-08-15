@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { Editor } from "@tiptap/react";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -10,8 +10,11 @@ import { useDragSelectGuard } from "../../../hooks/useDragSelectGuard.js";
 import { useHasHover } from "../../../hooks/useHasHover.js";
 import { useClickOutside } from "../../../hooks/useClickOutside.js";
 import { useKeepInViewport } from "../../../hooks/useKeepInViewport.js";
+import { useTwoFingerTap } from "../../../hooks/useTwoFingerTap.js";
 import { randomId } from "../../../lib/randomId.js";
+import { wasLastPointerTouch } from "../../../lib/pointerTracking.js";
 import { Icon } from "../../ui/Icon.js";
+import { ContextMenu, isNativeMenuOverride } from "../../ui/ContextMenu.js";
 import { useBlockEditor } from "../BlockEditorContext.js";
 import { useTemplatableField } from "../useTemplatableField.js";
 import { SWIPE_DELETE_THRESHOLD_PX, TAP_MOVEMENT_TOLERANCE_PX } from "../blockGestures.js";
@@ -72,6 +75,7 @@ function ChecklistItemRow({
   onChangeText,
   onEnter,
   onRemove,
+  onDuplicate,
   onFlush,
   registerEditor,
   readOnly,
@@ -92,6 +96,8 @@ function ChecklistItemRow({
   onChangeText: (markdown: string) => void;
   onEnter: () => void;
   onRemove: () => void;
+  /** Right-click / two-finger-tap on this row's own item-level context menu - see BlockContextMenu.tsx for the block-level equivalent this deliberately doesn't reuse (single "Duplicate" entry, no lock/turn-into/etc.). */
+  onDuplicate: () => void;
   /** Saves a pending edit right away on blur instead of waiting out the rest of useDebouncedSave's window - see RichTextEditor.tsx's identical onBlur flush, which this matches for consistency. */
   onFlush: () => void;
   registerEditor: (editor: Editor | null) => void;
@@ -153,6 +159,25 @@ function ChecklistItemRow({
   // focus from whatever else is on the page whenever a templated item first
   // renders in its rendered state.
   const focusOnEditRef = useRef(false);
+  // Item-level context menu (right-click on desktop, two-finger tap on
+  // touch) - separate from the block-level one (see blockGestures.ts/
+  // BlockContextMenu.tsx): a right-click landing on an item stops
+  // propagation so the block's own onContextMenu never fires, while a
+  // right-click on the block elsewhere (e.g. the "Add item" row) still
+  // reaches it undisturbed.
+  const [itemMenu, setItemMenu] = useState<{ x: number; y: number } | null>(null);
+  const itemTwoFingerTap = useTwoFingerTap((x, y) => {
+    if (!readOnly) setItemMenu({ x, y });
+  });
+  function handleItemTouchStart(event: ReactTouchEvent): void {
+    if (canLongPressDrag) listeners?.onTouchStart?.(event);
+    // While locked/read-only there's no item menu to open (see itemTwoFingerTap's
+    // own readOnly guard above) - leaving the event alone here lets it bubble to
+    // BlockItem.tsx's own two-finger-tap handling instead, so the block-level menu
+    // (already filtered down to read-only-safe actions) still opens.
+    if (!readOnly) event.stopPropagation();
+    itemTwoFingerTap.onTouchStart(event);
+  }
 
   return (
     <div className="relative" data-flip-id={sortableId}>
@@ -170,7 +195,21 @@ function ChecklistItemRow({
         onFocus={() => setIsEditingContent(true)}
         onBlur={() => setIsEditingContent(false)}
         {...(canLongPressDrag ? listeners : {})}
+        onTouchStart={handleItemTouchStart}
+        onTouchMove={itemTwoFingerTap.onTouchMove}
+        onTouchEnd={itemTwoFingerTap.onTouchEnd}
+        onTouchCancel={itemTwoFingerTap.onTouchCancel}
         onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
+        onContextMenu={(event) => {
+          if (readOnly || isNativeMenuOverride(event)) return;
+          if (wasLastPointerTouch()) {
+            event.preventDefault();
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          setItemMenu({ x: event.clientX, y: event.clientY });
+        }}
         className={`group/checklistitem relative flex items-start gap-1 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""
         }`}
@@ -274,6 +313,14 @@ function ChecklistItemRow({
           </button>
         )}
       </div>
+      {itemMenu && (
+        <ContextMenu
+          x={itemMenu.x}
+          y={itemMenu.y}
+          items={[{ key: "duplicate", label: t("editor.blockMenu.duplicate"), icon: "duplicate", onSelect: onDuplicate }]}
+          onClose={() => setItemMenu(null)}
+        />
+      )}
     </div>
   );
 }
@@ -525,6 +572,14 @@ export function ChecklistBlock({
     setPendingFocusId(newItem.id!);
   }
 
+  /** Item-level "Duplicate" (see ChecklistItemRow's context menu) - inserts an exact copy (new id, same text/checked state) directly after the original, mirroring BlockEditor.tsx's block-level `duplicateBlock`. */
+  function duplicateItem(index: number) {
+    const original = items[index];
+    if (!original) return;
+    const copy: ChecklistItem = { ...original, id: randomId() };
+    save({ ...content, items: [...items.slice(0, index + 1), copy, ...items.slice(index + 1)] });
+  }
+
   function removeItem(index: number) {
     const removedId = items[index]?.id;
     if (removedId) pendingNewItemsRef.current.delete(removedId);
@@ -634,6 +689,7 @@ export function ChecklistBlock({
                 onChangeText={(markdown) => updateItem(index, { markdown })}
                 onEnter={() => insertItemAfter(index)}
                 onRemove={() => removeItem(index)}
+                onDuplicate={() => duplicateItem(index)}
                 onTouchArmStart={dragSelectGuard.onTouchArmStart}
                 autoFocus={Boolean(item.id) && item.id === pendingFocusId}
                 onFlush={() => {
