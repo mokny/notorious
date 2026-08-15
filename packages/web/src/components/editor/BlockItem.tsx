@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type TouchEvent as ReactTouchEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -62,6 +62,18 @@ export function BlockItem({ block }: { block: BlockNode }) {
   // Independent of drag/lock/editing state since it's never ambiguous with
   // any single-finger gesture (drag, swipe, text selection).
   const twoFingerTap = useTwoFingerTap((x, y) => openBlockMenu(block.id, x, y));
+  const dragListeners = canLongPressDrag ? (listeners ?? {}) : {};
+  // dnd-kit's TouchSensor activates via a plain `onTouchStart` prop, same as
+  // useTwoFingerTap's own detector below - spreading both directly would
+  // have the second silently clobber the first's `onTouchStart` (an object
+  // spread, not a listener list), breaking touch drag outright rather than
+  // combining with the tap gesture. Calling both explicitly here is what
+  // actually lets a single-finger long-press still start a drag while a
+  // second finger touching down is what useTwoFingerTap is watching for.
+  function handleTouchStart(event: ReactTouchEvent): void {
+    dragListeners.onTouchStart?.(event);
+    twoFingerTap.onTouchStart(event);
+  }
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -148,8 +160,9 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // the latter's `role="button" tabIndex={0}` etc. are meant for a
         // dedicated handle, not a row that already contains its own
         // interactive content (text, checkboxes, ...).
-        {...(canLongPressDrag ? listeners : {})}
+        {...dragListeners}
         {...twoFingerTap}
+        onTouchStart={handleTouchStart}
         onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
         className={`group/item relative flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""

@@ -1,4 +1,4 @@
-import { useMemo, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
+import { useMemo, type MouseEvent as ReactMouseEvent, type PointerEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -182,6 +182,17 @@ function BoardCard({
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: item.id });
   const twoFingerTap = useTwoFingerTap(onTwoFingerTap);
+  // dnd-kit's TouchSensor activates via a plain `onTouchStart` prop, same as
+  // useTwoFingerTap's own detector - spreading both directly would have the
+  // second silently clobber the first's `onTouchStart` (an object spread,
+  // not a listener list), breaking touch drag outright. Calling both
+  // explicitly is what actually lets a single-finger long-press still start
+  // a drag while a second finger touching down is what useTwoFingerTap is
+  // watching for.
+  function handleTouchStart(event: ReactTouchEvent): void {
+    listeners?.onTouchStart?.(event);
+    twoFingerTap.onTouchStart(event);
+  }
 
   return (
     <div
@@ -189,6 +200,7 @@ function BoardCard({
       {...listeners}
       {...attributes}
       {...twoFingerTap}
+      onTouchStart={handleTouchStart}
       onPointerDownCapture={onTouchArmStart}
       onClick={onOpen}
       onContextMenu={onContextMenu}
