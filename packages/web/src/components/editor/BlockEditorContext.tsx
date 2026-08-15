@@ -59,6 +59,16 @@ export interface BlockEditorActions {
   /** Owner-only, exempt from the object lock - see updateVotingSettingsSchema and VotingBlock.tsx. */
   updateVotingSettings: (blockId: string, allowMultipleVotes: boolean, votingEndsAt: string | null) => Promise<void>;
   deleteBlock: (blockId: string) => void;
+  /** Writes the block's content to the clipboard (HTML/plaintext + the lossless Notorious format, see lib/blockClipboard.ts) - used by BlockContextMenu.tsx's Copy when there's no active text selection to copy instead. */
+  copyBlock: (blockId: string) => void;
+  /** Same clipboard write as `copyBlock`, then deletes the block. */
+  cutBlock: (blockId: string) => void;
+  /** Inserts a copy of the block with the same type/content right after it. */
+  duplicateBlock: (blockId: string) => void;
+  /** Recreates the block as `type` (best-effort content carried over between the markdown-based rich-text types, see lib/blockClipboard.ts's `turnIntoContent`) in the same position, then deletes the original - the PATCH endpoint has no way to change a block's `type` in place (see blocks/service.ts's `updateBlock`). */
+  turnIntoBlock: (blockId: string, type: BlockType) => void;
+  /** Selects every block's rendered text as one native browser selection, spanning block boundaries - what the context menu's "Select all" does, since each block is its own small TipTap instance rather than one shared document. */
+  selectAllInEditor: () => void;
   moveBlock: (blockId: string, parentBlockId: string | null, afterBlockId: string | null) => void;
   /** The block that should receive focus once it appears (set right after Enter creates one). */
   pendingFocusBlockId: string | null;
@@ -71,14 +81,16 @@ export interface BlockEditorActions {
   selectedBlockId: string | null;
   selectBlock: (blockId: string) => void;
   /**
-   * Which block's touch context menu is open - set by BlockEditor.tsx's
-   * handleDragEnd when a touch long-press activates a drag but the pointer
-   * never actually moved (see BlockItem.tsx: on touch, the drag handle/id/
-   * delete buttons are removed entirely to reclaim content width, so a
-   * long-press-then-release-without-moving opens this menu instead, bundling
-   * what those buttons used to do). `null` when closed.
+   * Which block's context menu is open and where it should be anchored -
+   * `x`/`y` are viewport (client) coordinates, either the touch point of a
+   * long-press-then-release-without-moving (see BlockEditor.tsx's
+   * handleDragEnd and blockGestures.ts: on touch, the drag handle/id/delete
+   * buttons are removed entirely to reclaim content width, so this menu
+   * bundles what those buttons used to do) or the desktop right-click event
+   * that opened it (see BlockItem.tsx's `onContextMenu`). `null` when closed.
    */
-  contextMenuBlockId: string | null;
+  contextMenu: { blockId: string; x: number; y: number } | null;
+  openBlockMenu: (blockId: string, x: number, y: number) => void;
   closeBlockMenu: () => void;
   /**
    * Search-result navigation (see SearchPage.tsx's `?highlight=` param and

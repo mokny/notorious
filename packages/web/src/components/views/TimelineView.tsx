@@ -2,6 +2,9 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
+import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { ContextMenu } from "../ui/ContextMenu.js";
+import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
 interface TimelineViewProps {
   workspaceId: string;
@@ -17,6 +20,7 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId, o
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const dateProperty = properties.find((p) => p.id === datePropertyId) ?? properties.find((p) => p.config.type === "date" || p.config.type === "datetime");
+  const rowContextMenu = useRowContextMenu();
 
   const dated = useMemo(() => {
     if (!dateProperty) return [];
@@ -45,6 +49,7 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId, o
             key={item.id}
             title={item.title}
             onClick={() => openObject(item.id)}
+            onContextMenu={(event) => rowContextMenu.openFromMouseEvent(item.id, event)}
             style={{ left: `${((new Date(date).getTime() - min) / span) * 100}%` }}
             className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-surface hover:scale-125"
           />
@@ -55,6 +60,7 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId, o
           <button
             key={item.id}
             onClick={() => openObject(item.id)}
+            onContextMenu={(event) => rowContextMenu.openFromMouseEvent(item.id, event)}
             className="flex w-full items-center justify-between px-1 py-2 text-left text-sm hover:bg-surface-raised"
           >
             <span className="truncate">{item.title}</span>
@@ -62,6 +68,14 @@ export function TimelineView({ workspaceId, items, properties, datePropertyId, o
           </button>
         ))}
       </div>
+      {rowContextMenu.menu && (
+        <ContextMenu
+          x={rowContextMenu.menu.x}
+          y={rowContextMenu.menu.y}
+          items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
+          onClose={rowContextMenu.close}
+        />
+      )}
     </div>
   );
 }

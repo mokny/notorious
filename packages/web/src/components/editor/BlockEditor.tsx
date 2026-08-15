@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DndContext, MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
@@ -7,6 +7,8 @@ import { generateKeyBetween } from "fractional-indexing";
 import type { Block, BlockType } from "@notorious/shared";
 import { blockContentForFile, createEmptyTableDoc } from "@notorious/shared";
 import { blockApi, fileApi, schemaApi } from "../../lib/api/resources.js";
+import { withShareToken } from "../../lib/api/shareMode.js";
+import { parseNotoriousClipboardPayload, turnIntoContent, writeBlocksToClipboard, writeImageToClipboard } from "../../lib/blockClipboard.js";
 import { buildBlockTree } from "./blockTree.js";
 import { BlockEditorProvider } from "./BlockEditorContext.js";
 import { BlockList } from "./BlockList.js";
@@ -128,7 +130,7 @@ export function BlockEditor({
   // swipe-delete specifically (the one new destructive gesture), not every
   // delete path - the toolbar delete button and backspace-on-empty already
   // have Ctrl+Z for that.
-  const [contextMenuBlockId, setContextMenuBlockId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ blockId: string; x: number; y: number } | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
   const undoToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -514,6 +516,72 @@ export function BlockEditor({
     }
   }
 
+  /** Writes a block's content to the clipboard - see BlockContextMenu.tsx's Copy, used when there's no active text selection inside the block (a selection just gets the browser's own native copy of it instead, see `document.execCommand("copy")` there). Fires the image-blob write alongside, not awaited - the HTML/text write above already resolves the action from the menu's point of view, and a failed/unsupported image write (see writeImageToClipboard's own guard) shouldn't block or error the rest of the copy. */
+  function copyBlock(blockId: string): void {
+    const block = (blocks ?? []).find((b) => b.id === blockId);
+    if (!block) return;
+    void writeBlocksToClipboard([block]);
+    const url = (block.content as { url?: string }).url;
+    if (block.type === "image" && typeof url === "string" && url) void writeImageToClipboard(withShareToken(url)).catch(() => {});
+  }
+
+  function cutBlock(blockId: string): void {
+    if (!(blocks ?? []).some((b) => b.id === blockId)) return;
+    copyBlock(blockId);
+    performDelete(blockId);
+  }
+
+  function duplicateBlock(blockId: string): void {
+    const block = (blocks ?? []).find((b) => b.id === blockId);
+    if (!block) return;
+    createMutation.mutate({ parentBlockId: block.parentBlockId, afterBlockId: blockId, type: block.type, content: block.content });
+  }
+
+  function turnIntoBlock(blockId: string, type: BlockType): void {
+    const block = (blocks ?? []).find((b) => b.id === blockId);
+    if (!block || block.type === type) return;
+    const content = turnIntoContent(block.type, block.content, type, defaultContentFor(type));
+    createMutation.mutate(
+      { parentBlockId: block.parentBlockId, afterBlockId: blockId, type, content },
+      { onSuccess: () => performDelete(blockId) },
+    );
+  }
+
+  function selectAllInEditor(): void {
+    const el = editorContainerRef.current;
+    if (!el) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+
+  /**
+   * Recognizes a paste carrying the hidden `data-notorious-blocks` marker
+   * (see lib/blockClipboard.ts) - a copy of one or more whole blocks made
+   * from this same app - and reconstructs them as real sibling blocks
+   * instead of falling through to TipTap's own HTML/markdown paste, which
+   * would flatten e.g. a table or checklist block into plain text. Any other
+   * paste (external content, or a same-app text-selection copy, which never
+   * carries the marker - see BlockContextMenu.tsx) is left alone entirely.
+   */
+  async function handlePaste(event: ClipboardEvent<HTMLDivElement>): Promise<void> {
+    if (effectiveReadOnly) return;
+    const html = event.clipboardData.getData("text/html");
+    if (!html) return;
+    const payload = parseNotoriousClipboardPayload(html);
+    if (!payload || payload.blocks.length === 0) return;
+    event.preventDefault();
+    const activeBlockId = (document.activeElement as HTMLElement | null)?.closest("[data-block-id]")?.getAttribute("data-block-id") ?? null;
+    const parentBlockId = activeBlockId ? ((blocks ?? []).find((b) => b.id === activeBlockId)?.parentBlockId ?? null) : null;
+    let afterBlockId = activeBlockId ?? (tree[tree.length - 1]?.id ?? null);
+    for (const pasted of payload.blocks) {
+      const created = await createMutation.mutateAsync({ parentBlockId, afterBlockId, type: pasted.type, content: pasted.content });
+      afterBlockId = created.id;
+    }
+  }
+
   function handleDragStart(event: DragStartEvent) {
     setIsDraggingAny(true);
     dragSelectGuard.onDragStart();
@@ -540,7 +608,8 @@ export function BlockEditor({
       const absX = Math.abs(event.delta.x);
       const absY = Math.abs(event.delta.y);
       if (absX < TAP_MOVEMENT_TOLERANCE_PX && absY < TAP_MOVEMENT_TOLERANCE_PX) {
-        setContextMenuBlockId(blockId);
+        const touch = (event.activatorEvent as TouchEvent).touches[0] ?? (event.activatorEvent as TouchEvent).changedTouches[0];
+        setContextMenu({ blockId, x: touch?.clientX ?? 0, y: touch?.clientY ?? 0 });
         return;
       }
       if (absX > SWIPE_DELETE_THRESHOLD_PX && absX > absY) {
@@ -650,6 +719,11 @@ export function BlockEditor({
         updateVotingSettings: (blockId, allowMultipleVotes, votingEndsAt) =>
           updateVotingSettingsMutation.mutateAsync({ blockId, allowMultipleVotes, votingEndsAt }).then(() => undefined),
         deleteBlock: (blockId) => performDelete(blockId),
+        copyBlock,
+        cutBlock,
+        duplicateBlock,
+        turnIntoBlock,
+        selectAllInEditor,
         moveBlock: (blockId, parentBlockId, afterBlockId) => performMove(blockId, parentBlockId, afterBlockId),
         pendingFocusBlockId,
         clearPendingFocus: () => setPendingFocusBlockId(null),
@@ -657,8 +731,9 @@ export function BlockEditor({
         onTouchArmStart: dragSelectGuard.onTouchArmStart,
         selectedBlockId,
         selectBlock: (blockId) => onSelectBlock?.(blockId),
-        contextMenuBlockId,
-        closeBlockMenu: () => setContextMenuBlockId(null),
+        contextMenu,
+        openBlockMenu: (blockId, x, y) => setContextMenu({ blockId, x, y }),
+        closeBlockMenu: () => setContextMenu(null),
         searchHighlight: activeMatch
           ? { terms: splitSearchTerms(highlightQuery ?? ""), activeBlockId: activeMatch.blockId }
           : null,
@@ -679,6 +754,7 @@ export function BlockEditor({
         }
         onDragLeave={isEmbedded ? undefined : handleDragLeave}
         onDrop={isEmbedded ? undefined : handleDrop}
+        onPaste={isEmbedded || effectiveReadOnly ? undefined : (event) => void handlePaste(event)}
       >
         {(isDragOver || isUploadingFiles) && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-accent bg-accent/5">

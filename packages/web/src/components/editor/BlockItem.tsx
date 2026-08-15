@@ -12,6 +12,7 @@ import { BlockContextMenu } from "./BlockContextMenu.js";
 import { Icon } from "../ui/Icon.js";
 import { useHasHover } from "../../hooks/useHasHover.js";
 import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
+import { isNativeMenuOverride } from "../ui/ContextMenu.js";
 
 export function BlockItem({ block }: { block: BlockNode }) {
   const { t } = useTranslation();
@@ -33,7 +34,8 @@ export function BlockItem({ block }: { block: BlockNode }) {
     isDraggingAny,
     onTouchArmStart,
     selectBlock,
-    contextMenuBlockId,
+    contextMenu,
+    openBlockMenu,
   } = useBlockEditor();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   // No real hover on touch (see useHasHover.ts) - that's when the row itself
@@ -108,6 +110,21 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // Selecting a block no longer highlights it here - see
         // BlockHistoryPanel.tsx, which now identifies which block its
         // entries belong to with a description line instead.
+        // Desktop right-click replacement for the browser's native menu -
+        // Shift+right-click is the universal escape hatch back to it (see
+        // isNativeMenuOverride), left alone here so Inspect Element etc.
+        // still work. Skipped entirely while locked/read-only: the native
+        // menu's own Copy still works for reading a locked object's text,
+        // and every action this menu offers besides Copy mutates the block.
+        onContextMenu={
+          readOnly
+            ? undefined
+            : (event) => {
+                if (isNativeMenuOverride(event)) return;
+                event.preventDefault();
+                openBlockMenu(block.id, event.clientX, event.clientY);
+              }
+        }
         onFocus={() => setIsEditingContent(true)}
         onBlur={() => setIsEditingContent(false)}
         // Touch only, and only between edits (see canLongPressDrag above) -
@@ -183,7 +200,9 @@ export function BlockItem({ block }: { block: BlockNode }) {
           </button>
         )}
 
-        {contextMenuBlockId === block.id && <BlockContextMenu blockId={block.id} slug={block.slug} />}
+        {contextMenu?.blockId === block.id && (
+          <BlockContextMenu blockId={block.id} slug={block.slug} type={block.type} x={contextMenu.x} y={contextMenu.y} />
+        )}
       </div>
     </div>
   );

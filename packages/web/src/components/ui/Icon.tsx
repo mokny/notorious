@@ -95,6 +95,10 @@ import {
   Volume2,
   VolumeX,
   Check,
+  Scissors,
+  CopyPlus,
+  Repeat,
+  TextSelect,
   type LucideIcon,
 } from "lucide-react";
 
@@ -192,6 +196,10 @@ const ICONS: Record<string, LucideIcon> = {
   reply: CornerUpLeft,
   rss: Rss,
   "alert-triangle": AlertTriangle,
+  cut: Scissors,
+  duplicate: CopyPlus,
+  "turn-into": Repeat,
+  "select-all": TextSelect,
 };
 
 function isImageUrl(value: string): boolean {

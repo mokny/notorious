@@ -59,7 +59,8 @@ const SLASH_COMMAND_ITEM_DEFS: { type: BlockType; key: string }[] = [
   { type: "rssFeed", key: "rssFeed" },
 ];
 
-function buildFixedSlashCommandItems(): SlashCommandItem[] {
+/** Exported for BlockContextMenu.tsx's "Turn into" submenu, which needs the same fixed list (freshly localized, not just the load-time `SLASH_COMMAND_ITEMS` snapshot below) but none of `buildSlashCommandItems`'s per-object-type "create and embed" entries - turning an existing block into a brand-new embedded object doesn't make sense. */
+export function buildFixedSlashCommandItems(): SlashCommandItem[] {
   return SLASH_COMMAND_ITEM_DEFS.map(({ type, key }) => ({
     type,
     label: i18next.t(`editor.slashCommand.items.${key}.label`),

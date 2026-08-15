@@ -413,7 +413,11 @@
   },
   "views": {
     "common": {
-      "noObjects": "Aucun objet pour l'instant."
+      "noObjects": "Aucun objet pour l'instant.",
+      "contextMenu": {
+        "copyLink": "Copier le lien",
+        "linkCopied": "Lien copié"
+      }
     },
     "board": {
       "noPivotProperty": "Choisissez une propriété de statut/sélection comme propriété de colonne de ce tableau dans les paramètres de la vue.",
@@ -455,7 +459,13 @@
       "reference": "Référencez ce bloc depuis les modèles comme blocks.{{value}}.",
       "saveIdFailed": "Impossible d'enregistrer cet ID",
       "saveId": "Enregistrer l'ID",
-      "deleteBlock": "Supprimer le bloc"
+      "deleteBlock": "Supprimer le bloc",
+      "copy": "Copier",
+      "cut": "Couper",
+      "duplicate": "Dupliquer",
+      "turnInto": "Convertir en",
+      "selectAll": "Tout sélectionner",
+      "setBlockId": "Définir l'ID du bloc"
     },
     "slugButton": {
       "title": "ID du bloc (pour les modèles)",

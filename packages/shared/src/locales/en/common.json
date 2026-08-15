@@ -419,7 +419,11 @@
   },
   "views": {
     "common": {
-      "noObjects": "No objects yet."
+      "noObjects": "No objects yet.",
+      "contextMenu": {
+        "copyLink": "Copy link",
+        "linkCopied": "Link copied"
+      }
     },
     "board": {
       "noPivotProperty": "Pick a status/select property as this board's column property in view settings.",
@@ -461,7 +465,13 @@
       "reference": "Reference this block from templates as blocks.{{value}}.",
       "saveIdFailed": "Could not save this id",
       "saveId": "Save id",
-      "deleteBlock": "Delete block"
+      "deleteBlock": "Delete block",
+      "copy": "Copy",
+      "cut": "Cut",
+      "duplicate": "Duplicate",
+      "turnInto": "Turn into",
+      "selectAll": "Select all",
+      "setBlockId": "Set block id"
     },
     "slugButton": {
       "title": "Block id (for templates)",

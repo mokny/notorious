@@ -1,4 +1,4 @@
-import { useMemo, type PointerEvent } from "react";
+import { useMemo, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { DndContext, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -6,6 +6,9 @@ import type { ObjectRecord, Property, PropertyOption } from "@notorious/shared";
 import { useObjectMutations } from "../../hooks/useObjectMutations.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { useDragSelectGuard } from "../../hooks/useDragSelectGuard.js";
+import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { ContextMenu } from "../ui/ContextMenu.js";
+import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
 interface BoardViewProps {
   workspaceId: string;
@@ -36,6 +39,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
   );
   const dragSelectGuard = useDragSelectGuard();
+  const rowContextMenu = useRowContextMenu();
   const pivot = properties.find((p) => p.id === pivotPropertyId);
   const options: PropertyOption[] = useMemo(
     () => (pivot && "options" in pivot.config ? pivot.config.options : []),
@@ -53,6 +57,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
   }, [items, options, pivot]);
 
   function handleDragEnd(event: DragEndEvent) {
+    if (rowContextMenu.openFromDragEnd(String(event.active.id), event.activatorEvent, event.delta)) return;
     if (!pivot || !event.over) return;
     const objectId = String(event.active.id);
     const columnId = String(event.over.id);
@@ -82,6 +87,7 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
           onOpenObject={openObject}
           stacked={stacked}
           onTouchArmStart={dragSelectGuard.onTouchArmStart}
+          onCardContextMenu={rowContextMenu.openFromMouseEvent}
         />
         {options.map((option) => (
           <BoardColumn
@@ -93,9 +99,18 @@ export function BoardView({ workspaceId, items, properties, pivotPropertyId, onO
             onOpenObject={openObject}
             stacked={stacked}
             onTouchArmStart={dragSelectGuard.onTouchArmStart}
+            onCardContextMenu={rowContextMenu.openFromMouseEvent}
           />
         ))}
       </div>
+      {rowContextMenu.menu && (
+        <ContextMenu
+          x={rowContextMenu.menu.x}
+          y={rowContextMenu.menu.y}
+          items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
+          onClose={rowContextMenu.close}
+        />
+      )}
     </DndContext>
   );
 }
@@ -108,6 +123,7 @@ function BoardColumn({
   onOpenObject,
   stacked,
   onTouchArmStart,
+  onCardContextMenu,
 }: {
   id: string;
   title: string;
@@ -116,6 +132,7 @@ function BoardColumn({
   onOpenObject: (objectId: string) => void;
   stacked: boolean;
   onTouchArmStart: (event: PointerEvent) => void;
+  onCardContextMenu: (objectId: string, event: ReactMouseEvent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
@@ -131,7 +148,13 @@ function BoardColumn({
       </div>
       <div className="space-y-2">
         {items.map((item) => (
-          <BoardCard key={item.id} item={item} onOpen={() => onOpenObject(item.id)} onTouchArmStart={onTouchArmStart} />
+          <BoardCard
+            key={item.id}
+            item={item}
+            onOpen={() => onOpenObject(item.id)}
+            onTouchArmStart={onTouchArmStart}
+            onContextMenu={(event) => onCardContextMenu(item.id, event)}
+          />
         ))}
       </div>
     </div>
@@ -142,10 +165,12 @@ function BoardCard({
   item,
   onOpen,
   onTouchArmStart,
+  onContextMenu,
 }: {
   item: ObjectRecord;
   onOpen: () => void;
   onTouchArmStart: (event: PointerEvent) => void;
+  onContextMenu: (event: ReactMouseEvent) => void;
 }) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: item.id });
@@ -157,6 +182,7 @@ function BoardCard({
       {...attributes}
       onPointerDownCapture={onTouchArmStart}
       onClick={onOpen}
+      onContextMenu={onContextMenu}
       style={transform ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 10 } : undefined}
       className={`cursor-pointer rounded-lg border border-border bg-surface p-2.5 text-sm shadow-sm hover:ring-2 hover:ring-accent/30 ${isDragging ? "opacity-60" : ""}`}
     >

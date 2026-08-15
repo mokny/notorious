@@ -3,6 +3,9 @@ import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { Icon } from "../ui/Icon.js";
 import { PropertyCell } from "../properties/PropertyCell.js";
+import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { ContextMenu } from "../ui/ContextMenu.js";
+import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
 interface ListViewProps {
   workspaceId: string;
@@ -17,11 +20,16 @@ export function ListView({ workspaceId, items, properties, visiblePropertyIds, o
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
+  const rowContextMenu = useRowContextMenu();
 
   return (
     <div className="divide-y divide-border p-2">
       {items.map((object) => (
-        <div key={object.id} className="flex items-center gap-3 px-2 py-2 hover:bg-surface-raised">
+        <div
+          key={object.id}
+          onContextMenu={(event) => rowContextMenu.openFromMouseEvent(object.id, event)}
+          className="flex items-center gap-3 px-2 py-2 hover:bg-surface-raised"
+        >
           <Icon name={object.icon ?? "file-text"} className="h-4 w-4 shrink-0 text-ink-muted" />
           <button className="flex-1 truncate text-left text-sm hover:underline" onClick={() => openObject(object.id)}>
             {object.title || t("nav.untitled")}
@@ -36,6 +44,14 @@ export function ListView({ workspaceId, items, properties, visiblePropertyIds, o
         </div>
       ))}
       {items.length === 0 && <p className="p-6 text-center text-sm text-ink-muted">{t("views.common.noObjects")}</p>}
+      {rowContextMenu.menu && (
+        <ContextMenu
+          x={rowContextMenu.menu.x}
+          y={rowContextMenu.menu.y}
+          items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
+          onClose={rowContextMenu.close}
+        />
+      )}
     </div>
   );
 }

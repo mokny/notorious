@@ -413,7 +413,11 @@
   },
   "views": {
     "common": {
-      "noObjects": "Aún no hay objetos."
+      "noObjects": "Aún no hay objetos.",
+      "contextMenu": {
+        "copyLink": "Copiar enlace",
+        "linkCopied": "Enlace copiado"
+      }
     },
     "board": {
       "noPivotProperty": "Elige una propiedad de estado/selección como propiedad de columna de este tablero en los ajustes de la vista.",
@@ -455,7 +459,13 @@
       "reference": "Haz referencia a este bloque desde plantillas como blocks.{{value}}.",
       "saveIdFailed": "No se pudo guardar este ID",
       "saveId": "Guardar ID",
-      "deleteBlock": "Eliminar bloque"
+      "deleteBlock": "Eliminar bloque",
+      "copy": "Copiar",
+      "cut": "Cortar",
+      "duplicate": "Duplicar",
+      "turnInto": "Convertir en",
+      "selectAll": "Seleccionar todo",
+      "setBlockId": "Establecer ID del bloque"
     },
     "slugButton": {
       "title": "ID del bloque (para plantillas)",

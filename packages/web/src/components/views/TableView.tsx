@@ -5,6 +5,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { PropertyCell } from "../properties/PropertyCell.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { ContextMenu } from "../ui/ContextMenu.js";
+import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
 interface TableViewProps {
   workspaceId: string;
@@ -28,11 +31,16 @@ function TableViewCards({ workspaceId, items, properties, visiblePropertyIds, on
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
+  const rowContextMenu = useRowContextMenu();
 
   return (
     <div className="h-full space-y-2 overflow-auto p-3">
       {items.map((object) => (
-        <div key={object.id} className="rounded-lg border border-border bg-surface-raised p-3">
+        <div
+          key={object.id}
+          onContextMenu={(event) => rowContextMenu.openFromMouseEvent(object.id, event)}
+          className="rounded-lg border border-border bg-surface-raised p-3"
+        >
           <button onClick={() => openObject(object.id)} className="block w-full truncate text-left text-sm font-medium hover:underline">
             {object.title || t("nav.untitled")}
           </button>
@@ -51,6 +59,14 @@ function TableViewCards({ workspaceId, items, properties, visiblePropertyIds, on
         </div>
       ))}
       {items.length === 0 && <p className="p-6 text-center text-sm text-ink-muted">{t("views.common.noObjects")}</p>}
+      {rowContextMenu.menu && (
+        <ContextMenu
+          x={rowContextMenu.menu.x}
+          y={rowContextMenu.menu.y}
+          items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
+          onClose={rowContextMenu.close}
+        />
+      )}
     </div>
   );
 }
@@ -62,6 +78,7 @@ function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onO
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const parentRef = useRef<HTMLDivElement>(null);
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
+  const rowContextMenu = useRowContextMenu();
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -91,6 +108,7 @@ function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onO
                 key={object.id}
                 style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${virtualRow.start}px)` }}
                 className="flex border-b border-border hover:bg-surface-raised"
+                onContextMenu={(event) => rowContextMenu.openFromMouseEvent(object.id, event)}
               >
                 <td className="flex-1 basis-56 p-2">
                   <button className="truncate text-left hover:underline" onClick={() => openObject(object.id)}>
@@ -107,6 +125,14 @@ function TableViewGrid({ workspaceId, items, properties, visiblePropertyIds, onO
           })}
         </tbody>
       </table>
+      {rowContextMenu.menu && (
+        <ContextMenu
+          x={rowContextMenu.menu.x}
+          y={rowContextMenu.menu.y}
+          items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
+          onClose={rowContextMenu.close}
+        />
+      )}
     </div>
   );
 }

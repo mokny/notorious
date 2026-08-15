@@ -418,7 +418,11 @@
   },
   "views": {
     "common": {
-      "noObjects": "Noch keine Objekte vorhanden."
+      "noObjects": "Noch keine Objekte vorhanden.",
+      "contextMenu": {
+        "copyLink": "Link kopieren",
+        "linkCopied": "Link kopiert"
+      }
     },
     "board": {
       "noPivotProperty": "Wähle in den Ansichtseinstellungen eine Status-/Auswahl-Eigenschaft als Spalteneigenschaft für dieses Board.",
@@ -460,7 +464,13 @@
       "reference": "Referenziere diesen Block in Vorlagen als blocks.{{value}}.",
       "saveIdFailed": "Diese ID konnte nicht gespeichert werden",
       "saveId": "ID speichern",
-      "deleteBlock": "Block löschen"
+      "deleteBlock": "Block löschen",
+      "copy": "Kopieren",
+      "cut": "Ausschneiden",
+      "duplicate": "Duplizieren",
+      "turnInto": "Umwandeln in",
+      "selectAll": "Alles auswählen",
+      "setBlockId": "Block-ID festlegen"
     },
     "slugButton": {
       "title": "Block-ID (für Vorlagen)",

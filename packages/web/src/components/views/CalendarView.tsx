@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ObjectRecord, Property } from "@notorious/shared";
 import { Icon } from "../ui/Icon.js";
+import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { ContextMenu } from "../ui/ContextMenu.js";
+import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
 interface CalendarViewProps {
   workspaceId: string;
@@ -21,6 +24,7 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
+  const rowContextMenu = useRowContextMenu();
   const dateProperty = properties.find((p) => p.id === datePropertyId) ?? properties.find((p) => p.config.type === "date" || p.config.type === "datetime");
 
   const itemsByDay = useMemo(() => {
@@ -73,6 +77,7 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
                     <button
                       key={item.id}
                       onClick={() => openObject(item.id)}
+                      onContextMenu={(event) => rowContextMenu.openFromMouseEvent(item.id, event)}
                       className="mb-0.5 block w-full truncate rounded bg-accent/10 px-1 py-0.5 text-left text-accent"
                     >
                       {item.title}
@@ -87,6 +92,14 @@ export function CalendarView({ workspaceId, items, properties, datePropertyId, o
           );
         })}
       </div>
+      {rowContextMenu.menu && (
+        <ContextMenu
+          x={rowContextMenu.menu.x}
+          y={rowContextMenu.menu.y}
+          items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
+          onClose={rowContextMenu.close}
+        />
+      )}
     </div>
   );
 }

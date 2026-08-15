@@ -4,6 +4,9 @@ import type { ObjectRecord, Property } from "@notorious/shared";
 import { useRobustImage } from "../../hooks/useRobustImage.js";
 import { Icon } from "../ui/Icon.js";
 import { ImageLoadError } from "../ui/ImageLoadError.js";
+import { useRowContextMenu } from "../../hooks/useRowContextMenu.js";
+import { ContextMenu } from "../ui/ContextMenu.js";
+import { buildObjectContextMenuItems } from "../../lib/objectContextMenu.js";
 
 function GalleryCover({ cover }: { cover: string }) {
   const image = useRobustImage(cover);
@@ -24,6 +27,7 @@ export function GalleryView({ workspaceId, items, properties, visiblePropertyIds
   const navigate = useNavigate();
   const openObject = onOpenObject ?? ((objectId: string) => navigate(`/w/${workspaceId}/objects/${objectId}`));
   const columns = properties.filter((property) => visiblePropertyIds.includes(property.id));
+  const rowContextMenu = useRowContextMenu();
 
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 p-4">
@@ -31,6 +35,7 @@ export function GalleryView({ workspaceId, items, properties, visiblePropertyIds
         <button
           key={object.id}
           onClick={() => openObject(object.id)}
+          onContextMenu={(event) => rowContextMenu.openFromMouseEvent(object.id, event)}
           className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface-raised text-left transition hover:ring-2 hover:ring-accent/30"
         >
           {object.cover ? (
@@ -58,6 +63,14 @@ export function GalleryView({ workspaceId, items, properties, visiblePropertyIds
       ))}
       {items.length === 0 && (
         <p className="col-span-full p-6 text-center text-sm text-ink-muted">{t("views.common.noObjects")}</p>
+      )}
+      {rowContextMenu.menu && (
+        <ContextMenu
+          x={rowContextMenu.menu.x}
+          y={rowContextMenu.menu.y}
+          items={buildObjectContextMenuItems(t, workspaceId, rowContextMenu.menu.objectId)}
+          onClose={rowContextMenu.close}
+        />
       )}
     </div>
   );
