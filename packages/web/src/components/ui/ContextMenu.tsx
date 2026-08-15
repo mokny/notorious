@@ -77,6 +77,13 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   const containerRef = useRef<HTMLDivElement>(null);
   const pos = useClampedPosition(containerRef, x, y);
   useCloseOnOutsidePointerDown(onClose);
+  // Which sibling's submenu is open, if any - lifted up from each row so
+  // opening one closes any other already open at this same level (moving
+  // the mouse onto a different row, with or without its own submenu, no
+  // longer leaves a stale submenu panel hanging open next to it). A deeper
+  // submenu is its own separate `<ContextMenu>` instance below with its own
+  // independent state, so this only ever coordinates one level at a time.
+  const [openSubmenuKey, setOpenSubmenuKey] = useState<string | null>(null);
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
@@ -105,7 +112,14 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
           // through every nesting level) - selecting a leaf item anywhere in
           // a submenu closes the entire menu, not just that one submenu
           // panel, matching how a native context menu's submenu behaves.
-          <ContextMenuRow key={item.key} item={item} onCloseAll={onClose} />
+          <ContextMenuRow
+            key={item.key}
+            item={item}
+            onCloseAll={onClose}
+            isOpen={openSubmenuKey === item.key}
+            onOpen={() => setOpenSubmenuKey(item.key)}
+            onCloseSubmenus={() => setOpenSubmenuKey(null)}
+          />
         ),
       )}
     </div>,
@@ -113,23 +127,41 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   );
 }
 
-function ContextMenuRow({ item, onCloseAll }: { item: ContextMenuItem; onCloseAll: () => void }) {
+function ContextMenuRow({
+  item,
+  onCloseAll,
+  isOpen,
+  onOpen,
+  onCloseSubmenus,
+}: {
+  item: ContextMenuItem;
+  onCloseAll: () => void;
+  /** Whether *this* row's submenu is the one currently open at its level - see ContextMenu's `openSubmenuKey`. */
+  isOpen: boolean;
+  onOpen: () => void;
+  /** Closes whichever sibling submenu is currently open - called on hovering any row that isn't itself a submenu trigger, and by a submenu row toggling its own open one back closed. */
+  onCloseSubmenus: () => void;
+}) {
   const rowRef = useRef<HTMLButtonElement>(null);
-  const [submenuOpen, setSubmenuOpen] = useState(false);
   const [submenuPos, setSubmenuPos] = useState<{ x: number; y: number } | null>(null);
 
   function openSubmenu() {
     const rect = rowRef.current?.getBoundingClientRect();
     if (!rect) return;
     setSubmenuPos({ x: rect.right, y: rect.top });
-    setSubmenuOpen(true);
+    onOpen();
+  }
+
+  function handleMouseEnter() {
+    if (item.submenu) openSubmenu();
+    else onCloseSubmenus();
   }
 
   function handleClick(event: ReactMouseEvent) {
     event.stopPropagation();
     if (item.disabled) return;
     if (item.submenu) {
-      if (submenuOpen) setSubmenuOpen(false);
+      if (isOpen) onCloseSubmenus();
       else openSubmenu();
       return;
     }
@@ -145,7 +177,7 @@ function ContextMenuRow({ item, onCloseAll }: { item: ContextMenuItem; onCloseAl
         role="menuitem"
         disabled={item.disabled}
         onClick={handleClick}
-        onMouseEnter={item.submenu ? openSubmenu : undefined}
+        onMouseEnter={handleMouseEnter}
         className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
           item.danger ? "text-red-500 hover:bg-red-500/10" : "text-ink hover:bg-surface"
         }`}
@@ -154,7 +186,7 @@ function ContextMenuRow({ item, onCloseAll }: { item: ContextMenuItem; onCloseAl
         <span className="flex-1 truncate">{item.label}</span>
         {item.submenu && <Icon name="chevron-right" className="h-3.5 w-3.5 shrink-0 text-ink-muted" />}
       </button>
-      {item.submenu && submenuOpen && submenuPos && (
+      {item.submenu && isOpen && submenuPos && (
         <ContextMenu x={submenuPos.x} y={submenuPos.y} items={item.submenu} onClose={onCloseAll} />
       )}
     </>
