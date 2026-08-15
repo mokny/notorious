@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { useClickOutside } from "../../hooks/useClickOutside.js";
 import { Icon } from "./Icon.js";
 
 export interface ContextMenuItem {
@@ -16,6 +15,8 @@ export interface ContextMenuItem {
 export type ContextMenuEntry = ContextMenuItem | { key: string; separator: true };
 
 const VIEWPORT_MARGIN = 8;
+/** Shared marker for every panel in a menu tree (the root list and any open submenu, each its own portal - see ContextMenuRow) - lets the outside-click check below treat the whole tree as one thing instead of each portal only knowing about itself. */
+const PANEL_ATTR = "data-context-menu-panel";
 
 /**
  * Shift held down at trigger time is the universal browser convention for
@@ -46,10 +47,36 @@ export function useClampedPosition(ref: React.RefObject<HTMLElement | null>, x: 
   return pos;
 }
 
+/**
+ * Closes on a pointerdown outside *every* currently-open panel in this menu
+ * tree, not just this specific one - a submenu is its own separate portal
+ * (see ContextMenuRow below), so a plain per-ref `useClickOutside` on the
+ * root list saw a click landing inside the submenu's portal as "outside"
+ * and closed the whole tree before the click's own `onClick` (which fires
+ * after `pointerdown`) ever ran, silently eating every submenu selection.
+ * Checking against every `[data-context-menu-panel]` in the document - not
+ * just this instance's own ref - fixes that regardless of which panel in
+ * the tree the click actually landed in.
+ */
+function useCloseOnOutsidePointerDown(onClose: () => void): void {
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent): void {
+      const target = event.target as Node;
+      const panels = document.querySelectorAll(`[${PANEL_ATTR}]`);
+      for (const panel of panels) {
+        if (panel.contains(target)) return;
+      }
+      onClose();
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [onClose]);
+}
+
 export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: ContextMenuEntry[]; onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pos = useClampedPosition(containerRef, x, y);
-  useClickOutside(containerRef, onClose, true);
+  useCloseOnOutsidePointerDown(onClose);
 
   useEffect(() => {
     function handleKey(event: KeyboardEvent) {
@@ -62,6 +89,7 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   return createPortal(
     <div
       ref={containerRef}
+      {...{ [PANEL_ATTR]: true }}
       role="menu"
       className="fixed z-[100] max-h-[70vh] min-w-[200px] overflow-y-auto rounded-lg border border-border bg-surface-raised p-1 shadow-lg"
       style={{ left: pos?.left ?? x, top: pos?.top ?? y, visibility: pos ? "visible" : "hidden" }}
@@ -72,7 +100,12 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
         "separator" in item ? (
           <div key={item.key} className="my-1 h-px bg-border" />
         ) : (
-          <ContextMenuRow key={item.key} item={item} onDone={onClose} />
+          // The whole tree shares one `onCloseAll` (ultimately this
+          // ContextMenu's own `onClose` prop, threaded down unchanged
+          // through every nesting level) - selecting a leaf item anywhere in
+          // a submenu closes the entire menu, not just that one submenu
+          // panel, matching how a native context menu's submenu behaves.
+          <ContextMenuRow key={item.key} item={item} onCloseAll={onClose} />
         ),
       )}
     </div>,
@@ -80,7 +113,7 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   );
 }
 
-function ContextMenuRow({ item, onDone }: { item: ContextMenuItem; onDone: () => void }) {
+function ContextMenuRow({ item, onCloseAll }: { item: ContextMenuItem; onCloseAll: () => void }) {
   const rowRef = useRef<HTMLButtonElement>(null);
   const [submenuOpen, setSubmenuOpen] = useState(false);
   const [submenuPos, setSubmenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -101,7 +134,7 @@ function ContextMenuRow({ item, onDone }: { item: ContextMenuItem; onDone: () =>
       return;
     }
     item.onSelect?.();
-    onDone();
+    onCloseAll();
   }
 
   return (
@@ -122,7 +155,7 @@ function ContextMenuRow({ item, onDone }: { item: ContextMenuItem; onDone: () =>
         {item.submenu && <Icon name="chevron-right" className="h-3.5 w-3.5 shrink-0 text-ink-muted" />}
       </button>
       {item.submenu && submenuOpen && submenuPos && (
-        <ContextMenu x={submenuPos.x} y={submenuPos.y} items={item.submenu} onClose={() => setSubmenuOpen(false)} />
+        <ContextMenu x={submenuPos.x} y={submenuPos.y} items={item.submenu} onClose={onCloseAll} />
       )}
     </>
   );
