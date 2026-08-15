@@ -32,7 +32,8 @@ function hasSelectionWithin(blockId: string): boolean {
  */
 export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: string; slug: string | null; type: BlockType; x: number; y: number }) {
   const { t } = useTranslation();
-  const { workspaceId, objectId, deleteBlock, copyBlock, cutBlock, duplicateBlock, turnIntoBlock, selectAllInEditor, closeBlockMenu } = useBlockEditor();
+  const { workspaceId, objectId, readOnly, deleteBlock, copyBlock, cutBlock, duplicateBlock, turnIntoBlock, selectAllInEditor, closeBlockMenu } =
+    useBlockEditor();
   const [slugEditorOpen, setSlugEditorOpen] = useState(false);
   const [hasSelection] = useState(() => hasSelectionWithin(blockId));
   const richTextEditor = getBlockEditor(blockId);
@@ -55,43 +56,46 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
 
   const shareTargets = (members ?? []).filter((member) => member.userId !== currentUser?.id);
 
-  const items: ContextMenuEntry[] = [
-    {
-      key: "copy",
-      label: t("editor.blockMenu.copy"),
-      icon: "copy",
-      onSelect: () => (hasSelection ? document.execCommand("copy") : copyBlock(blockId)),
-    },
-    {
-      key: "cut",
-      label: t("editor.blockMenu.cut"),
-      icon: "cut",
-      onSelect: () => (hasSelection ? document.execCommand("cut") : cutBlock(blockId)),
-    },
-    { key: "duplicate", label: t("editor.blockMenu.duplicate"), icon: "duplicate", onSelect: () => duplicateBlock(blockId) },
-    {
-      key: "turn-into",
-      label: t("editor.blockMenu.turnInto"),
-      icon: "turn-into",
-      submenu: buildFixedSlashCommandItems()
-        .filter((item) => item.type !== type)
-        .map((item) => ({ key: item.type, label: item.label, onSelect: () => turnIntoBlock(blockId, item.type) })),
-    },
-    { key: "select-all", label: t("editor.blockMenu.selectAll"), icon: "select-all", onSelect: () => selectAllInEditor() },
-    // Only shown when this block actually has a registered rich-text editor
-    // (see editorRegistry.ts) - a block whose field has no formatting marks
-    // at all (checklist items, ...) never registers one, so there'd be
-    // nothing to clear. Clears bold/italic/color/alignment on the current
-    // selection inside that editor's own instance - a plain
-    // `document.execCommand` (used above for Copy/Cut when there's a
-    // selection) mutates the DOM directly and risks desyncing it from
-    // ProseMirror's document model, which every other command here avoids by
-    // going through TipTap/the block editor's own mutations instead.
-    // `setTextAlign` only exists on a table cell's editor (see
-    // TableFormatToolbar.tsx) - the markdown-based blocks never load that
-    // extension (see useMarkdownEditor.ts), so it's applied conditionally
-    // rather than assumed.
-    ...(richTextEditor
+  // While locked, only actions that don't touch the block's content/
+  // structure survive: Copy, Select all (both pure reads) and Share (sends a
+  // chat message, never mutates the object). Everything else here -
+  // Cut/Duplicate/Turn into/Clear formatting/Set block id/Delete - mutates
+  // the block, which the lock exists to prevent, so those entries are
+  // omitted entirely rather than shown disabled.
+  const editingItems: ContextMenuEntry[] = readOnly
+    ? []
+    : [
+        {
+          key: "cut",
+          label: t("editor.blockMenu.cut"),
+          icon: "cut",
+          onSelect: () => (hasSelection ? document.execCommand("cut") : cutBlock(blockId)),
+        },
+        { key: "duplicate", label: t("editor.blockMenu.duplicate"), icon: "duplicate", onSelect: () => duplicateBlock(blockId) },
+        {
+          key: "turn-into",
+          label: t("editor.blockMenu.turnInto"),
+          icon: "turn-into",
+          submenu: buildFixedSlashCommandItems()
+            .filter((item) => item.type !== type)
+            .map((item) => ({ key: item.type, label: item.label, onSelect: () => turnIntoBlock(blockId, item.type) })),
+        },
+      ];
+
+  // Only shown when this block actually has a registered rich-text editor
+  // (see editorRegistry.ts) - a block whose field has no formatting marks at
+  // all (checklist items, ...) never registers one, so there'd be nothing to
+  // clear. Clears bold/italic/color/alignment on the current selection
+  // inside that editor's own instance - a plain `document.execCommand`
+  // (used above for Copy/Cut when there's a selection) mutates the DOM
+  // directly and risks desyncing it from ProseMirror's document model,
+  // which every other command here avoids by going through TipTap/the block
+  // editor's own mutations instead. `setTextAlign` only exists on a table
+  // cell's editor (see TableFormatToolbar.tsx) - the markdown-based blocks
+  // never load that extension (see useMarkdownEditor.ts), so it's applied
+  // conditionally rather than assumed.
+  const clearFormattingItem: ContextMenuEntry[] =
+    !readOnly && richTextEditor
       ? [
           {
             key: "clear-formatting",
@@ -104,7 +108,27 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
             },
           },
         ]
-      : []),
+      : [];
+
+  const slugAndDeleteItems: ContextMenuEntry[] = readOnly
+    ? []
+    : [
+        { key: "sep-2", separator: true },
+        { key: "set-slug", label: t("editor.blockMenu.setBlockId"), icon: "braces", onSelect: () => setSlugEditorOpen(true) },
+        { key: "sep-3", separator: true },
+        { key: "delete", label: t("editor.blockMenu.deleteBlock"), icon: "trash", danger: true, onSelect: () => deleteBlock(blockId) },
+      ];
+
+  const items: ContextMenuEntry[] = [
+    {
+      key: "copy",
+      label: t("editor.blockMenu.copy"),
+      icon: "copy",
+      onSelect: () => (hasSelection ? document.execCommand("copy") : copyBlock(blockId)),
+    },
+    ...editingItems,
+    { key: "select-all", label: t("editor.blockMenu.selectAll"), icon: "select-all", onSelect: () => selectAllInEditor() },
+    ...clearFormattingItem,
     { key: "sep-1", separator: true },
     {
       key: "share",
@@ -119,10 +143,7 @@ export function BlockContextMenu({ blockId, slug, type, x, y }: { blockId: strin
             }))
           : [{ key: "no-members", label: t("editor.blockMenu.shareNoMembers"), disabled: true }],
     },
-    { key: "sep-2", separator: true },
-    { key: "set-slug", label: t("editor.blockMenu.setBlockId"), icon: "braces", onSelect: () => setSlugEditorOpen(true) },
-    { key: "sep-3", separator: true },
-    { key: "delete", label: t("editor.blockMenu.deleteBlock"), icon: "trash", danger: true, onSelect: () => deleteBlock(blockId) },
+    ...slugAndDeleteItems,
   ];
 
   if (slugEditorOpen) {

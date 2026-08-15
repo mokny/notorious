@@ -13,6 +13,7 @@ import { Icon } from "../ui/Icon.js";
 import { useHasHover } from "../../hooks/useHasHover.js";
 import { SWIPE_DELETE_THRESHOLD_PX } from "./blockGestures.js";
 import { isNativeMenuOverride } from "../ui/ContextMenu.js";
+import { useLongPressToOpenMenu } from "../../hooks/useLongPressToOpenMenu.js";
 
 export function BlockItem({ block }: { block: BlockNode }) {
   const { t } = useTranslation();
@@ -53,6 +54,13 @@ export function BlockItem({ block }: { block: BlockNode }) {
   // surface (contentEditable, <textarea>, Excalidraw canvas, ...).
   const [isEditingContent, setIsEditingContent] = useState(false);
   const canLongPressDrag = !hasHover && !readOnly && !isEditingContent;
+  // Locked: still opens on a long-press, just via a plain timer instead of
+  // dnd-kit's drag machinery - arming that (see `canLongPressDrag` above)
+  // would also make the row draggable/swipeable, and reordering/deleting is
+  // exactly what a lock should block (see BlockContextMenu.tsx, which
+  // itself hides every action that isn't safe while locked).
+  const longPressToOpenMenu = useLongPressToOpenMenu((x, y) => openBlockMenu(block.id, x, y));
+  const canLongPressOpenMenuOnly = !hasHover && readOnly && !isEditingContent;
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -113,18 +121,14 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // Desktop right-click replacement for the browser's native menu -
         // Shift+right-click is the universal escape hatch back to it (see
         // isNativeMenuOverride), left alone here so Inspect Element etc.
-        // still work. Skipped entirely while locked/read-only: the native
-        // menu's own Copy still works for reading a locked object's text,
-        // and every action this menu offers besides Copy mutates the block.
-        onContextMenu={
-          readOnly
-            ? undefined
-            : (event) => {
-                if (isNativeMenuOverride(event)) return;
-                event.preventDefault();
-                openBlockMenu(block.id, event.clientX, event.clientY);
-              }
-        }
+        // still work. Still opens while locked/read-only - BlockContextMenu.tsx
+        // itself filters the item list down to whatever isn't affected by the
+        // lock (Copy, Select all, Share, ...) rather than gating the trigger.
+        onContextMenu={(event) => {
+          if (isNativeMenuOverride(event)) return;
+          event.preventDefault();
+          openBlockMenu(block.id, event.clientX, event.clientY);
+        }}
         onFocus={() => setIsEditingContent(true)}
         onBlur={() => setIsEditingContent(false)}
         // Touch only, and only between edits (see canLongPressDrag above) -
@@ -136,6 +140,7 @@ export function BlockItem({ block }: { block: BlockNode }) {
         // dedicated handle, not a row that already contains its own
         // interactive content (text, checkboxes, ...).
         {...(canLongPressDrag ? listeners : {})}
+        {...(canLongPressOpenMenuOnly ? longPressToOpenMenu : {})}
         onPointerDownCapture={canLongPressDrag ? onTouchArmStart : undefined}
         className={`group/item relative flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-surface-raised/60 ${!hasHover ? "bg-surface" : ""} ${
           isDragging && !hasHover ? "z-10 scale-[1.02]" : ""
