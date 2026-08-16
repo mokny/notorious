@@ -615,6 +615,8 @@ export interface AdminSettings {
   allowTemplateHttpRequests: boolean;
   callsEnabled: boolean;
   loginRateLimitEnabled: boolean;
+  trustProxyEnabled: boolean;
+  trustProxyAddresses: string;
 }
 
 export interface AdminSession {

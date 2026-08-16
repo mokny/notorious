@@ -651,6 +651,15 @@ export const instanceSettings = sqliteTable("instance_settings", {
   // enabling it is an explicit admin opt-in, not a surprise for existing
   // instances after an upgrade.
   loginRateLimitEnabled: integer("login_rate_limit_enabled", { mode: "boolean" }).notNull().default(false),
+  // Whether request.ip should be derived from X-Forwarded-For/X-Real-IP instead of the raw
+  // socket peer address - see modules/instanceSettings/service.ts's getTrustProxyConfigSync,
+  // consumed synchronously by app.ts's Fastify `trustProxy` function. Off by default: enabling
+  // this without actually running behind the reverse proxy listed in trustProxyAddresses lets
+  // any direct caller spoof their IP (login rate limiting, session/audit logs). See docs/NGINX.md.
+  trustProxyEnabled: integer("trust_proxy_enabled", { mode: "boolean" }).notNull().default(false),
+  // Comma-separated list of trusted proxy IPs/CIDRs (e.g. "127.0.0.1,172.18.0.0/16"). Required
+  // (non-empty) for trustProxyEnabled to actually take effect - see getTrustProxyConfigSync.
+  trustProxyAddresses: text("trust_proxy_addresses"),
 });
 
 // Append-only log of security-relevant admin actions - see modules/admin/service.ts's

@@ -5,13 +5,14 @@ import { adminApi, type AdminSettings } from "../../lib/api/resources.js";
 import { Button } from "../ui/Button.js";
 import { Icon } from "../ui/Icon.js";
 
-type ToggleKey = keyof AdminSettings;
+type ToggleKey = Exclude<keyof AdminSettings, "trustProxyEnabled" | "trustProxyAddresses">;
 
 export function AdminSettingsTab() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ["admin", "settings"], queryFn: adminApi.getSettings });
   const [callsSetupOpen, setCallsSetupOpen] = useState(false);
+  const [trustProxyAddresses, setTrustProxyAddresses] = useState<string | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: (patch: Partial<AdminSettings>) => adminApi.updateSettings(patch),
@@ -54,7 +55,64 @@ export function AdminSettingsTab() {
           </div>
         ))}
 
+      {settings && (
+        <TrustProxyRow
+          settings={settings}
+          addresses={trustProxyAddresses ?? settings.trustProxyAddresses}
+          onAddressesChange={setTrustProxyAddresses}
+          onSave={(patch) => {
+            updateMutation.mutate(patch);
+            setTrustProxyAddresses(null);
+          }}
+        />
+      )}
+
       {callsSetupOpen && <CallsSetupPanel onClose={() => setCallsSetupOpen(false)} />}
+    </div>
+  );
+}
+
+function TrustProxyRow({
+  settings,
+  addresses,
+  onAddressesChange,
+  onSave,
+}: {
+  settings: AdminSettings;
+  addresses: string;
+  onAddressesChange: (value: string) => void;
+  onSave: (patch: Partial<AdminSettings>) => void;
+}) {
+  const { t } = useTranslation();
+  const hasAddresses = addresses.trim() !== "";
+  const addressesDirty = addresses !== settings.trustProxyAddresses;
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={settings.trustProxyEnabled}
+          disabled={!hasAddresses && !settings.trustProxyEnabled}
+          onChange={(e) => onSave({ trustProxyEnabled: e.target.checked, trustProxyAddresses: addresses })}
+        />
+        {t("admin.settings.trustProxy.label")}
+      </label>
+      <p className="mt-1 text-xs text-ink-muted">{t("admin.settings.trustProxy.description")}</p>
+
+      <label className="mt-2 block text-xs text-ink-muted">
+        {t("admin.settings.trustProxy.addressesLabel")}
+        <input
+          className="mt-1 w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+          placeholder={t("admin.settings.trustProxy.addressesPlaceholder")}
+          value={addresses}
+          onChange={(e) => onAddressesChange(e.target.value)}
+          onBlur={() => addressesDirty && onSave({ trustProxyAddresses: addresses })}
+        />
+      </label>
+      {!hasAddresses && !settings.trustProxyEnabled && (
+        <p className="mt-1 text-xs text-amber-600">{t("admin.settings.trustProxy.addressesRequired")}</p>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { AutoUpdateSettings, UpdateChannel } from "@notorious/shared";
 import { db } from "../../db/client.js";
 import { instanceSettings } from "../../db/schema.js";
+import { badRequest } from "../../lib/httpError.js";
 
 const SETTINGS_ROW_ID = 1;
 
@@ -81,6 +82,54 @@ export async function getLoginRateLimitEnabled(): Promise<boolean> {
 
 export async function setLoginRateLimitEnabled(enabled: boolean): Promise<void> {
   await db.update(instanceSettings).set({ loginRateLimitEnabled: enabled }).where(eq(instanceSettings.id, SETTINGS_ROW_ID));
+}
+
+export interface TrustProxyConfig {
+  enabled: boolean;
+  addresses: string;
+}
+
+/** See docs/NGINX.md - request.ip is only derived from X-Forwarded-For/X-Real-IP when `enabled` is
+ * true AND `addresses` (comma-separated IPs/CIDRs) is non-empty; the caller (app.ts's Fastify
+ * `trustProxy` function) treats a missing address list as "disabled" regardless of the flag, so a
+ * half-configured toggle never silently starts trusting an unbounded set of proxies. */
+export async function getTrustProxyConfig(): Promise<TrustProxyConfig> {
+  const rows = await db
+    .select({ enabled: instanceSettings.trustProxyEnabled, addresses: instanceSettings.trustProxyAddresses })
+    .from(instanceSettings)
+    .where(eq(instanceSettings.id, SETTINGS_ROW_ID))
+    .limit(1);
+  return { enabled: rows[0]?.enabled ?? false, addresses: rows[0]?.addresses ?? "" };
+}
+
+/** Synchronous twin of `getTrustProxyConfig`, for use inside app.ts's Fastify `trustProxy` function -
+ * that function must return a boolean synchronously (it's called by the `proxy-addr` library per
+ * request, not awaited), and better-sqlite3's driver executes synchronously under the hood, so this
+ * is a plain synchronous query rather than a cached copy that could go stale after an admin toggles
+ * the setting. */
+export function getTrustProxyConfigSync(): TrustProxyConfig {
+  const rows = db
+    .select({ enabled: instanceSettings.trustProxyEnabled, addresses: instanceSettings.trustProxyAddresses })
+    .from(instanceSettings)
+    .where(eq(instanceSettings.id, SETTINGS_ROW_ID))
+    .limit(1)
+    .all();
+  return { enabled: rows[0]?.enabled ?? false, addresses: rows[0]?.addresses ?? "" };
+}
+
+/** Rejects enabling the flag with no address list configured - see getTrustProxyConfig's note on why
+ * that combination must never be treated as "trust everyone". */
+export async function setTrustProxyConfig(input: { enabled?: boolean; addresses?: string }): Promise<void> {
+  const current = await getTrustProxyConfig();
+  const enabled = input.enabled ?? current.enabled;
+  const addresses = input.addresses ?? current.addresses;
+  if (enabled && addresses.trim() === "") {
+    throw badRequest("trustProxyAddresses must be set before trustProxyEnabled can be turned on");
+  }
+  await db
+    .update(instanceSettings)
+    .set({ trustProxyEnabled: enabled, trustProxyAddresses: addresses })
+    .where(eq(instanceSettings.id, SETTINGS_ROW_ID));
 }
 
 // ---- Auto-update (see modules/admin/autoUpdateScheduler.ts) ----

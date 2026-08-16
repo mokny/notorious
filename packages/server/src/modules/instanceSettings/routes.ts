@@ -14,22 +14,38 @@ import {
   setCallsEnabled,
   getLoginRateLimitEnabled,
   setLoginRateLimitEnabled,
+  getTrustProxyConfig,
+  setTrustProxyConfig,
   getAutoUpdateSettings,
   setAutoUpdateSettings,
 } from "./service.js";
 
-/** Admin-only read/write for the instance-wide toggles that used to be CLI-only (see scripts/setRegistration.ts and friends) - now available from the /admin UI too. The CLI scripts remain as-is for headless/first-time setup. */
-export async function registerInstanceSettingsRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/v1/admin/settings", async (request) => {
-    await requireInstanceAdmin(request);
-    const [registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled] = await Promise.all([
+async function getAllSettings() {
+  const [registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled, trustProxy] =
+    await Promise.all([
       getRegistrationEnabled(),
       getRequire2faEnabled(),
       getAllowTemplateHttpRequests(),
       getCallsEnabled(),
       getLoginRateLimitEnabled(),
+      getTrustProxyConfig(),
     ]);
-    return { registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled };
+  return {
+    registrationEnabled,
+    require2faEnabled,
+    allowTemplateHttpRequests,
+    callsEnabled,
+    loginRateLimitEnabled,
+    trustProxyEnabled: trustProxy.enabled,
+    trustProxyAddresses: trustProxy.addresses,
+  };
+}
+
+/** Admin-only read/write for the instance-wide toggles that used to be CLI-only (see scripts/setRegistration.ts and friends) - now available from the /admin UI too. The CLI scripts remain as-is for headless/first-time setup. */
+export async function registerInstanceSettingsRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/api/v1/admin/settings", async (request) => {
+    await requireInstanceAdmin(request);
+    return getAllSettings();
   });
 
   app.patch("/api/v1/admin/settings", async (request) => {
@@ -57,18 +73,16 @@ export async function registerInstanceSettingsRoutes(app: FastifyInstance): Prom
       await setLoginRateLimitEnabled(input.loginRateLimitEnabled);
       changed.push(`login rate limiting ${input.loginRateLimitEnabled ? "enabled" : "disabled"}`);
     }
+    if (input.trustProxyEnabled !== undefined || input.trustProxyAddresses !== undefined) {
+      await setTrustProxyConfig({ enabled: input.trustProxyEnabled, addresses: input.trustProxyAddresses });
+      if (input.trustProxyEnabled !== undefined) changed.push(`trust proxy ${input.trustProxyEnabled ? "enabled" : "disabled"}`);
+      if (input.trustProxyAddresses !== undefined) changed.push(`trust proxy addresses updated`);
+    }
     if (changed.length > 0) {
       await logAdminAction(admin, "settings.update", `Changed instance settings: ${changed.join(", ")}`);
     }
 
-    const [registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled] = await Promise.all([
-      getRegistrationEnabled(),
-      getRequire2faEnabled(),
-      getAllowTemplateHttpRequests(),
-      getCallsEnabled(),
-      getLoginRateLimitEnabled(),
-    ]);
-    return { registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled };
+    return getAllSettings();
   });
 
   // ---- Auto-update ----

@@ -13,6 +13,7 @@ import swaggerUi from "@fastify/swagger-ui";
 import { ZodError } from "zod";
 import { env } from "./env.js";
 import { HttpError } from "./lib/httpError.js";
+import { trustProxyFn } from "./modules/instanceSettings/trustProxy.js";
 import { sessionPlugin } from "./plugins/session.js";
 import { registerAuthRoutes } from "./modules/auth/routes.js";
 import { registerTwoFactorRoutes } from "./modules/twoFactor/routes.js";
@@ -55,7 +56,7 @@ const { version: PACKAGE_VERSION } = JSON.parse(
 ) as { version: string };
 
 export async function buildApp(): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024, trustProxy: trustProxyFn });
 
   await app.register(swagger, {
     openapi: {

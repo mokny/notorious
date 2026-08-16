@@ -1186,6 +1186,14 @@
       "loginRateLimit": {
         "label": "Rate-limit login attempts",
         "description": "Blocks an IP after 10 failed login attempts within 15 minutes."
+      },
+      "trustProxy": {
+        "label": "Behind a reverse proxy",
+        "description": "Reads the real client IP from X-Forwarded-For/X-Real-IP instead of the proxy's own IP - see NGINX.md. Only enable this if direct access to this server's port is blocked, otherwise a caller could fake their IP.",
+        "addressesLabel": "Trusted proxy IPs/CIDRs (comma-separated)",
+        "addressesPlaceholder": "127.0.0.1",
+        "addressesRequired": "Add at least one IP/CIDR before enabling this.",
+        "addressesInvalid": "Expected a comma-separated list of IPs or CIDR ranges."
       }
     },
     "users": {

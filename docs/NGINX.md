@@ -26,6 +26,9 @@ Either way, the same three things matter, and are the source of almost every iss
    drops the session cookie, which looks exactly like "login doesn't work" with no error message.
    Leave it `false` while you're still setting things up; flip it once you've confirmed
    `https://your-domain` loads correctly.
+4. **The "Behind a reverse proxy" setting in Admin → Advanced**, so Notorious shows each visitor's
+   real IP (Sessions list, login rate limiting, audit log) instead of nginx's own IP on every entry -
+   see [Showing the real client IP](#showing-the-real-client-ip) below.
 
 ---
 
@@ -118,7 +121,9 @@ the network the moment it's up.
   cron job to set up yourself.
 
 "Advanced" tab - NPM doesn't expose `client_max_body_size` as its own field, so add it here as a raw
-nginx directive (point 2 above):
+nginx directive (point 2 above). NPM sets `X-Forwarded-For`/`X-Real-IP` on outgoing proxied requests
+by default, so nothing extra is needed here for point 4 (real client IPs) - just complete the
+[Showing the real client IP](#showing-the-real-client-ip) section below once this proxy host is live:
 
 ```nginx
 client_max_body_size 200m;
@@ -269,6 +274,57 @@ If calls aren't connecting, the nginx config is very unlikely to be the cause - 
 `MEDIA_ANNOUNCED_IP` in `.env` is actually your public IP and that `MEDIA_PORT` is really forwarded
 on your router instead.
 
+## Showing the real client IP
+
+By default Notorious shows every visitor's IP as your reverse proxy's own address (e.g.
+`192.168.178.6` for a bare-metal nginx, or a Docker-internal IP for NPM) in Admin → Sessions, the
+per-user Security settings device list, and the admin audit log - because without being told
+otherwise, it reads the raw TCP connection address, which *is* nginx, not the visitor behind it. Both
+setups above already forward the real address via the `X-Forwarded-For`/`X-Real-IP` headers; Notorious
+just needs to be told to trust and read them.
+
+### 1. Confirm port 4000 isn't reachable directly
+
+This is the important part, not a formality: once Notorious trusts `X-Forwarded-For`, anyone who can
+reach it *without* going through nginx can put an arbitrary IP in that header and have Notorious
+believe it - bypassing login rate limiting and forging entries in the sessions/audit log. Only enable
+the setting below once you've confirmed nginx is the only way in:
+
+- **Bare-metal / systemd**: firewall off external access to `PORT` (`4000` by default), e.g.
+  `sudo ufw deny 4000` (nginx reaches it over `127.0.0.1`, which stays allowed).
+- **Docker Compose**: bind the published port to localhost only, so it's not exposed on the host's
+  public interfaces at all:
+
+  ```yaml
+  services:
+    notorious:
+      ports:
+        - "127.0.0.1:4000:4000"   # was "4000:4000"
+  ```
+
+  If NPM or another reverse-proxy container reaches Notorious over the shared Docker network instead
+  (see [Via a UI](#via-a-ui-nginx-proxy-manager) above), you don't even need the port published to the
+  host - you can drop the `ports:` mapping for `notorious` entirely and rely on the container-name
+  DNS resolution within `proxy-net`.
+
+### 2. Enable it in Admin → Advanced
+
+Log in as an instance admin, go to **Admin → Advanced**, and turn on **"Behind a reverse proxy"**.
+It requires at least one trusted IP/CIDR in the field next to it - Notorious only reads
+`X-Forwarded-For` when the request actually arrives from one of these, everything else still falls
+back to the raw connection address:
+
+- **Plain nginx** (proxying via `proxy_pass http://127.0.0.1:4000` on the same host): use `127.0.0.1`
+  (and `::1` too, comma-separated, if nginx might connect over IPv6 loopback).
+- **Nginx Proxy Manager / other reverse-proxy container on the shared `proxy-net` Docker network**:
+  use that network's subnet, e.g. `172.18.0.0/16` - check the actual range with
+  `docker network inspect proxy-net` (`IPAM.Config[0].Subnet`) rather than guessing, Compose doesn't
+  always pick the same one.
+
+No restart needed - the setting takes effect on the next request. Log out and back in (or just
+refresh the Sessions list) to see the real IP appear on new session rows; existing rows keep whatever
+was already stored.
+
 ## Troubleshooting checklist
 
 | Symptom | Likely cause |
@@ -279,3 +335,4 @@ on your router instead.
 | `502 Bad Gateway` | Notorious isn't actually running/listening on the port nginx is forwarding to - check `systemctl status notorious` / `docker compose ps`, and that the port in the proxy config matches `PORT` in `.env` |
 | Certificate renewal seems to have stopped working | Plain nginx: check `sudo systemctl status certbot.timer` and `sudo certbot renew --dry-run`. NPM: certs auto-renew internally - check the container logs (`docker compose logs npm`) if a cert actually expired |
 | Calls ring but audio/video never connects | Not an nginx issue - see the calls section above. Check `MEDIA_ANNOUNCED_IP`/`MEDIA_PORT` in `.env` and router port forwarding |
+| Sessions/audit log always show the nginx server's own IP for every visitor | "Behind a reverse proxy" isn't enabled (or the trusted IP/CIDR doesn't match) in Admin → Advanced - see [Showing the real client IP](#showing-the-real-client-ip) |

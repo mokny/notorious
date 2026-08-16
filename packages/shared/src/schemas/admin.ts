@@ -19,6 +19,18 @@ export const adminResetPasswordSchema = z.object({
 });
 export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
 
+/** One comma-separated entry: IPv4/IPv6, optionally with a `/prefix` CIDR suffix. Loose on purpose -
+ * modules/instanceSettings/service.ts's ipaddr.js-based matcher is the authoritative parser; this
+ * just rejects obvious typos early with a clear error instead of the setting silently never matching. */
+const ipOrCidr = /^[0-9a-fA-F.:]+(\/\d{1,3})?$/;
+export const trustProxyAddressesSchema = z
+  .string()
+  .max(2000)
+  .refine(
+    (value) => value.split(",").every((entry) => ipOrCidr.test(entry.trim())),
+    "Expected a comma-separated list of IPs or CIDR ranges",
+  );
+
 export const adminUpdateSettingsSchema = z
   .object({
     registrationEnabled: z.boolean(),
@@ -26,6 +38,10 @@ export const adminUpdateSettingsSchema = z
     allowTemplateHttpRequests: z.boolean(),
     callsEnabled: z.boolean(),
     loginRateLimitEnabled: z.boolean(),
+    trustProxyEnabled: z.boolean(),
+    /** Empty string clears the list. Must be non-empty (validated in modules/instanceSettings/service.ts)
+     * for trustProxyEnabled to actually be settable to true - see docs/NGINX.md. */
+    trustProxyAddresses: z.union([trustProxyAddressesSchema, z.literal("")]),
   })
   .partial();
 export type AdminUpdateSettingsInput = z.infer<typeof adminUpdateSettingsSchema>;
