@@ -1,9 +1,10 @@
 /**
  * Cuts a real GitHub Release on top of the per-commit patch-version counter
  * (see scripts/bump-version.mjs / .githooks/pre-commit): bumps to the next
- * `major.minor.0`, commits, tags, pushes, and publishes a GitHub Release via
- * `gh`. Interactive - run locally by a human (`npm run release`), never part
- * of an automated pipeline.
+ * `major.minor.0`, commits, tags, pushes, builds a changelog from the
+ * commits since the last tag, and publishes a GitHub Release via `gh` using
+ * that changelog as the notes body. Interactive - run locally by a human
+ * (`npm run release`), never part of an automated pipeline.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -73,6 +74,47 @@ for (;;) {
   console.log(`Ungueltiges Format: '${candidate}' - erwartet z.B. '1.4.0'.`);
 }
 
+// 6b. Build the changelog from commits since the last tag, grouped by
+// conventional-commit type. Own `chore(release):` commits are noise (they
+// just mark a prior release) and are dropped.
+function buildChangelog() {
+  let previousTag;
+  try {
+    previousTag = runCapture("git describe --tags --abbrev=0");
+  } catch {
+    previousTag = runCapture("git rev-list --max-parents=0 HEAD");
+  }
+  const range = `${previousTag}..HEAD`;
+  const subjects = runCapture(`git log ${range} --pretty=%s`)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^chore\(release\):/.test(line));
+
+  const features = [];
+  const fixes = [];
+  const other = [];
+  const conventional = /^(\w+)(\([^)]*\))?!?:\s*(.*)$/;
+  for (const subject of subjects) {
+    const match = subject.match(conventional);
+    const type = match ? match[1] : null;
+    const message = match ? match[3] : subject;
+    if (type === "feat") features.push(message);
+    else if (type === "fix") fixes.push(message);
+    else other.push(message);
+  }
+
+  const section = (title, items) =>
+    items.length ? `## ${title}\n${items.map((item) => `- ${item}`).join("\n")}\n\n` : "";
+
+  const body = `${section("Features", features)}${section("Fixes", fixes)}${section("Other", other)}`.trim();
+  return body === "" ? "No changes." : body;
+}
+
+const changelog = buildChangelog();
+console.log("\n==> Changelog:\n");
+console.log(changelog);
+
 // 7. Confirm.
 console.log(`\n${pkg.version} -> ${next}`);
 console.log(`Erstellt und pusht Tag v${next}, veroeffentlicht ein GitHub Release.`);
@@ -95,8 +137,14 @@ run(`git tag v${next}`);
 run("git push origin main");
 run(`git push origin v${next}`);
 
-// 13. Publish the GitHub Release.
+// 13. Publish the GitHub Release, with our own changelog as the notes body.
 console.log("\n==> Publishing GitHub Release...");
-run(`gh release create v${next} --title v${next} --generate-notes`);
+const notesPath = path.join(repoRoot, ".release-notes.md");
+fs.writeFileSync(notesPath, changelog + "\n");
+try {
+  run(`gh release create v${next} --title v${next} --notes-file "${notesPath}"`);
+} finally {
+  fs.rmSync(notesPath, { force: true });
+}
 
 console.log(`\nRelease v${next} veroeffentlicht.`);

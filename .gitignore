@@ -17,3 +17,4 @@ data/files/*
 .DS_Store
 *.tsbuildinfo
 coverage/
+.release-notes.md
