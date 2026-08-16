@@ -25,7 +25,7 @@ import {
   markAllAdminNotificationsRead,
 } from "./service.js";
 import { setCallsEnabled } from "../instanceSettings/service.js";
-import { broadcastSystemStatus } from "../realtime/hub.js";
+import { broadcastSystemStatus, debugOnlineState } from "../realtime/hub.js";
 import { detectPublicIp } from "../../lib/publicIp.js";
 import { upsertEnvVars } from "../../lib/envFile.js";
 import { repoRoot } from "../../env.js";
@@ -40,6 +40,13 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/admin/users", async (request) => {
     await requireInstanceAdmin(request);
     return listUsers();
+  });
+
+  // TEMPORARY - diagnostic only, remove once the "user X never goes offline" bug is found.
+  app.get("/api/v1/admin/debug/online/:userId", async (request) => {
+    await requireInstanceAdmin(request);
+    const { userId } = request.params as { userId: string };
+    return debugOnlineState(userId);
   });
 
   app.post("/api/v1/admin/users", async (request, reply) => {
