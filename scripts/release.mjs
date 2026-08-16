@@ -40,11 +40,19 @@ if (branch !== "main") {
   fail(`Must be on 'main' to cut a release (currently on '${branch}').`);
 }
 
-// 3. Typecheck/lint/build.
+// 3. Build packages/shared first - typecheck/lint of server and web resolve
+// @notorious/shared through its dist/ output, which isn't rebuilt by them.
+// Also clear the web package's Vite dep cache, which otherwise keeps
+// serving a stale copy of shared after it changes.
+console.log("\n==> Building packages/shared...");
+run("npm run build --workspace=packages/shared");
+fs.rmSync(path.join(repoRoot, "packages/web/node_modules/.vite"), { recursive: true, force: true });
+
+// 4. Typecheck/lint/build.
 console.log("\n==> Running typecheck, lint, and build...");
 run("npm run typecheck && npm run lint && npm run build");
 
-// 4. gh CLI present and authenticated - checked before any mutating git action.
+// 5. gh CLI present and authenticated - checked before any mutating git action.
 try {
   execSync("gh --version", { cwd: repoRoot, stdio: "ignore" });
 } catch {
@@ -56,12 +64,12 @@ try {
   fail("'gh' isn't authenticated - run 'gh auth login' and try again.");
 }
 
-// 5. Read current version, propose major.(minor+1).0.
+// 6. Read current version, propose major.(minor+1).0.
 const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 const [major, minor] = pkg.version.split(".").map(Number);
 const proposed = `${major}.${minor + 1}.0`;
 
-// 6. Prompt for the version to use.
+// 7. Prompt for the version to use.
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 let next;
 for (;;) {
@@ -74,7 +82,7 @@ for (;;) {
   console.log(`Ungueltiges Format: '${candidate}' - erwartet z.B. '1.4.0'.`);
 }
 
-// 6b. Build the changelog from commits since the last tag, grouped by
+// 7b. Build the changelog from commits since the last tag, grouped by
 // conventional-commit type. Own `chore(release):` commits are noise (they
 // just mark a prior release) and are dropped.
 function buildChangelog() {
@@ -115,7 +123,7 @@ const changelog = buildChangelog();
 console.log("\n==> Changelog:\n");
 console.log(changelog);
 
-// 7. Confirm.
+// 8. Confirm.
 console.log(`\n${pkg.version} -> ${next}`);
 console.log(`Erstellt und pusht Tag v${next}, veroeffentlicht ein GitHub Release.`);
 const confirm = (await rl.question("Fortfahren? [y/N]: ")).trim();
@@ -124,20 +132,20 @@ if (!/^[yY]$/.test(confirm)) {
   fail("Abgebrochen.");
 }
 
-// 8. Write the new version, preserving the existing write style (see scripts/bump-version.mjs).
+// 9. Write the new version, preserving the existing write style (see scripts/bump-version.mjs).
 pkg.version = next;
 fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2) + "\n");
 
-// 9. Commit - NOTORIOUS_RELEASE=1 tells the pre-commit hook to skip its own bump.
+// 10. Commit - NOTORIOUS_RELEASE=1 tells the pre-commit hook to skip its own bump.
 run("git add package.json");
 run(`git commit -m "chore(release): v${next}"`, { env: { ...process.env, NOTORIOUS_RELEASE: "1" } });
 
-// 10-12. Tag and push.
+// 11-13. Tag and push.
 run(`git tag v${next}`);
 run("git push origin main");
 run(`git push origin v${next}`);
 
-// 13. Publish the GitHub Release, with our own changelog as the notes body.
+// 14. Publish the GitHub Release, with our own changelog as the notes body.
 console.log("\n==> Publishing GitHub Release...");
 const notesPath = path.join(repoRoot, ".release-notes.md");
 fs.writeFileSync(notesPath, changelog + "\n");
