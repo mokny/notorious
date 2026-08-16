@@ -1183,6 +1183,7 @@
       "available": "Update available: v{{version}}",
       "upToDate": "Already up to date",
       "wouldDowngrade": "Installing this would downgrade the instance",
+      "checkFailed": "Could not check the latest version",
       "updateButton": "Update now",
       "nightlyWarning": "Nightly builds can be unstable and may contain bugs.",
       "waitingForRestart": "Waiting for the server to come back online…",

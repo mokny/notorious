@@ -168,7 +168,7 @@ function ChannelCard({
   if (!data) disabledReason = null;
   else if (channel === "release" && !data.hasRelease) disabledReason = t("admin.update.noRelease");
   else if (data.wouldDowngrade) disabledReason = t("admin.update.wouldDowngrade");
-  else if (!data.updateAvailable) disabledReason = t("admin.update.upToDate");
+  else if (data.latest === null) disabledReason = t("admin.update.checkFailed");
 
   return (
     <div className="rounded-lg border border-border p-4">
