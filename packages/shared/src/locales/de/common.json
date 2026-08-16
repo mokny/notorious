@@ -932,6 +932,7 @@
     "thread": {
       "typing": "{{name}} tippt…",
       "chatFallback": "Chat",
+      "lastSeen": "Zuletzt online {{time}}",
       "callInProgress_one": "Anruf läuft · {{count}} Teilnehmer",
       "callInProgress_other": "Anruf läuft · {{count}} Teilnehmer",
       "joinCall": "Anruf beitreten",

@@ -925,6 +925,7 @@
     "thread": {
       "typing": "{{name}} est en train d'écrire…",
       "chatFallback": "Discussion",
+      "lastSeen": "Vu {{time}}",
       "callInProgress_one": "Appel en cours · {{count}} participant",
       "callInProgress_other": "Appel en cours · {{count}} participants",
       "joinCall": "Rejoindre l'appel",

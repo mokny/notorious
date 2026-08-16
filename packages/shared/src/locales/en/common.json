@@ -933,6 +933,7 @@
     "thread": {
       "typing": "{{name}} is typing…",
       "chatFallback": "Chat",
+      "lastSeen": "Last seen {{time}}",
       "callInProgress_one": "Call in progress · {{count}} participant",
       "callInProgress_other": "Call in progress · {{count}} participants",
       "joinCall": "Join call",

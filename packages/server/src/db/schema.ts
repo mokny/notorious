@@ -43,6 +43,12 @@ export const users = sqliteTable("users", {
   // modules/chat/service.ts and modules/calls/service.ts for where each is
   // enforced, and hooks/useChatSound.ts on the client.
   chatStatus: text("chat_status").notNull().default("green").$type<"green" | "yellow" | "red">(),
+  // Set every time a user's last `/ws/chat` socket closes (see
+  // realtime/hub.ts's `onUserOnlineChange` listener in modules/chat/
+  // service.ts) - null until they've ever disconnected once. Powers the
+  // "last seen at HH:MM" line ThreadView.tsx shows under an offline
+  // contact's name.
+  lastSeenAt: text("last_seen_at"),
 });
 
 export const sessions = sqliteTable("sessions", {

@@ -92,6 +92,7 @@ export async function listUnifiedConversations(userId: string): Promise<Conversa
       avatarColor: users.avatarColor,
       avatarUrl: users.avatarUrl,
       chatStatus: users.chatStatus,
+      lastSeenAt: users.lastSeenAt,
     })
     .from(conversationParticipants)
     .innerJoin(users, eq(conversationParticipants.userId, users.id))
@@ -108,6 +109,7 @@ export async function listUnifiedConversations(userId: string): Promise<Conversa
       avatarUrl: row.avatarUrl,
       chatStatus: row.chatStatus,
       online: isUserOnline(row.userId),
+      lastSeenAt: row.lastSeenAt,
     });
     otherParticipantsByConversation.set(row.conversationId, list);
   }
@@ -635,6 +637,7 @@ export async function updateChatStatus(userId: string, status: "green" | "yellow
 // here rather than in the hub itself (no DB access there).
 onUserOnlineChange((userId, online) => {
   void (async () => {
+    if (!online) await db.update(users).set({ lastSeenAt: nowIso() }).where(eq(users.id, userId));
     const [row] = await db.select({ chatStatus: users.chatStatus }).from(users).where(eq(users.id, userId)).limit(1);
     if (!row) return;
     const contactIds = await getChatContactUserIds(userId);

@@ -18,6 +18,10 @@ import { Icon } from "../ui/Icon.js";
 const TYPING_TIMEOUT_MS = 5000;
 const MESSAGES_PAGE_SIZE = 50;
 
+function formatLastSeen(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 /** Dispatches to the "Notorious AI" thread (a different backend entirely - see aiConversation.ts) or the real, DB-backed conversation thread below. Calls no hooks itself so switching between the two never trips the rules of hooks - each branch is its own component instance. */
 export function ThreadView({ conversationId, onBack }: { conversationId: string; onBack?: () => void }) {
   const aiWorkspaceId = aiConversationWorkspaceId(conversationId);
@@ -358,8 +362,13 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
             />
           )
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-          {conversation ? (conversation.type === "workspace_channel" ? `# ${conversation.name}` : conversation.name) : t("chat.thread.chatFallback")}
+        <span className="flex min-w-0 flex-1 flex-col justify-center">
+          <span className="truncate text-sm font-semibold text-ink">
+            {conversation ? (conversation.type === "workspace_channel" ? `# ${conversation.name}` : conversation.name) : t("chat.thread.chatFallback")}
+          </span>
+          {otherParticipant && !otherParticipant.online && otherParticipant.lastSeenAt && (
+            <span className="truncate text-xs text-ink-muted">{t("chat.thread.lastSeen", { time: formatLastSeen(otherParticipant.lastSeenAt) })}</span>
+          )}
         </span>
         {callsEnabled &&
           (isInThisCall ? (

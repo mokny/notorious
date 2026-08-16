@@ -10,6 +10,8 @@ export interface ConversationParticipantSummary {
   chatStatus: ChatStatus;
   /** Whether this participant currently has at least one open `/ws/chat` socket - see `modules/realtime/hub.ts`'s `isUserOnline`. `false` overrides `chatStatus` to a gray dot client-side (see `ChatAvatar.tsx`), since a manually-set status conveys nothing about a user who isn't around to see the message live. */
   online: boolean;
+  /** When this participant's last `/ws/chat` socket closed - null if they've never disconnected (e.g. never logged in, or the process was restarted before their first disconnect). Only meaningful while `online` is false; see `ThreadView.tsx`'s "last seen" line. */
+  lastSeenAt: ISODateString | null;
 }
 
 /**
