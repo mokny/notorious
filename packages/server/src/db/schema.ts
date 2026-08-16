@@ -161,6 +161,20 @@ export const workspaces = sqliteTable("workspaces", {
   coverMaxWidth: integer("cover_max_width"),
   coverMaxHeight: integer("cover_max_height"),
   imageQuality: integer("image_quality").notNull().default(80),
+  // Optional owner-set branding shown as a thin banner on object detail pages
+  // (see components/CompanyBanner.tsx) - companyCover (if set) renders as a
+  // plain image with no text; otherwise companyName (if set) renders as text
+  // over companyBannerBackgroundColor. Owner-only to change (routes.ts's PATCH
+  // handler gates these fields specifically), unlike the rest of this table.
+  companyName: text("company_name"),
+  companyCover: text("company_cover"),
+  companyBannerHeight: integer("company_banner_height").notNull().default(50),
+  companyBannerTextColor: text("company_banner_text_color"),
+  companyBannerBackgroundColor: text("company_banner_background_color"),
+  companyBannerBold: integer("company_banner_bold", { mode: "boolean" }).notNull().default(false),
+  companyBannerItalic: integer("company_banner_italic", { mode: "boolean" }).notNull().default(false),
+  companyBannerLetterSpacing: integer("company_banner_letter_spacing", { mode: "boolean" }).notNull().default(false),
+  companyBannerTextAlign: text("company_banner_text_align").notNull().default("center").$type<"left" | "center" | "right">(),
   createdAt: text("created_at").notNull(),
 });
 

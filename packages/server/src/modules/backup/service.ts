@@ -253,6 +253,15 @@ export async function importWorkspace(ownerId: string, zipBuffer: Buffer, backup
     coverMaxWidth: null,
     coverMaxHeight: null,
     imageQuality: 80,
+    companyName: null,
+    companyCover: null,
+    companyBannerHeight: 50,
+    companyBannerTextColor: null,
+    companyBannerBackgroundColor: null,
+    companyBannerBold: false,
+    companyBannerItalic: false,
+    companyBannerLetterSpacing: false,
+    companyBannerTextAlign: "center",
     createdAt,
   };
 }

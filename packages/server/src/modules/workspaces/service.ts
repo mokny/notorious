@@ -73,6 +73,15 @@ export async function createWorkspace(
     coverMaxWidth: null,
     coverMaxHeight: null,
     imageQuality: 80,
+    companyName: null,
+    companyCover: null,
+    companyBannerHeight: 50,
+    companyBannerTextColor: null,
+    companyBannerBackgroundColor: null,
+    companyBannerBold: false,
+    companyBannerItalic: false,
+    companyBannerLetterSpacing: false,
+    companyBannerTextAlign: "center",
     createdAt,
   };
 }
@@ -92,6 +101,15 @@ export async function listWorkspacesForUser(userId: string): Promise<Workspace[]
       coverMaxWidth: workspaces.coverMaxWidth,
       coverMaxHeight: workspaces.coverMaxHeight,
       imageQuality: workspaces.imageQuality,
+      companyName: workspaces.companyName,
+      companyCover: workspaces.companyCover,
+      companyBannerHeight: workspaces.companyBannerHeight,
+      companyBannerTextColor: workspaces.companyBannerTextColor,
+      companyBannerBackgroundColor: workspaces.companyBannerBackgroundColor,
+      companyBannerBold: workspaces.companyBannerBold,
+      companyBannerItalic: workspaces.companyBannerItalic,
+      companyBannerLetterSpacing: workspaces.companyBannerLetterSpacing,
+      companyBannerTextAlign: workspaces.companyBannerTextAlign,
       createdAt: workspaces.createdAt,
     })
     .from(workspaceMembers)

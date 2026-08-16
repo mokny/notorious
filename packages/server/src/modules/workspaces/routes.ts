@@ -178,6 +178,23 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     await requireWorkspaceRole(id, user.id, "editor");
     const input = updateWorkspaceSchema.parse(request.body);
 
+    // Company banner fields are owner-only, unlike the rest of this route's
+    // fields (editor+) - see schemas/workspace.ts.
+    const companyBannerFields: (keyof typeof input)[] = [
+      "companyName",
+      "companyCover",
+      "companyBannerHeight",
+      "companyBannerTextColor",
+      "companyBannerBackgroundColor",
+      "companyBannerBold",
+      "companyBannerItalic",
+      "companyBannerLetterSpacing",
+      "companyBannerTextAlign",
+    ];
+    if (companyBannerFields.some((field) => field in input)) {
+      await requireWorkspaceRole(id, user.id, "owner");
+    }
+
     if (input.dashboardObjectId) {
       const objectWorkspaceId = await getObjectWorkspaceId(input.dashboardObjectId);
       if (objectWorkspaceId !== id) throw badRequest("Dashboard object must belong to this workspace");

@@ -21,6 +21,18 @@ export const updateWorkspaceSchema = z.object({
   coverMaxWidth: z.number().int().min(1).max(20000).nullable().optional(),
   coverMaxHeight: z.number().int().min(1).max(20000).nullable().optional(),
   imageQuality: z.number().int().min(1).max(100).optional(),
+  // Owner-only fields (see workspaces/routes.ts's PATCH handler) - null clears
+  // the value (companyName/companyCover/color fields), falling back to
+  // "banner hidden" or the theme default respectively.
+  companyName: z.string().max(100).nullable().optional(),
+  companyCover: z.string().max(500).nullable().optional(),
+  companyBannerHeight: z.number().int().min(30).max(150).optional(),
+  companyBannerTextColor: z.string().max(20).nullable().optional(),
+  companyBannerBackgroundColor: z.string().max(20).nullable().optional(),
+  companyBannerBold: z.boolean().optional(),
+  companyBannerItalic: z.boolean().optional(),
+  companyBannerLetterSpacing: z.boolean().optional(),
+  companyBannerTextAlign: z.enum(["left", "center", "right"]).optional(),
 });
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 

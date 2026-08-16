@@ -73,6 +73,21 @@ export interface Workspace {
   coverMaxHeight: number | null;
   /** WebP re-encode quality (1-100) applied whenever a resize above actually triggers - not used otherwise. */
   imageQuality: number;
+  /** Optional owner-set company/organization name - see CompanyBanner.tsx. Null = banner hidden unless companyCover is set. */
+  companyName: string | null;
+  /** Optional owner-set banner image (a fileApi.downloadUrl()-shaped URL, uploaded with kind "cover") - if set, CompanyBanner.tsx renders just this image with no text overlay, taking priority over companyName. */
+  companyCover: string | null;
+  /** Max height (px, 30-150) the company banner is cropped to - see CompanyBanner.tsx. */
+  companyBannerHeight: number;
+  /** Text color for the companyName banner (only used when companyCover is unset) - null = theme default. */
+  companyBannerTextColor: string | null;
+  /** Background color for the companyName banner (only used when companyCover is unset) - null = theme default. */
+  companyBannerBackgroundColor: string | null;
+  companyBannerBold: boolean;
+  companyBannerItalic: boolean;
+  /** Stretches companyName to fill the banner's width via computed letter-spacing - see CompanyBanner.tsx. */
+  companyBannerLetterSpacing: boolean;
+  companyBannerTextAlign: "left" | "center" | "right";
   createdAt: ISODateString;
 }
 

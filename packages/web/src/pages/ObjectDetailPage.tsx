@@ -20,6 +20,7 @@ import { BlockHistoryPanel } from "../components/BlockHistoryPanel.js";
 import { CommentsPanel } from "../components/CommentsPanel.js";
 import { IconPicker } from "../components/IconPicker.js";
 import { CoverImage } from "../components/CoverImage.js";
+import { CompanyBanner } from "../components/CompanyBanner.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 import { ExportMenu } from "../components/ExportMenu.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
@@ -345,8 +346,26 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
     );
   }
 
+  const companyBanner = workspace && (workspace.companyName || workspace.companyCover) ? (
+    <CompanyBanner
+      companyName={workspace.companyName}
+      companyCover={workspace.companyCover}
+      companyBannerHeight={workspace.companyBannerHeight}
+      companyBannerTextColor={workspace.companyBannerTextColor}
+      companyBannerBackgroundColor={workspace.companyBannerBackgroundColor}
+      companyBannerBold={workspace.companyBannerBold}
+      companyBannerItalic={workspace.companyBannerItalic}
+      companyBannerLetterSpacing={workspace.companyBannerLetterSpacing}
+      companyBannerTextAlign={workspace.companyBannerTextAlign}
+    />
+  ) : null;
+
   return (
     <div>
+      {/* Company banner sits directly below the object's own cover when it
+          has one, or takes the very top spot (where CoverImage would
+          otherwise be first) when it doesn't - see CompanyBanner.tsx. */}
+      {!object.cover && companyBanner}
       <CoverImage
         // Forces a full remount on every object change, so its <img> starts
         // blank instead of carrying over the *previous* object's cover -
@@ -367,6 +386,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         icon={renderIcon}
         highlightTerms={titleTerms}
       />
+      {object.cover && companyBanner}
 
       {/* No top padding once there's a cover (just a small `pt-2`) - the
           sticky toolbar below is the first thing in this column then (the
