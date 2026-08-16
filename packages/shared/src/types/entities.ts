@@ -102,6 +102,8 @@ export interface Workspace {
   companyBannerTextShadow: boolean;
   /** One of CoverTextStyle's fontFamily values (see lib/coverTextStyle.ts's FONT_FAMILY_OPTIONS), null = inherit page font. */
   companyBannerFontFamily: CoverTextStyle["fontFamily"] | null;
+  /** Whether the banner renders above or below an object's own cover image - only matters when the object has one, see ObjectDetailPage.tsx. */
+  companyBannerPosition: "above" | "below";
   createdAt: ISODateString;
 }
 

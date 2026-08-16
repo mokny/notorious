@@ -40,6 +40,7 @@ export const updateWorkspaceSchema = z.object({
   companyBannerGradientStartPosition: z.number().int().min(0).max(100).optional(),
   companyBannerTextShadow: z.boolean().optional(),
   companyBannerFontFamily: z.enum(["default", "serif", "sans-serif", "monospace", "cursive"]).nullable().optional(),
+  companyBannerPosition: z.enum(["above", "below"]).optional(),
 });
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 

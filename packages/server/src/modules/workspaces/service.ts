@@ -89,6 +89,7 @@ export async function createWorkspace(
     companyBannerGradientStartPosition: 0,
     companyBannerTextShadow: false,
     companyBannerFontFamily: null,
+    companyBannerPosition: "below",
     createdAt,
   };
 }
@@ -124,6 +125,7 @@ export async function listWorkspacesForUser(userId: string): Promise<Workspace[]
       companyBannerGradientStartPosition: workspaces.companyBannerGradientStartPosition,
       companyBannerTextShadow: workspaces.companyBannerTextShadow,
       companyBannerFontFamily: workspaces.companyBannerFontFamily,
+      companyBannerPosition: workspaces.companyBannerPosition,
       createdAt: workspaces.createdAt,
     })
     .from(workspaceMembers)

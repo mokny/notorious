@@ -366,13 +366,19 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
       companyBannerFontFamily={workspace.companyBannerFontFamily}
     />
   ) : null;
+  // Only matters when the object has its own cover - with no cover there's
+  // just the one "top" slot regardless of the setting. Anything other than
+  // "above" is treated as "below" so this degrades safely if the field is
+  // ever missing/unexpected.
+  const companyBannerAbove = !object.cover || workspace?.companyBannerPosition === "above";
 
   return (
     <div>
-      {/* Company banner sits directly below the object's own cover when it
-          has one, or takes the very top spot (where CoverImage would
-          otherwise be first) when it doesn't - see CompanyBanner.tsx. */}
-      {!object.cover && companyBanner}
+      {/* Company banner sits above or below the object's own cover per
+          workspace.companyBannerPosition when it has one, or takes the very
+          top spot (where CoverImage would otherwise be first) when it
+          doesn't - see CompanyBanner.tsx. */}
+      {companyBannerAbove && companyBanner}
       <CoverImage
         // Forces a full remount on every object change, so its <img> starts
         // blank instead of carrying over the *previous* object's cover -
@@ -393,7 +399,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
         icon={renderIcon}
         highlightTerms={titleTerms}
       />
-      {object.cover && companyBanner}
+      {object.cover && !companyBannerAbove && companyBanner}
 
       {/* No top padding once there's a cover (just a small `pt-2`) - the
           sticky toolbar below is the first thing in this column then (the

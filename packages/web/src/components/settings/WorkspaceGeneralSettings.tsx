@@ -94,6 +94,7 @@ export function WorkspaceGeneralSettings() {
           | "companyBannerGradientStartPosition"
           | "companyBannerTextShadow"
           | "companyBannerFontFamily"
+          | "companyBannerPosition"
         >
       >,
     ) => workspaceApi.update(workspaceId!, values),
@@ -332,6 +333,22 @@ export function WorkspaceGeneralSettings() {
             />
           </div>
           <p className="text-xs text-ink-muted">{t("settings.workspace.general.companyCoverHint")}</p>
+
+          <label className="flex items-center justify-between gap-2 text-sm">
+            <span>{t("settings.workspace.general.companyBannerPosition")}</span>
+            <select
+              value={workspace.companyBannerPosition}
+              onChange={(e) =>
+                updateCompanyBannerMutation.mutate({
+                  companyBannerPosition: e.target.value as "above" | "below",
+                })
+              }
+              className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+            >
+              <option value="above">{t("settings.workspace.general.companyBannerPositionAbove")}</option>
+              <option value="below">{t("settings.workspace.general.companyBannerPositionBelow")}</option>
+            </select>
+          </label>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">

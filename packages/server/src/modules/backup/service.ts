@@ -269,6 +269,7 @@ export async function importWorkspace(ownerId: string, zipBuffer: Buffer, backup
     companyBannerGradientStartPosition: 0,
     companyBannerTextShadow: false,
     companyBannerFontFamily: null,
+    companyBannerPosition: "below",
     createdAt,
   };
 }

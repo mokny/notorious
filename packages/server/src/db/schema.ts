@@ -182,6 +182,7 @@ export const workspaces = sqliteTable("workspaces", {
   companyBannerGradientStartPosition: integer("company_banner_gradient_start_position").notNull().default(0),
   companyBannerTextShadow: integer("company_banner_text_shadow", { mode: "boolean" }).notNull().default(false),
   companyBannerFontFamily: text("company_banner_font_family").$type<"default" | "serif" | "sans-serif" | "monospace" | "cursive">(),
+  companyBannerPosition: text("company_banner_position").notNull().default("below").$type<"above" | "below">(),
   createdAt: text("created_at").notNull(),
 });
 
