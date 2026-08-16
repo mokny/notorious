@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
-import { adminCreateUserSchema, adminCallsSetupSchema, adminTriggerUpdateSchema } from "@notorious/shared";
+import { adminCreateUserSchema, adminCallsSetupSchema, adminTriggerUpdateSchema, adminUpdateUserProfileSchema, adminResetPasswordSchema } from "@notorious/shared";
 import { requireInstanceAdmin } from "./access.js";
 import {
   listUsers,
   createUserByAdmin,
+  updateUserProfileByAdmin,
+  resetPasswordByAdmin,
   setServerAdmin,
   previewUserDeletion,
   deleteUserAccount,
@@ -28,6 +30,8 @@ import { setCallsEnabled } from "../instanceSettings/service.js";
 import { broadcastSystemStatus, sendToSession } from "../realtime/hub.js";
 import { listAllSessions, adminRevokeSession, revokeAllSessions } from "../../plugins/session.js";
 import { listFailedLogins, getUserById } from "../auth/service.js";
+import { disable as disableTwoFactor } from "../twoFactor/service.js";
+import { listCredentials as listWebauthnCredentials, deleteCredential as deleteWebauthnCredential } from "../webauthn/service.js";
 import { detectPublicIp } from "../../lib/publicIp.js";
 import { upsertEnvVars } from "../../lib/envFile.js";
 import { repoRoot } from "../../env.js";
@@ -35,6 +39,13 @@ import { nowIso } from "../../lib/ids.js";
 import { badRequest, unauthorized, notFound } from "../../lib/httpError.js";
 
 const PACKAGE_VERSION = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
+
+/** Shared by every admin action that changes how a user authenticates (password reset, 2FA disable, passkey removal) - kicks out any session that might rely on the credential that just changed, same as the standalone "Log out everywhere" action below. Returns the number of sessions revoked. */
+async function revokeAllSessionsAndNotify(userId: string): Promise<number> {
+  const revokedIds = await revokeAllSessions(userId);
+  for (const sessionId of revokedIds) sendToSession(sessionId, { type: "sessionRevoked" });
+  return revokedIds.length;
+}
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   // ---- Users ----
@@ -67,6 +78,60 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const user = await setServerAdmin(id, false);
     await logAdminAction(admin, "user.demote", `Revoked server-admin from ${user.email}`);
     return user;
+  });
+
+  app.patch("/api/v1/admin/users/:id/profile", async (request) => {
+    const admin = await requireInstanceAdmin(request);
+    const { id } = request.params as { id: string };
+    const input = adminUpdateUserProfileSchema.parse(request.body);
+    const { before, after } = await updateUserProfileByAdmin(id, input);
+    if (before.email !== after.email) await logAdminAction(admin, "user.email_change", `Changed email for ${before.name} from ${before.email} to ${after.email}`);
+    if (before.name !== after.name) await logAdminAction(admin, "user.name_change", `Changed name for ${after.email} from '${before.name}' to '${after.name}'`);
+    return after;
+  });
+
+  app.post("/api/v1/admin/users/:id/password-reset", async (request) => {
+    const admin = await requireInstanceAdmin(request);
+    const { id } = request.params as { id: string };
+    if (id === admin.id) throw badRequest("Use your own account settings to change your password");
+    const input = adminResetPasswordSchema.parse(request.body ?? {});
+    const result = await resetPasswordByAdmin(id, input.password);
+    await revokeAllSessionsAndNotify(id);
+    await logAdminAction(admin, "user.password_reset", `Reset password for ${result.user.email}`);
+    return result;
+  });
+
+  app.post("/api/v1/admin/users/:id/2fa/disable", async (request, reply) => {
+    const admin = await requireInstanceAdmin(request);
+    const { id } = request.params as { id: string };
+    if (id === admin.id) throw badRequest("Use your own account settings to disable 2FA");
+    const target = await getUserById(id);
+    if (!target) throw notFound("User not found");
+    await disableTwoFactor(id);
+    await revokeAllSessionsAndNotify(id);
+    await logAdminAction(admin, "user.2fa_disable", `Disabled 2FA for ${target.email}`);
+    reply.code(204);
+  });
+
+  app.delete("/api/v1/admin/users/:id/passkeys/:credentialId", async (request, reply) => {
+    const admin = await requireInstanceAdmin(request);
+    const { id, credentialId } = request.params as { id: string; credentialId: string };
+    if (id === admin.id) throw badRequest("Use your own account settings to remove passkeys");
+    const target = await getUserById(id);
+    if (!target) throw notFound("User not found");
+    const credentials = await listWebauthnCredentials(id);
+    const credential = credentials.find((c) => c.id === credentialId);
+    if (!credential) throw notFound("Passkey not found");
+    await deleteWebauthnCredential(id, credentialId);
+    await revokeAllSessionsAndNotify(id);
+    await logAdminAction(admin, "user.passkey_remove", `Removed passkey '${credential.name}' for ${target.email}`);
+    reply.code(204);
+  });
+
+  app.get("/api/v1/admin/users/:id/passkeys", async (request) => {
+    await requireInstanceAdmin(request);
+    const { id } = request.params as { id: string };
+    return listWebauthnCredentials(id);
   });
 
   app.get("/api/v1/admin/users/:id/delete-preview", async (request) => {
@@ -105,9 +170,8 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string };
     const target = await getUserById(id);
     if (!target) throw notFound("User not found");
-    const revokedIds = await revokeAllSessions(id);
-    for (const sessionId of revokedIds) sendToSession(sessionId, { type: "sessionRevoked" });
-    await logAdminAction(admin, "session.revokeAll", `Logged out ${target.email} from all devices (${revokedIds.length} session(s))`);
+    const revokedCount = await revokeAllSessionsAndNotify(id);
+    await logAdminAction(admin, "session.revokeAll", `Logged out ${target.email} from all devices (${revokedCount} session(s))`);
     reply.code(204);
   });
 

@@ -59,11 +59,19 @@ export interface AdminUserSummary {
   name: string;
   createdAt: string;
   isServerAdmin: boolean;
+  totpEnabled: boolean;
 }
 
 export async function listUsers(): Promise<AdminUserSummary[]> {
   const rows = await db
-    .select({ id: users.id, email: users.email, name: users.name, createdAt: users.createdAt, isServerAdmin: users.isServerAdmin })
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      createdAt: users.createdAt,
+      isServerAdmin: users.isServerAdmin,
+      totpEnabled: users.totpEnabled,
+    })
     .from(users)
     .where(notInArray(users.id, [PLACEHOLDER_USER_ID]));
   return rows;
@@ -78,7 +86,35 @@ function generatePassword(): string {
 export async function createUserByAdmin(input: { email: string; name: string }): Promise<{ user: AdminUserSummary; password: string }> {
   const password = generatePassword();
   const user = await registerUser({ email: input.email, name: input.name, password });
-  return { user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt, isServerAdmin: user.isServerAdmin }, password };
+  return { user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt, isServerAdmin: user.isServerAdmin, totpEnabled: false }, password };
+}
+
+/** Admin-driven email/name edit - no current-password check (the admin isn't the account owner). Returns both the pre- and post-edit summary so the caller (routes.ts) can build a precise audit-log message. */
+export async function updateUserProfileByAdmin(userId: string, input: { email: string; name: string }): Promise<{ before: AdminUserSummary; after: AdminUserSummary }> {
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const target = rows[0];
+  if (!target) throw notFound("User not found");
+
+  if (input.email !== target.email) {
+    const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email)).limit(1);
+    if (existing[0] && existing[0].id !== userId) throw badRequest("An account with this email already exists");
+  }
+
+  await db.update(users).set({ email: input.email, name: input.name }).where(eq(users.id, userId));
+  const before: AdminUserSummary = { id: target.id, email: target.email, name: target.name, createdAt: target.createdAt, isServerAdmin: target.isServerAdmin, totpEnabled: target.totpEnabled };
+  return { before, after: { ...before, email: input.email, name: input.name } };
+}
+
+/** Admin-driven password reset - no current-password check. `password` omitted generates a random one (same as `createUserByAdmin`), returned once for the admin to relay to the user. */
+export async function resetPasswordByAdmin(userId: string, password?: string): Promise<{ user: AdminUserSummary; password: string }> {
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const target = rows[0];
+  if (!target) throw notFound("User not found");
+
+  const finalPassword = password ?? generatePassword();
+  const passwordHash = await argon2.hash(finalPassword);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  return { user: { id: target.id, email: target.email, name: target.name, createdAt: target.createdAt, isServerAdmin: target.isServerAdmin, totpEnabled: target.totpEnabled }, password: finalPassword };
 }
 
 /** Throws if this would leave the instance with zero server admins - see modules/admin/access.ts's `countServerAdmins`. */
@@ -93,7 +129,7 @@ export async function setServerAdmin(targetUserId: string, isAdmin: boolean): Pr
   }
 
   await db.update(users).set({ isServerAdmin: isAdmin }).where(eq(users.id, targetUserId));
-  return { id: target.id, email: target.email, name: target.name, createdAt: target.createdAt, isServerAdmin: isAdmin };
+  return { id: target.id, email: target.email, name: target.name, createdAt: target.createdAt, isServerAdmin: isAdmin, totpEnabled: target.totpEnabled };
 }
 
 /** Rows in `column`'s table attributed to `userId`, but outside every workspace in `ownedWorkspaceIds` - mirrors scripts/deleteUser.ts's `foreignCondition`. */

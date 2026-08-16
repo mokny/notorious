@@ -6,6 +6,19 @@ export const adminCreateUserSchema = z.object({
 });
 export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>;
 
+/** PATCH /api/v1/admin/users/:id/profile - admin-driven email/name edit, no current-password check (the admin isn't the account owner). */
+export const adminUpdateUserProfileSchema = z.object({
+  email: z.string().email().max(254),
+  name: z.string().min(1).max(120),
+});
+export type AdminUpdateUserProfileInput = z.infer<typeof adminUpdateUserProfileSchema>;
+
+/** POST /api/v1/admin/users/:id/password-reset - `password` omitted means "generate one" (see modules/admin/service.ts's `generatePassword`), same as `createUserByAdmin`. */
+export const adminResetPasswordSchema = z.object({
+  password: z.string().min(8).max(200).optional(),
+});
+export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
+
 export const adminUpdateSettingsSchema = z
   .object({
     registrationEnabled: z.boolean(),

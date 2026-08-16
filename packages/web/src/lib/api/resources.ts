@@ -119,6 +119,8 @@ import type {
   MediaKind,
   ProducerSource,
   AdminCreateUserInput,
+  AdminUpdateUserProfileInput,
+  AdminResetPasswordInput,
   AdminUpdateSettingsInput,
   AdminCallsSetupInput,
   AdminTriggerUpdateInput,
@@ -644,6 +646,7 @@ export interface AdminUser {
   name: string;
   createdAt: string;
   isServerAdmin: boolean;
+  totpEnabled: boolean;
 }
 
 export interface AdminUserDeletionPreview {
@@ -671,6 +674,12 @@ export const adminApi = {
   demoteUser: (id: string) => apiRequest<AdminUser>(`/api/v1/admin/users/${id}/demote`, { method: "POST" }),
   deletionPreview: (id: string) => apiRequest<AdminUserDeletionPreview>(`/api/v1/admin/users/${id}/delete-preview`),
   deleteUser: (id: string) => apiRequest<void>(`/api/v1/admin/users/${id}`, { method: "DELETE" }),
+  updateUserProfile: (id: string, input: AdminUpdateUserProfileInput) => apiRequest<AdminUser>(`/api/v1/admin/users/${id}/profile`, { method: "PATCH", body: input }),
+  resetPassword: (id: string, input: AdminResetPasswordInput) =>
+    apiRequest<{ user: AdminUser; password: string }>(`/api/v1/admin/users/${id}/password-reset`, { method: "POST", body: input }),
+  disable2fa: (id: string) => apiRequest<void>(`/api/v1/admin/users/${id}/2fa/disable`, { method: "POST" }),
+  listUserPasskeys: (id: string) => apiRequest<WebauthnCredential[]>(`/api/v1/admin/users/${id}/passkeys`),
+  removeUserPasskey: (id: string, credentialId: string) => apiRequest<void>(`/api/v1/admin/users/${id}/passkeys/${credentialId}`, { method: "DELETE" }),
 
   listSessions: () => apiRequest<AdminSession[]>("/api/v1/admin/sessions"),
   revokeSession: (id: string) => apiRequest<void>(`/api/v1/admin/sessions/${id}`, { method: "DELETE" }),
