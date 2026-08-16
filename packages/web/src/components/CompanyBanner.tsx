@@ -1,5 +1,7 @@
 import { useLayoutEffect, useState } from "react";
+import type { CoverTextStyle } from "@notorious/shared";
 import { withShareToken } from "../lib/api/shareMode.js";
+import { FONT_FAMILY_OPTIONS } from "../lib/coverTextStyle.js";
 
 interface CompanyBannerProps {
   companyName: string | null;
@@ -11,12 +13,23 @@ interface CompanyBannerProps {
   companyBannerItalic: boolean;
   companyBannerLetterSpacing: boolean;
   companyBannerTextAlign: "left" | "center" | "right";
+  companyBannerFadeEnabled: boolean;
+  companyBannerGradientEnabled: boolean;
+  companyBannerBackgroundColor2: string | null;
+  companyBannerGradientAngle: number;
+  companyBannerGradientStartPosition: number;
+  companyBannerTextShadow: boolean;
+  companyBannerFontFamily: CoverTextStyle["fontFamily"] | null;
 }
 
 // Same left/right fade-to-transparent idiom as Tabs.tsx's scrollable-edge
 // mask, applied unconditionally here (the banner always fades, not just when
-// content overflows).
+// content overflows) - unless companyBannerFadeEnabled is off.
 const FADE_MASK = "linear-gradient(to right, transparent, black 12%, black 88%, transparent)";
+
+// Theme default used both for the flat-color case and as a gradient
+// fallback when a color hasn't been explicitly set.
+const DEFAULT_BACKGROUND = "rgb(var(--surface-raised))";
 
 /**
  * Optional owner-set branding banner shown on object detail pages (see
@@ -36,28 +49,41 @@ export function CompanyBanner({
   companyBannerItalic,
   companyBannerLetterSpacing,
   companyBannerTextAlign,
+  companyBannerFadeEnabled,
+  companyBannerGradientEnabled,
+  companyBannerBackgroundColor2,
+  companyBannerGradientAngle,
+  companyBannerGradientStartPosition,
+  companyBannerTextShadow,
+  companyBannerFontFamily,
 }: CompanyBannerProps) {
   const letterSpacing = useFillWidthLetterSpacing(companyBannerLetterSpacing ? companyName : null);
 
   if (!companyCover && !companyName) return null;
 
+  const maskStyle = companyBannerFadeEnabled ? { maskImage: FADE_MASK, WebkitMaskImage: FADE_MASK } : {};
+
   if (companyCover) {
     return (
-      <div className="w-full" style={{ height: companyBannerHeight, maskImage: FADE_MASK, WebkitMaskImage: FADE_MASK }}>
+      <div className="w-full" style={{ height: companyBannerHeight, ...maskStyle }}>
         <img src={withShareToken(companyCover)} alt="" className="h-full w-full object-cover" />
       </div>
     );
   }
+
+  const background = companyBannerGradientEnabled
+    ? `linear-gradient(${companyBannerGradientAngle}deg, ${companyBannerBackgroundColor ?? DEFAULT_BACKGROUND} ${companyBannerGradientStartPosition}%, ${companyBannerBackgroundColor2 ?? companyBannerBackgroundColor ?? DEFAULT_BACKGROUND} 100%)`
+    : undefined;
 
   return (
     <div
       className="flex w-full items-center px-6"
       style={{
         height: companyBannerHeight,
-        backgroundColor: companyBannerBackgroundColor ?? "rgb(var(--surface-raised))",
+        backgroundColor: background ? undefined : (companyBannerBackgroundColor ?? DEFAULT_BACKGROUND),
+        backgroundImage: background,
         justifyContent: companyBannerTextAlign === "left" ? "flex-start" : companyBannerTextAlign === "right" ? "flex-end" : "center",
-        maskImage: FADE_MASK,
-        WebkitMaskImage: FADE_MASK,
+        ...maskStyle,
       }}
     >
       <span
@@ -68,6 +94,10 @@ export function CompanyBanner({
           fontWeight: companyBannerBold ? 700 : 400,
           fontStyle: companyBannerItalic ? "italic" : "normal",
           letterSpacing: letterSpacing.value,
+          textShadow: companyBannerTextShadow ? "0 1px 3px rgba(0, 0, 0, 0.4)" : undefined,
+          fontFamily: companyBannerFontFamily
+            ? (FONT_FAMILY_OPTIONS.find((option) => option.value === companyBannerFontFamily)?.css ?? undefined)
+            : undefined,
         }}
       >
         {companyName}

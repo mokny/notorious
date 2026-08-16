@@ -9,6 +9,7 @@ import { useAuth } from "../../context/AuthContext.js";
 import { TextField } from "../ui/TextField.js";
 import { IconPicker } from "../IconPicker.js";
 import { Icon } from "../ui/Icon.js";
+import { FONT_FAMILY_OPTIONS } from "../../lib/coverTextStyle.js";
 
 /** Extracts the file id from a `fileApi.downloadUrl()`-shaped cover value, so a replaced upload can clean up the one it's replacing - same idiom as useCoverActions.ts's fileIdFromUrl. */
 function fileIdFromUrl(url: string): string | null {
@@ -86,6 +87,13 @@ export function WorkspaceGeneralSettings() {
           | "companyBannerItalic"
           | "companyBannerLetterSpacing"
           | "companyBannerTextAlign"
+          | "companyBannerFadeEnabled"
+          | "companyBannerGradientEnabled"
+          | "companyBannerBackgroundColor2"
+          | "companyBannerGradientAngle"
+          | "companyBannerGradientStartPosition"
+          | "companyBannerTextShadow"
+          | "companyBannerFontFamily"
         >
       >,
     ) => workspaceApi.update(workspaceId!, values),
@@ -94,6 +102,27 @@ export function WorkspaceGeneralSettings() {
   const [companyName, setCompanyName] = useDebouncedSave(workspace?.companyName ?? "", (value) =>
     updateCompanyBannerMutation.mutateAsync({ companyName: value || null }).then(() => undefined),
   );
+
+  const [companyBannerGradientAngleDraft, setCompanyBannerGradientAngleDraft] = useState<number | null>(null);
+  const updateCompanyBannerGradientAngleMutation = useMutation({
+    mutationFn: (companyBannerGradientAngle: number) => workspaceApi.update(workspaceId!, { companyBannerGradientAngle }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
+      setCompanyBannerGradientAngleDraft(null);
+    },
+  });
+  const companyBannerGradientAngle = companyBannerGradientAngleDraft ?? workspace?.companyBannerGradientAngle ?? 90;
+
+  const [companyBannerGradientStartDraft, setCompanyBannerGradientStartDraft] = useState<number | null>(null);
+  const updateCompanyBannerGradientStartMutation = useMutation({
+    mutationFn: (companyBannerGradientStartPosition: number) =>
+      workspaceApi.update(workspaceId!, { companyBannerGradientStartPosition }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
+      setCompanyBannerGradientStartDraft(null);
+    },
+  });
+  const companyBannerGradientStartPosition = companyBannerGradientStartDraft ?? workspace?.companyBannerGradientStartPosition ?? 0;
 
   const [companyBannerHeightDraft, setCompanyBannerHeightDraft] = useState<number | null>(null);
   const updateCompanyBannerHeightMutation = useMutation({
@@ -391,6 +420,114 @@ export function WorkspaceGeneralSettings() {
                 <option value="left">{t("settings.workspace.general.alignLeft")}</option>
                 <option value="center">{t("settings.workspace.general.alignCenter")}</option>
                 <option value="right">{t("settings.workspace.general.alignRight")}</option>
+              </select>
+            </label>
+
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={workspace.companyBannerFadeEnabled}
+                onChange={(e) => updateCompanyBannerMutation.mutate({ companyBannerFadeEnabled: e.target.checked })}
+              />
+              {t("settings.workspace.general.companyBannerFadeEnabled")}
+            </label>
+
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={workspace.companyBannerGradientEnabled}
+                onChange={(e) => updateCompanyBannerMutation.mutate({ companyBannerGradientEnabled: e.target.checked })}
+              />
+              {t("settings.workspace.general.companyBannerGradientEnabled")}
+            </label>
+
+            {workspace.companyBannerGradientEnabled && (
+              <div className="space-y-2 border-l-2 border-border pl-3">
+                <label className="flex items-center justify-between gap-2 text-sm">
+                  <span>{t("settings.workspace.general.companyBannerBackgroundColor2")}</span>
+                  <input
+                    type="color"
+                    value={workspace.companyBannerBackgroundColor2 ?? "#f8fafc"}
+                    onChange={(e) => updateCompanyBannerMutation.mutate({ companyBannerBackgroundColor2: e.target.value })}
+                    className="h-7 w-14 rounded border border-border"
+                    aria-label={t("settings.workspace.general.companyBannerBackgroundColor2")}
+                  />
+                </label>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span>{t("settings.workspace.general.companyBannerGradientAngle")}</span>
+                    <span className="text-ink-muted">{companyBannerGradientAngle}°</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    value={companyBannerGradientAngle}
+                    onChange={(e) => setCompanyBannerGradientAngleDraft(Number(e.target.value))}
+                    onPointerUp={(e) => updateCompanyBannerGradientAngleMutation.mutate(Number(e.currentTarget.value))}
+                    onKeyUp={(e) => updateCompanyBannerGradientAngleMutation.mutate(Number(e.currentTarget.value))}
+                    className="w-full accent-accent"
+                    aria-label={t("settings.workspace.general.companyBannerGradientAngle")}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span>{t("settings.workspace.general.companyBannerGradientStartPosition")}</span>
+                    <span className="text-ink-muted">{companyBannerGradientStartPosition}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={companyBannerGradientStartPosition}
+                    onChange={(e) => setCompanyBannerGradientStartDraft(Number(e.target.value))}
+                    onPointerUp={(e) => updateCompanyBannerGradientStartMutation.mutate(Number(e.currentTarget.value))}
+                    onKeyUp={(e) => updateCompanyBannerGradientStartMutation.mutate(Number(e.currentTarget.value))}
+                    className="w-full accent-accent"
+                    aria-label={t("settings.workspace.general.companyBannerGradientStartPosition")}
+                  />
+                </div>
+
+                <div
+                  className="w-full rounded-lg"
+                  style={{
+                    height: 32,
+                    background: `linear-gradient(${companyBannerGradientAngle}deg, ${workspace.companyBannerBackgroundColor ?? "#f8fafc"} ${companyBannerGradientStartPosition}%, ${workspace.companyBannerBackgroundColor2 ?? workspace.companyBannerBackgroundColor ?? "#f8fafc"} 100%)`,
+                  }}
+                />
+              </div>
+            )}
+
+            <label className="flex items-center gap-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={workspace.companyBannerTextShadow}
+                onChange={(e) => updateCompanyBannerMutation.mutate({ companyBannerTextShadow: e.target.checked })}
+              />
+              {t("settings.workspace.general.companyBannerTextShadow")}
+            </label>
+
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span>{t("settings.workspace.general.companyBannerFontFamily")}</span>
+              <select
+                value={workspace.companyBannerFontFamily ?? ""}
+                onChange={(e) =>
+                  updateCompanyBannerMutation.mutate({
+                    companyBannerFontFamily: e.target.value
+                      ? (e.target.value as Workspace["companyBannerFontFamily"])
+                      : null,
+                  })
+                }
+                className="rounded-lg border border-border bg-surface px-2 py-1 text-sm"
+              >
+                <option value="">{t("settings.workspace.general.companyBannerFontFamilyDefault")}</option>
+                {FONT_FAMILY_OPTIONS.filter((option) => option.value !== "default").map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
           </div>

@@ -33,6 +33,13 @@ export const updateWorkspaceSchema = z.object({
   companyBannerItalic: z.boolean().optional(),
   companyBannerLetterSpacing: z.boolean().optional(),
   companyBannerTextAlign: z.enum(["left", "center", "right"]).optional(),
+  companyBannerFadeEnabled: z.boolean().optional(),
+  companyBannerGradientEnabled: z.boolean().optional(),
+  companyBannerBackgroundColor2: z.string().max(20).nullable().optional(),
+  companyBannerGradientAngle: z.number().int().min(0).max(360).optional(),
+  companyBannerGradientStartPosition: z.number().int().min(0).max(100).optional(),
+  companyBannerTextShadow: z.boolean().optional(),
+  companyBannerFontFamily: z.enum(["default", "serif", "sans-serif", "monospace", "cursive"]).nullable().optional(),
 });
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 

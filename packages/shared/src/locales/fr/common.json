@@ -232,7 +232,15 @@
         "companyBannerTextAlign": "Alignement du texte",
         "alignLeft": "Gauche",
         "alignCenter": "Centre",
-        "alignRight": "Droite"
+        "alignRight": "Droite",
+        "companyBannerFadeEnabled": "Activer le fondu sur les bords",
+        "companyBannerGradientEnabled": "Utiliser un dégradé au lieu d'une couleur unie",
+        "companyBannerBackgroundColor2": "Deuxième couleur",
+        "companyBannerGradientAngle": "Angle du dégradé",
+        "companyBannerGradientStartPosition": "Position de départ du dégradé",
+        "companyBannerTextShadow": "Ombre du texte",
+        "companyBannerFontFamily": "Police",
+        "companyBannerFontFamilyDefault": "Par défaut"
       },
       "members": {
         "description": "Toutes les personnes ci-dessous peuvent accéder à « {{name}} ».",

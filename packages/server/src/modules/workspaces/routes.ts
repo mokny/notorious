@@ -190,6 +190,13 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
       "companyBannerItalic",
       "companyBannerLetterSpacing",
       "companyBannerTextAlign",
+      "companyBannerFadeEnabled",
+      "companyBannerGradientEnabled",
+      "companyBannerBackgroundColor2",
+      "companyBannerGradientAngle",
+      "companyBannerGradientStartPosition",
+      "companyBannerTextShadow",
+      "companyBannerFontFamily",
     ];
     if (companyBannerFields.some((field) => field in input)) {
       await requireWorkspaceRole(id, user.id, "owner");

@@ -238,7 +238,15 @@
         "companyBannerTextAlign": "Text alignment",
         "alignLeft": "Left",
         "alignCenter": "Center",
-        "alignRight": "Right"
+        "alignRight": "Right",
+        "companyBannerFadeEnabled": "Enable edge fade",
+        "companyBannerGradientEnabled": "Use gradient instead of flat background",
+        "companyBannerBackgroundColor2": "Second color",
+        "companyBannerGradientAngle": "Gradient angle",
+        "companyBannerGradientStartPosition": "Gradient start position",
+        "companyBannerTextShadow": "Text shadow",
+        "companyBannerFontFamily": "Font",
+        "companyBannerFontFamilyDefault": "Default"
       },
       "members": {
         "description": "Everyone below can access \"{{name}}\".",

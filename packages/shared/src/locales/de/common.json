@@ -237,7 +237,15 @@
         "companyBannerTextAlign": "Textausrichtung",
         "alignLeft": "Links",
         "alignCenter": "Mitte",
-        "alignRight": "Rechts"
+        "alignRight": "Rechts",
+        "companyBannerFadeEnabled": "Rand-Ausblendung (Fade) aktivieren",
+        "companyBannerGradientEnabled": "Verlauf statt einfarbigem Hintergrund",
+        "companyBannerBackgroundColor2": "Zweite Farbe",
+        "companyBannerGradientAngle": "Verlaufswinkel",
+        "companyBannerGradientStartPosition": "Verlauf-Startposition",
+        "companyBannerTextShadow": "Textschatten",
+        "companyBannerFontFamily": "Schriftart",
+        "companyBannerFontFamilyDefault": "Standard"
       },
       "members": {
         "description": "Alle unten Aufgeführten haben Zugriff auf „{{name}}“.",

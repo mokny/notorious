@@ -88,6 +88,20 @@ export interface Workspace {
   /** Stretches companyName to fill the banner's width via computed letter-spacing - see CompanyBanner.tsx. */
   companyBannerLetterSpacing: boolean;
   companyBannerTextAlign: "left" | "center" | "right";
+  /** Whether the banner fades to transparent at its left/right edges - see CompanyBanner.tsx. */
+  companyBannerFadeEnabled: boolean;
+  /** When true, the background-color mode (companyCover unset) renders a two-color gradient instead of a flat companyBannerBackgroundColor fill. */
+  companyBannerGradientEnabled: boolean;
+  /** The gradient's second color - only used when companyBannerGradientEnabled is true. */
+  companyBannerBackgroundColor2: string | null;
+  /** CSS linear-gradient angle in degrees (0-360). */
+  companyBannerGradientAngle: number;
+  /** Percent (0-100) at which the transition from companyBannerBackgroundColor to companyBannerBackgroundColor2 begins. */
+  companyBannerGradientStartPosition: number;
+  /** Fixed drop-shadow applied to the banner text when true - see CompanyBanner.tsx. */
+  companyBannerTextShadow: boolean;
+  /** One of CoverTextStyle's fontFamily values (see lib/coverTextStyle.ts's FONT_FAMILY_OPTIONS), null = inherit page font. */
+  companyBannerFontFamily: CoverTextStyle["fontFamily"] | null;
   createdAt: ISODateString;
 }
 

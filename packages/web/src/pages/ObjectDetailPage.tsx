@@ -357,6 +357,13 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
       companyBannerItalic={workspace.companyBannerItalic}
       companyBannerLetterSpacing={workspace.companyBannerLetterSpacing}
       companyBannerTextAlign={workspace.companyBannerTextAlign}
+      companyBannerFadeEnabled={workspace.companyBannerFadeEnabled}
+      companyBannerGradientEnabled={workspace.companyBannerGradientEnabled}
+      companyBannerBackgroundColor2={workspace.companyBannerBackgroundColor2}
+      companyBannerGradientAngle={workspace.companyBannerGradientAngle}
+      companyBannerGradientStartPosition={workspace.companyBannerGradientStartPosition}
+      companyBannerTextShadow={workspace.companyBannerTextShadow}
+      companyBannerFontFamily={workspace.companyBannerFontFamily}
     />
   ) : null;
 

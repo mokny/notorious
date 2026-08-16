@@ -82,6 +82,13 @@ export async function createWorkspace(
     companyBannerItalic: false,
     companyBannerLetterSpacing: false,
     companyBannerTextAlign: "center",
+    companyBannerFadeEnabled: true,
+    companyBannerGradientEnabled: false,
+    companyBannerBackgroundColor2: null,
+    companyBannerGradientAngle: 90,
+    companyBannerGradientStartPosition: 0,
+    companyBannerTextShadow: false,
+    companyBannerFontFamily: null,
     createdAt,
   };
 }
@@ -110,6 +117,13 @@ export async function listWorkspacesForUser(userId: string): Promise<Workspace[]
       companyBannerItalic: workspaces.companyBannerItalic,
       companyBannerLetterSpacing: workspaces.companyBannerLetterSpacing,
       companyBannerTextAlign: workspaces.companyBannerTextAlign,
+      companyBannerFadeEnabled: workspaces.companyBannerFadeEnabled,
+      companyBannerGradientEnabled: workspaces.companyBannerGradientEnabled,
+      companyBannerBackgroundColor2: workspaces.companyBannerBackgroundColor2,
+      companyBannerGradientAngle: workspaces.companyBannerGradientAngle,
+      companyBannerGradientStartPosition: workspaces.companyBannerGradientStartPosition,
+      companyBannerTextShadow: workspaces.companyBannerTextShadow,
+      companyBannerFontFamily: workspaces.companyBannerFontFamily,
       createdAt: workspaces.createdAt,
     })
     .from(workspaceMembers)

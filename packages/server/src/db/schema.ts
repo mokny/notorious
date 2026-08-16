@@ -175,6 +175,13 @@ export const workspaces = sqliteTable("workspaces", {
   companyBannerItalic: integer("company_banner_italic", { mode: "boolean" }).notNull().default(false),
   companyBannerLetterSpacing: integer("company_banner_letter_spacing", { mode: "boolean" }).notNull().default(false),
   companyBannerTextAlign: text("company_banner_text_align").notNull().default("center").$type<"left" | "center" | "right">(),
+  companyBannerFadeEnabled: integer("company_banner_fade_enabled", { mode: "boolean" }).notNull().default(true),
+  companyBannerGradientEnabled: integer("company_banner_gradient_enabled", { mode: "boolean" }).notNull().default(false),
+  companyBannerBackgroundColor2: text("company_banner_background_color_2"),
+  companyBannerGradientAngle: integer("company_banner_gradient_angle").notNull().default(90),
+  companyBannerGradientStartPosition: integer("company_banner_gradient_start_position").notNull().default(0),
+  companyBannerTextShadow: integer("company_banner_text_shadow", { mode: "boolean" }).notNull().default(false),
+  companyBannerFontFamily: text("company_banner_font_family").$type<"default" | "serif" | "sans-serif" | "monospace" | "cursive">(),
   createdAt: text("created_at").notNull(),
 });
 
