@@ -220,3 +220,45 @@ export async function invalidateOtherSessions(request: FastifyRequest, userId: s
   await db.delete(sessions).where(condition);
   return toRevoke.map((row) => row.id);
 }
+
+/** Every active session across every account, most recently active first - powers the admin panel's instance-wide "Sessions" tab (see modules/admin/service.ts). Unlike `listSessions`, not scoped to one `userId`; `isCurrent` still marks the requesting admin's own session, if it appears in the list. */
+export async function listAllSessions(request: FastifyRequest): Promise<(Session & { userId: string; userName: string; userEmail: string })[]> {
+  const currentSid = getSessionId(request);
+  const rows = await db
+    .select({
+      id: sessions.id,
+      userAgent: sessions.userAgent,
+      ip: sessions.ip,
+      createdAt: sessions.createdAt,
+      lastSeenAt: sessions.lastSeenAt,
+      userId: sessions.userId,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .orderBy(desc(sessions.lastSeenAt));
+  return rows.map((row) => ({ ...row, isCurrent: row.id === currentSid }));
+}
+
+/**
+ * Admin-panel counterpart to `revokeSession` - terminates one session by id
+ * regardless of which account it belongs to (the caller is already gated on
+ * `requireInstanceAdmin`, so no `userId` scoping is needed here). Returns
+ * whether the revoked session was the *admin's own* current one - see
+ * `revokeSession`'s doc comment for why the caller needs to know that (to
+ * also clear its own cookie rather than leave itself to discover the logout
+ * on its next request).
+ */
+export async function adminRevokeSession(request: FastifyRequest, sessionId: string): Promise<{ wasCurrent: boolean }> {
+  const currentSid = getSessionId(request);
+  await db.delete(sessions).where(eq(sessions.id, sessionId));
+  return { wasCurrent: sessionId === currentSid };
+}
+
+/** Signs out *every* session for one account, including whichever one the target user is currently on - the admin panel's "log out all devices" action. Unlike `invalidateOtherSessions` (self-service, always spares the caller's own tab), there's no "current session" to spare here: the admin isn't logged in as the target user. Returns the revoked session ids so the caller can push a live forced-logout to each (see `sendToSession`). */
+export async function revokeAllSessions(userId: string): Promise<string[]> {
+  const toRevoke = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId));
+  await db.delete(sessions).where(eq(sessions.userId, userId));
+  return toRevoke.map((row) => row.id);
+}

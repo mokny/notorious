@@ -25,12 +25,14 @@ import {
   markAllAdminNotificationsRead,
 } from "./service.js";
 import { setCallsEnabled } from "../instanceSettings/service.js";
-import { broadcastSystemStatus } from "../realtime/hub.js";
+import { broadcastSystemStatus, sendToSession } from "../realtime/hub.js";
+import { listAllSessions, adminRevokeSession, revokeAllSessions } from "../../plugins/session.js";
+import { listFailedLogins, getUserById } from "../auth/service.js";
 import { detectPublicIp } from "../../lib/publicIp.js";
 import { upsertEnvVars } from "../../lib/envFile.js";
 import { repoRoot } from "../../env.js";
 import { nowIso } from "../../lib/ids.js";
-import { badRequest, unauthorized } from "../../lib/httpError.js";
+import { badRequest, unauthorized, notFound } from "../../lib/httpError.js";
 
 const PACKAGE_VERSION = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
 
@@ -80,6 +82,41 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     await deleteUserAccount(id);
     await logAdminAction(admin, "user.delete", `Deleted user ${preview.user.email}`);
     reply.code(204);
+  });
+
+  // ---- Sessions (see plugins/session.ts's admin-facing helpers) ----
+
+  app.get("/api/v1/admin/sessions", async (request) => {
+    await requireInstanceAdmin(request);
+    return listAllSessions(request);
+  });
+
+  app.delete("/api/v1/admin/sessions/:id", async (request, reply) => {
+    const admin = await requireInstanceAdmin(request);
+    const { id } = request.params as { id: string };
+    const { wasCurrent } = await adminRevokeSession(request, id);
+    sendToSession(id, { type: "sessionRevoked" });
+    await logAdminAction(admin, "session.revoke", `Terminated session ${id}${wasCurrent ? " (own session)" : ""}`);
+    reply.code(204);
+  });
+
+  app.delete("/api/v1/admin/users/:id/sessions", async (request, reply) => {
+    const admin = await requireInstanceAdmin(request);
+    const { id } = request.params as { id: string };
+    const target = await getUserById(id);
+    if (!target) throw notFound("User not found");
+    const revokedIds = await revokeAllSessions(id);
+    for (const sessionId of revokedIds) sendToSession(sessionId, { type: "sessionRevoked" });
+    await logAdminAction(admin, "session.revokeAll", `Logged out ${target.email} from all devices (${revokedIds.length} session(s))`);
+    reply.code(204);
+  });
+
+  // ---- Failed logins ----
+
+  app.get("/api/v1/admin/failed-logins", async (request) => {
+    await requireInstanceAdmin(request);
+    const { filter } = request.query as { filter?: string };
+    return listFailedLogins(filter === "unknown" ? "unknown" : "known");
   });
 
   // ---- Audit log ----

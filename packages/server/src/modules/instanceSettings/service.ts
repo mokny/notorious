@@ -69,6 +69,20 @@ export async function setCallsEnabled(enabled: boolean): Promise<void> {
   await db.update(instanceSettings).set({ callsEnabled: enabled }).where(eq(instanceSettings.id, SETTINGS_ROW_ID));
 }
 
+/** See modules/admin/routes.ts's login rate-limit wiring - off by default, gates whether POST /api/v1/auth/login enforces the fixed 10-attempts/15-minutes-per-IP limit. */
+export async function getLoginRateLimitEnabled(): Promise<boolean> {
+  const rows = await db
+    .select({ loginRateLimitEnabled: instanceSettings.loginRateLimitEnabled })
+    .from(instanceSettings)
+    .where(eq(instanceSettings.id, SETTINGS_ROW_ID))
+    .limit(1);
+  return rows[0]?.loginRateLimitEnabled ?? false;
+}
+
+export async function setLoginRateLimitEnabled(enabled: boolean): Promise<void> {
+  await db.update(instanceSettings).set({ loginRateLimitEnabled: enabled }).where(eq(instanceSettings.id, SETTINGS_ROW_ID));
+}
+
 // ---- Auto-update (see modules/admin/autoUpdateScheduler.ts) ----
 
 /** Never returns the stored sudo password itself, only whether one is set - see modules/admin/sudoCrypto.ts. */

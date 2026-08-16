@@ -612,6 +612,30 @@ export interface AdminSettings {
   require2faEnabled: boolean;
   allowTemplateHttpRequests: boolean;
   callsEnabled: boolean;
+  loginRateLimitEnabled: boolean;
+}
+
+export interface AdminSession {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAgent: string | null;
+  ip: string | null;
+  createdAt: string;
+  lastSeenAt: string | null;
+  isCurrent: boolean;
+}
+
+export interface AdminFailedLogin {
+  id: string;
+  email: string;
+  userId: string | null;
+  userName: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  reason: "unknown_email" | "wrong_password" | "no_password_set";
+  createdAt: string;
 }
 
 export interface AdminUser {
@@ -647,6 +671,12 @@ export const adminApi = {
   demoteUser: (id: string) => apiRequest<AdminUser>(`/api/v1/admin/users/${id}/demote`, { method: "POST" }),
   deletionPreview: (id: string) => apiRequest<AdminUserDeletionPreview>(`/api/v1/admin/users/${id}/delete-preview`),
   deleteUser: (id: string) => apiRequest<void>(`/api/v1/admin/users/${id}`, { method: "DELETE" }),
+
+  listSessions: () => apiRequest<AdminSession[]>("/api/v1/admin/sessions"),
+  revokeSession: (id: string) => apiRequest<void>(`/api/v1/admin/sessions/${id}`, { method: "DELETE" }),
+  revokeAllUserSessions: (userId: string) => apiRequest<void>(`/api/v1/admin/users/${userId}/sessions`, { method: "DELETE" }),
+
+  listFailedLogins: (filter: "known" | "unknown") => apiRequest<AdminFailedLogin[]>("/api/v1/admin/failed-logins", { query: { filter } }),
 
   auditLog: () => apiRequest<AdminAuditEntry[]>("/api/v1/admin/audit-log"),
 

@@ -7,6 +7,7 @@ import { startBackupScheduler } from "./modules/backup/scheduler.js";
 import { startAiUsageScheduler } from "./modules/ai/scheduler.js";
 import { startFeedScheduler } from "./modules/feeds/scheduler.js";
 import { startAutoUpdateScheduler } from "./modules/admin/autoUpdateScheduler.js";
+import { startFailedLoginCleanup } from "./modules/admin/failedLoginCleanup.js";
 
 const app = await buildApp();
 
@@ -16,6 +17,7 @@ startBackupScheduler();
 startAiUsageScheduler();
 startFeedScheduler();
 startAutoUpdateScheduler();
+startFailedLoginCleanup();
 await initScriptEngine();
 
 app

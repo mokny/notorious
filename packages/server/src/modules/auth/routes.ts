@@ -14,10 +14,15 @@ import { createSession, destroySession, requireUser, invalidateOtherSessions, li
 import { sendToSession } from "../realtime/hub.js";
 import { forbidden } from "../../lib/httpError.js";
 import { env } from "../../env.js";
+import { getLoginRateLimitEnabled } from "../instanceSettings/service.js";
 import { createPendingChallenge, PENDING_TOTP_COOKIE } from "../twoFactor/service.js";
 import { reverifyWithPassword, markSudoVerified } from "../reverify/service.js";
 
 const PENDING_TOTP_TTL_SECONDS = 5 * 60;
+// Fixed, not admin-editable - only whether this applies at all is a toggle
+// (instanceSettings.loginRateLimitEnabled, see the `max` function below).
+const LOGIN_RATE_LIMIT_MAX = 10;
+const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/v1/auth/register", async (request, reply) => {
@@ -41,31 +46,48 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     return user;
   });
 
-  app.post("/api/v1/auth/login", async (request, reply) => {
-    const input = loginSchema.parse(request.body);
-    const user = await verifyCredentials(input);
+  app.post(
+    "/api/v1/auth/login",
+    {
+      config: {
+        rateLimit: {
+          // Effectively unlimited (rather than disabling the hook entirely)
+          // when the admin toggle is off, so this stays a live per-request
+          // check - no server restart needed to flip it - instead of a
+          // fixed value baked in at route-registration time.
+          max: async () => ((await getLoginRateLimitEnabled()) ? LOGIN_RATE_LIMIT_MAX : Number.MAX_SAFE_INTEGER),
+          timeWindow: LOGIN_RATE_LIMIT_WINDOW_MS,
+          keyGenerator: (request) => request.ip,
+        },
+      },
+    },
+    async (request, reply) => {
+      const input = loginSchema.parse(request.body);
+      const userAgentHeader = request.headers["user-agent"];
+      const user = await verifyCredentials(input, { ip: request.ip, userAgent: typeof userAgentHeader === "string" ? userAgentHeader : null });
 
-    // Password is correct, but that's only step one when 2FA is set up - a
-    // real session isn't created yet, just a short-lived "waiting for the
-    // code" marker (see modules/twoFactor/service.ts's doc comment on why
-    // this is its own cookie/table, not a `sessions` row). The frontend
-    // shows a second form (LoginPage.tsx) that posts to
-    // POST /api/v1/auth/2fa/verify, which creates the real session on success.
-    if (user.totpEnabled) {
-      const challengeId = await createPendingChallenge(user.id);
-      reply.setCookie(PENDING_TOTP_COOKIE, challengeId, {
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-        secure: env.cookieSecure,
-        maxAge: PENDING_TOTP_TTL_SECONDS,
-      });
-      return { pending2fa: true as const };
-    }
+      // Password is correct, but that's only step one when 2FA is set up - a
+      // real session isn't created yet, just a short-lived "waiting for the
+      // code" marker (see modules/twoFactor/service.ts's doc comment on why
+      // this is its own cookie/table, not a `sessions` row). The frontend
+      // shows a second form (LoginPage.tsx) that posts to
+      // POST /api/v1/auth/2fa/verify, which creates the real session on success.
+      if (user.totpEnabled) {
+        const challengeId = await createPendingChallenge(user.id);
+        reply.setCookie(PENDING_TOTP_COOKIE, challengeId, {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: env.cookieSecure,
+          maxAge: PENDING_TOTP_TTL_SECONDS,
+        });
+        return { pending2fa: true as const };
+      }
 
-    await createSession(reply, user.id);
-    return user;
-  });
+      await createSession(reply, user.id);
+      return user;
+    },
+  );
 
   app.post("/api/v1/auth/logout", async (request, reply) => {
     await destroySession(request, reply);

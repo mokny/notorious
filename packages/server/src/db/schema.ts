@@ -624,6 +624,11 @@ export const instanceSettings = sqliteTable("instance_settings", {
   autoUpdateChannel: text("auto_update_channel").notNull().default("nightly"),
   autoUpdateTime: text("auto_update_time"),
   autoUpdateSudoPasswordEncrypted: text("auto_update_sudo_password_encrypted"),
+  // Rate-limits POST /api/v1/auth/login by IP when on - see
+  // modules/admin/routes.ts's login rate-limit wiring. Off by default so
+  // enabling it is an explicit admin opt-in, not a surprise for existing
+  // instances after an upgrade.
+  loginRateLimitEnabled: integer("login_rate_limit_enabled", { mode: "boolean" }).notNull().default(false),
 });
 
 // Append-only log of security-relevant admin actions - see modules/admin/service.ts's
@@ -645,6 +650,26 @@ export const adminAuditLog = sqliteTable("admin_audit_log", {
 // modules/admin/routes.ts's `GET /api/v1/admin/update/history`. Text `id`
 // via newId(), same convention as adminAuditLog above, rather than an
 // autoincrement integer PK (no other table in this schema uses one).
+// One row per failed login attempt (admin panel "Failed Logins" tab) - see
+// modules/admin/service.ts's `recordFailedLogin`. `userId` is null when the
+// attempted email doesn't belong to any account (still worth surfacing to an
+// admin - enumeration/credential-stuffing against unknown addresses). Pruned
+// to the last 30 days by a daily cron job (see
+// modules/admin/failedLoginCleanup.ts) rather than kept forever.
+export const failedLoginAttempts = sqliteTable(
+  "failed_login_attempts",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    reason: text("reason").notNull().$type<"unknown_email" | "wrong_password" | "no_password_set">(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_failed_login_attempts_user_id").on(table.userId), index("idx_failed_login_attempts_created_at").on(table.createdAt)],
+);
+
 export const updateRuns = sqliteTable("update_runs", {
   id: text("id").primaryKey(),
   startedAt: text("started_at").notNull(),

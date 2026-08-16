@@ -21,6 +21,8 @@ export function AdminPage() {
   const TABS: TabItem[] = [
     { key: "settings", label: t("admin.tabs.settings"), to: "/admin/settings" },
     { key: "users", label: t("admin.tabs.users"), to: "/admin/users" },
+    { key: "sessions", label: t("admin.tabs.sessions"), to: "/admin/sessions" },
+    { key: "failed-logins", label: t("admin.tabs.failedLogins"), to: "/admin/failed-logins" },
     { key: "update", label: t("admin.tabs.update"), to: "/admin/update" },
     { key: "audit-log", label: t("admin.tabs.auditLog"), to: "/admin/audit-log" },
   ];

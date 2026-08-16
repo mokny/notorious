@@ -1,8 +1,8 @@
 import argon2 from "argon2";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, isNull, isNotNull, lt } from "drizzle-orm";
 import type { RegisterInput, LoginInput, ChangePasswordInput, ChangeEmailInput, UpdatePushPreferencesInput, UpdateLocaleInput, UpdateContentFontSizeInput, User } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { users, workspaceInvites, workspaceMembers, webauthnCredentials } from "../../db/schema.js";
+import { users, workspaceInvites, workspaceMembers, webauthnCredentials, failedLoginAttempts } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, unauthorized } from "../../lib/httpError.js";
 import { createWorkspace, nextMemberPosition } from "../workspaces/service.js";
@@ -173,16 +173,70 @@ async function redeemPendingInvites(userId: string, email: string): Promise<void
   }
 }
 
-export async function verifyCredentials(input: LoginInput): Promise<User> {
+export type FailedLoginReason = "unknown_email" | "wrong_password" | "no_password_set";
+
+/** Logged for the admin panel's "Failed Logins" tab (see `listFailedLogins`/`pruneFailedLoginAttempts` below) - no `userId` for an attempt against an email that doesn't belong to any account, since there's nothing to point at. */
+async function recordFailedLogin(email: string, reason: FailedLoginReason, userId: string | null, ip: string | null, userAgent: string | null): Promise<void> {
+  await db.insert(failedLoginAttempts).values({ id: newId(), email, userId, ip, userAgent, reason, createdAt: nowIso() });
+}
+
+export async function verifyCredentials(input: LoginInput, context: { ip: string | null; userAgent: string | null }): Promise<User> {
   const rows = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
   const row = rows[0];
-  if (!row) throw unauthorized("Invalid email or password");
-  if (row.passwordHash === null) throw unauthorized("This account doesn't have a password - sign in with a passkey instead");
+  if (!row) {
+    await recordFailedLogin(input.email, "unknown_email", null, context.ip, context.userAgent);
+    throw unauthorized("Invalid email or password");
+  }
+  if (row.passwordHash === null) {
+    await recordFailedLogin(input.email, "no_password_set", row.id, context.ip, context.userAgent);
+    throw unauthorized("This account doesn't have a password - sign in with a passkey instead");
+  }
 
   const valid = await argon2.verify(row.passwordHash, input.password);
-  if (!valid) throw unauthorized("Invalid email or password");
+  if (!valid) {
+    await recordFailedLogin(input.email, "wrong_password", row.id, context.ip, context.userAgent);
+    throw unauthorized("Invalid email or password");
+  }
 
   return toUser(row);
+}
+
+export interface FailedLoginEntry {
+  id: string;
+  email: string;
+  userId: string | null;
+  userName: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  reason: FailedLoginReason;
+  createdAt: string;
+}
+
+/** Powers the admin panel's "Failed Logins" tab - `filter` splits attempts against a real account from ones against an email nobody registered (see modules/admin/routes.ts). Most-recent-first. */
+export async function listFailedLogins(filter: "known" | "unknown", limit = 200): Promise<FailedLoginEntry[]> {
+  const rows = await db
+    .select({
+      id: failedLoginAttempts.id,
+      email: failedLoginAttempts.email,
+      userId: failedLoginAttempts.userId,
+      userName: users.name,
+      ip: failedLoginAttempts.ip,
+      userAgent: failedLoginAttempts.userAgent,
+      reason: failedLoginAttempts.reason,
+      createdAt: failedLoginAttempts.createdAt,
+    })
+    .from(failedLoginAttempts)
+    .leftJoin(users, eq(failedLoginAttempts.userId, users.id))
+    .where(filter === "known" ? isNotNull(failedLoginAttempts.userId) : isNull(failedLoginAttempts.userId))
+    .orderBy(desc(failedLoginAttempts.createdAt))
+    .limit(limit);
+  return rows;
+}
+
+/** Deletes attempts older than `olderThanDays` - called daily by modules/admin/failedLoginCleanup.ts so this table doesn't grow unbounded on a publicly reachable instance getting scanned/brute-forced. */
+export async function pruneFailedLoginAttempts(olderThanDays = 30): Promise<void> {
+  const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
+  await db.delete(failedLoginAttempts).where(lt(failedLoginAttempts.createdAt, cutoff));
 }
 
 export async function getUserById(id: string): Promise<User | null> {

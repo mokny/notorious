@@ -1123,6 +1123,8 @@
     "tabs": {
       "settings": "Settings",
       "users": "Users",
+      "sessions": "Sessions",
+      "failedLogins": "Failed logins",
       "update": "Update",
       "auditLog": "Audit log"
     },
@@ -1151,6 +1153,10 @@
         "enableAndRestart": "Enable calls and restart",
         "restarting": "Restarting the server…",
         "restartingHint": "This page will keep working once the server is back - no action needed."
+      },
+      "loginRateLimit": {
+        "label": "Rate-limit login attempts",
+        "description": "Blocks an IP after 10 failed login attempts within 15 minutes."
       }
     },
     "users": {
@@ -1174,6 +1180,23 @@
       "workspaceSummary": "\"{{name}}\": {{members}} member(s), {{objects}} object(s)",
       "reattributedHint": "{{count}} item(s) created in other workspaces will be kept, reattributed to \"Deleted User\".",
       "confirmTypeEmail": "Type {{email}} to confirm"
+    },
+    "sessions": {
+      "empty": "No active sessions.",
+      "terminate": "Terminate session",
+      "logoutAll": "Log out all devices",
+      "confirmSelfTitle": "Terminate your own session?",
+      "confirmSelfDescription": "This is the session you're currently using. You'll be logged out immediately.",
+      "confirmLogoutAllTitle": "Log out {{name}} from all devices?",
+      "confirmLogoutAllDescription": "Every active session for this account will be terminated immediately."
+    },
+    "failedLogins": {
+      "filterKnown": "Known accounts",
+      "filterUnknown": "Unknown emails",
+      "empty": "No failed login attempts recorded.",
+      "reasonUnknownEmail": "No account with this email",
+      "reasonWrongPassword": "Wrong password",
+      "reasonNoPasswordSet": "Account has no password set"
     },
     "update": {
       "channelRelease": "Release",

@@ -12,6 +12,8 @@ import {
   setAllowTemplateHttpRequests,
   getCallsEnabled,
   setCallsEnabled,
+  getLoginRateLimitEnabled,
+  setLoginRateLimitEnabled,
   getAutoUpdateSettings,
   setAutoUpdateSettings,
 } from "./service.js";
@@ -20,13 +22,14 @@ import {
 export async function registerInstanceSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/admin/settings", async (request) => {
     await requireInstanceAdmin(request);
-    const [registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled] = await Promise.all([
+    const [registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled] = await Promise.all([
       getRegistrationEnabled(),
       getRequire2faEnabled(),
       getAllowTemplateHttpRequests(),
       getCallsEnabled(),
+      getLoginRateLimitEnabled(),
     ]);
-    return { registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled };
+    return { registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled };
   });
 
   app.patch("/api/v1/admin/settings", async (request) => {
@@ -50,17 +53,22 @@ export async function registerInstanceSettingsRoutes(app: FastifyInstance): Prom
       await setCallsEnabled(input.callsEnabled);
       changed.push(`calls ${input.callsEnabled ? "enabled" : "disabled"}`);
     }
+    if (input.loginRateLimitEnabled !== undefined) {
+      await setLoginRateLimitEnabled(input.loginRateLimitEnabled);
+      changed.push(`login rate limiting ${input.loginRateLimitEnabled ? "enabled" : "disabled"}`);
+    }
     if (changed.length > 0) {
       await logAdminAction(admin, "settings.update", `Changed instance settings: ${changed.join(", ")}`);
     }
 
-    const [registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled] = await Promise.all([
+    const [registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled] = await Promise.all([
       getRegistrationEnabled(),
       getRequire2faEnabled(),
       getAllowTemplateHttpRequests(),
       getCallsEnabled(),
+      getLoginRateLimitEnabled(),
     ]);
-    return { registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled };
+    return { registrationEnabled, require2faEnabled, allowTemplateHttpRequests, callsEnabled, loginRateLimitEnabled };
   });
 
   // ---- Auto-update ----

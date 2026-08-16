@@ -12,6 +12,7 @@ export const adminUpdateSettingsSchema = z
     require2faEnabled: z.boolean(),
     allowTemplateHttpRequests: z.boolean(),
     callsEnabled: z.boolean(),
+    loginRateLimitEnabled: z.boolean(),
   })
   .partial();
 export type AdminUpdateSettingsInput = z.infer<typeof adminUpdateSettingsSchema>;

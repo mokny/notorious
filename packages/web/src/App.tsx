@@ -22,6 +22,8 @@ import { AccountSettingsPage } from "./pages/AccountSettingsPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { AdminSettingsTab } from "./components/admin/AdminSettingsTab.js";
 import { AdminUsersTab } from "./components/admin/AdminUsersTab.js";
+import { AdminSessionsTab } from "./components/admin/AdminSessionsTab.js";
+import { AdminFailedLoginsTab } from "./components/admin/AdminFailedLoginsTab.js";
 import { AdminUpdateTab } from "./components/admin/AdminUpdateTab.js";
 import { AdminAuditLogTab } from "./components/admin/AdminAuditLogTab.js";
 import { WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage.js";
@@ -162,6 +164,8 @@ function AppRoutes() {
         <Route index element={<Navigate to="settings" replace />} />
         <Route path="settings" element={<AdminSettingsTab />} />
         <Route path="users" element={<AdminUsersTab />} />
+        <Route path="sessions" element={<AdminSessionsTab />} />
+        <Route path="failed-logins" element={<AdminFailedLoginsTab />} />
         <Route path="update" element={<AdminUpdateTab />} />
         <Route path="audit-log" element={<AdminAuditLogTab />} />
       </Route>

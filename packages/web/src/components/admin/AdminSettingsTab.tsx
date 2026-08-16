@@ -31,6 +31,7 @@ export function AdminSettingsTab() {
     { key: "require2faEnabled", label: t("admin.settings.require2fa.label"), description: t("admin.settings.require2fa.description") },
     { key: "allowTemplateHttpRequests", label: t("admin.settings.templateHttp.label"), description: t("admin.settings.templateHttp.description") },
     { key: "callsEnabled", label: t("admin.settings.calls.label"), description: t("admin.settings.calls.description") },
+    { key: "loginRateLimitEnabled", label: t("admin.settings.loginRateLimit.label"), description: t("admin.settings.loginRateLimit.description") },
   ];
 
   return (
