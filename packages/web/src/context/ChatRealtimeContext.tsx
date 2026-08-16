@@ -35,7 +35,7 @@ export function ChatRealtimeProvider({ children }: { children: ReactNode }) {
 
   const { data: conversations } = useQuery({
     queryKey: ["chatConversations"],
-    queryFn: chatApi.listConversations,
+    queryFn: ({ signal }) => chatApi.listConversations(signal),
     enabled: Boolean(user),
   });
 

@@ -66,7 +66,7 @@ function RealThreadView({ conversationId, onBack }: { conversationId: string; on
   // by conversationId alone.
   const processedRef = useRef<{ conversationId: string | null; count: number }>({ conversationId: null, count: 0 });
 
-  const { data: conversations } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
+  const { data: conversations } = useQuery({ queryKey: ["chatConversations"], queryFn: ({ signal }) => chatApi.listConversations(signal) });
   const conversation = conversations?.find((c) => c.id === conversationId);
 
   const { data: messages } = useQuery({

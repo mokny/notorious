@@ -51,7 +51,11 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
   });
   // Reuses the same ["chatConversations"] cache key ChatRealtimeContext keeps
   // live via /ws/chat, so this is just a read - no extra polling of its own.
-  const { data: chatConversations } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations, enabled: !shareToken });
+  const { data: chatConversations } = useQuery({
+    queryKey: ["chatConversations"],
+    queryFn: ({ signal }) => chatApi.listConversations(signal),
+    enabled: !shareToken,
+  });
   const chatUnreadCount = chatConversations?.filter((c) => c.unreadCount > 0).length ?? 0;
 
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);

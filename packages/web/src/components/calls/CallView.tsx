@@ -9,7 +9,11 @@ import { CallSettingsPanel } from "./CallSettingsPanel.js";
 
 function useParticipantInfo(conversationId: string | null, userId: string): { name: string; avatarColor: string; avatarUrl?: string | null } {
   const { t } = useTranslation();
-  const { data: conversations } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations, enabled: Boolean(conversationId) });
+  const { data: conversations } = useQuery({
+    queryKey: ["chatConversations"],
+    queryFn: ({ signal }) => chatApi.listConversations(signal),
+    enabled: Boolean(conversationId),
+  });
   const conversation = conversations?.find((c) => c.id === conversationId);
   const participant = conversation?.otherParticipants.find((p) => p.userId === userId);
   return participant ?? { name: t("calls.view.someone"), avatarColor: "#6366f1", avatarUrl: null };

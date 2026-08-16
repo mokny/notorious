@@ -40,7 +40,7 @@ function conversationInitial(
  */
 export function ConversationList({ onSelect, onNewChat, onNewChannel }: { onSelect: (id: string) => void; onNewChat: () => void; onNewChannel: () => void }) {
   const { t } = useTranslation();
-  const { data: conversations, isLoading } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
+  const { data: conversations, isLoading } = useQuery({ queryKey: ["chatConversations"], queryFn: ({ signal }) => chatApi.listConversations(signal) });
   const currentWorkspaceId = useCurrentWorkspaceId();
   const { muted, setMuted } = useChatSound();
   // Pinned "Notorious AI" row for the active workspace, if it has AI

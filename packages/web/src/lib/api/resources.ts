@@ -404,7 +404,11 @@ export const fileApi = {
 };
 
 export const chatApi = {
-  listConversations: () => apiRequest<ConversationSummary[]>("/api/v1/chat/conversations"),
+  // Forwards React Query's abort signal so an in-flight fetch from a stale
+  // invalidation (e.g. an earlier userStatusChanged still resolving) gets
+  // cancelled instead of racing a newer one and overwriting the cache with
+  // outdated online/offline data - see ["chatConversations"] call sites.
+  listConversations: (signal?: AbortSignal) => apiRequest<ConversationSummary[]>("/api/v1/chat/conversations", { signal }),
   createChannel: (workspaceId: string, input: CreateChannelInput) =>
     apiRequest<Conversation>(`/api/v1/workspaces/${workspaceId}/chat/channels`, { method: "POST", body: input }),
   listChannels: (workspaceId: string) => apiRequest<ChannelListEntry[]>(`/api/v1/workspaces/${workspaceId}/chat/channels`),

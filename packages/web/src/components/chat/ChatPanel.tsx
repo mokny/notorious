@@ -50,6 +50,6 @@ export function ChatPanel() {
 
 /** Unread-conversation count for the bubble's badge - same visual convention as NotificationBell.tsx. */
 export function useChatUnreadCount(): number {
-  const { data: conversations } = useQuery({ queryKey: ["chatConversations"], queryFn: chatApi.listConversations });
+  const { data: conversations } = useQuery({ queryKey: ["chatConversations"], queryFn: ({ signal }) => chatApi.listConversations(signal) });
   return conversations?.filter((c) => c.unreadCount > 0).length ?? 0;
 }
