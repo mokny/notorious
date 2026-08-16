@@ -41,7 +41,9 @@ curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update
 
 See [Installing on your own Linux server (in detail)](#installing-on-your-own-linux-server-in-detail)
 further down for what these scripts do under the hood, and
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the fully manual steps.
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the fully manual steps. Once it's running, head to
+[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) for creating your first account, managing users,
+and turning on optional features like calls.
 
 ## Installing with Docker
 
@@ -126,6 +128,8 @@ and the non-Docker `git pull` deployment flow.
 
 ## Documentation
 
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) - step-by-step shell commands from a fresh
+  install to a fully configured instance: first user, managing accounts, 2FA, calls, push, templates
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - how the system is put together and why
 - [docs/API.md](docs/API.md) - REST/WebSocket API reference (also available live at `/api/docs`)
 - [docs/SCRIPTING.md](docs/SCRIPTING.md) - writing sandboxed per-object JavaScript, with examples
