@@ -80,12 +80,36 @@ export function CompanyBanner({
 // stretch to - not the full 100%, so it doesn't hug the fade edges.
 const FILL_WIDTH_FRACTION = 0.8;
 
+// Lazily-created, module-singleton offscreen element used to measure text
+// width without ever touching the visible node's style (see below).
+let sharedMeasurer: HTMLSpanElement | null = null;
+function getSharedMeasurer(): HTMLSpanElement {
+  if (!sharedMeasurer) {
+    sharedMeasurer = document.createElement("span");
+    sharedMeasurer.style.position = "absolute";
+    sharedMeasurer.style.visibility = "hidden";
+    sharedMeasurer.style.whiteSpace = "nowrap";
+    sharedMeasurer.style.pointerEvents = "none";
+    sharedMeasurer.style.left = "-9999px";
+    sharedMeasurer.style.top = "0";
+    document.body.appendChild(sharedMeasurer);
+  }
+  return sharedMeasurer;
+}
+
 /**
  * Computes a `letter-spacing` value that stretches `text` to roughly fill
  * FILL_WIDTH_FRACTION of its container's width, re-measured on resize - same
  * "measure at natural width, scale against the container" approach as
  * useFitText.ts, but solving for letter-spacing instead of font-size. `null`
  * (the toggle off, or no text) skips all measurement and returns undefined.
+ *
+ * Measures via a detached, invisible clone rather than the visible span
+ * itself - toggling the live element's letter-spacing to 0 to measure it
+ * caused a visible flash back to normal spacing on every resize, and left
+ * spacing stuck at 0 whenever a measurement briefly came out invalid (e.g.
+ * before layout/fonts settled on first mount) since React never re-touches
+ * a style property that was already undefined in its previous render.
  */
 function useFillWidthLetterSpacing(text: string | null): {
   measureRef: (node: HTMLSpanElement | null) => void;
@@ -104,16 +128,28 @@ function useFillWidthLetterSpacing(text: string | null): {
 
     function recompute(): void {
       if (!text || !container || !parent) return;
+      const measurer = getSharedMeasurer();
+      const containerStyle = getComputedStyle(container);
+      measurer.style.fontFamily = containerStyle.fontFamily;
+      measurer.style.fontSize = containerStyle.fontSize;
+      measurer.style.fontWeight = containerStyle.fontWeight;
+      measurer.style.fontStyle = containerStyle.fontStyle;
+      measurer.style.letterSpacing = "0px";
+      measurer.textContent = text;
+      const naturalWidth = measurer.getBoundingClientRect().width;
+
       const parentStyle = getComputedStyle(parent);
       const horizontalPadding = parseFloat(parentStyle.paddingLeft) + parseFloat(parentStyle.paddingRight);
       const availableWidth = (parent.clientWidth - horizontalPadding) * FILL_WIDTH_FRACTION;
-      container.style.letterSpacing = "0px";
-      const naturalWidth = container.getBoundingClientRect().width;
       if (availableWidth <= 0 || naturalWidth <= 0 || text.length < 2) {
         setValue(undefined);
         return;
       }
-      const extra = (availableWidth - naturalWidth) / (text.length - 1);
+      // Divide by the full character count, not length-1: browsers apply
+      // letter-spacing after every character including the last one, so the
+      // rendered width is naturalWidth + extra * text.length, not
+      // naturalWidth + extra * (text.length - 1).
+      const extra = (availableWidth - naturalWidth) / text.length;
       setValue(extra > 0 ? extra : undefined);
     }
 
