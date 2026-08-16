@@ -210,18 +210,6 @@ export function isUserOnline(userId: string): boolean {
   return (socketsByUserId.get(userId)?.size ?? 0) > 0;
 }
 
-// TEMPORARY - diagnostic only, remove once the "user X never goes offline"
-// bug is found. Not wired to any route yet; see admin/routes.ts debug wiring.
-export function debugOnlineState(userId: string): { socketCount: number; readyStates: number[]; clientIds: string[] } {
-  const sockets = socketsByUserId.get(userId);
-  if (!sockets) return { socketCount: 0, readyStates: [], clientIds: [] };
-  return {
-    socketCount: sockets.size,
-    readyStates: [...sockets].map((s) => s.readyState),
-    clientIds: [...sockets].map((s) => clientIdBySocket.get(s) ?? "?"),
-  };
-}
-
 type OnlineChangeListener = (userId: string, online: boolean) => void;
 
 // Fired only on the 0<->1 transition of a user's `/ws/chat` socket count (not
