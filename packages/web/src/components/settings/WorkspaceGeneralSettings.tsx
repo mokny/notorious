@@ -381,7 +381,7 @@ export function WorkspaceGeneralSettings() {
               />
             </label>
             <div className="flex items-center gap-4 text-sm">
-              <label className="flex items-center gap-1.5">
+              <label className="flex items-center gap-1.5 text-sm">
                 <input
                   type="checkbox"
                   checked={workspace.companyBannerBold}
@@ -389,7 +389,7 @@ export function WorkspaceGeneralSettings() {
                 />
                 {t("settings.workspace.general.companyBannerBold")}
               </label>
-              <label className="flex items-center gap-1.5">
+              <label className="flex items-center gap-1.5 text-sm">
                 <input
                   type="checkbox"
                   checked={workspace.companyBannerItalic}
@@ -423,7 +423,7 @@ export function WorkspaceGeneralSettings() {
               </select>
             </label>
 
-            <label className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-sm">
               <input
                 type="checkbox"
                 checked={workspace.companyBannerFadeEnabled}
@@ -432,7 +432,7 @@ export function WorkspaceGeneralSettings() {
               {t("settings.workspace.general.companyBannerFadeEnabled")}
             </label>
 
-            <label className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 text-sm">
               <input
                 type="checkbox"
                 checked={workspace.companyBannerGradientEnabled}
