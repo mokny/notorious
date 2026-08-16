@@ -76,12 +76,16 @@ export function CompanyBanner({
   );
 }
 
+// Target fraction of the available (padding-excluded) width the text should
+// stretch to - not the full 100%, so it doesn't hug the fade edges.
+const FILL_WIDTH_FRACTION = 0.8;
+
 /**
  * Computes a `letter-spacing` value that stretches `text` to roughly fill
- * its container's width, re-measured on resize - same "measure at natural
- * width, scale against the container" approach as useFitText.ts, but solving
- * for letter-spacing instead of font-size. `null` (the toggle off, or no
- * text) skips all measurement and returns undefined.
+ * FILL_WIDTH_FRACTION of its container's width, re-measured on resize - same
+ * "measure at natural width, scale against the container" approach as
+ * useFitText.ts, but solving for letter-spacing instead of font-size. `null`
+ * (the toggle off, or no text) skips all measurement and returns undefined.
  */
 function useFillWidthLetterSpacing(text: string | null): {
   measureRef: (node: HTMLSpanElement | null) => void;
@@ -100,18 +104,24 @@ function useFillWidthLetterSpacing(text: string | null): {
 
     function recompute(): void {
       if (!text || !container || !parent) return;
-      const containerWidth = parent.clientWidth;
+      const parentStyle = getComputedStyle(parent);
+      const horizontalPadding = parseFloat(parentStyle.paddingLeft) + parseFloat(parentStyle.paddingRight);
+      const availableWidth = (parent.clientWidth - horizontalPadding) * FILL_WIDTH_FRACTION;
       container.style.letterSpacing = "0px";
       const naturalWidth = container.getBoundingClientRect().width;
-      if (containerWidth <= 0 || naturalWidth <= 0 || text.length < 2) {
+      if (availableWidth <= 0 || naturalWidth <= 0 || text.length < 2) {
         setValue(undefined);
         return;
       }
-      const extra = (containerWidth - naturalWidth) / (text.length - 1);
+      const extra = (availableWidth - naturalWidth) / (text.length - 1);
       setValue(extra > 0 ? extra : undefined);
     }
 
     recompute();
+    // Fonts loading async can make the first measurement use fallback-font
+    // metrics, undershooting the target width until something else (e.g. a
+    // resize) forces a remeasure - so also recompute once webfonts are ready.
+    void document.fonts?.ready?.then(recompute);
     const observer = new ResizeObserver(recompute);
     observer.observe(parent);
     return () => observer.disconnect();
