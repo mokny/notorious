@@ -20,6 +20,38 @@ import type {
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
 const RUNNING_VERSION = (JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")) as { version: string }).version;
 
+// None of the three connection types below (`joinRoom`, `joinGlobalRoom`,
+// `joinSystemChannel`) ever see a `close` event on an ungraceful disconnect -
+// a closed laptop lid, a dropped wifi connection, or a network path that just
+// vanishes leaves the OS-level TCP socket sitting open with nothing to
+// trigger a FIN/RST, so `ws` never fires `close` and a stale entry (most
+// visibly: `isUserOnline` staying true forever) lingers indefinitely. This is
+// the standard `ws` heartbeat pattern - ping every open socket, terminate any
+// that didn't `pong` since the previous ping - applied uniformly via
+// `trackHeartbeat` so every join* function's existing `close`-driven cleanup
+// keeps working unchanged (`terminate()` still emits `close`).
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const heartbeatSockets = new Set<WebSocket>();
+const socketAlive = new WeakMap<WebSocket, boolean>();
+
+function trackHeartbeat(socket: WebSocket): void {
+  socketAlive.set(socket, true);
+  heartbeatSockets.add(socket);
+  socket.on("pong", () => socketAlive.set(socket, true));
+  socket.on("close", () => heartbeatSockets.delete(socket));
+}
+
+setInterval(() => {
+  for (const socket of heartbeatSockets) {
+    if (socketAlive.get(socket) === false) {
+      socket.terminate();
+      continue;
+    }
+    socketAlive.set(socket, false);
+    socket.ping();
+  }
+}, HEARTBEAT_INTERVAL_MS).unref();
+
 interface RoomEntry {
   objectIdFilter: string | null;
   /** The browser tab's `clientId` (see lib/ws/clientId.ts on the frontend), used to target a single client - e.g. `sendToClient` for backup progress - rather than the whole room. Absent for anonymous share visitors, who never trigger a targeted send. */
@@ -51,6 +83,7 @@ export function joinRoom(
     roomsByWorkspace.set(workspaceId, room);
   }
   room.set(socket, { objectIdFilter, clientId, userId, notificationsOnly });
+  trackHeartbeat(socket);
 
   socket.on("close", () => {
     room?.delete(socket);
@@ -203,6 +236,7 @@ export function joinGlobalRoom(userId: string, socket: WebSocket, clientId: stri
   }
   sockets.add(socket);
   clientIdBySocket.set(socket, clientId);
+  trackHeartbeat(socket);
   if (!wasOnline) notifyOnlineChange(userId, true);
 
   let sessionSockets: Set<WebSocket> | undefined;
@@ -303,6 +337,7 @@ let lastSystemStatus: SystemUpdateStatusMessage = { type: "systemUpdate", status
 /** Registers a socket on the update/restart status channel and immediately sends it the current status (see `lastSystemStatus`'s doc comment for why "immediately" matters) - cleans up on disconnect. */
 export function joinSystemChannel(socket: WebSocket): void {
   systemSockets.add(socket);
+  trackHeartbeat(socket);
   socket.on("close", () => systemSockets.delete(socket));
   if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(lastSystemStatus));
 }
