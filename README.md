@@ -1,10 +1,10 @@
 # Notorious
 
-Notorious is a self-hosted, multi-user notes and knowledge base app in the vein of Notion, Anytype or
-Obsidian, built around object-based editing rather than plain documents: everything you create is a
-typed object - Note, Project, Task, Person, Book, Meeting, Company, File, or a custom type you define
-yourself - with its own properties (text, dates, relations, formulas, ...) alongside a rich block
-editor for its content. The same underlying data can then be browsed through six different view types
+Notorious is a self-hosted, multi-user notes and knowledge base app built around object-based editing
+rather than plain documents: everything you create is a typed object - Note, Project, Task, Person,
+Book, Meeting, Company, File, or a custom type you define yourself - with its own properties (text,
+dates, relations, formulas, ...) alongside a rich block editor for its content. The same underlying
+data can then be browsed through six different view types
 (Table, Board, Calendar, Timeline, Gallery, List) with filters and sorts, so a set of Task objects
 becomes a Kanban board in one place and a deadline calendar in another without duplicating anything.
 On top of that: full-text/fuzzy search, live multi-user sync with roles and presence, chat and
@@ -36,7 +36,7 @@ reachable at `http://<your-server>:4000`. The script is safe to re-run, and upda
 idea with a different script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash -s -- --channel=release
 ```
 
 See [Installing on your own Linux server (in detail)](#installing-on-your-own-linux-server-in-detail)
@@ -198,7 +198,7 @@ into it and run `./scripts/install.sh` directly - same script, same result.)
 Whenever you want to update to the latest version, from inside that directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/update.sh | bash -s -- --channel=release
 ```
 
 This re-downloads the latest code as a tarball (`.env` and `data/` are untouched - neither is part of
