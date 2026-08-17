@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "../../../../packages/web/src/components/ui/Modal.js";
+import { formatCents } from "@notorious/shared";
 import { fakturaApi, type PaymentMethod, type ProductListItemDto } from "../api.js";
 import { PosProductGrid } from "../components/PosProductGrid.js";
 import { PosCart, type CartItem } from "../components/PosCart.js";
+import { PosCashTenderModal } from "../components/PosCashTenderModal.js";
 
 /**
  * Requests a screen wake lock so the tablet display never dims/locks during
@@ -62,6 +64,9 @@ function PosTerminalPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [receiptDocumentId, setReceiptDocumentId] = useState<string | null>(null);
+  const [changeCents, setChangeCents] = useState<number | null>(null);
+  const [cashTenderOpen, setCashTenderOpen] = useState(false);
+  const [tenderedCents, setTenderedCents] = useState(0);
   // Own state, not derived from `document.fullscreenElement`: iPadOS Safari
   // doesn't support the Fullscreen API for ordinary elements (only
   // <video>), so `requestFullscreen()` silently does nothing there. This
@@ -102,6 +107,8 @@ function PosTerminalPage() {
     setCart((prev) => prev.flatMap((item) => (item.productId === productId ? (item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : []) : [item])));
   }
 
+  const cartTotalCents = cart.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
+
   const checkoutMutation = useMutation({
     mutationFn: () =>
       fakturaApi.pos.sale(
@@ -111,10 +118,27 @@ function PosTerminalPage() {
       ),
     onSuccess: (result) => {
       setCart([]);
+      setCashTenderOpen(false);
       setReceiptDocumentId(result.document.id);
       void queryClient.invalidateQueries({ queryKey: ["module-faktura-pos-active-shift", workspaceId] });
     },
   });
+
+  function handleCheckoutClick() {
+    if (paymentMethod === "cash") {
+      setTenderedCents(0);
+      setChangeCents(null);
+      setCashTenderOpen(true);
+    } else {
+      setChangeCents(null);
+      checkoutMutation.mutate();
+    }
+  }
+
+  function confirmCashSale() {
+    setChangeCents(tenderedCents - cartTotalCents);
+    checkoutMutation.mutate();
+  }
 
   if (!activeShift) {
     return (
@@ -158,14 +182,27 @@ function PosTerminalPage() {
           onDecrement={decrement}
           paymentMethod={paymentMethod}
           onPaymentMethodChange={setPaymentMethod}
-          onCheckout={() => checkoutMutation.mutate()}
+          onCheckout={handleCheckoutClick}
           checkoutDisabled={cart.length === 0 || checkoutMutation.isPending}
         />
       </div>
 
+      <PosCashTenderModal
+        open={cashTenderOpen}
+        totalCents={cartTotalCents}
+        tenderedCents={tenderedCents}
+        onTenderedChange={setTenderedCents}
+        onCancel={() => setCashTenderOpen(false)}
+        onConfirm={confirmCashSale}
+        confirmPending={checkoutMutation.isPending}
+      />
+
       <Modal open={Boolean(receiptDocumentId)} onOpenChange={(open) => !open && setReceiptDocumentId(null)} title="Verkauf abgeschlossen">
         {receiptDocumentId && (
           <div className="flex flex-col items-center gap-3">
+            {changeCents !== null && changeCents > 0 && (
+              <p className="text-lg font-semibold text-emerald-600">Rückgeld: {formatCents(changeCents)}</p>
+            )}
             <img
               src={fakturaApi.documents.qrUrl(workspaceId!, receiptDocumentId, window.location.origin)}
               alt="QR-Code für den Bon"
