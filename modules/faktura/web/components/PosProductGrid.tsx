@@ -30,7 +30,7 @@ export function PosProductGrid(props: { products: ProductListItemDto[]; onAdd: (
           </button>
         ))}
       </div>
-      <div className="mt-3 grid flex-1 grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2 overflow-y-auto content-start">
+      <div className="mt-3 grid flex-1 grid-cols-4 content-start gap-2 overflow-y-auto sm:grid-cols-5 lg:grid-cols-6">
         {visibleProducts.map((product) => (
           <button
             key={product.id}

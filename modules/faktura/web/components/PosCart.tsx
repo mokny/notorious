@@ -48,13 +48,13 @@ export function PosCart(props: {
           <span>Summe</span>
           <span>{formatCents(total)}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {(Object.keys(methodLabel) as PaymentMethod[]).map((method) => (
             <button
               key={method}
               type="button"
               onClick={() => props.onPaymentMethodChange(method)}
-              className={`flex-1 rounded-md py-2 text-sm ${method === props.paymentMethod ? "bg-accent text-white" : "border border-border"}`}
+              className={`rounded-md py-2.5 text-sm font-medium ${method === props.paymentMethod ? "bg-accent text-white" : "border border-border"}`}
             >
               {methodLabel[method]}
             </button>
