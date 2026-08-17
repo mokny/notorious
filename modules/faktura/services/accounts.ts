@@ -132,8 +132,10 @@ export function seedChartOfAccounts(sdk: ModuleSdk, workspaceId: string, chart: 
   tx(seed);
 }
 
-/** Resolves a well-known account "role" to the actual account id for this workspace's active chart - looks up by the seeded code for that purpose. Throws if the account was archived/deleted and no replacement with the same code exists, since the booking-proposal logic (services/bookings.ts) has nothing sensible to fall back to. */
+/** Resolves a well-known account "role" to the actual account id for this workspace's active chart - looks up by the seeded code for that purpose. Auto-seeds the chart first if the workspace has no accounts at all yet (seedChartOfAccounts is idempotent, so this is a no-op once the company-settings save or the "Kontenrahmen initialisieren" button has already seeded it) - so booking proposals never fail just because nobody has visited the settings/accounts page yet. Still throws if a specific account was later archived without a same-code replacement, since the booking-proposal logic has nothing sensible to fall back to in that case. */
 export function getAccountByPurpose(sdk: ModuleSdk, workspaceId: string, chart: "skr03" | "skr04", purpose: AccountPurpose): FakturaAccountRow {
+  seedChartOfAccounts(sdk, workspaceId, chart);
+
   const seed = chart === "skr03" ? SKR03_SEED : SKR04_SEED;
   const seedAccount = seed.find((a) => a.purpose === purpose);
   if (!seedAccount) throw new Error(`No seed account defined for purpose "${purpose}"`);
