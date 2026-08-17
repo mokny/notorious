@@ -1,7 +1,7 @@
 {
   "name": "notorious",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "Self-hosted, multi-user notes and knowledge base application",
   "workspaces": [
@@ -15,7 +15,8 @@
     "dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
-    "build": "npm run build --workspace=packages/shared && npm run build --workspace=packages/server && npm run build --workspace=packages/web",
+    "build": "npm run build --workspace=packages/shared && npm run build:modules && npm run build --workspace=packages/server && npm run build --workspace=packages/web",
+    "build:modules": "tsc -p modules/tsconfig.json",
     "start": "npm run start --workspace=packages/server",
     "start:prod": "npm run migrate:prod --workspace=packages/server && npm run start --workspace=packages/server",
     "migrate": "npm run migrate --workspace=packages/server",
@@ -36,7 +37,8 @@
     "migrate-table-blocks": "npm run migrate-table-blocks:prod --workspace=packages/server",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && npm run typecheck:modules",
+    "typecheck:modules": "tsc -p modules/tsconfig.json --noEmit",
     "test": "npm run test --workspaces --if-present",
     "release": "node scripts/release.mjs"
   },

@@ -22,6 +22,7 @@ export function WorkspaceSettingsPage() {
           { key: "sharing", label: t("settings.workspace.tabs.sharing"), to: `${base}/sharing` },
           { key: "ai", label: t("settings.workspace.tabs.ai"), to: `${base}/ai` },
           { key: "webhooks", label: t("settings.workspace.tabs.webhooks"), to: `${base}/webhooks` },
+          { key: "modules", label: t("settings.workspace.tabs.modules"), to: `${base}/modules` },
           { key: "backup", label: t("settings.workspace.tabs.backup"), to: `${base}/backup` },
           { key: "danger-zone", label: t("settings.workspace.tabs.dangerZone"), to: `${base}/danger-zone` },
         ]

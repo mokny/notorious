@@ -105,6 +105,8 @@ import {
   Archive,
   ArchiveRestore,
   UserPlus,
+  Puzzle,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -212,6 +214,8 @@ const ICONS: Record<string, LucideIcon> = {
   archive: Archive,
   "archive-restore": ArchiveRestore,
   "user-plus": UserPlus,
+  puzzle: Puzzle,
+  package: Package,
 };
 
 function isImageUrl(value: string): boolean {

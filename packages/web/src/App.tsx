@@ -40,6 +40,8 @@ import { WorkspaceAiSettingsTab } from "./components/settings/WorkspaceAiSetting
 import { WorkspaceWebhooksSettingsTab } from "./components/settings/WorkspaceWebhooksSettingsTab.js";
 import { WorkspaceBackupSettingsTab } from "./components/settings/WorkspaceBackupSettingsTab.js";
 import { WorkspaceDangerZoneSettings } from "./components/settings/WorkspaceDangerZoneSettings.js";
+import { WorkspaceModulesSettingsTab } from "./components/settings/WorkspaceModulesSettingsTab.js";
+import { MODULE_WEB_MANIFESTS } from "./modules/registry.js";
 import { ChatBubble } from "./components/chat/ChatBubble.js";
 import { ChatSheet } from "./components/chat/ChatSheet.js";
 import { CallView } from "./components/calls/CallView.js";
@@ -197,6 +199,11 @@ function AppRoutes() {
         <Route path="types/:objectTypeKey" element={<ObjectTypePage />} />
         <Route path="objects/:objectId" element={<ObjectDetailPage />} />
         <Route path="search" element={<SearchPage />} />
+        {MODULE_WEB_MANIFESTS.flatMap((manifest) =>
+          manifest.routes.map((route) => (
+            <Route key={`${manifest.id}/${route.path}`} path={`modules/${manifest.id}/${route.path}`} element={route.element} />
+          )),
+        )}
         <Route path="settings" element={<WorkspaceSettingsPage />}>
           <Route index element={<Navigate to="general" replace />} />
           <Route path="general" element={<WorkspaceGeneralSettings />} />
@@ -204,6 +211,7 @@ function AppRoutes() {
           <Route path="sharing" element={<WorkspaceSharingSettings />} />
           <Route path="ai" element={<WorkspaceAiSettingsTab />} />
           <Route path="webhooks" element={<WorkspaceWebhooksSettingsTab />} />
+          <Route path="modules" element={<WorkspaceModulesSettingsTab />} />
           <Route path="backup" element={<WorkspaceBackupSettingsTab />} />
           <Route path="danger-zone" element={<WorkspaceDangerZoneSettings />} />
         </Route>

@@ -29,6 +29,7 @@ export * from "./schemas/push.js";
 export * from "./schemas/apiKey.js";
 export * from "./schemas/shareLink.js";
 export * from "./schemas/webhook.js";
+export * from "./schemas/module.js";
 export * from "./schemas/backup.js";
 export * from "./schemas/ai.js";
 export * from "./schemas/template.js";

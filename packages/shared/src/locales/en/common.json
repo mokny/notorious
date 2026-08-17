@@ -204,7 +204,8 @@
         "ai": "AI",
         "webhooks": "Webhooks",
         "backup": "Backup",
-        "dangerZone": "Danger zone"
+        "dangerZone": "Danger zone",
+        "modules": "Modules"
       },
       "general": {
         "description": "Rename \"{{name}}\", pick an icon, or upload your own image.",
@@ -430,6 +431,21 @@
         "deleteConfirmDescription": "This deletes the entire workspace for everyone: every object, block, file, view and member's access. This cannot be undone.",
         "deleteConfirmButton": "Delete workspace",
         "deleteButton": "Delete this workspace"
+      },
+      "modules": {
+        "description": "Modules extend this workspace with extra features. A server admin has to release a module for this workspace before it can be enabled here.",
+        "none": "No modules are installed on this server yet.",
+        "notReleased": "A server admin hasn't released this module for this workspace yet.",
+        "enable": "Enable",
+        "disable": "Disable",
+        "managePermissions": "Manage permissions",
+        "disableConfirm": "Disabling turns this module off for everyone in this workspace. Keep its data so it's ready again if you re-enable it, or delete it now.",
+        "disableKeepData": "Disable, keep data",
+        "disablePurgeData": "Disable and delete data",
+        "cancelDisable": "Cancel",
+        "member": "Member",
+        "noMembers": "No other members in this workspace yet.",
+        "ownerImplicit": "As the workspace owner, you always have every permission for an enabled module."
       }
     }
   },
@@ -1241,7 +1257,11 @@
       "confirmDisable2fa": "Really remove?",
       "passkeysSection": "Passkeys",
       "removePasskey": "Remove",
-      "confirmRemovePasskey": "Really remove?"
+      "confirmRemovePasskey": "Really remove?",
+      "moduleAccess": "Module access",
+      "moduleAccessTitle": "Module access for {{email}}",
+      "noModules": "No modules are installed on this server yet.",
+      "workspaceColumn": "Workspace"
     },
     "sessions": {
       "empty": "No active sessions.",

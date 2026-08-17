@@ -130,6 +130,13 @@ import type {
   VersionCheckResult,
   AutoUpdateSettings,
   UpdateRun,
+  ModuleSummary,
+  ModuleDescriptor,
+  ModulePermissionsGrid,
+  SetModulePermissionInput,
+  DisableModuleInput,
+  ModuleInstanceGrant,
+  GrantModuleAccessInput,
 } from "@notorious/shared";
 import type {
   PublicKeyCredentialCreationOptionsJSON,
@@ -559,6 +566,18 @@ export const apiKeyApi = {
   revoke: (id: string) => apiRequest<void>(`/api/v1/api-keys/${id}`, { method: "DELETE" }),
 };
 
+export const moduleApi = {
+  list: (workspaceId: string) => apiRequest<ModuleSummary[]>(`/api/v1/workspaces/${workspaceId}/modules`),
+  enable: (workspaceId: string, moduleId: string) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/${moduleId}/enable`, { method: "POST" }),
+  disable: (workspaceId: string, moduleId: string, input: DisableModuleInput) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/${moduleId}/disable`, { method: "POST", body: input }),
+  permissions: (workspaceId: string, moduleId: string) =>
+    apiRequest<ModulePermissionsGrid>(`/api/v1/workspaces/${workspaceId}/modules/${moduleId}/permissions`),
+  setPermission: (workspaceId: string, moduleId: string, input: SetModulePermissionInput) =>
+    apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/${moduleId}/permissions`, { method: "PUT", body: input }),
+};
+
 export const webhookApi = {
   list: (workspaceId: string) => apiRequest<Webhook[]>(`/api/v1/workspaces/${workspaceId}/webhooks`),
   create: (workspaceId: string, input: CreateWebhookInput) =>
@@ -702,6 +721,13 @@ export const adminApi = {
   listFailedLogins: (filter: "known" | "unknown") => apiRequest<AdminFailedLogin[]>("/api/v1/admin/failed-logins", { query: { filter } }),
 
   auditLog: () => apiRequest<AdminAuditEntry[]>("/api/v1/admin/audit-log"),
+
+  listModules: () => apiRequest<ModuleDescriptor[]>("/api/v1/admin/modules"),
+  listUserModuleGrants: (userId: string) =>
+    apiRequest<{ grants: ModuleInstanceGrant[]; ownedWorkspaces: { id: string; name: string }[] }>(`/api/v1/admin/users/${userId}/module-grants`),
+  grantModuleAccess: (input: GrantModuleAccessInput) =>
+    apiRequest<ModuleInstanceGrant>("/api/v1/admin/module-grants", { method: "POST", body: input }),
+  revokeModuleAccess: (id: string) => apiRequest<void>(`/api/v1/admin/module-grants/${id}`, { method: "DELETE" }),
 
   versionCheck: () => apiRequest<VersionCheckResult>("/api/v1/admin/version-check"),
   /** Whether `streamUpdate` needs a `sudoPassword` - see AdminUpdateTab.tsx. */

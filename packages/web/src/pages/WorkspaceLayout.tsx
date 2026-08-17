@@ -24,6 +24,7 @@ import { PushNotificationBanner } from "../components/nav/PushNotificationBanner
 import { RecentNavSection } from "../components/nav/RecentNavSection.js";
 import { RecentlyEditedNavSection } from "../components/nav/RecentlyEditedNavSection.js";
 import { ObjectTypeMenu } from "../components/nav/ObjectTypeMenu.js";
+import { ModulesNav } from "../components/nav/ModulesNav.js";
 import { NotificationBell } from "../components/nav/NotificationBell.js";
 import { AdminNotificationBell } from "../components/nav/AdminNotificationBell.js";
 import { MobileTopBar } from "../components/nav/MobileTopBar.js";
@@ -206,6 +207,8 @@ function WorkspaceLayoutInner() {
             </NavLink>
           )}
           <ObjectTypeMenu workspaceId={workspaceId!} />
+          {/* Desktop-only for now (see CLAUDE.md's module-system design notes) - modules aren't reachable via a share link either, same reasoning as RecentlyEditedNavSection below. */}
+          {breakpoint === "desktop" && !shareToken && <ModulesNav workspaceId={workspaceId!} />}
           <NavLink to={`/w/${workspaceId}/search`} className={({ isActive }) => navLinkClass(isActive)}>
             <Icon name="search" className="h-4 w-4" /> {t("nav.search")}
           </NavLink>

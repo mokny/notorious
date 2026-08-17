@@ -1092,6 +1092,87 @@ export const feedItems = sqliteTable(
   ],
 );
 
+// Instance-admin-granted permission for one (module, user, workspace) combo -
+// see modules/moduleRegistry/. A user can only enable/use a module for a
+// specific workspace once a server admin has explicitly allowed that exact
+// combination here; there's no global "this user may use this module
+// anywhere" shortcut - see modules/admin/moduleGrants.ts.
+export const moduleInstanceGrants = sqliteTable(
+  "module_instance_grants",
+  {
+    id: text("id").primaryKey(),
+    moduleId: text("module_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    grantedBy: text("granted_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.moduleId, table.userId, table.workspaceId)],
+);
+
+// Whether a module is switched on for a workspace - see
+// modules/moduleRegistry/access.ts's `requireModuleAccess`. Requires a
+// matching `moduleInstanceGrants` row for the enabling owner before it can be
+// created (enforced in service.ts, not at the SQL level).
+export const workspaceModules = sqliteTable(
+  "workspace_modules",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    moduleId: text("module_id").notNull(),
+    enabledBy: text("enabled_by")
+      .notNull()
+      .references(() => users.id),
+    enabledAt: text("enabled_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.moduleId] })],
+);
+
+// One row per (module, member) permission string granted by the workspace
+// owner - see modules/moduleRegistry/service.ts. The owner themselves never
+// needs a row here (implicitly holds every permission a module declares,
+// checked directly in `requireModuleAccess`).
+export const workspaceModulePermissions = sqliteTable(
+  "workspace_module_permissions",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    moduleId: text("module_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    permission: text("permission").notNull(),
+    grantedBy: text("granted_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.workspaceId, table.moduleId, table.userId, table.permission] })],
+);
+
+// Tracks which of a module's own migrations/*.sql files have run - separate
+// from the core `_migrations` table (see db/migrate.ts) so a module can ship
+// and version its own schema independently of the core migration sequence.
+// Runs at boot for every module found on disk, regardless of whether any
+// workspace has actually enabled it yet - see modules/moduleRegistry/loader.ts.
+export const moduleMigrations = sqliteTable(
+  "module_migrations",
+  {
+    moduleId: text("module_id").notNull(),
+    filename: text("filename").notNull(),
+    appliedAt: text("applied_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.moduleId, table.filename] })],
+);
+
 export const messageReadReceipts = sqliteTable(
   "message_read_receipts",
   {

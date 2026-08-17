@@ -16,6 +16,7 @@ export function AdminUsersTab() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
+  const [moduleGrantsTarget, setModuleGrantsTarget] = useState<AdminUser | null>(null);
 
   function invalidate() {
     return queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
@@ -64,6 +65,9 @@ export function AdminUsersTab() {
                   {t("admin.users.promote")}
                 </Button>
               )}
+              <Button variant="secondary" onClick={() => setModuleGrantsTarget(user)}>
+                <Icon name="puzzle" className="h-4 w-4" /> {t("admin.users.moduleAccess")}
+              </Button>
               {user.id !== me?.id && (
                 <Button variant="secondary" onClick={() => setEditTarget(user)}>
                   <Icon name="pencil" className="h-4 w-4" /> {t("admin.users.edit")}
@@ -84,7 +88,93 @@ export function AdminUsersTab() {
       {createOpen && <CreateUserModal onClose={() => setCreateOpen(false)} onCreated={invalidate} />}
       {deleteTarget && <DeleteUserModal user={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={invalidate} />}
       {editTarget && <EditUserModal user={editTarget} onClose={() => setEditTarget(null)} onUpdated={invalidate} />}
+      {moduleGrantsTarget && <ModuleGrantsModal user={moduleGrantsTarget} onClose={() => setModuleGrantsTarget(null)} />}
     </div>
+  );
+}
+
+/**
+ * Lets a server admin pick which modules `user` may enable, per workspace
+ * they own - only ever a workspace they own (a module can only be enabled by
+ * its owner, see moduleRegistry/service.ts's `enableModule`), so there's no
+ * "all workspaces on the instance" picker here, just this user's own list -
+ * same reuse of the owned-workspaces lookup as `DeleteUserModal`'s preview.
+ */
+function ModuleGrantsModal({ user, onClose }: { user: AdminUser; onClose: () => void }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const modulesQuery = useQuery({ queryKey: ["admin", "modules"], queryFn: adminApi.listModules });
+  const grantsQueryKey = ["admin", "module-grants", user.id];
+  const grantsQuery = useQuery({ queryKey: grantsQueryKey, queryFn: () => adminApi.listUserModuleGrants(user.id) });
+
+  const grantMutation = useMutation({
+    mutationFn: (vars: { moduleId: string; workspaceId: string }) => adminApi.grantModuleAccess({ ...vars, userId: user.id }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: grantsQueryKey }),
+  });
+  const revokeMutation = useMutation({
+    mutationFn: (grantId: string) => adminApi.revokeModuleAccess(grantId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: grantsQueryKey }),
+  });
+
+  const modules = modulesQuery.data ?? [];
+  const ownedWorkspaces = grantsQuery.data?.ownedWorkspaces ?? [];
+  const grants = grantsQuery.data?.grants ?? [];
+
+  return (
+    <Modal
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={t("admin.users.moduleAccessTitle", { email: user.email })}
+      footer={
+        <Button variant="secondary" onClick={onClose}>
+          {t("admin.done")}
+        </Button>
+      }
+    >
+      {modules.length === 0 ? (
+        <p className="text-sm text-ink-muted">{t("admin.users.noModules")}</p>
+      ) : ownedWorkspaces.length === 0 ? (
+        <p className="text-sm text-ink-muted">{t("admin.users.ownsNoWorkspaces")}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="p-2 font-medium">{t("admin.users.workspaceColumn")}</th>
+                {modules.map((module) => (
+                  <th key={module.id} className="p-2 font-medium">
+                    {module.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ownedWorkspaces.map((workspace) => (
+                <tr key={workspace.id} className="border-b border-border last:border-0">
+                  <td className="p-2 font-medium">{workspace.name}</td>
+                  {modules.map((module) => {
+                    const existing = grants.find((g) => g.moduleId === module.id && g.workspaceId === workspace.id);
+                    return (
+                      <td key={module.id} className="p-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(existing)}
+                          disabled={grantMutation.isPending || revokeMutation.isPending}
+                          onChange={(e) => {
+                            if (e.target.checked) grantMutation.mutate({ moduleId: module.id, workspaceId: workspace.id });
+                            else if (existing) revokeMutation.mutate(existing.id);
+                          }}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
   );
 }
 
