@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Modal } from "../../../../packages/web/src/components/ui/Modal.js";
 import { formatCents } from "@notorious/shared";
@@ -45,6 +45,7 @@ function useWakeLock(enabled: boolean): void {
 /** Kassen-Terminal: Kategorie-Kacheln, Produkt-Grid, Warenkorb, Kassieren - touch-optimiert für ein Tablet am Verkaufsstand. Erfordert eine offene Kassenschicht (siehe web/pages/PosShiftPage.tsx). NICHT KassenSichV-konform (siehe services/pos.ts). */
 function PosTerminalPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -67,28 +68,30 @@ function PosTerminalPage() {
   const [changeCents, setChangeCents] = useState<number | null>(null);
   const [cashTenderOpen, setCashTenderOpen] = useState(false);
   const [tenderedCents, setTenderedCents] = useState(0);
-  // Own state, not derived from `document.fullscreenElement`: iPadOS Safari
-  // doesn't support the Fullscreen API for ordinary elements (only
-  // <video>), so `requestFullscreen()` silently does nothing there. This
-  // CSS-only "cover the whole viewport" mode works on every device
-  // regardless, and also hides this app's own sidebar/top bar (they're
-  // simply painted over, not just this page's own content) since it's a
-  // fixed-position overlay above everything else in the DOM. The native
-  // Fullscreen API is still attempted as a bonus on browsers that do
-  // support it (desktop/Android Chrome etc. also hide the browser chrome).
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  function toggleFullscreen() {
-    const enteringFullscreen = !isFullscreen;
-    setIsFullscreen(enteringFullscreen);
-
-    if (enteringFullscreen) {
-      if (containerRef.current && typeof containerRef.current.requestFullscreen === "function") {
-        void containerRef.current.requestFullscreen().catch(() => {});
-      }
-    } else if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => {});
+  // The terminal always renders as a CSS-only fixed overlay covering the
+  // whole viewport, no toggle: iPadOS Safari doesn't support the
+  // Fullscreen API for ordinary elements (only <video>), so
+  // `requestFullscreen()` silently does nothing there - this fixed overlay
+  // works on every device regardless, and also hides this app's own
+  // sidebar/top bar (painted over, not just this page's own content) since
+  // it's positioned above everything else in the DOM. "Kasse beenden"
+  // (see `exitTerminal` below) is the only way out, back to the cash book.
+  useEffect(() => {
+    // Best-effort bonus on browsers that do support element fullscreen
+    // (desktop/Android Chrome etc. - also hides the actual browser chrome,
+    // not just this app's own nav). Requesting it automatically on mount
+    // without a user gesture is commonly blocked by browsers, so this can
+    // silently no-op; the CSS overlay above is what actually guarantees
+    // the fullscreen look everywhere, including iPad.
+    if (containerRef.current && typeof containerRef.current.requestFullscreen === "function") {
+      void containerRef.current.requestFullscreen().catch(() => {});
     }
+  }, []);
+
+  /** "Beenden" leaves the terminal entirely, back to the cash book - the terminal has no other purpose once you're not actively selling. */
+  function exitTerminal() {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    navigate(`/w/${workspaceId}/modules/faktura/kassenbuch`);
   }
 
   function addToCart(product: ProductListItemDto) {
@@ -155,18 +158,11 @@ function PosTerminalPage() {
   const receiptPdfUrl = receiptDocumentId ? `/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${receiptDocumentId}/pdf` : null;
 
   return (
-    <div
-      ref={containerRef}
-      className={
-        isFullscreen
-          ? "fixed inset-0 z-50 flex h-[100dvh] w-screen gap-4 overflow-y-auto bg-surface px-4 py-4"
-          : "flex h-[calc(100vh-4rem)] gap-4 bg-surface px-4 py-4"
-      }
-    >
+    <div ref={containerRef} className="fixed inset-0 z-50 flex h-[100dvh] w-screen gap-4 overflow-y-auto bg-surface px-4 py-4">
       <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="mb-2 flex justify-end">
-          <button type="button" onClick={toggleFullscreen} className="rounded-md border border-border px-3 py-1.5 text-sm">
-            {isFullscreen ? "Vollbild beenden" : "Vollbild"}
+          <button type="button" onClick={exitTerminal} className="rounded-md border border-border px-3 py-1.5 text-sm">
+            Kasse beenden
           </button>
         </div>
         <PosProductGrid products={products ?? []} onAdd={addToCart} />

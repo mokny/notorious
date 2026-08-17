@@ -30,15 +30,15 @@ export function PosProductGrid(props: { products: ProductListItemDto[]; onAdd: (
           </button>
         ))}
       </div>
-      <div className="mt-3 grid flex-1 grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-4">
+      <div className="mt-3 grid flex-1 grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2 overflow-y-auto content-start">
         {visibleProducts.map((product) => (
           <button
             key={product.id}
             type="button"
             onClick={() => props.onAdd(product)}
-            className="flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-surface p-4 text-center active:bg-surface-hover"
+            className="flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border border-border bg-surface p-2 text-center active:bg-surface-hover"
           >
-            <span className="text-sm font-medium">{product.name}</span>
+            <span className="line-clamp-2 text-xs font-medium leading-tight">{product.name}</span>
             <span className="text-xs text-ink-muted">{formatCents(product.basePriceCents)}</span>
           </button>
         ))}
