@@ -53,7 +53,7 @@ const SKR04_SEED: SeedAccount[] = [
   { code: "6805", name: "Bürobedarf", type: "expense" },
   { code: "6663", name: "Reisekosten Unternehmer", type: "expense" },
   { code: "6600", name: "Werbekosten", type: "expense" },
-  { code: "6805", name: "Porto", type: "expense" },
+  { code: "6800", name: "Porto", type: "expense" },
   { code: "6815", name: "Telefon", type: "expense" },
   { code: "6825", name: "Internetkosten", type: "expense" },
   { code: "6520", name: "Versicherungen", type: "expense" },
