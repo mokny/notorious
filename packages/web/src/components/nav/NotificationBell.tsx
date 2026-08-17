@@ -122,10 +122,19 @@ export function NotificationBell({ workspaceId }: { workspaceId: string }) {
                     <div className="flex items-center gap-1.5">
                       {!notification.readAt && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
                       <span className="truncate font-medium text-ink">
-                        {t(notificationTitleKey(notification.source), { actor: notification.actorName, title: notification.objectTitle })}
+                        {/* A subscription notification's `body` is already the fully-composed
+                            sentence (translated server-side, count-aware - see
+                            modules/subscriptions/service.ts's `deliverPendingSubscriptionNotification`),
+                            unlike comment/mention notifications, whose `body` is just a content
+                            preview meant to sit under a client-templated title line below. */}
+                        {notification.source === "subscription"
+                          ? notification.body
+                          : t(notificationTitleKey(notification.source), { actor: notification.actorName, title: notification.objectTitle })}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-ink-muted">{notification.body}</p>
+                    <p className="mt-0.5 truncate text-xs text-ink-muted">
+                      {notification.source === "subscription" ? notification.objectTitle : notification.body}
+                    </p>
                     <p className="mt-0.5 text-xs text-ink-muted">{new Date(notification.createdAt).toLocaleString()}</p>
                   </button>
                 </li>
