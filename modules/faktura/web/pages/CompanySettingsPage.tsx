@@ -20,6 +20,14 @@ const EMPTY_FORM: UpdateCompanySettingsInput = {
   orderNumberPrefix: "AB",
   invoiceNumberPrefix: "RE",
   creditNoteNumberPrefix: "GS",
+  dunningNumberPrefix: "MA",
+  dunningLevel1Days: 7,
+  dunningLevel2Days: 14,
+  dunningLevel3Days: 28,
+  dunningLevel1FeeCents: 0,
+  dunningLevel2FeeCents: 500,
+  dunningLevel3FeeCents: 1000,
+  dunningInterestRatePercent: 9.89,
 };
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
@@ -58,6 +66,14 @@ function CompanySettingsPage() {
         orderNumberPrefix: data.orderNumberPrefix,
         invoiceNumberPrefix: data.invoiceNumberPrefix,
         creditNoteNumberPrefix: data.creditNoteNumberPrefix,
+        dunningNumberPrefix: data.dunningNumberPrefix,
+        dunningLevel1Days: data.dunningLevel1Days,
+        dunningLevel2Days: data.dunningLevel2Days,
+        dunningLevel3Days: data.dunningLevel3Days,
+        dunningLevel1FeeCents: data.dunningLevel1FeeCents,
+        dunningLevel2FeeCents: data.dunningLevel2FeeCents,
+        dunningLevel3FeeCents: data.dunningLevel3FeeCents,
+        dunningInterestRatePercent: data.dunningInterestRatePercent,
       });
     }
   }, [data]);
@@ -182,6 +198,94 @@ function CompanySettingsPage() {
               onChange={(e) => field("defaultPaymentTermsDays", Number(e.target.value))}
             />
           </label>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink">Mahnwesen</h2>
+          <div className="grid grid-cols-4 gap-3">
+            <label className={labelClass}>
+              <span className={labelTextClass}>Mahnung-Präfix</span>
+              <input className={inputClass} value={form.dunningNumberPrefix} onChange={(e) => field("dunningNumberPrefix", e.target.value)} />
+            </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Verzugszins (%)</span>
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                className={inputClass}
+                value={form.dunningInterestRatePercent}
+                onChange={(e) => field("dunningInterestRatePercent", Number(e.target.value))}
+              />
+            </label>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <label className={labelClass}>
+              <span className={labelTextClass}>Stufe 1: Tage überfällig</span>
+              <input
+                type="number"
+                min={1}
+                className={inputClass}
+                value={form.dunningLevel1Days}
+                onChange={(e) => field("dunningLevel1Days", Number(e.target.value))}
+              />
+            </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Stufe 2: Tage überfällig</span>
+              <input
+                type="number"
+                min={1}
+                className={inputClass}
+                value={form.dunningLevel2Days}
+                onChange={(e) => field("dunningLevel2Days", Number(e.target.value))}
+              />
+            </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Stufe 3: Tage überfällig</span>
+              <input
+                type="number"
+                min={1}
+                className={inputClass}
+                value={form.dunningLevel3Days}
+                onChange={(e) => field("dunningLevel3Days", Number(e.target.value))}
+              />
+            </label>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <label className={labelClass}>
+              <span className={labelTextClass}>Gebühr Stufe 1 (€)</span>
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                className={inputClass}
+                value={(form.dunningLevel1FeeCents / 100).toFixed(2)}
+                onChange={(e) => field("dunningLevel1FeeCents", Math.round(Number(e.target.value) * 100))}
+              />
+            </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Gebühr Stufe 2 (€)</span>
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                className={inputClass}
+                value={(form.dunningLevel2FeeCents / 100).toFixed(2)}
+                onChange={(e) => field("dunningLevel2FeeCents", Math.round(Number(e.target.value) * 100))}
+              />
+            </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Gebühr Stufe 3 (€)</span>
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                className={inputClass}
+                value={(form.dunningLevel3FeeCents / 100).toFixed(2)}
+                onChange={(e) => field("dunningLevel3FeeCents", Math.round(Number(e.target.value) * 100))}
+              />
+            </label>
+          </div>
         </section>
 
         <div className="flex items-center gap-3">

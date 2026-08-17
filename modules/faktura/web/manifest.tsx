@@ -8,6 +8,8 @@ import { SuppliersListPage } from "./pages/SuppliersListPage.js";
 import { SupplierDetailPage } from "./pages/SupplierDetailPage.js";
 import { DocumentsListPage } from "./pages/DocumentsListPage.js";
 import { DocumentDetailPage } from "./pages/DocumentDetailPage.js";
+import { DunningListPage } from "./pages/DunningListPage.js";
+import { DunningDetailPage } from "./pages/DunningDetailPage.js";
 
 /**
  * Faktura - German invoicing/accounting module, Phase 1. Nav sub-items and
@@ -24,6 +26,7 @@ const manifest: ModuleWebManifest = {
     { label: "Kunden", path: "kunden" },
     { label: "Produkte", path: "produkte" },
     { label: "Belege", path: "belege" },
+    { label: "Mahnungen", path: "mahnungen" },
     { label: "Lieferanten", path: "lieferanten" },
     { label: "Einstellungen", path: "einstellungen" },
   ],
@@ -37,6 +40,8 @@ const manifest: ModuleWebManifest = {
     { path: "lieferanten/:id", element: <SupplierDetailPage /> },
     { path: "belege", element: <DocumentsListPage /> },
     { path: "belege/:id", element: <DocumentDetailPage /> },
+    { path: "mahnungen", element: <DunningListPage /> },
+    { path: "mahnungen/:id", element: <DunningDetailPage /> },
   ],
 };
 

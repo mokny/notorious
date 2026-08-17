@@ -19,6 +19,14 @@ export interface FakturaCompanySettingsRow {
   order_number_prefix: string;
   invoice_number_prefix: string;
   credit_note_number_prefix: string;
+  dunning_number_prefix: string;
+  dunning_level_1_days: number;
+  dunning_level_2_days: number;
+  dunning_level_3_days: number;
+  dunning_level_1_fee_cents: number;
+  dunning_level_2_fee_cents: number;
+  dunning_level_3_fee_cents: number;
+  dunning_interest_rate_percent: number;
   updated_at: string;
 }
 
@@ -187,9 +195,10 @@ export interface FakturaDocumentTaxBreakdownRow {
   tax_total_cents: number;
 }
 
+/** `document_type` also holds the literal `"dunning"` for the Mahnung numbering sequence (see services/dunning.ts) - the column itself has no CHECK constraint tying it to the four sales-document types. */
 export interface FakturaNumberSequenceRow {
   workspace_id: string;
-  document_type: FakturaDocumentType;
+  document_type: FakturaDocumentType | "dunning";
   year: number;
   next_number: number;
 }
@@ -219,4 +228,40 @@ export interface FakturaAuditLogRow {
   summary: string;
   diff_json: string | null;
   created_at: string;
+}
+
+export type FakturaPaymentMethod = "bank_transfer" | "cash" | "direct_debit" | "other";
+
+export interface FakturaPaymentRow {
+  id: string;
+  workspace_id: string;
+  invoice_id: string;
+  amount_cents: number;
+  paid_at: string;
+  method: FakturaPaymentMethod;
+  reference: string;
+  notes: string;
+  created_by: string;
+  created_at: string;
+}
+
+export type FakturaDunningStatus = "draft" | "sent";
+
+export interface FakturaDunningLetterRow {
+  id: string;
+  workspace_id: string;
+  invoice_id: string;
+  level: 1 | 2 | 3;
+  status: FakturaDunningStatus;
+  number: string | null;
+  open_amount_cents: number;
+  fee_cents: number;
+  interest_cents: number;
+  total_due_cents: number;
+  days_overdue: number;
+  issue_date: string | null;
+  pdf_storage_path: string | null;
+  created_by: string;
+  created_at: string;
+  sent_at: string | null;
 }

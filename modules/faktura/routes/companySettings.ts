@@ -41,6 +41,14 @@ export function registerCompanySettingsRoutes(app: FastifyInstance, sdk: ModuleS
       orderNumberPrefix: body.orderNumberPrefix ?? "AB",
       invoiceNumberPrefix: body.invoiceNumberPrefix ?? "RE",
       creditNoteNumberPrefix: body.creditNoteNumberPrefix ?? "GS",
+      dunningNumberPrefix: body.dunningNumberPrefix ?? "MA",
+      dunningLevel1Days: body.dunningLevel1Days ?? 7,
+      dunningLevel2Days: body.dunningLevel2Days ?? 14,
+      dunningLevel3Days: body.dunningLevel3Days ?? 28,
+      dunningLevel1FeeCents: body.dunningLevel1FeeCents ?? 0,
+      dunningLevel2FeeCents: body.dunningLevel2FeeCents ?? 500,
+      dunningLevel3FeeCents: body.dunningLevel3FeeCents ?? 1000,
+      dunningInterestRatePercent: body.dunningInterestRatePercent ?? 9.89,
     };
 
     const dto = upsertCompanySettings(sdk, workspaceId, input);

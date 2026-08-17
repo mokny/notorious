@@ -19,6 +19,14 @@ export interface CompanySettingsDto {
   orderNumberPrefix: string;
   invoiceNumberPrefix: string;
   creditNoteNumberPrefix: string;
+  dunningNumberPrefix: string;
+  dunningLevel1Days: number;
+  dunningLevel2Days: number;
+  dunningLevel3Days: number;
+  dunningLevel1FeeCents: number;
+  dunningLevel2FeeCents: number;
+  dunningLevel3FeeCents: number;
+  dunningInterestRatePercent: number;
   updatedAt: string | null;
 }
 
@@ -40,6 +48,14 @@ const DEFAULTS: Omit<CompanySettingsDto, "updatedAt"> = {
   orderNumberPrefix: "AB",
   invoiceNumberPrefix: "RE",
   creditNoteNumberPrefix: "GS",
+  dunningNumberPrefix: "MA",
+  dunningLevel1Days: 7,
+  dunningLevel2Days: 14,
+  dunningLevel3Days: 28,
+  dunningLevel1FeeCents: 0,
+  dunningLevel2FeeCents: 500,
+  dunningLevel3FeeCents: 1000,
+  dunningInterestRatePercent: 9.89,
 };
 
 function toDto(row: FakturaCompanySettingsRow): CompanySettingsDto {
@@ -61,6 +77,14 @@ function toDto(row: FakturaCompanySettingsRow): CompanySettingsDto {
     orderNumberPrefix: row.order_number_prefix,
     invoiceNumberPrefix: row.invoice_number_prefix,
     creditNoteNumberPrefix: row.credit_note_number_prefix,
+    dunningNumberPrefix: row.dunning_number_prefix,
+    dunningLevel1Days: row.dunning_level_1_days,
+    dunningLevel2Days: row.dunning_level_2_days,
+    dunningLevel3Days: row.dunning_level_3_days,
+    dunningLevel1FeeCents: row.dunning_level_1_fee_cents,
+    dunningLevel2FeeCents: row.dunning_level_2_fee_cents,
+    dunningLevel3FeeCents: row.dunning_level_3_fee_cents,
+    dunningInterestRatePercent: row.dunning_interest_rate_percent,
     updatedAt: row.updated_at,
   };
 }
@@ -100,6 +124,47 @@ export function getNumberPrefixes(
   };
 }
 
+/** Reads the dunning-relevant fields other services need without pulling in the whole DTO. */
+export function getDunningSettings(
+  sdk: ModuleSdk,
+  workspaceId: string,
+): {
+  numberPrefix: string;
+  levelDays: [number, number, number];
+  levelFeeCents: [number, number, number];
+  interestRatePercent: number;
+} {
+  const row = sdk.sqlite
+    .prepare(
+      `SELECT dunning_number_prefix, dunning_level_1_days, dunning_level_2_days, dunning_level_3_days,
+              dunning_level_1_fee_cents, dunning_level_2_fee_cents, dunning_level_3_fee_cents, dunning_interest_rate_percent
+       FROM faktura_company_settings WHERE workspace_id = ?`,
+    )
+    .get(workspaceId) as
+    | Pick<
+        FakturaCompanySettingsRow,
+        | "dunning_number_prefix"
+        | "dunning_level_1_days"
+        | "dunning_level_2_days"
+        | "dunning_level_3_days"
+        | "dunning_level_1_fee_cents"
+        | "dunning_level_2_fee_cents"
+        | "dunning_level_3_fee_cents"
+        | "dunning_interest_rate_percent"
+      >
+    | undefined;
+  return {
+    numberPrefix: row?.dunning_number_prefix ?? DEFAULTS.dunningNumberPrefix,
+    levelDays: [row?.dunning_level_1_days ?? DEFAULTS.dunningLevel1Days, row?.dunning_level_2_days ?? DEFAULTS.dunningLevel2Days, row?.dunning_level_3_days ?? DEFAULTS.dunningLevel3Days],
+    levelFeeCents: [
+      row?.dunning_level_1_fee_cents ?? DEFAULTS.dunningLevel1FeeCents,
+      row?.dunning_level_2_fee_cents ?? DEFAULTS.dunningLevel2FeeCents,
+      row?.dunning_level_3_fee_cents ?? DEFAULTS.dunningLevel3FeeCents,
+    ],
+    interestRatePercent: row?.dunning_interest_rate_percent ?? DEFAULTS.dunningInterestRatePercent,
+  };
+}
+
 export interface UpdateCompanySettingsInput {
   legalName: string;
   street: string;
@@ -117,6 +182,14 @@ export interface UpdateCompanySettingsInput {
   orderNumberPrefix: string;
   invoiceNumberPrefix: string;
   creditNoteNumberPrefix: string;
+  dunningNumberPrefix: string;
+  dunningLevel1Days: number;
+  dunningLevel2Days: number;
+  dunningLevel3Days: number;
+  dunningLevel1FeeCents: number;
+  dunningLevel2FeeCents: number;
+  dunningLevel3FeeCents: number;
+  dunningInterestRatePercent: number;
 }
 
 export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input: UpdateCompanySettingsInput): CompanySettingsDto {
@@ -127,8 +200,10 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
          workspace_id, legal_name, street, postal_code, city, country, tax_number, vat_id,
          is_kleinunternehmer, bank_name, iban, bic, default_payment_terms_days,
          quote_number_prefix, order_number_prefix, invoice_number_prefix, credit_note_number_prefix,
+         dunning_number_prefix, dunning_level_1_days, dunning_level_2_days, dunning_level_3_days,
+         dunning_level_1_fee_cents, dunning_level_2_fee_cents, dunning_level_3_fee_cents, dunning_interest_rate_percent,
          updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(workspace_id) DO UPDATE SET
          legal_name = excluded.legal_name,
          street = excluded.street,
@@ -146,6 +221,14 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
          order_number_prefix = excluded.order_number_prefix,
          invoice_number_prefix = excluded.invoice_number_prefix,
          credit_note_number_prefix = excluded.credit_note_number_prefix,
+         dunning_number_prefix = excluded.dunning_number_prefix,
+         dunning_level_1_days = excluded.dunning_level_1_days,
+         dunning_level_2_days = excluded.dunning_level_2_days,
+         dunning_level_3_days = excluded.dunning_level_3_days,
+         dunning_level_1_fee_cents = excluded.dunning_level_1_fee_cents,
+         dunning_level_2_fee_cents = excluded.dunning_level_2_fee_cents,
+         dunning_level_3_fee_cents = excluded.dunning_level_3_fee_cents,
+         dunning_interest_rate_percent = excluded.dunning_interest_rate_percent,
          updated_at = excluded.updated_at`,
     )
     .run(
@@ -166,6 +249,14 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
       input.orderNumberPrefix.trim() || DEFAULTS.orderNumberPrefix,
       input.invoiceNumberPrefix.trim() || DEFAULTS.invoiceNumberPrefix,
       input.creditNoteNumberPrefix.trim() || DEFAULTS.creditNoteNumberPrefix,
+      input.dunningNumberPrefix.trim() || DEFAULTS.dunningNumberPrefix,
+      input.dunningLevel1Days,
+      input.dunningLevel2Days,
+      input.dunningLevel3Days,
+      input.dunningLevel1FeeCents,
+      input.dunningLevel2FeeCents,
+      input.dunningLevel3FeeCents,
+      input.dunningInterestRatePercent,
       updatedAt,
     );
   return getCompanySettings(sdk, workspaceId);

@@ -56,6 +56,13 @@ export default defineConfig({
         // server out of heap. It still loads fine on demand from the network.
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         globIgnores: ["**/vendor-diagrams-*.js", "**/vendor-whiteboard-*.js", "**/vendor-canvas-shared-*.js"],
+        // Default is 2 MiB; the main app-shell chunk (index-*.js) crossed that
+        // as feature modules like Faktura got statically bundled into it (see
+        // modules/registry.ts - no code-splitting per module yet). Raised
+        // rather than excluding it from precache, since it's the actual app
+        // shell a PWA install needs offline, not a big-and-optional bundle
+        // like vendor-diagrams/vendor-whiteboard above.
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
       strategies: "injectManifest",
       srcDir: "src",

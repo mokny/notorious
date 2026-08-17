@@ -6,6 +6,7 @@ import { fakturaApi, type DocumentType, type DocumentInput } from "../api.js";
 import { DocumentLineEditor, emptyLine, lineFormToInput, type LineForm } from "../components/DocumentLineEditor.js";
 import { TaxBreakdownTable } from "../components/TaxBreakdownTable.js";
 import { AttachmentsPanel } from "../components/AttachmentsPanel.js";
+import { PaymentsPanel } from "../components/PaymentsPanel.js";
 
 const typeLabel: Record<DocumentType, string> = { quote: "Angebot", order: "Auftrag", invoice: "Rechnung", credit_note: "Gutschrift" };
 const nextType: Partial<Record<DocumentType, DocumentType>> = { quote: "order", order: "invoice", invoice: "credit_note" };
@@ -290,7 +291,40 @@ function DocumentDetailPage() {
       </form>
 
       {!isNew && type === "order" && <AttachmentsPanel workspaceId={workspaceId!} entityType="order" entityId={id!} />}
+      {document && document.type === "invoice" && document.status === "issued" && (
+        <PaymentsPanel workspaceId={workspaceId!} invoiceId={document.id} />
+      )}
+      {document && document.type === "invoice" && document.status === "issued" && (
+        <DunningLettersForInvoice workspaceId={workspaceId!} invoiceId={document.id} />
+      )}
     </div>
+  );
+}
+
+const dunningLevelLabel: Record<number, string> = { 1: "Zahlungserinnerung", 2: "1. Mahnung", 3: "2. Mahnung" };
+
+/** Kompakte Mahnungs-Übersicht auf der Rechnungsseite - verlinkt in die volle Mahnwesen-Ansicht (siehe DunningListPage.tsx) zum Erstellen neuer Mahnungen. */
+function DunningLettersForInvoice(props: { workspaceId: string; invoiceId: string }) {
+  const { data: letters } = useQuery({
+    queryKey: ["module-faktura-dunning-letters-for-invoice", props.workspaceId, props.invoiceId],
+    queryFn: () => fakturaApi.dunning.listForInvoice(props.workspaceId, props.invoiceId),
+  });
+
+  if (!letters || letters.length === 0) return null;
+
+  return (
+    <section className="space-y-1">
+      <h2 className="text-sm font-semibold text-ink">Mahnungen</h2>
+      <ul className="space-y-1 text-xs">
+        {letters.map((letter) => (
+          <li key={letter.id}>
+            <Link className="underline" to={`/w/${props.workspaceId}/modules/faktura/mahnungen/${letter.id}`}>
+              {dunningLevelLabel[letter.level]} {letter.number ?? "(Entwurf)"} - {letter.status === "sent" ? "versendet" : "Entwurf"}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

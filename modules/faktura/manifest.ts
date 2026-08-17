@@ -7,6 +7,9 @@ import { registerSupplierRoutes } from "./routes/suppliers.js";
 import { registerDocumentRoutes } from "./routes/documents.js";
 import { registerDocumentPdfRoutes } from "./routes/documentPdf.js";
 import { registerAttachmentRoutes } from "./routes/attachments.js";
+import { registerPaymentRoutes } from "./routes/payments.js";
+import { registerDunningRoutes } from "./routes/dunning.js";
+import { registerDunningPdfRoutes } from "./routes/dunningPdf.js";
 
 /**
  * Structural copy of `packages/server/src/modules/moduleRegistry/sdk.ts`'s
@@ -74,11 +77,16 @@ const manifest = {
     registerDocumentRoutes(app, sdk);
     registerDocumentPdfRoutes(app, sdk);
     registerAttachmentRoutes(app, sdk);
+    registerPaymentRoutes(app, sdk);
+    registerDunningRoutes(app, sdk);
+    registerDunningPdfRoutes(app, sdk);
   },
 
   async purge(workspaceId: string, sdk: ModuleSdk): Promise<void> {
     const tx = sdk.sqlite.transaction((wsId: string) => {
       sdk.sqlite.prepare("DELETE FROM faktura_audit_log WHERE workspace_id = ?").run(wsId);
+      sdk.sqlite.prepare("DELETE FROM faktura_dunning_letters WHERE workspace_id = ?").run(wsId);
+      sdk.sqlite.prepare("DELETE FROM faktura_payments WHERE workspace_id = ?").run(wsId);
       sdk.sqlite.prepare("DELETE FROM faktura_attachments WHERE workspace_id = ?").run(wsId);
       sdk.sqlite
         .prepare(

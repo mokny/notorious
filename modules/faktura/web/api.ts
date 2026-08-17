@@ -18,6 +18,14 @@ export interface CompanySettingsDto {
   orderNumberPrefix: string;
   invoiceNumberPrefix: string;
   creditNoteNumberPrefix: string;
+  dunningNumberPrefix: string;
+  dunningLevel1Days: number;
+  dunningLevel2Days: number;
+  dunningLevel3Days: number;
+  dunningLevel1FeeCents: number;
+  dunningLevel2FeeCents: number;
+  dunningLevel3FeeCents: number;
+  dunningInterestRatePercent: number;
   updatedAt: string | null;
 }
 
@@ -245,6 +253,63 @@ export interface DocumentInput {
   lines: DocumentLineInput[];
 }
 
+export type PaymentMethod = "bank_transfer" | "cash" | "direct_debit" | "other";
+
+export interface PaymentDto {
+  id: string;
+  invoiceId: string;
+  amountCents: number;
+  paidAt: string;
+  method: PaymentMethod;
+  reference: string;
+  notes: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface PaymentSummary {
+  totalPaidCents: number;
+  openAmountCents: number;
+  isFullyPaid: boolean;
+}
+
+export interface PaymentInput {
+  amountCents: number;
+  paidAt: string;
+  method: PaymentMethod;
+  reference?: string;
+  notes?: string;
+}
+
+export type DunningStatus = "draft" | "sent";
+
+export interface DunningLetterDto {
+  id: string;
+  invoiceId: string;
+  level: 1 | 2 | 3;
+  status: DunningStatus;
+  number: string | null;
+  openAmountCents: number;
+  feeCents: number;
+  interestCents: number;
+  totalDueCents: number;
+  daysOverdue: number;
+  issueDate: string | null;
+  createdAt: string;
+  sentAt: string | null;
+}
+
+export interface OverdueInvoiceDto {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  customerId: string;
+  dueDate: string;
+  daysOverdue: number;
+  openAmountCents: number;
+  lastSentLevel: 0 | 1 | 2 | 3;
+  suggestedLevel: 1 | 2 | 3 | null;
+}
+
 export type AttachmentEntityType = "customer" | "order";
 
 export interface AttachmentDto {
@@ -325,6 +390,38 @@ export const fakturaApi = {
       apiRequest<DocumentDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/convert`, { method: "POST", body: { targetType } }),
     derived: (workspaceId: string, id: string) =>
       apiRequest<DocumentDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/derived`),
+  },
+  payments: {
+    list: (workspaceId: string, invoiceId: string) =>
+      apiRequest<{ payments: PaymentDto[]; summary: PaymentSummary }>(
+        `/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${invoiceId}/payments`,
+      ),
+    record: (workspaceId: string, invoiceId: string, input: PaymentInput) =>
+      apiRequest<PaymentDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${invoiceId}/payments`, {
+        method: "POST",
+        body: input,
+      }),
+    remove: (workspaceId: string, id: string) =>
+      apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/faktura/payments/${id}`, { method: "DELETE" }),
+  },
+  dunning: {
+    overdue: (workspaceId: string) => apiRequest<OverdueInvoiceDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/dunning/overdue`),
+    listAll: (workspaceId: string) => apiRequest<DunningLetterDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/dunning-letters`),
+    listForInvoice: (workspaceId: string, invoiceId: string) =>
+      apiRequest<DunningLetterDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${invoiceId}/dunning-letters`),
+    get: (workspaceId: string, id: string) => apiRequest<DunningLetterDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/dunning-letters/${id}`),
+    create: (workspaceId: string, invoiceId: string, level: 1 | 2 | 3) =>
+      apiRequest<DunningLetterDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${invoiceId}/dunning-letters`, {
+        method: "POST",
+        body: { level },
+      }),
+    remove: (workspaceId: string, id: string) =>
+      apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/faktura/dunning-letters/${id}`, { method: "DELETE" }),
+    send: (workspaceId: string, id: string, recipient?: string) =>
+      apiRequest<{ letter: DunningLetterDto; sentTo: string }>(`/api/v1/workspaces/${workspaceId}/modules/faktura/dunning-letters/${id}/send`, {
+        method: "POST",
+        body: { recipient },
+      }),
   },
   attachments: {
     list: (workspaceId: string, entityType: AttachmentEntityType, entityId: string) =>
