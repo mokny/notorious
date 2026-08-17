@@ -28,13 +28,25 @@ export function NotificationBell({ workspaceId }: { workspaceId: string }) {
   });
   const unreadCount = notifications?.filter((n) => !n.readAt).length ?? 0;
 
+  // Also invalidates `notificationUnreadCount` - the rail's per-workspace
+  // badge (see useWorkspaceUnreadCounts.ts) reads that key, not this one.
+  // Marking read is a local REST call with no server-pushed WS `notification`
+  // message back to this same user's socket (see useRealtime.ts's `notification`
+  // case, which invalidates both keys but only ever fires for an *incoming*
+  // notification), so without this the rail badge would never clear.
   const markReadMutation = useMutation({
     mutationFn: (id: string) => notificationApi.markRead(workspaceId, id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["notificationUnreadCount", workspaceId] });
+    },
   });
   const markAllReadMutation = useMutation({
     mutationFn: () => notificationApi.markAllRead(workspaceId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications", workspaceId] });
+      void queryClient.invalidateQueries({ queryKey: ["notificationUnreadCount", workspaceId] });
+    },
   });
 
   // Appends the deep-link query param ObjectDetailPage.tsx reads (`?block=`/
