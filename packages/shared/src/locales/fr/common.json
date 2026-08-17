@@ -1019,7 +1019,9 @@
     "markDone": "Marquer comme terminé",
     "properties": "Propriétés",
     "computedValue": "Valeur calculée",
-    "script": "Script"
+    "script": "Script",
+    "objectSettings": "Paramètres de l'objet",
+    "ownerOnlyEditTooltip": "Seul le propriétaire peut modifier cet objet"
   },
   "objectType": {
     "viewTypes": {

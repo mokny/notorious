@@ -1027,7 +1027,9 @@
     "markDone": "Mark done",
     "properties": "Properties",
     "computedValue": "Computed Value",
-    "script": "Script"
+    "script": "Script",
+    "objectSettings": "Object Settings",
+    "ownerOnlyEditTooltip": "Only the owner can edit this object"
   },
   "objectType": {
     "viewTypes": {

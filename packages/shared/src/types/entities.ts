@@ -201,6 +201,10 @@ export interface ObjectRecord {
    * editor may toggle it, same permission tier as `lockedAt`.
    */
   requiresReverify: boolean;
+  /** Owner-only: while set, only the workspace owner can edit this object - overrides an editor's normal role, independent of `lockedAt`. See objects/service.ts's `assertObjectEditable`. */
+  ownerOnlyEdit: boolean;
+  /** Owner-only: while set, an apiKey/MCP request (`request.authMethod === "apiKey"`) may edit this object even though `lockedAt` and/or `ownerOnlyEdit` would otherwise block it - the UI itself still enforces both normally. */
+  allowApiEditsOverride: boolean;
   values: Record<string, PropertyValue>;
 }
 

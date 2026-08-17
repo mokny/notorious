@@ -24,7 +24,9 @@ import { CompanyBanner } from "../components/CompanyBanner.js";
 import { ShareDialog } from "../components/ShareDialog.js";
 import { ExportMenu } from "../components/ExportMenu.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
+import { ObjectSettingsDialog } from "../components/ObjectSettingsDialog.js";
 import { PresencePanel } from "../components/PresencePanel.js";
+import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "../components/nav/IOSMenu.js";
 import { useAuth } from "../context/AuthContext.js";
 import { useConfirm } from "../context/ConfirmContext.js";
 import { useMobileChrome } from "../context/MobileChromeContext.js";
@@ -178,6 +180,11 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // object, so a stale selection from the last object never lingers.
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   useEffect(() => setSelectedBlockId(null), [objectId]);
+  // Desktop's reduced toolbar (lock + owner-only indicator + title + hamburger
+  // only) - everything else that used to live in that row now lives in this
+  // menu instead, mirroring MobileTopBar.tsx's "…" menu.
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [objectId]);
 
   // Viewing Now, Properties, Sub-objects, Linked-from and Script are all
   // secondary/meta info rather than the object's actual content - hidden
@@ -308,7 +315,12 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
   // (the lock button itself, obviously) need to stay clickable regardless
   // of the object's current lock state.
   const isLocked = Boolean(object.lockedAt);
-  const effectiveCanEdit = canEdit && !isLocked;
+  // Owner-only-edit (see the "Object Settings" dialog) overrides an editor's
+  // normal role the same way the lock does, but independently of it - see
+  // objects/service.ts's `assertObjectEditable` for the matching server-side
+  // check. Never blocks the owner themselves.
+  const isOwnerOnlyBlocked = object.ownerOnlyEdit && !isOwner;
+  const effectiveCanEdit = canEdit && !isLocked && !isOwnerOnlyBlocked;
 
   // Rebound so their types stay non-optional inside the `renderIcon` closure
   // below - TS's narrowing from the early `if (!object || ... || !workspaceId)
@@ -463,7 +475,9 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
               one exception, in MobileBottomBar.tsx's floating toolbar - see
               those components' own comments), so a phone user never loses
               scroll real estate to a bar that would otherwise just duplicate
-              that menu. */}
+              that menu. Reduced to just lock + owner-only indicator + title +
+              a hamburger - everything else that used to live in this row now
+              lives in that hamburger's IOSMenu below instead. */}
           <div
             className={`sticky z-10 relative hidden items-center gap-2 bg-surface py-2 md:flex ${object.cover ? "" : "mt-2"}`}
             style={{ top: "var(--sticky-toolbar-top, 0px)" }}
@@ -487,96 +501,123 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 </span>
               )
             )}
-            {/* "Vault" protection (see modules/reverify/) - unlike the lock button above, this
-                never blocks its own toggle: the owner-only endpoint it hits deliberately skips
-                `requireAccess`'s reverify check (see objects/routes.ts), so protecting/
-                unprotecting always stays reachable regardless of the object's own current state. */}
-            {isOwner && (
-              <button
-                onClick={() => void handleToggleRequiresReverify(!object.requiresReverify)}
-                disabled={requiresReverifyMutation.isPending}
-                title={object.requiresReverify ? t("objectDetail.removeReverifyProtectionTooltip") : t("objectDetail.requireReauthTooltip")}
-                className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.requiresReverify ? "text-accent" : "text-ink-muted"}`}
-              >
-                <Icon name="shield" className="h-4 w-4" />
-              </button>
+            {/* Owner-only-edit status (see the "Object Settings" dialog in
+                the hamburger menu below) - visible to everyone, including the
+                owner, as confirmation it's active; never interactive here. */}
+            {object.ownerOnlyEdit && (
+              <span className="shrink-0 p-1.5 text-accent" title={t("objectDetail.ownerOnlyEditTooltip")}>
+                <Icon name="user" className="h-4 w-4" />
+              </span>
             )}
             {/* Only shown once a cover is set - that's the only case where
                 the plain title input above is hidden entirely (see the
                 `!object.cover` guard around it), so this is the sole visible
                 copy of the title once you've scrolled the cover itself out
                 of view. `min-w-0` lets it actually shrink/truncate instead
-                of pushing the (all `shrink-0`) action buttons off screen. */}
+                of pushing the hamburger button off screen. */}
             {object.cover && (
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 <HighlightedText text={title || t("nav.untitled")} terms={titleTerms} />
               </span>
             )}
-            {/* `key={object.id}` forces a full remount on every object
-                change, same reasoning as CoverImage's own `key` above -
-                without it, navigating from one object to another reuses
-                this same component instance, and its internal state (the
-                open/closed popover, the in-progress slug edit) would carry
-                over from the *previous* object instead of resetting. */}
-            {!share && <ObjectSlugButton key={object.id} objectId={object.id} slug={object.slug} disabled={isLocked} />}
-            <button
-              onClick={() => setSectionsVisible(!sectionsVisible)}
-              title={sectionsVisible ? t("objectDetail.hideSections") : t("objectDetail.showSections")}
-              // A view action, not an edit - exempt from READ_ONLY_LOCK's
-              // pointer-events-none like CollapsibleSection's own toggle.
-              data-view-toggle
-              className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${sectionsVisible ? "text-accent" : "text-ink-muted"}`}
-            >
-              <Icon name="eye" className="h-4 w-4" />
-            </button>
-            {/* Outside the `!share` gate below (unlike ShareDialog right next
-                to it) - a read-only share visitor can see this object, so
-                they should be able to export it too, not just a workspace
-                member. See ExportMenu.tsx's own doc comment. */}
-            <ExportMenu workspaceId={workspaceId} objectId={object.id} title={title || t("nav.untitled")} />
-            {!share && (
-              <>
-                <button
-                  onClick={() => togglePin(object.id)}
-                  title={pinned ? t("nav.mobile.unpinFromSidebar") : t("nav.mobile.pinToSidebar")}
-                  className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised ${pinned ? "text-accent" : "text-ink-muted"}`}
-                >
-                  <Icon name={pinned ? "pin-off" : "pin"} className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => dashboardMutation.mutate(isDashboard ? null : object.id)}
-                  disabled={dashboardMutation.isPending}
-                  title={isDashboard ? t("objectDetail.removeAsDashboard") : t("objectDetail.setAsDashboard")}
-                  className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${isDashboard ? "text-accent" : "text-ink-muted"}`}
-                >
-                  <Icon name="layout-dashboard" className="h-4 w-4" />
-                </button>
-                {/* Owner-only kill-switch for comments, deliberately sitting
-                    right next to Share - the two controls answer the same
-                    kind of question ("who can interact with this object,
-                    and how") - see CommentsPanel.tsx's own doc comment for
-                    why this is independent of the lock button above. */}
-                {isOwner && (
-                  <button
-                    onClick={() => commentsDisabledMutation.mutate(!object.commentsDisabled)}
-                    disabled={commentsDisabledMutation.isPending}
-                    title={object.commentsDisabled ? t("objectDetail.enableComments") : t("objectDetail.disableComments")}
-                    className={`shrink-0 rounded-md p-1.5 hover:bg-surface-raised disabled:opacity-50 ${object.commentsDisabled ? "text-ink-muted" : "text-accent"}`}
-                  >
-                    <Icon name={object.commentsDisabled ? "comment-off" : "comment"} className="h-4 w-4" />
-                  </button>
+            {!object.cover && <span className="min-w-0 flex-1" />}
+            {/* Every other action that used to sit in this row now lives
+                here instead, mirroring MobileTopBar.tsx's "…" menu (see that
+                component's object-actions group for the template each row
+                below follows). */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                title={t("nav.mobile.more")}
+                className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-surface-raised"
+              >
+                <Icon name="menu" className="h-4 w-4" />
+              </button>
+              <IOSMenu open={menuOpen} onClose={() => setMenuOpen(false)} align="end" side="bottom">
+                <IOSMenuGroup>
+                  {/* "Vault" protection (see modules/reverify/) - unlike the lock button above, this
+                      never blocks its own toggle: the owner-only endpoint it hits deliberately skips
+                      `requireAccess`'s reverify check (see objects/routes.ts), so protecting/
+                      unprotecting always stays reachable regardless of the object's own current state. */}
+                  {isOwner && (
+                    <IOSMenuItem
+                      icon="shield"
+                      label={object.requiresReverify ? t("nav.mobile.disableReverify") : t("nav.mobile.requireReverify")}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void handleToggleRequiresReverify(!object.requiresReverify);
+                      }}
+                    />
+                  )}
+                  <IOSMenuItem
+                    icon="eye"
+                    label={sectionsVisible ? t("objectDetail.hideSections") : t("objectDetail.showSections")}
+                    onClick={() => {
+                      setSectionsVisible(!sectionsVisible);
+                      setMenuOpen(false);
+                    }}
+                  />
+                </IOSMenuGroup>
+                <IOSMenuGroup>
+                  {/* Reachable for a read-only share visitor too, not just a
+                      member - see ExportMenu.tsx's own doc comment. */}
+                  <ExportMenu variant="menuItem" workspaceId={workspaceId} objectId={object.id} title={title || t("nav.untitled")} />
+                  {!share && (
+                    <>
+                      <ObjectSlugButton key={object.id} variant="menuItem" objectId={object.id} slug={object.slug} disabled={isLocked} />
+                      <IOSMenuItem
+                        icon={pinned ? "pin-off" : "pin"}
+                        label={pinned ? t("nav.mobile.unpinFromSidebar") : t("nav.mobile.pinToSidebar")}
+                        onClick={() => {
+                          togglePin(object.id);
+                          setMenuOpen(false);
+                        }}
+                      />
+                      <IOSMenuItem
+                        icon="layout-dashboard"
+                        label={isDashboard ? t("objectDetail.removeAsDashboard") : t("objectDetail.setAsDashboard")}
+                        onClick={() => {
+                          dashboardMutation.mutate(isDashboard ? null : object.id);
+                          setMenuOpen(false);
+                        }}
+                      />
+                      {/* Owner-only kill-switch for comments, deliberately
+                          sitting right next to Share - the two controls
+                          answer the same kind of question ("who can interact
+                          with this object, and how") - see CommentsPanel.tsx's
+                          own doc comment for why this is independent of the
+                          lock button above. */}
+                      {isOwner && (
+                        <IOSMenuItem
+                          icon={object.commentsDisabled ? "comment-off" : "comment"}
+                          label={object.commentsDisabled ? t("objectDetail.enableComments") : t("objectDetail.disableComments")}
+                          onClick={() => {
+                            commentsDisabledMutation.mutate(!object.commentsDisabled);
+                            setMenuOpen(false);
+                          }}
+                        />
+                      )}
+                      <ShareDialog variant="menuItem" workspaceId={workspaceId} objectId={object.id} label={t("nav.mobile.share")} />
+                      {isOwner && <ObjectSettingsDialog objectId={object.id} object={object} label={t("objectDetail.objectSettings")} />}
+                    </>
+                  )}
+                </IOSMenuGroup>
+                {!share && (
+                  <IOSMenuGroup>
+                    <IOSMenuItem
+                      icon="trash"
+                      label={t("objectDetail.deleteObject")}
+                      destructive
+                      disabled={isDeleting || isLocked || isOwnerOnlyBlocked}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        handleDelete();
+                      }}
+                    />
+                  </IOSMenuGroup>
                 )}
-                <ShareDialog workspaceId={workspaceId} objectId={object.id} label={t("nav.mobile.share")} />
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting || isLocked}
-                  title={isLocked ? t("objectDetail.unlockBeforeDelete") : t("objectDetail.deleteObject")}
-                  className="shrink-0 rounded-md p-1.5 text-ink-muted hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
-                >
-                  <Icon name="trash" className="h-4 w-4" />
-                </button>
-              </>
-            )}
+              </IOSMenu>
+            </div>
           </div>
 
           {hasRecurrence && !share && (
@@ -656,57 +697,50 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
           )}
         </div>
 
-        <aside
-          className={`w-full shrink-0 space-y-3 lg:w-72 ${
-            // The dividing border/padding only makes sense when there's
-            // actually something below it to divide from the content above -
-            // otherwise (sectionsVisible off) this would just be a stray line
-            // with nothing under it. Block history is also gated behind
-            // sectionsVisible below, so it isn't a second condition here.
-            sectionsVisible ? "border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" : ""
-          }`}
-        >
-          {sectionsVisible && (
-            <>
-              {/* Shown for anonymous share visitors too, not just real members -
-                  they're exactly who gets the "Anonymous <Animal>" identity and
-                  rename affordance this feature is for (see PresencePanel.tsx),
-                  same as `object.id` below is already safe to dereference
-                  unguarded for either audience once `object` has loaded. */}
-              <PresencePanel objectId={object.id} />
-              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t("objectDetail.properties")}</h3>
-              <div className={`space-y-3 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
-                {properties
-                  .filter((property) => property.key !== "sub_objects")
-                  .map((property) => (
-                    <div key={property.id} id={`property-${property.key}`} data-property-key={property.key}>
-                      <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
-                      <PropertyCell workspaceId={workspaceId} object={object} property={property} />
-                    </div>
-                  ))}
-
-                {objectType?.key === "variable" && (
-                  <div>
-                    <label className="mb-1 block text-xs text-ink-muted">{t("objectDetail.computedValue")}</label>
-                    {object.values.computedValueError ? (
-                      <p className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
-                        ⚠ {String(object.values.computedValueError)}
-                      </p>
-                    ) : (
-                      <code className="block break-all rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink">
-                        {object.values.computedValue === null || object.values.computedValue === undefined
-                          ? "—"
-                          : String(object.values.computedValue)}
-                      </code>
-                    )}
+        {/* Entirely unmounted (not just its children) while `sectionsVisible`
+            is off, rather than rendering an empty `lg:w-72` column - lets the
+            main content's own `flex-1` above actually reclaim that width
+            instead of leaving it reserved-but-blank. */}
+        {sectionsVisible && (
+          <aside className="w-full shrink-0 space-y-3 border-t border-border pt-6 lg:w-72 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            {/* Shown for anonymous share visitors too, not just real members -
+                they're exactly who gets the "Anonymous <Animal>" identity and
+                rename affordance this feature is for (see PresencePanel.tsx),
+                same as `object.id` below is already safe to dereference
+                unguarded for either audience once `object` has loaded. */}
+            <PresencePanel objectId={object.id} />
+            <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">{t("objectDetail.properties")}</h3>
+            <div className={`space-y-3 ${effectiveCanEdit ? "" : READ_ONLY_LOCK}`}>
+              {properties
+                .filter((property) => property.key !== "sub_objects")
+                .map((property) => (
+                  <div key={property.id} id={`property-${property.key}`} data-property-key={property.key}>
+                    <label className="mb-1 block text-xs text-ink-muted">{property.name}</label>
+                    <PropertyCell workspaceId={workspaceId} object={object} property={property} />
                   </div>
-                )}
-              </div>
-            </>
-          )}
+                ))}
 
-          {sectionsVisible && selectedBlockId && <BlockHistoryPanel objectId={object.id} blockId={selectedBlockId} />}
-        </aside>
+              {objectType?.key === "variable" && (
+                <div>
+                  <label className="mb-1 block text-xs text-ink-muted">{t("objectDetail.computedValue")}</label>
+                  {object.values.computedValueError ? (
+                    <p className="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-xs text-red-500">
+                      ⚠ {String(object.values.computedValueError)}
+                    </p>
+                  ) : (
+                    <code className="block break-all rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-ink">
+                      {object.values.computedValue === null || object.values.computedValue === undefined
+                        ? "—"
+                        : String(object.values.computedValue)}
+                    </code>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedBlockId && <BlockHistoryPanel objectId={object.id} blockId={selectedBlockId} />}
+          </aside>
+        )}
       </div>
     </div>
   );

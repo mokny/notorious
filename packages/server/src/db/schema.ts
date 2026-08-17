@@ -299,6 +299,10 @@ export const objects = sqliteTable("objects", {
   // workspaces/access.ts's `requireAccess`, checked for every object-scoped request
   // regardless of role (unlike `lockedAt`, which only ever blocks editor+ requests).
   requiresReverify: integer("requires_reverify", { mode: "boolean" }).notNull().default(false),
+  // Owner-configurable access overrides - see migrations/0059_object_settings.sql
+  // and objects/service.ts's `assertObjectEditable` for enforcement.
+  ownerOnlyEdit: integer("owner_only_edit", { mode: "boolean" }).notNull().default(false),
+  allowApiEditsOverride: integer("allow_api_edits_override", { mode: "boolean" }).notNull().default(false),
 });
 
 export const objectValues = sqliteTable(

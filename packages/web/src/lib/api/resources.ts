@@ -36,6 +36,8 @@ import type {
   UpdateObjectInput,
   SetObjectLockedInput,
   SetObjectRequiresReverifyInput,
+  SetObjectOwnerOnlyEditInput,
+  SetObjectAllowApiEditsOverrideInput,
   ReverifyPasswordInput,
   WebauthnCredential,
   RenameWebauthnCredentialInput,
@@ -264,6 +266,10 @@ export const objectApi = {
     apiRequest<ObjectRecord>(`/api/v1/objects/${id}/comments-disabled`, { method: "POST", body: input }),
   setRequiresReverify: (id: string, input: SetObjectRequiresReverifyInput) =>
     apiRequest<ObjectRecord>(`/api/v1/objects/${id}/requires-reverify`, { method: "POST", body: input }),
+  setOwnerOnlyEdit: (id: string, input: SetObjectOwnerOnlyEditInput) =>
+    apiRequest<ObjectRecord>(`/api/v1/objects/${id}/owner-only-edit`, { method: "POST", body: input }),
+  setAllowApiEditsOverride: (id: string, input: SetObjectAllowApiEditsOverrideInput) =>
+    apiRequest<ObjectRecord>(`/api/v1/objects/${id}/allow-api-edits-override`, { method: "POST", body: input }),
   archive: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/archive`, { method: "POST" }),
   restore: (id: string) => apiRequest<void>(`/api/v1/objects/${id}/restore`, { method: "POST" }),
   remove: (id: string) => apiRequest<void>(`/api/v1/objects/${id}`, { method: "DELETE" }),

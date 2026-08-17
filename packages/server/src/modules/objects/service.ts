@@ -12,7 +12,7 @@ import type {
 import { db } from "../../db/client.js";
 import { objects, relations, objectValues, objectTypes, blocks } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
-import { notFound, locked, conflict } from "../../lib/httpError.js";
+import { notFound, locked, conflict, forbidden } from "../../lib/httpError.js";
 import { slugify, randomSlugSuffix } from "../../lib/slug.js";
 import { listProperties } from "../schema/service.js";
 import { resolveValuesForObjects } from "./valueResolver.js";
@@ -53,6 +53,8 @@ function toRecord(row: typeof objects.$inferSelect, values: Record<string, unkno
     slug: row.slug,
     commentsDisabled: row.commentsDisabled,
     requiresReverify: row.requiresReverify,
+    ownerOnlyEdit: row.ownerOnlyEdit,
+    allowApiEditsOverride: row.allowApiEditsOverride,
     values: values as ObjectRecord["values"],
   };
 }
@@ -114,17 +116,37 @@ export function redactForReverify(record: ObjectRecord, hasSudo: boolean): Objec
   };
 }
 
+/** Who is asking, for `assertObjectEditable`'s owner-only/API-override checks below. */
+export interface EditableContext {
+  isOwner: boolean;
+  authMethod: "session" | "apiKey" | null;
+}
+
 /**
- * Throws 423 if `objectId` is currently locked - the enforcement side of the
- * owner-only lock toggle (see objects/routes.ts). Called from
- * `workspaces/access.ts`'s `requireAccess` for every object-scoped editor+
- * request, plus explicitly from the handful of mutating routes that check
- * access via `requireWorkspaceRole` instead (relations, object delete) -
- * see those call sites for why they can't go through `requireAccess` itself.
+ * Throws 423 if `objectId` is currently locked, or 403 if it's marked
+ * owner-only and the caller isn't the workspace owner - the enforcement side
+ * of the lock and "Object Settings" owner-only toggles (see objects/routes.ts).
+ * An `authMethod: "apiKey"` caller (covers MCP too, see plugins/session.ts)
+ * bypasses both when the object's `allowApiEditsOverride` is set - the UI
+ * itself never sets that auth method, so this can't be used to route around
+ * either restriction from the browser. Called from `workspaces/access.ts`'s
+ * `requireAccess` for every object-scoped editor+ request, plus explicitly
+ * from the handful of mutating routes that check access via
+ * `requireWorkspaceRole` instead (relations, object delete) - see those call
+ * sites for why they can't go through `requireAccess` itself.
  */
-export async function assertObjectEditable(objectId: string): Promise<void> {
-  const rows = await db.select({ lockedAt: objects.lockedAt }).from(objects).where(eq(objects.id, objectId)).limit(1);
-  if (rows[0]?.lockedAt) throw locked();
+export async function assertObjectEditable(objectId: string, context: EditableContext): Promise<void> {
+  const rows = await db
+    .select({ lockedAt: objects.lockedAt, ownerOnlyEdit: objects.ownerOnlyEdit, allowApiEditsOverride: objects.allowApiEditsOverride })
+    .from(objects)
+    .where(eq(objects.id, objectId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return;
+
+  const apiOverride = context.authMethod === "apiKey" && row.allowApiEditsOverride;
+  if (row.lockedAt && !apiOverride) throw locked();
+  if (row.ownerOnlyEdit && !context.isOwner && !apiOverride) throw forbidden("Only the workspace owner can edit this object");
 }
 
 export async function setObjectLocked(objectId: string, userId: string | null, isLocked: boolean): Promise<ObjectRecord> {
@@ -158,6 +180,16 @@ export async function isObjectReverifyProtected(objectId: string): Promise<boole
 
 export async function setObjectRequiresReverify(objectId: string, requiresReverify: boolean): Promise<ObjectRecord> {
   await db.update(objects).set({ requiresReverify }).where(eq(objects.id, objectId));
+  return getObject(objectId);
+}
+
+export async function setObjectOwnerOnlyEdit(objectId: string, ownerOnlyEdit: boolean): Promise<ObjectRecord> {
+  await db.update(objects).set({ ownerOnlyEdit }).where(eq(objects.id, objectId));
+  return getObject(objectId);
+}
+
+export async function setObjectAllowApiEditsOverride(objectId: string, allowApiEditsOverride: boolean): Promise<ObjectRecord> {
+  await db.update(objects).set({ allowApiEditsOverride }).where(eq(objects.id, objectId));
   return getObject(objectId);
 }
 
@@ -476,12 +508,12 @@ export async function createRelation(
   return { id, workspaceId, propertyId: input.propertyId, sourceObjectId: input.sourceObjectId, targetObjectId: input.targetObjectId, createdAt };
 }
 
-export async function deleteRelation(relationId: string): Promise<void> {
+export async function deleteRelation(relationId: string, context: EditableContext): Promise<void> {
   // Route only has the relation's own id, not the source object's - looked
   // up here so the lock check (see assertObjectEditable) has something to
   // check against.
   const rows = await db.select({ sourceObjectId: relations.sourceObjectId }).from(relations).where(eq(relations.id, relationId)).limit(1);
-  if (rows[0]) await assertObjectEditable(rows[0].sourceObjectId);
+  if (rows[0]) await assertObjectEditable(rows[0].sourceObjectId, context);
   await db.delete(relations).where(eq(relations.id, relationId));
 }
 

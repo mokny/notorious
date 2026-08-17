@@ -1026,7 +1026,9 @@
     "markDone": "Als erledigt markieren",
     "properties": "Eigenschaften",
     "computedValue": "Berechneter Wert",
-    "script": "Skript"
+    "script": "Skript",
+    "objectSettings": "Objekteinstellungen",
+    "ownerOnlyEditTooltip": "Nur der Owner darf dieses Objekt bearbeiten"
   },
   "objectType": {
     "viewTypes": {

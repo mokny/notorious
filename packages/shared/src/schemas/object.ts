@@ -58,6 +58,18 @@ export const setObjectRequiresReverifySchema = z.object({
 });
 export type SetObjectRequiresReverifyInput = z.infer<typeof setObjectRequiresReverifySchema>;
 
+/** Toggles owner-only editing on an object (see `ObjectRecord.ownerOnlyEdit`) - owner-only to set, same permission tier as the lock toggle above. */
+export const setObjectOwnerOnlyEditSchema = z.object({
+  ownerOnlyEdit: z.boolean(),
+});
+export type SetObjectOwnerOnlyEditInput = z.infer<typeof setObjectOwnerOnlyEditSchema>;
+
+/** Toggles the apiKey/MCP bypass of the lock and owner-only-edit restrictions (see `ObjectRecord.allowApiEditsOverride`) - owner-only to set. */
+export const setObjectAllowApiEditsOverrideSchema = z.object({
+  allowApiEditsOverride: z.boolean(),
+});
+export type SetObjectAllowApiEditsOverrideInput = z.infer<typeof setObjectAllowApiEditsOverrideSchema>;
+
 /**
  * Deliberately its own endpoint/schema, not folded into `updateObjectSchema` -
  * script mutations go through a stricter "real workspace member only" auth

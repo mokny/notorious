@@ -7,6 +7,8 @@ import {
   setObjectLockedSchema,
   setCommentsDisabledSchema,
   setObjectRequiresReverifySchema,
+  setObjectOwnerOnlyEditSchema,
+  setObjectAllowApiEditsOverrideSchema,
 } from "@notorious/shared";
 import { requireUser, getClientId } from "../../plugins/session.js";
 import { requireWorkspaceRole, requireAccess, requireWorkspaceScopedAccess, resolveActor } from "../workspaces/access.js";
@@ -187,6 +189,64 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     return object;
   });
 
+  // Owner-only; part of the "Object Settings" dialog alongside the
+  // API-edits-override toggle below. Deliberately NOT routed through
+  // `requireAccess` - same reasoning as the lock/comments-disabled/
+  // requires-reverify endpoints above: the owner must always be able to turn
+  // this back off even while it's blocking their own non-owner session (n/a
+  // for the owner, but keeps this consistent with the others).
+  app.post("/api/v1/objects/:id/owner-only-edit", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    const workspaceId = await objectService.getObjectWorkspaceId(id);
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const input = setObjectOwnerOnlyEditSchema.parse(request.body);
+    const object = await objectService.setObjectOwnerOnlyEdit(id, input.ownerOnlyEdit);
+
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: input.ownerOnlyEdit
+        ? `${user.name} restricted "${object.title}" to owner-only editing`
+        : `${user.name} allowed editors to edit "${object.title}" again`,
+      entity: "object",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return object;
+  });
+
+  // Owner-only; see owner-only-edit endpoint above for why this isn't routed
+  // through `requireAccess`.
+  app.post("/api/v1/objects/:id/allow-api-edits-override", async (request) => {
+    const user = requireUser(request);
+    const { id } = request.params as { id: string };
+    const workspaceId = await objectService.getObjectWorkspaceId(id);
+    await requireWorkspaceRole(workspaceId, user.id, "owner");
+    const input = setObjectAllowApiEditsOverrideSchema.parse(request.body);
+    const object = await objectService.setObjectAllowApiEditsOverride(id, input.allowApiEditsOverride);
+
+    await recordAndBroadcast({
+      workspaceId,
+      objectId: id,
+      actorId: user.id,
+      clientId: getClientId(request),
+      action: "updated",
+      summary: input.allowApiEditsOverride
+        ? `${user.name} allowed API/MCP edits on "${object.title}" despite lock/owner-only restrictions`
+        : `${user.name} revoked the API/MCP edit override on "${object.title}"`,
+      entity: "object",
+      entityId: id,
+      realtimeAction: "updated",
+    });
+
+    return object;
+  });
+
   app.post("/api/v1/objects/:id/archive", async (request) => {
     const user = requireUser(request);
     const { id } = request.params as { id: string };
@@ -240,8 +300,8 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
     const user = requireUser(request);
     const { id } = request.params as { id: string };
     const workspaceId = await objectService.getObjectWorkspaceId(id);
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
-    await objectService.assertObjectEditable(id);
+    const role = await requireWorkspaceRole(workspaceId, user.id, "editor");
+    await objectService.assertObjectEditable(id, { isOwner: role === "owner", authMethod: request.authMethod });
     await objectService.deleteObject(id);
 
     await recordAndBroadcast({
@@ -293,13 +353,13 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
   app.post("/api/v1/workspaces/:workspaceId/relations", async (request, reply) => {
     const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    const role = await requireWorkspaceRole(workspaceId, user.id, "editor");
     const input = createRelationSchema.parse(request.body);
     // This route (unlike blocks/object-property routes) authorizes via
     // `requireWorkspaceRole`, not `requireAccess`, so it doesn't get the lock
     // check `requireAccess` runs automatically for an object-scoped editor+
     // request - checked explicitly here instead.
-    await objectService.assertObjectEditable(input.sourceObjectId);
+    await objectService.assertObjectEditable(input.sourceObjectId, { isOwner: role === "owner", authMethod: request.authMethod });
     const relation = await objectService.createRelation(workspaceId, input);
 
     await recordAndBroadcast({
@@ -320,13 +380,13 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
   app.delete("/api/v1/workspaces/:workspaceId/relations/by-triple", async (request, reply) => {
     const user = requireUser(request);
     const { workspaceId } = request.params as { workspaceId: string };
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
+    const role = await requireWorkspaceRole(workspaceId, user.id, "editor");
     const { propertyId, sourceObjectId, targetObjectId } = request.body as {
       propertyId: string;
       sourceObjectId: string;
       targetObjectId: string;
     };
-    await objectService.assertObjectEditable(sourceObjectId);
+    await objectService.assertObjectEditable(sourceObjectId, { isOwner: role === "owner", authMethod: request.authMethod });
     await objectService.deleteRelationByTriple(propertyId, sourceObjectId, targetObjectId);
 
     await recordAndBroadcast({
@@ -347,8 +407,8 @@ export async function registerObjectRoutes(app: FastifyInstance): Promise<void> 
   app.delete("/api/v1/workspaces/:workspaceId/relations/:id", async (request, reply) => {
     const user = requireUser(request);
     const { workspaceId, id } = request.params as { workspaceId: string; id: string };
-    await requireWorkspaceRole(workspaceId, user.id, "editor");
-    await objectService.deleteRelation(id);
+    const role = await requireWorkspaceRole(workspaceId, user.id, "editor");
+    await objectService.deleteRelation(id, { isOwner: role === "owner", authMethod: request.authMethod });
 
     await recordAndBroadcast({
       workspaceId,

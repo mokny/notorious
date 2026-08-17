@@ -1,3 +1,4 @@
+import { createContext, useContext, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Icon } from "../ui/Icon.js";
 
@@ -10,6 +11,9 @@ interface IOSMenuProps {
   widthClassName?: string;
   children: React.ReactNode;
 }
+
+/** Which nested `IOSMenuSubmenu` (if any) is currently pushed on top of the root panel - see that component below. */
+const IOSMenuNavContext = createContext<{ activePanel: string | null; setActivePanel: (id: string | null) => void } | null>(null);
 
 /**
  * Native-iOS-context-menu-styled dropdown shell - shared by MobileTopBar.tsx's
@@ -28,6 +32,13 @@ interface IOSMenuProps {
  */
 export function IOSMenu({ open, onClose, align = "end", side = "bottom", widthClassName = "w-60", children }: IOSMenuProps) {
   const yOffset = side === "top" ? 4 : -4;
+  const [activePanel, setActivePanel] = useState<string | null>(null);
+  // A submenu pushed open shouldn't still be showing the next time this same
+  // trigger reopens the menu - reset to the root panel on every close.
+  useEffect(() => {
+    if (!open) setActivePanel(null);
+  }, [open]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -41,7 +52,7 @@ export function IOSMenu({ open, onClose, align = "end", side = "bottom", widthCl
             style={{ transformOrigin: `${side === "top" ? "bottom" : "top"} ${align === "end" ? "right" : "left"}` }}
             className={`absolute z-50 ${side === "top" ? "bottom-full mb-2" : "top-full mt-2"} ${align === "end" ? "right-0" : "left-0"} ${widthClassName} overflow-hidden rounded-2xl border border-border/60 bg-surface-raised/90 shadow-2xl backdrop-blur-xl`}
           >
-            {children}
+            <IOSMenuNavContext.Provider value={{ activePanel, setActivePanel }}>{children}</IOSMenuNavContext.Provider>
           </motion.div>
         </>
       )}
@@ -75,5 +86,61 @@ export function IOSMenuItem({ icon, label, onClick, destructive, disabled }: IOS
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${destructive ? "text-red-500" : "text-ink-muted"}`} />
     </button>
+  );
+}
+
+interface IOSMenuSubmenuProps {
+  /** Unique within this IOSMenu - identifies which panel is pushed open. */
+  id: string;
+  icon: string;
+  label: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}
+
+/**
+ * A row that pushes a nested panel of its own `children` over the menu,
+ * iOS-context-menu style, with a back row to return to the root. Renders its
+ * trigger row inline (so it composes with `IOSMenuGroup` like any other
+ * item), and - only while active - an absolutely-positioned overlay panel
+ * that slides in from the right and fully covers the root content; both
+ * live in the same DOM position so no parent needs to know a submenu exists.
+ */
+export function IOSMenuSubmenu({ id, icon, label, disabled, children }: IOSMenuSubmenuProps) {
+  const nav = useContext(IOSMenuNavContext);
+  if (!nav) throw new Error("IOSMenuSubmenu must be rendered inside an IOSMenu");
+  const isActive = nav.activePanel === id;
+
+  return (
+    <>
+      <button
+        onClick={() => nav.setActivePanel(id)}
+        disabled={disabled}
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink disabled:opacity-40 active:bg-surface"
+      >
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
+      </button>
+      <AnimatePresence>
+        {isActive && (
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+            className="absolute inset-0 z-10 overflow-y-auto rounded-2xl bg-surface-raised/95 backdrop-blur-xl"
+          >
+            <button
+              onClick={() => nav.setActivePanel(null)}
+              className="flex min-h-11 w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left text-[15px] font-medium text-ink active:bg-surface"
+            >
+              <Icon name="chevron-left" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
+              <span className="min-w-0 flex-1 truncate">{label}</span>
+            </button>
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

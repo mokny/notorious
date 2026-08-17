@@ -15,6 +15,7 @@ import { roleAtLeast } from "@notorious/shared";
 import { ShareDialog } from "../ShareDialog.js";
 import { ExportMenu } from "../ExportMenu.js";
 import { ObjectSlugButton } from "../ObjectSlugButton.js";
+import { ObjectSettingsDialog } from "../ObjectSettingsDialog.js";
 import { CoverMenuItem } from "../CoverMenuItem.js";
 import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "./IOSMenu.js";
 import { Icon } from "../ui/Icon.js";
@@ -318,6 +319,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                     />
                   )}
                   <ShareDialog variant="menuItem" workspaceId={workspaceId} objectId={object.id} label={t("nav.mobile.share")} />
+                  {isOwner && <ObjectSettingsDialog objectId={object.id} object={object} label={t("objectDetail.objectSettings")} />}
                   <IOSMenuItem
                     icon="trash"
                     label={t("nav.mobile.delete")}

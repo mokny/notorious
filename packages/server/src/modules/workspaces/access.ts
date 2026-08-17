@@ -65,9 +65,10 @@ export async function requireAccess(
   options: RequireAccessOptions = {},
 ): Promise<AccessResult> {
   let result: AccessResult;
+  let role: WorkspaceRole | null = null;
 
   if (request.user) {
-    await requireWorkspaceRole(workspaceId, request.user.id, minRole);
+    role = await requireWorkspaceRole(workspaceId, request.user.id, minRole);
     result = { actorId: request.user.id, actorName: request.user.name };
   } else {
     const share = request.shareAccess;
@@ -88,9 +89,12 @@ export async function requireAccess(
   // Locking blocks edits from *everyone*, including the workspace owner
   // (see objects/routes.ts's lock endpoint) - "editor" is the lowest role
   // any mutating route asks for here, so this only ever runs for a request
-  // that's actually trying to change something, never a plain read.
+  // that's actually trying to change something, never a plain read. Also
+  // covers the owner-only-edit override (see assertObjectEditable) - an
+  // anonymous share-link visitor is never the owner, so `role` being null
+  // there correctly falls through to "not the owner".
   if (options.objectId && roleAtLeast(minRole, "editor") && !options.allowWhenLocked) {
-    await assertObjectEditable(options.objectId);
+    await assertObjectEditable(options.objectId, { isOwner: role === "owner", authMethod: request.authMethod });
   }
 
   if (options.objectId && !options.skipReverifyGate) {
@@ -143,9 +147,9 @@ export async function requireRealMemberAccess(
   objectId?: string,
 ): Promise<{ actorId: string; actorName: string }> {
   const user = requireUser(request);
-  await requireWorkspaceRole(workspaceId, user.id, minRole);
+  const role = await requireWorkspaceRole(workspaceId, user.id, minRole);
   if (objectId && roleAtLeast(minRole, "editor")) {
-    await assertObjectEditable(objectId);
+    await assertObjectEditable(objectId, { isOwner: role === "owner", authMethod: request.authMethod });
   }
   if (objectId) {
     await assertReverifyAccess(request, objectId);
