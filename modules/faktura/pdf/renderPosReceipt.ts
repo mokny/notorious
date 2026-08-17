@@ -3,6 +3,7 @@ import { formatCents } from "@notorious/shared";
 import type { DocumentDto } from "../services/documents.js";
 import type { CompanySettingsDto } from "../services/companySettings.js";
 import { unitLabelDe, taxRateLabel } from "./text.de.js";
+import { drawTestBanner } from "./testBanner.js";
 
 // 80mm thermal-receipt width in PDF points (1mm ≈ 2.8346pt).
 const PAGE_WIDTH = 227;
@@ -26,6 +27,10 @@ export function renderPosReceiptPdf(document: DocumentDto, company: CompanySetti
     doc.on("error", reject);
 
     let y = MARGIN;
+    if (company.testMode) {
+      drawTestBanner(doc, PAGE_WIDTH);
+      y += 20;
+    }
     doc.fontSize(10).text(company.legalName, MARGIN, y, { width: CONTENT_WIDTH, align: "center" });
     y += 14;
     doc.fontSize(7).fillColor("#333333").text(`${company.street}, ${company.postalCode} ${company.city}`, MARGIN, y, { width: CONTENT_WIDTH, align: "center" });

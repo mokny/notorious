@@ -68,6 +68,7 @@ function PosTerminalPage() {
   const [changeCents, setChangeCents] = useState<number | null>(null);
   const [cashTenderOpen, setCashTenderOpen] = useState(false);
   const [tenderedCents, setTenderedCents] = useState(0);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   // The terminal always renders as a CSS-only fixed overlay covering the
   // whole viewport, no toggle: iPadOS Safari doesn't support the
   // Fullscreen API for ordinary elements (only <video>), so
@@ -93,6 +94,12 @@ function PosTerminalPage() {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
     navigate(`/w/${workspaceId}/modules/faktura/kassenbuch`);
   }
+
+  const reorderMutation = useMutation({
+    mutationFn: ({ productId, afterProductId }: { productId: string; afterProductId: string | null }) =>
+      fakturaApi.products.reorderPos(workspaceId!, productId, afterProductId),
+    onSuccess: (reordered) => queryClient.setQueryData(["module-faktura-pos-products", workspaceId], reordered),
+  });
 
   function addToCart(product: ProductListItemDto) {
     setCart((prev) => {
@@ -143,6 +150,15 @@ function PosTerminalPage() {
     checkoutMutation.mutate();
   }
 
+  const cancelSaleMutation = useMutation({
+    mutationFn: (id: string) => fakturaApi.documents.cancel(workspaceId!, id),
+    onSuccess: () => {
+      setConfirmingCancel(false);
+      setReceiptDocumentId(null);
+      void queryClient.invalidateQueries({ queryKey: ["module-faktura-pos-active-shift", workspaceId] });
+    },
+  });
+
   if (!activeShift) {
     return (
       <div className="mx-auto max-w-md space-y-4 px-6 py-10 text-center">
@@ -165,7 +181,11 @@ function PosTerminalPage() {
             Kasse beenden
           </button>
         </div>
-        <PosProductGrid products={products ?? []} onAdd={addToCart} />
+        <PosProductGrid
+          products={products ?? []}
+          onAdd={addToCart}
+          onReorder={(productId, afterProductId) => reorderMutation.mutate({ productId, afterProductId })}
+        />
       </div>
       {/* Fixed-width, never shrinking - summary/cart always stay visible on the right, regardless of product-grid content. */}
       <div className="flex w-1/3 shrink-0 flex-col gap-2">
@@ -193,7 +213,16 @@ function PosTerminalPage() {
         confirmPending={checkoutMutation.isPending}
       />
 
-      <Modal open={Boolean(receiptDocumentId)} onOpenChange={(open) => !open && setReceiptDocumentId(null)} title="Verkauf abgeschlossen">
+      <Modal
+        open={Boolean(receiptDocumentId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReceiptDocumentId(null);
+            setConfirmingCancel(false);
+          }
+        }}
+        title="Verkauf abgeschlossen"
+      >
         {receiptDocumentId && (
           <div className="flex flex-col items-center gap-3">
             {changeCents !== null && changeCents > 0 && (
@@ -214,6 +243,30 @@ function PosTerminalPage() {
               >
                 Bon öffnen
               </a>
+            )}
+
+            {!confirmingCancel ? (
+              <button type="button" onClick={() => setConfirmingCancel(true)} className="text-xs text-red-500">
+                Verkauf stornieren
+              </button>
+            ) : (
+              <div className="flex w-full items-center justify-center gap-2">
+                <span className="text-xs text-ink-muted">Wirklich stornieren?</span>
+                <button
+                  type="button"
+                  disabled={cancelSaleMutation.isPending}
+                  onClick={() => cancelSaleMutation.mutate(receiptDocumentId)}
+                  className="rounded-md bg-red-500 px-3 py-1 text-xs text-white disabled:opacity-50"
+                >
+                  Ja, stornieren
+                </button>
+                <button type="button" onClick={() => setConfirmingCancel(false)} className="rounded-md border border-border px-3 py-1 text-xs">
+                  Nein
+                </button>
+              </div>
+            )}
+            {cancelSaleMutation.isError && (
+              <p className="text-xs text-red-500">{cancelSaleMutation.error instanceof Error ? cancelSaleMutation.error.message : "Fehler."}</p>
             )}
           </div>
         )}

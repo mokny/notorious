@@ -15,6 +15,8 @@ import { registerExpenseRoutes } from "./routes/expenses.js";
 import { registerBookingRoutes } from "./routes/bookings.js";
 import { registerDatevExportRoutes } from "./routes/datevExport.js";
 import { registerPosRoutes } from "./routes/pos.js";
+import { registerResetRoutes } from "./routes/reset.js";
+import { resetFakturaData } from "./services/reset.js";
 
 /**
  * Structural copy of `packages/server/src/modules/moduleRegistry/sdk.ts`'s
@@ -94,59 +96,11 @@ const manifest = {
     registerBookingRoutes(app, sdk);
     registerDatevExportRoutes(app, sdk);
     registerPosRoutes(app, sdk);
+    registerResetRoutes(app, sdk);
   },
 
   async purge(workspaceId: string, sdk: ModuleSdk): Promise<void> {
-    const tx = sdk.sqlite.transaction((wsId: string) => {
-      sdk.sqlite.prepare("DELETE FROM faktura_audit_log WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_dunning_letters WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_bookings WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_pos_shifts WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_expenses WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_accounts WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_payments WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_attachments WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite
-        .prepare(
-          "DELETE FROM faktura_document_tax_breakdown WHERE document_id IN (SELECT id FROM faktura_documents WHERE workspace_id = ?)",
-        )
-        .run(wsId);
-      sdk.sqlite
-        .prepare("DELETE FROM faktura_document_lines WHERE document_id IN (SELECT id FROM faktura_documents WHERE workspace_id = ?)")
-        .run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_documents WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_number_sequences WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite
-        .prepare(
-          "DELETE FROM faktura_price_history WHERE product_id IN (SELECT id FROM faktura_products WHERE workspace_id = ?)",
-        )
-        .run(wsId);
-      sdk.sqlite
-        .prepare(
-          "DELETE FROM faktura_customer_product_prices WHERE product_id IN (SELECT id FROM faktura_products WHERE workspace_id = ?)",
-        )
-        .run(wsId);
-      sdk.sqlite
-        .prepare(
-          "DELETE FROM faktura_product_price_tiers WHERE product_id IN (SELECT id FROM faktura_products WHERE workspace_id = ?)",
-        )
-        .run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_products WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_suppliers WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite
-        .prepare(
-          "DELETE FROM faktura_customer_addresses WHERE customer_id IN (SELECT id FROM faktura_customers WHERE workspace_id = ?)",
-        )
-        .run(wsId);
-      sdk.sqlite
-        .prepare(
-          "DELETE FROM faktura_customer_contacts WHERE customer_id IN (SELECT id FROM faktura_customers WHERE workspace_id = ?)",
-        )
-        .run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_customers WHERE workspace_id = ?").run(wsId);
-      sdk.sqlite.prepare("DELETE FROM faktura_company_settings WHERE workspace_id = ?").run(wsId);
-    });
-    tx(workspaceId);
+    resetFakturaData(sdk, workspaceId, { keepCompanySettings: false });
     // Attachments + cached PDFs live under this one subpath (see
     // services/attachments.ts, routes/documentPdf.ts) - removed in one go
     // rather than per-row, after the DB rows referencing them are gone.

@@ -29,6 +29,8 @@ export interface CompanySettingsDto {
   dunningLevel3FeeCents: number;
   dunningInterestRatePercent: number;
   chartOfAccounts: "skr03" | "skr04";
+  /** When true, every rendered PDF gets a prominent "TESTMODUS" banner (see pdf/testBanner.ts) - lets users try out the module without producing documents that look like real, legally-issued paperwork. */
+  testMode: boolean;
   updatedAt: string | null;
 }
 
@@ -60,6 +62,7 @@ const DEFAULTS: Omit<CompanySettingsDto, "updatedAt"> = {
   dunningLevel3FeeCents: 1000,
   dunningInterestRatePercent: 9.89,
   chartOfAccounts: "skr04",
+  testMode: false,
 };
 
 function toDto(row: FakturaCompanySettingsRow): CompanySettingsDto {
@@ -91,6 +94,7 @@ function toDto(row: FakturaCompanySettingsRow): CompanySettingsDto {
     dunningLevel3FeeCents: row.dunning_level_3_fee_cents,
     dunningInterestRatePercent: row.dunning_interest_rate_percent,
     chartOfAccounts: row.chart_of_accounts,
+    testMode: row.test_mode === 1,
     updatedAt: row.updated_at,
   };
 }
@@ -210,6 +214,7 @@ export interface UpdateCompanySettingsInput {
   dunningLevel3FeeCents: number;
   dunningInterestRatePercent: number;
   chartOfAccounts: "skr03" | "skr04";
+  testMode: boolean;
 }
 
 export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input: UpdateCompanySettingsInput): CompanySettingsDto {
@@ -222,8 +227,8 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
          quote_number_prefix, order_number_prefix, invoice_number_prefix, credit_note_number_prefix, pos_receipt_number_prefix,
          dunning_number_prefix, dunning_level_1_days, dunning_level_2_days, dunning_level_3_days,
          dunning_level_1_fee_cents, dunning_level_2_fee_cents, dunning_level_3_fee_cents, dunning_interest_rate_percent,
-         chart_of_accounts, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         chart_of_accounts, test_mode, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(workspace_id) DO UPDATE SET
          legal_name = excluded.legal_name,
          street = excluded.street,
@@ -251,6 +256,7 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
          dunning_level_3_fee_cents = excluded.dunning_level_3_fee_cents,
          dunning_interest_rate_percent = excluded.dunning_interest_rate_percent,
          chart_of_accounts = excluded.chart_of_accounts,
+         test_mode = excluded.test_mode,
          updated_at = excluded.updated_at`,
     )
     .run(
@@ -281,6 +287,7 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
       input.dunningLevel3FeeCents,
       input.dunningInterestRatePercent,
       input.chartOfAccounts,
+      input.testMode ? 1 : 0,
       updatedAt,
     );
   return getCompanySettings(sdk, workspaceId);

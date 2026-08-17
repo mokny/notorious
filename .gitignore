@@ -18,3 +18,4 @@ data/files/*
 *.tsbuildinfo
 coverage/
 .release-notes.md
+FAKTURA_STATUS.md

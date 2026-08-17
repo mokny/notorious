@@ -9,6 +9,7 @@ import {
   type DocumentInput,
 } from "../services/documents.js";
 import { issueDocument, cancelDocument } from "../services/numbering.js";
+import { cancelPosSale } from "../services/pos.js";
 import { convertDocument, listDerivedDocuments } from "../services/documentConversion.js";
 import { sendDocumentByEmail } from "../services/email.js";
 import { renderAndMaybeCachePdf } from "./documentPdf.js";
@@ -167,10 +168,21 @@ export function registerDocumentRoutes(app: FastifyInstance, sdk: ModuleSdk): vo
 
   app.post("/api/v1/workspaces/:workspaceId/modules/faktura/documents/:id/cancel", async (request, reply) => {
     const { workspaceId, id } = request.params as { workspaceId: string; id: string };
-    const { userId } = await sdk.requireModuleAccess(request, workspaceId, "faktura.documents.issue");
+    const existing = getDocument(sdk, workspaceId, id);
+    if (!existing) {
+      reply.code(404);
+      return { message: "Document not found" };
+    }
+    // A POS receipt's Storno also undoes its payment/bookings (see
+    // services/pos.ts::cancelPosSale's doc comment for why that's safe to
+    // do automatically only for POS sales, not ordinary invoices) - gated
+    // on the lighter `faktura.pos.use` permission so terminal staff can
+    // void a sale without needing full accounting-level access.
+    const isPosSale = existing.type === "pos_receipt";
+    const { userId } = await sdk.requireModuleAccess(request, workspaceId, isPosSale ? "faktura.pos.use" : "faktura.documents.issue");
     let document;
     try {
-      document = cancelDocument(sdk, workspaceId, id);
+      document = isPosSale ? cancelPosSale(sdk, workspaceId, userId, id) : cancelDocument(sdk, workspaceId, id);
     } catch (error) {
       reply.code(409);
       return { message: error instanceof Error ? error.message : "Could not cancel document" };

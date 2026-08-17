@@ -29,6 +29,7 @@ export interface FakturaCompanySettingsRow {
   dunning_interest_rate_percent: number;
   chart_of_accounts: "skr03" | "skr04";
   pos_receipt_number_prefix: string;
+  test_mode: 0 | 1;
   updated_at: string;
 }
 
@@ -108,6 +109,9 @@ export interface FakturaProductRow {
   sku: string;
   pos_enabled: 0 | 1;
   pos_category: string;
+  pos_favorite: 0 | 1;
+  pos_color: string;
+  pos_sort_key: string;
   created_at: string;
   updated_at: string;
   archived_at: string | null;

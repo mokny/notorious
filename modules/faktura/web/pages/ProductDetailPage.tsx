@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents, parseCentsInput } from "@notorious/shared";
 import { fakturaApi, type ProductInput, type ProductUnit, type TaxRateBasisPoints } from "../api.js";
+import { autoProductColor } from "../lib/posColor.js";
 
 interface TierForm {
   minQuantity: string;
@@ -47,6 +48,8 @@ function ProductDetailPage() {
   const [sku, setSku] = useState("");
   const [posEnabled, setPosEnabled] = useState(false);
   const [posCategory, setPosCategory] = useState("");
+  const [posFavorite, setPosFavorite] = useState(false);
+  const [posColor, setPosColor] = useState("");
   const [tiers, setTiers] = useState<TierForm[]>([]);
   const [customerPrices, setCustomerPrices] = useState<CustomerPriceForm[]>([]);
 
@@ -61,6 +64,8 @@ function ProductDetailPage() {
       setSku(product.sku);
       setPosEnabled(product.posEnabled);
       setPosCategory(product.posCategory);
+      setPosFavorite(product.posFavorite);
+      setPosColor(product.posColor);
       setTiers(product.priceTiers.map((t) => ({ minQuantity: String(t.minQuantity), price: (t.priceCents / 100).toFixed(2).replace(".", ",") })));
       setCustomerPrices(
         product.customerPrices.map((p) => ({ customerId: p.customerId, price: (p.priceCents / 100).toFixed(2).replace(".", ","), effectiveFrom: p.effectiveFrom.slice(0, 10) })),
@@ -81,6 +86,8 @@ function ProductDetailPage() {
         sku,
         posEnabled,
         posCategory,
+        posFavorite,
+        posColor,
         priceTiers: tiers
           .filter((t) => t.minQuantity.trim())
           .map((t) => ({ minQuantity: Number(t.minQuantity), priceCents: parseCentsInput(t.price) ?? 0 })),
@@ -159,10 +166,32 @@ function ProductDetailPage() {
             <span>Am Kassen-Terminal anzeigen</span>
           </label>
           {posEnabled && (
-            <label className={labelClass}>
-              <span className={labelTextClass}>Kassen-Kategorie</span>
-              <input className={inputClass} value={posCategory} onChange={(e) => setPosCategory(e.target.value)} placeholder="z. B. Getränke" />
-            </label>
+            <>
+              <label className={labelClass}>
+                <span className={labelTextClass}>Kassen-Kategorie</span>
+                <input className={inputClass} value={posCategory} onChange={(e) => setPosCategory(e.target.value)} placeholder="z. B. Getränke" />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={posFavorite} onChange={(e) => setPosFavorite(e.target.checked)} />
+                <span>Als Favorit anheften (eigener "Favoriten"-Reiter an der Kasse)</span>
+              </label>
+              <div className="flex items-center gap-3">
+                <label className={labelClass}>
+                  <span className={labelTextClass}>Kachel-Farbe</span>
+                  <input
+                    type="color"
+                    className="h-9 w-16 rounded-md border border-border bg-surface"
+                    value={posColor || autoProductColor(id ?? "neu")}
+                    onChange={(e) => setPosColor(e.target.value)}
+                  />
+                </label>
+                {posColor && (
+                  <button type="button" className="text-xs text-accent" onClick={() => setPosColor("")}>
+                    Automatisch (Standard)
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </section>
 

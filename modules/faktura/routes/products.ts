@@ -7,6 +7,7 @@ import {
   createProduct,
   updateProduct,
   archiveProduct,
+  reorderPosProduct,
   getPriceHistory,
   type ProductInput,
 } from "../services/products.js";
@@ -33,6 +34,8 @@ function parseInput(body: unknown): ProductInput | null {
     sku: b.sku,
     posEnabled: b.posEnabled,
     posCategory: b.posCategory,
+    posFavorite: b.posFavorite,
+    posColor: b.posColor,
     priceTiers: b.priceTiers,
     customerPrices: b.customerPrices,
   };
@@ -105,6 +108,18 @@ export function registerProductRoutes(app: FastifyInstance, sdk: ModuleSdk): voi
     }
     recordAudit(sdk, { workspaceId, entityType: "product", entityId: product.id, action: "updated", actorId: userId, summary: `Produkt aktualisiert: ${product.name}` });
     return product;
+  });
+
+  app.post("/api/v1/workspaces/:workspaceId/modules/faktura/products/:id/pos-reorder", async (request, reply) => {
+    const { workspaceId, id } = request.params as { workspaceId: string; id: string };
+    await sdk.requireModuleAccess(request, workspaceId, "faktura.pos.use");
+    const { afterProductId } = request.body as { afterProductId?: string | null };
+    const moved = reorderPosProduct(sdk, workspaceId, id, afterProductId ?? null);
+    if (!moved) {
+      reply.code(404);
+      return { message: "Product not found" };
+    }
+    return listPosProducts(sdk, workspaceId);
   });
 
   app.delete("/api/v1/workspaces/:workspaceId/modules/faktura/products/:id", async (request, reply) => {

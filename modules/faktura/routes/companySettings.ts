@@ -52,6 +52,7 @@ export function registerCompanySettingsRoutes(app: FastifyInstance, sdk: ModuleS
       dunningLevel3FeeCents: body.dunningLevel3FeeCents ?? 1000,
       dunningInterestRatePercent: body.dunningInterestRatePercent ?? 9.89,
       chartOfAccounts: body.chartOfAccounts === "skr03" ? "skr03" : "skr04",
+      testMode: Boolean(body.testMode),
     };
 
     const dto = upsertCompanySettings(sdk, workspaceId, input);

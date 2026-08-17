@@ -226,6 +226,25 @@ export function getBooking(sdk: ModuleSdk, workspaceId: string, id: string): Boo
   return row ? rowToDto(row) : null;
 }
 
+/**
+ * Undoes every still-live booking generated for one source record (e.g. a
+ * POS receipt being voided, see services/pos.ts::cancelPosSale): a
+ * `proposed` booking that was never confirmed has no GoBD binding yet and
+ * is simply rejected/deleted, while a `confirmed` booking is corrected the
+ * only way a confirmed booking ever can be - a reversal (Storno) booking,
+ * never edited or deleted. Already-`reversed` bookings are left alone.
+ */
+export function undoBookingsForSource(sdk: ModuleSdk, workspaceId: string, actorId: string, sourceEntityType: FakturaBookingSourceType, sourceEntityId: string): void {
+  const rows = sdk.sqlite
+    .prepare("SELECT id, status FROM faktura_bookings WHERE workspace_id = ? AND source_entity_type = ? AND source_entity_id = ?")
+    .all(workspaceId, sourceEntityType, sourceEntityId) as Array<Pick<FakturaBookingRow, "id" | "status">>;
+
+  for (const row of rows) {
+    if (row.status === "proposed") rejectProposedBooking(sdk, workspaceId, row.id);
+    else if (row.status === "confirmed") createReversalBooking(sdk, workspaceId, actorId, row.id);
+  }
+}
+
 export function confirmBooking(sdk: ModuleSdk, workspaceId: string, actorId: string, id: string): BookingDto {
   const row = sdk.sqlite.prepare("SELECT status FROM faktura_bookings WHERE id = ? AND workspace_id = ?").get(id, workspaceId) as
     | Pick<FakturaBookingRow, "status">

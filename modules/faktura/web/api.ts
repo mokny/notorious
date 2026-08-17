@@ -28,6 +28,7 @@ export interface CompanySettingsDto {
   dunningLevel3FeeCents: number;
   dunningInterestRatePercent: number;
   chartOfAccounts: "skr03" | "skr04";
+  testMode: boolean;
   updatedAt: string | null;
 }
 
@@ -120,6 +121,8 @@ export interface ProductDto {
   sku: string;
   posEnabled: boolean;
   posCategory: string;
+  posFavorite: boolean;
+  posColor: string;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -135,6 +138,8 @@ export interface ProductListItemDto {
   taxRateBasisPoints: TaxRateBasisPoints;
   posEnabled: boolean;
   posCategory: string;
+  posFavorite: boolean;
+  posColor: string;
   archivedAt: string | null;
 }
 
@@ -148,6 +153,8 @@ export interface ProductInput {
   sku?: string;
   posEnabled?: boolean;
   posCategory?: string;
+  posFavorite?: boolean;
+  posColor?: string;
   priceTiers?: Array<{ minQuantity: number; priceCents: number }>;
   customerPrices?: Array<{ customerId: string; priceCents: number; effectiveFrom: string }>;
 }
@@ -414,6 +421,8 @@ export const fakturaApi = {
     get: (workspaceId: string) => apiRequest<CompanySettingsDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/settings`),
     update: (workspaceId: string, input: UpdateCompanySettingsInput) =>
       apiRequest<CompanySettingsDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/settings`, { method: "PUT", body: input }),
+    reset: (workspaceId: string, confirmationText: string) =>
+      apiRequest<{ ok: true }>(`/api/v1/workspaces/${workspaceId}/modules/faktura/reset`, { method: "POST", body: { confirmationText } }),
   },
   customers: {
     list: (workspaceId: string) => apiRequest<CustomerListItemDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/customers`),
@@ -428,6 +437,11 @@ export const fakturaApi = {
   products: {
     list: (workspaceId: string) => apiRequest<ProductListItemDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/products`),
     listPos: (workspaceId: string) => apiRequest<ProductListItemDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/products/pos`),
+    reorderPos: (workspaceId: string, productId: string, afterProductId: string | null) =>
+      apiRequest<ProductListItemDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/products/${productId}/pos-reorder`, {
+        method: "POST",
+        body: { afterProductId },
+      }),
     get: (workspaceId: string, id: string) =>
       apiRequest<ProductDto & { priceHistory: Array<{ customerId: string | null; priceCents: number; effectiveFrom: string; createdAt: string }> }>(
         `/api/v1/workspaces/${workspaceId}/modules/faktura/products/${id}`,

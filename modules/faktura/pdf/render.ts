@@ -4,8 +4,10 @@ import type { DocumentDto } from "../services/documents.js";
 import type { CompanySettingsDto } from "../services/companySettings.js";
 import type { CustomerDto } from "../services/customers.js";
 import { documentTypeLabel, unitLabelDe, taxRateLabel } from "./text.de.js";
+import { drawTestBanner } from "./testBanner.js";
 
 const PAGE_MARGIN = 50;
+const PAGE_WIDTH = 595.28; // A4 width in pt
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -27,6 +29,8 @@ export function renderDocumentPdf(document: DocumentDto, customer: CustomerDto, 
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
+
+    if (company.testMode) drawTestBanner(doc, PAGE_WIDTH);
 
     doc.fontSize(8).fillColor("#666666").text(`${company.legalName} · ${company.street} · ${company.postalCode} ${company.city}`, PAGE_MARGIN, PAGE_MARGIN);
 
@@ -84,6 +88,7 @@ export function renderDocumentPdf(document: DocumentDto, customer: CustomerDto, 
     for (const line of document.lines) {
       if (tableY > 720) {
         doc.addPage();
+        if (company.testMode) drawTestBanner(doc, PAGE_WIDTH);
         tableY = PAGE_MARGIN;
       }
       const unitLabel = unitLabelDe[line.unit] ?? line.unit;

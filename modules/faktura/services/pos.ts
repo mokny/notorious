@@ -1,10 +1,11 @@
 import type { ModuleSdk } from "../manifest.js";
 import type { FakturaPaymentMethod } from "../db/types.js";
-import { createDraftDocument, type DocumentDto } from "./documents.js";
-import { issueDocument } from "./numbering.js";
-import { recordPayment, type PaymentDto } from "./payments.js";
+import { createDraftDocument, requireDocument, type DocumentDto } from "./documents.js";
+import { issueDocument, cancelDocument } from "./numbering.js";
+import { recordPayment, listPayments, deletePayment, type PaymentDto } from "./payments.js";
 import { requireProduct } from "./products.js";
 import { requireActiveShift } from "./posShifts.js";
+import { undoBookingsForSource } from "./bookings.js";
 
 const WALK_IN_CUSTOMER_NAME = "Laufkundschaft (Kasse)";
 
@@ -76,4 +77,34 @@ export function createPosSale(
   });
 
   return { document, payment };
+}
+
+/**
+ * Voids a POS sale (Storno): unlike a plain "cancel" on an ordinary invoice
+ * (where a payment may be partial/absent and reversing it isn't
+ * automatically correct), a POS receipt is always paid in full at the time
+ * of sale, so voiding it can safely and automatically undo everything it
+ * caused -
+ *   1. the payment record itself (payments carry no GoBD binding, plain
+ *      delete - see services/payments.ts),
+ *   2. every booking proposed/confirmed from that payment,
+ *   3. every booking proposed/confirmed from the receipt document itself
+ *      (the revenue/tax lines),
+ *   4. finally the document is marked `cancelled` (never deleted - GoBD).
+ * This keeps the cash shift's expected-cash calculation
+ * (services/posShifts.ts::closeShift, which sums live `faktura_payments`
+ * rows) and the accounting journal correct without any manual cleanup.
+ */
+export function cancelPosSale(sdk: ModuleSdk, workspaceId: string, actorId: string, documentId: string): DocumentDto {
+  const document = requireDocument(sdk, workspaceId, documentId);
+  if (document.type !== "pos_receipt") throw new Error("Only POS receipts can be voided this way");
+  if (document.status !== "issued") throw new Error("Only an issued receipt can be voided");
+
+  for (const payment of listPayments(sdk, workspaceId, documentId)) {
+    undoBookingsForSource(sdk, workspaceId, actorId, "payment", payment.id);
+    deletePayment(sdk, workspaceId, payment.id);
+  }
+  undoBookingsForSource(sdk, workspaceId, actorId, "invoice", documentId);
+
+  return cancelDocument(sdk, workspaceId, documentId);
 }

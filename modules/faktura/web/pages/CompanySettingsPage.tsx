@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fakturaApi, type UpdateCompanySettingsInput } from "../api.js";
+import { Modal } from "../../../../packages/web/src/components/ui/Modal.js";
+import { RESET_CONFIRMATION_PHRASE } from "./resetConfirmationPhrase.js";
 
 const EMPTY_FORM: UpdateCompanySettingsInput = {
   legalName: "",
@@ -30,6 +32,7 @@ const EMPTY_FORM: UpdateCompanySettingsInput = {
   dunningLevel3FeeCents: 1000,
   dunningInterestRatePercent: 9.89,
   chartOfAccounts: "skr04",
+  testMode: false,
 };
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
@@ -78,6 +81,7 @@ function CompanySettingsPage() {
         dunningLevel3FeeCents: data.dunningLevel3FeeCents,
         dunningInterestRatePercent: data.dunningInterestRatePercent,
         chartOfAccounts: data.chartOfAccounts,
+        testMode: data.testMode,
       });
     }
   }, [data]);
@@ -85,6 +89,17 @@ function CompanySettingsPage() {
   const saveMutation = useMutation({
     mutationFn: () => fakturaApi.settings.update(workspaceId!, form),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetConfirmationText, setResetConfirmationText] = useState("");
+  const resetMutation = useMutation({
+    mutationFn: () => fakturaApi.settings.reset(workspaceId!, resetConfirmationText),
+    onSuccess: () => {
+      setResetModalOpen(false);
+      setResetConfirmationText("");
+      void queryClient.invalidateQueries();
+    },
   });
 
   function handleSubmit(event: FormEvent) {
@@ -148,6 +163,20 @@ function CompanySettingsPage() {
             <input type="checkbox" checked={form.isKleinunternehmer} onChange={(e) => field("isKleinunternehmer", e.target.checked)} />
             <span>Kleinunternehmer gem. §19 UStG (keine Umsatzsteuer wird ausgewiesen)</span>
           </label>
+        </section>
+
+        <section className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
+          <h2 className="text-sm font-semibold text-ink">Testmodus</h2>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.testMode} onChange={(e) => field("testMode", e.target.checked)} />
+            <span>Testmodus aktiv</span>
+          </label>
+          <p className="text-xs text-ink-muted">
+            Solange der Testmodus aktiv ist, wird auf jedem erzeugten PDF (Angebote, Aufträge, Rechnungen, Gutschriften, Mahnungen,
+            Kassenbons) ein deutlich sichtbarer roter Hinweis „TESTMODUS – KEIN ECHTER BELEG" eingeblendet. So kann sich niemand mit dem
+            System vertraut machen und dabei aus Versehen echt aussehende Belege erzeugen. Vor dem produktiven Einsatz unbedingt
+            deaktivieren.
+          </p>
         </section>
 
         <section className="space-y-3">
@@ -331,6 +360,70 @@ function CompanySettingsPage() {
           {saveMutation.isError && <span className="text-xs text-red-500">Fehler beim Speichern.</span>}
         </div>
       </form>
+
+      <section className="space-y-3 rounded-md border border-red-300 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
+        <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">Gefahrenzone</h2>
+        <p className="text-xs text-ink-muted">
+          Löscht unwiderruflich alle Kunden, Lieferanten, Produkte, Angebote/Aufträge/Rechnungen/Gutschriften/Kassenbons, Zahlungen,
+          Mahnungen, Ausgaben, Buchungen, Kassenschichten und Anhänge dieses Workspaces. Firmeneinstellungen, Steuerkonfiguration,
+          Kontenrahmen, Nummernkreis-Präfixe und der Testmodus-Status bleiben erhalten.
+        </p>
+        <button
+          type="button"
+          onClick={() => setResetModalOpen(true)}
+          className="rounded-md border border-red-400 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-100 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-900"
+        >
+          Faktura-Daten zurücksetzen…
+        </button>
+      </section>
+
+      <Modal
+        open={resetModalOpen}
+        onOpenChange={(open) => {
+          setResetModalOpen(open);
+          if (!open) setResetConfirmationText("");
+        }}
+        title="Faktura-Daten wirklich zurücksetzen?"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-ink">
+            Diese Aktion kann <strong>nicht rückgängig gemacht werden</strong>. Es werden alle Kunden, Lieferanten, Produkte, Belege,
+            Zahlungen, Mahnungen, Ausgaben, Buchungen und Kassenschichten dieses Workspaces endgültig gelöscht.
+          </p>
+          <label className={labelClass}>
+            <span className={labelTextClass}>
+              Zum Bestätigen bitte <code>{RESET_CONFIRMATION_PHRASE}</code> eingeben
+            </span>
+            <input
+              className={inputClass}
+              value={resetConfirmationText}
+              onChange={(e) => setResetConfirmationText(e.target.value)}
+              autoFocus
+            />
+          </label>
+          {resetMutation.isError && <p className="text-xs text-red-500">Fehler beim Zurücksetzen.</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResetModalOpen(false);
+                setResetConfirmationText("");
+              }}
+              className="rounded-md border border-border px-3 py-1.5 text-sm"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              disabled={resetConfirmationText !== RESET_CONFIRMATION_PHRASE || resetMutation.isPending}
+              onClick={() => resetMutation.mutate()}
+              className="rounded-md bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            >
+              Endgültig zurücksetzen
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
