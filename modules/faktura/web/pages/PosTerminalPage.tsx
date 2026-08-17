@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Modal } from "../../../../packages/web/src/components/ui/Modal.js";
 import { fakturaApi, type PaymentMethod, type ProductListItemDto } from "../api.js";
 import { PosProductGrid } from "../components/PosProductGrid.js";
 import { PosCart, type CartItem } from "../components/PosCart.js";
@@ -60,7 +61,7 @@ function PosTerminalPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [lastDocumentId, setLastDocumentId] = useState<string | null>(null);
+  const [receiptDocumentId, setReceiptDocumentId] = useState<string | null>(null);
   // Own state, not derived from `document.fullscreenElement`: iPadOS Safari
   // doesn't support the Fullscreen API for ordinary elements (only
   // <video>), so `requestFullscreen()` silently does nothing there. This
@@ -110,7 +111,7 @@ function PosTerminalPage() {
       ),
     onSuccess: (result) => {
       setCart([]);
-      setLastDocumentId(result.document.id);
+      setReceiptDocumentId(result.document.id);
       void queryClient.invalidateQueries({ queryKey: ["module-faktura-pos-active-shift", workspaceId] });
     },
   });
@@ -127,6 +128,8 @@ function PosTerminalPage() {
     );
   }
 
+  const receiptPdfUrl = receiptDocumentId ? `/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${receiptDocumentId}/pdf` : null;
+
   return (
     <div
       ref={containerRef}
@@ -136,7 +139,7 @@ function PosTerminalPage() {
           : "flex h-[calc(100vh-4rem)] gap-4 bg-surface px-4 py-4"
       }
     >
-      <div className="w-2/3">
+      <div className="min-w-0 flex-1 overflow-y-auto">
         <div className="mb-2 flex justify-end">
           <button type="button" onClick={toggleFullscreen} className="rounded-md border border-border px-3 py-1.5 text-sm">
             {isFullscreen ? "Vollbild beenden" : "Vollbild"}
@@ -144,23 +147,8 @@ function PosTerminalPage() {
         </div>
         <PosProductGrid products={products ?? []} onAdd={addToCart} />
       </div>
-      <div className="w-1/3 space-y-2">
-        {lastDocumentId && (
-          <div className="flex items-center gap-3 rounded-md border border-border p-2">
-            <img src={fakturaApi.documents.qrUrl(workspaceId!, lastDocumentId)} alt="QR-Code für den letzten Bon" className="h-20 w-20" />
-            <div className="flex-1 text-xs">
-              <p className="text-ink-muted">Bon per QR-Code herunterladen</p>
-              <a
-                href={`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${lastDocumentId}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-accent underline"
-              >
-                oder hier öffnen
-              </a>
-            </div>
-          </div>
-        )}
+      {/* Fixed-width, never shrinking - summary/cart always stay visible on the right, regardless of product-grid content. */}
+      <div className="flex w-1/3 shrink-0 flex-col gap-2">
         {checkoutMutation.isError && (
           <p className="text-xs text-red-500">{checkoutMutation.error instanceof Error ? checkoutMutation.error.message : "Fehler."}</p>
         )}
@@ -174,6 +162,29 @@ function PosTerminalPage() {
           checkoutDisabled={cart.length === 0 || checkoutMutation.isPending}
         />
       </div>
+
+      <Modal open={Boolean(receiptDocumentId)} onOpenChange={(open) => !open && setReceiptDocumentId(null)} title="Verkauf abgeschlossen">
+        {receiptDocumentId && (
+          <div className="flex flex-col items-center gap-3">
+            <img
+              src={fakturaApi.documents.qrUrl(workspaceId!, receiptDocumentId, window.location.origin)}
+              alt="QR-Code für den Bon"
+              className="h-48 w-48"
+            />
+            <p className="text-center text-xs text-ink-muted">Bon mit dem Smartphone scannen und herunterladen.</p>
+            {receiptPdfUrl && (
+              <a
+                href={receiptPdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full rounded-md bg-accent px-4 py-2 text-center text-sm text-white"
+              >
+                Bon öffnen
+              </a>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

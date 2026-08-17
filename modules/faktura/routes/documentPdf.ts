@@ -54,11 +54,15 @@ export function registerDocumentPdfRoutes(app: FastifyInstance, sdk: ModuleSdk):
 
   // Staff-only: a QR code encoding the public download link below, meant to
   // be shown on the POS terminal screen for a customer to scan with their
-  // own phone (see web/pages/PosTerminalPage.tsx). Assumes the API is
-  // reachable at `sdk.webOrigin` (true for the typical single-origin nginx
-  // deployment described in docs/DEPLOYMENT.md/NGINX.md) - in local dev
-  // this only works if scanned from the same machine, since `webOrigin`
-  // defaults to `http://localhost:5173`.
+  // own phone (see web/pages/PosTerminalPage.tsx). The caller passes its
+  // own `window.location.origin` as `?origin=` - that's the only origin
+  // guaranteed to be what the staff device (and therefore, on the same
+  // network, the customer's phone) actually used to reach this app,
+  // regardless of dev-proxy rewriting (Vite's `/api` proxy runs with
+  // `changeOrigin: true`, so the `Host` header Fastify sees is always
+  // "localhost:4000", not whatever LAN address/domain the browser is really
+  // on) or reverse-proxy setups. Falls back to `sdk.webOrigin` (a static
+  // env-configured default) only if the query param is missing/malformed.
   app.get("/api/v1/workspaces/:workspaceId/modules/faktura/documents/:id/qr", async (request, reply) => {
     const { workspaceId, id } = request.params as { workspaceId: string; id: string };
     await sdk.requireModuleAccess(request, workspaceId, "faktura.documents.view");
@@ -68,8 +72,10 @@ export function registerDocumentPdfRoutes(app: FastifyInstance, sdk: ModuleSdk):
       reply.code(404);
       return { message: "Document not found" };
     }
+    const { origin } = request.query as { origin?: string };
+    const baseOrigin = origin && /^https?:\/\/[^/]+$/.test(origin) ? origin : sdk.webOrigin;
     const token = ensurePublicShareToken(sdk, workspaceId, id);
-    const url = `${sdk.webOrigin}/api/v1/public/faktura/receipts/${token}`;
+    const url = `${baseOrigin}/api/v1/public/faktura/receipts/${token}`;
     const png = await QRCode.toBuffer(url, { type: "png", width: 300, margin: 1 });
     reply.header("Content-Type", "image/png");
     return reply.send(png);

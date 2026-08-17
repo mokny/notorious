@@ -476,7 +476,11 @@ export const fakturaApi = {
       apiRequest<DocumentDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/convert`, { method: "POST", body: { targetType } }),
     derived: (workspaceId: string, id: string) =>
       apiRequest<DocumentDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/derived`),
-    qrUrl: (workspaceId: string, id: string) => `/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/qr`,
+    // `origin` should be `window.location.origin` from the caller - the
+    // server can't reliably infer it itself (dev-proxy/reverse-proxy Host
+    // header rewriting), see routes/documentPdf.ts's doc comment.
+    qrUrl: (workspaceId: string, id: string, origin: string) =>
+      `/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/qr?origin=${encodeURIComponent(origin)}`,
   },
   payments: {
     list: (workspaceId: string, invoiceId: string) =>
