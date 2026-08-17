@@ -61,21 +61,27 @@ function PosTerminalPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [lastDocumentId, setLastDocumentId] = useState<string | null>(null);
+  // Own state, not derived from `document.fullscreenElement`: iPadOS Safari
+  // doesn't support the Fullscreen API for ordinary elements (only
+  // <video>), so `requestFullscreen()` silently does nothing there. This
+  // CSS-only "cover the whole viewport" mode works on every device
+  // regardless, and also hides this app's own sidebar/top bar (they're
+  // simply painted over, not just this page's own content) since it's a
+  // fixed-position overlay above everything else in the DOM. The native
+  // Fullscreen API is still attempted as a bonus on browsers that do
+  // support it (desktop/Android Chrome etc. also hide the browser chrome).
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  useEffect(() => {
-    function handleChange() {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    }
-    document.addEventListener("fullscreenchange", handleChange);
-    return () => document.removeEventListener("fullscreenchange", handleChange);
-  }, []);
-
   function toggleFullscreen() {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen();
-    } else {
-      void containerRef.current?.requestFullscreen();
+    const enteringFullscreen = !isFullscreen;
+    setIsFullscreen(enteringFullscreen);
+
+    if (enteringFullscreen) {
+      if (containerRef.current && typeof containerRef.current.requestFullscreen === "function") {
+        void containerRef.current.requestFullscreen().catch(() => {});
+      }
+    } else if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
     }
   }
 
@@ -122,7 +128,14 @@ function PosTerminalPage() {
   }
 
   return (
-    <div ref={containerRef} className="flex h-[calc(100vh-4rem)] gap-4 bg-surface px-4 py-4">
+    <div
+      ref={containerRef}
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-50 flex h-[100dvh] w-screen gap-4 overflow-y-auto bg-surface px-4 py-4"
+          : "flex h-[calc(100vh-4rem)] gap-4 bg-surface px-4 py-4"
+      }
+    >
       <div className="w-2/3">
         <div className="mb-2 flex justify-end">
           <button type="button" onClick={toggleFullscreen} className="rounded-md border border-border px-3 py-1.5 text-sm">
