@@ -1,0 +1,42 @@
+# Notorious API - Home Assistant example (native rest_command, no external script).
+#
+# Appends a paragraph block to a fixed Notorious object every time a door/window
+# binary_sensor changes state - e.g. a running log of "Front Door opened um 14:32".
+#
+# Setup:
+#   1. Get an API key: web UI -> Settings -> API keys -> Create key.
+#   2. Add it to secrets.yaml, INCLUDING the "Bearer " prefix - a `!secret` tag
+#      must be the whole value of a YAML node, it can't be spliced into a string:
+#        notorious_api_token: "Bearer ntr_your_api_token_here"
+#   3. Find the target object id: open the note in the web UI, the id is in the URL.
+#   4. Copy the rest_command and automation below into configuration.yaml (or split
+#      into rest_commands.yaml / automations.yaml per your setup), fill in the
+#      object id and your Notorious URL, then adjust the trigger's entity_id.
+#   5. Reload YAML config (or restart Home Assistant).
+
+rest_command:
+  notorious_add_paragraph:
+    url: "http://localhost:4000/api/v1/blocks"
+    method: POST
+    headers:
+      Authorization: !secret notorious_api_token
+      Content-Type: "application/json"
+    payload: >-
+      {"objectId": "your-object-id", "type": "paragraph", "content": {"markdown": "{{ text }}"}}
+    content_type: "application/json"
+
+automation:
+  - alias: "Log door sensor to Notorious"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.front_door
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state in ['on', 'off'] }}"
+    action:
+      - service: rest_command.notorious_add_paragraph
+        data:
+          text: >-
+            {{ trigger.to_state.name }}
+            {{ 'geöffnet' if trigger.to_state.state == 'on' else 'geschlossen' }}
+            um {{ now().strftime('%H:%M') }}

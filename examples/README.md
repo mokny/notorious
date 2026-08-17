@@ -35,3 +35,9 @@ Run, e.g.:
 python python/log_rotate.py "backup finished"
 php php/log_rotate.php "backup finished"
 ```
+
+## Home Assistant
+
+See [`home-assistant/`](home-assistant/) for appending a paragraph to a Notorious
+note from a Home Assistant automation (e.g. logging door/window sensor events) -
+both a native `rest_command` and a `shell_command` + Python script variant.
