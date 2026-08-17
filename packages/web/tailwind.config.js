@@ -1,7 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: "class",
-  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  // "../../modules/**" is included because the module system (e.g.
+  // modules/faktura/web/**) ships its own React components with Tailwind
+  // classes that live outside packages/web/src - without this, any class
+  // used only inside a module (never elsewhere in core src) gets purged
+  // from the compiled CSS and silently falls back to default block layout.
+  content: ["./index.html", "./src/**/*.{ts,tsx}", "../../modules/**/*.{ts,tsx}"],
   future: {
     // Every `hover:` class app-wide (not just group-hover reveal patterns
     // like PinnedNavItem.tsx's - plain `hover:bg-surface`/`hover:text-ink`
