@@ -36,6 +36,17 @@ export const env = {
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   vapidSubject: process.env.VAPID_SUBJECT ?? "mailto:admin@example.com",
+  // SMTP relay for outbound email (currently only used by the Faktura
+  // module to send documents - see lib/mailer.ts). Unset by default: no
+  // part of the app sent email before this, so there's no historical
+  // fallback to preserve; sendMail() throws a clear error if smtpHost is
+  // empty rather than silently no-opping.
+  smtpHost: process.env.SMTP_HOST ?? "",
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpSecure: process.env.SMTP_SECURE === "true",
+  smtpUser: process.env.SMTP_USER ?? "",
+  smtpPassword: process.env.SMTP_PASSWORD ?? "",
+  smtpFrom: process.env.SMTP_FROM ?? "",
   webOrigin: process.env.WEB_ORIGIN ?? "http://localhost:5173",
   // The exact public origin (scheme + hostname + optional port, no trailing
   // slash) this instance is reachable at - required for WebAuthn/passkeys

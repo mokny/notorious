@@ -1,0 +1,222 @@
+/** Row shapes for modules/faktura's own SQLite tables (see ../migrations). */
+
+export interface FakturaCompanySettingsRow {
+  workspace_id: string;
+  legal_name: string;
+  street: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  tax_number: string;
+  vat_id: string;
+  is_kleinunternehmer: 0 | 1;
+  bank_name: string;
+  iban: string;
+  bic: string;
+  logo_storage_path: string | null;
+  default_payment_terms_days: number;
+  quote_number_prefix: string;
+  order_number_prefix: string;
+  invoice_number_prefix: string;
+  credit_note_number_prefix: string;
+  updated_at: string;
+}
+
+export type FakturaCustomerKind = "company" | "person";
+export type FakturaTaxTreatment = "standard" | "reverse_charge";
+
+export interface FakturaCustomerRow {
+  id: string;
+  workspace_id: string;
+  kind: FakturaCustomerKind;
+  display_name: string;
+  tax_treatment: FakturaTaxTreatment;
+  vat_id: string;
+  country: string;
+  default_payment_terms_days: number | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
+export interface FakturaCustomerContactRow {
+  id: string;
+  customer_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  is_primary: 0 | 1;
+  created_at: string;
+}
+
+export type FakturaAddressKind = "billing" | "shipping";
+
+export interface FakturaCustomerAddressRow {
+  id: string;
+  customer_id: string;
+  kind: FakturaAddressKind;
+  street: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  is_default: 0 | 1;
+  created_at: string;
+}
+
+export interface FakturaSupplierRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  street: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  vat_id: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
+export type FakturaProductUnit = "piece" | "hour" | "day" | "flat" | "kg" | "custom";
+export type FakturaTaxRateBasisPoints = 0 | 700 | 1900;
+
+export interface FakturaProductRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  unit: FakturaProductUnit;
+  unit_label: string;
+  base_price_cents: number;
+  tax_rate_basis_points: FakturaTaxRateBasisPoints;
+  sku: string;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
+export interface FakturaProductPriceTierRow {
+  id: string;
+  product_id: string;
+  min_quantity: number;
+  price_cents: number;
+  created_at: string;
+}
+
+export interface FakturaCustomerProductPriceRow {
+  id: string;
+  product_id: string;
+  customer_id: string;
+  price_cents: number;
+  effective_from: string;
+  created_at: string;
+}
+
+export interface FakturaPriceHistoryRow {
+  id: string;
+  product_id: string;
+  customer_id: string | null;
+  price_cents: number;
+  effective_from: string;
+  created_by: string;
+  created_at: string;
+}
+
+export type FakturaDocumentType = "quote" | "order" | "invoice" | "credit_note";
+export type FakturaDocumentStatus = "draft" | "issued" | "cancelled";
+
+export interface FakturaDocumentRow {
+  id: string;
+  workspace_id: string;
+  type: FakturaDocumentType;
+  status: FakturaDocumentStatus;
+  number: string | null;
+  customer_id: string;
+  source_document_id: string | null;
+  billing_street: string;
+  billing_postal_code: string;
+  billing_city: string;
+  billing_country: string;
+  shipping_street: string;
+  shipping_postal_code: string;
+  shipping_city: string;
+  shipping_country: string;
+  issue_date: string | null;
+  due_date: string | null;
+  tax_treatment: FakturaTaxTreatment;
+  currency: string;
+  subtotal_cents: number;
+  tax_total_cents: number;
+  total_cents: number;
+  notes: string;
+  legal_disclaimer_text: string;
+  pdf_storage_path: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  issued_at: string | null;
+}
+
+export interface FakturaDocumentLineRow {
+  id: string;
+  document_id: string;
+  product_id: string | null;
+  position: number;
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price_cents: number;
+  discount_percent: number;
+  tax_rate_basis_points: FakturaTaxRateBasisPoints;
+  line_subtotal_cents: number;
+  line_tax_cents: number;
+  line_total_cents: number;
+}
+
+export interface FakturaDocumentTaxBreakdownRow {
+  id: string;
+  document_id: string;
+  tax_rate_basis_points: FakturaTaxRateBasisPoints;
+  net_total_cents: number;
+  tax_total_cents: number;
+}
+
+export interface FakturaNumberSequenceRow {
+  workspace_id: string;
+  document_type: FakturaDocumentType;
+  year: number;
+  next_number: number;
+}
+
+export type FakturaAttachmentEntityType = "customer" | "order";
+
+export interface FakturaAttachmentRow {
+  id: string;
+  workspace_id: string;
+  entity_type: FakturaAttachmentEntityType;
+  entity_id: string;
+  filename: string;
+  storage_path: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  created_at: string;
+}
+
+export interface FakturaAuditLogRow {
+  id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  actor_id: string;
+  summary: string;
+  diff_json: string | null;
+  created_at: string;
+}

@@ -1,5 +1,6 @@
 import type { ModuleWebManifest } from "./types.js";
 import { manifest as exampleManifest } from "../../../../modules/example/web/manifest.js";
+import { manifest as fakturaManifest } from "../../../../modules/faktura/web/manifest.js";
 
 /**
  * Every module's web manifest, statically imported - unlike the server's
@@ -10,4 +11,4 @@ import { manifest as exampleManifest } from "../../../../modules/example/web/man
  * against `GET /api/v1/workspaces/:id/modules` (which module is actually
  * enabled/permitted) before rendering anything from it.
  */
-export const MODULE_WEB_MANIFESTS: ModuleWebManifest[] = [exampleManifest];
+export const MODULE_WEB_MANIFESTS: ModuleWebManifest[] = [exampleManifest, fakturaManifest];
