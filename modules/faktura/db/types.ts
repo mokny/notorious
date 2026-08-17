@@ -27,6 +27,8 @@ export interface FakturaCompanySettingsRow {
   dunning_level_2_fee_cents: number;
   dunning_level_3_fee_cents: number;
   dunning_interest_rate_percent: number;
+  chart_of_accounts: "skr03" | "skr04";
+  pos_receipt_number_prefix: string;
   updated_at: string;
 }
 
@@ -104,6 +106,8 @@ export interface FakturaProductRow {
   base_price_cents: number;
   tax_rate_basis_points: FakturaTaxRateBasisPoints;
   sku: string;
+  pos_enabled: 0 | 1;
+  pos_category: string;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -136,7 +140,7 @@ export interface FakturaPriceHistoryRow {
   created_at: string;
 }
 
-export type FakturaDocumentType = "quote" | "order" | "invoice" | "credit_note";
+export type FakturaDocumentType = "quote" | "order" | "invoice" | "credit_note" | "pos_receipt";
 export type FakturaDocumentStatus = "draft" | "issued" | "cancelled";
 
 export interface FakturaDocumentRow {
@@ -169,6 +173,10 @@ export interface FakturaDocumentRow {
   created_at: string;
   updated_at: string;
   issued_at: string | null;
+  pos_shift_id: string | null;
+  /** Unused placeholder for a future real TSE (Kassensicherungsverordnung) integration - see migrations/0010. */
+  tse_signature: string | null;
+  tse_transaction_number: string | null;
 }
 
 export interface FakturaDocumentLineRow {
@@ -203,7 +211,7 @@ export interface FakturaNumberSequenceRow {
   next_number: number;
 }
 
-export type FakturaAttachmentEntityType = "customer" | "order";
+export type FakturaAttachmentEntityType = "customer" | "order" | "expense";
 
 export interface FakturaAttachmentRow {
   id: string;
@@ -264,4 +272,71 @@ export interface FakturaDunningLetterRow {
   created_by: string;
   created_at: string;
   sent_at: string | null;
+}
+
+export type FakturaAccountType = "revenue" | "expense" | "asset" | "liability" | "equity";
+
+export interface FakturaAccountRow {
+  id: string;
+  workspace_id: string;
+  code: string;
+  name: string;
+  account_type: FakturaAccountType;
+  is_system: 0 | 1;
+  archived_at: string | null;
+  created_at: string;
+}
+
+export type FakturaExpensePaymentMethod = "bank_transfer" | "cash" | "direct_debit" | "other" | "open";
+
+export interface FakturaExpenseRow {
+  id: string;
+  workspace_id: string;
+  supplier_id: string | null;
+  expense_account_id: string;
+  description: string;
+  amount_cents: number;
+  tax_rate_basis_points: FakturaTaxRateBasisPoints;
+  expense_date: string;
+  payment_method: FakturaExpensePaymentMethod;
+  created_by: string;
+  created_at: string;
+}
+
+export type FakturaBookingStatus = "proposed" | "confirmed" | "reversed";
+export type FakturaBookingSourceType = "invoice" | "credit_note" | "payment" | "expense";
+
+export interface FakturaBookingRow {
+  id: string;
+  workspace_id: string;
+  booking_date: string;
+  debit_account_id: string;
+  credit_account_id: string;
+  amount_cents: number;
+  description: string;
+  tax_rate_basis_points: FakturaTaxRateBasisPoints | null;
+  status: FakturaBookingStatus;
+  source_entity_type: FakturaBookingSourceType;
+  source_entity_id: string;
+  reverses_booking_id: string | null;
+  created_by: string;
+  created_at: string;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+}
+
+export type FakturaPosShiftStatus = "open" | "closed";
+
+export interface FakturaPosShiftRow {
+  id: string;
+  workspace_id: string;
+  opened_by: string;
+  opened_at: string;
+  opening_balance_cents: number;
+  status: FakturaPosShiftStatus;
+  closed_by: string | null;
+  closed_at: string | null;
+  counted_cash_cents: number | null;
+  expected_cash_cents: number | null;
+  difference_cents: number | null;
 }

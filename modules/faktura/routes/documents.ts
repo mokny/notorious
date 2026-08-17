@@ -42,7 +42,13 @@ function parseInput(body: unknown): DocumentInput | null {
 }
 
 const typePermission = { view: "faktura.documents.view", manage: "faktura.documents.manage" } as const;
-const typeLabel: Record<FakturaDocumentType, string> = { quote: "Angebot", order: "Auftrag", invoice: "Rechnung", credit_note: "Gutschrift" };
+const typeLabel: Record<FakturaDocumentType, string> = {
+  quote: "Angebot",
+  order: "Auftrag",
+  invoice: "Rechnung",
+  credit_note: "Gutschrift",
+  pos_receipt: "Kassenbon",
+};
 
 export function registerDocumentRoutes(app: FastifyInstance, sdk: ModuleSdk): void {
   app.get("/api/v1/workspaces/:workspaceId/modules/faktura/documents", async (request) => {
@@ -143,7 +149,7 @@ export function registerDocumentRoutes(app: FastifyInstance, sdk: ModuleSdk): vo
     const { userId } = await sdk.requireModuleAccess(request, workspaceId, "faktura.documents.issue");
     let document;
     try {
-      document = issueDocument(sdk, workspaceId, id);
+      document = issueDocument(sdk, workspaceId, id, userId);
     } catch (error) {
       reply.code(409);
       return { message: error instanceof Error ? error.message : "Could not issue document" };

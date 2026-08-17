@@ -20,6 +20,7 @@ const EMPTY_FORM: UpdateCompanySettingsInput = {
   orderNumberPrefix: "AB",
   invoiceNumberPrefix: "RE",
   creditNoteNumberPrefix: "GS",
+  posReceiptNumberPrefix: "BON",
   dunningNumberPrefix: "MA",
   dunningLevel1Days: 7,
   dunningLevel2Days: 14,
@@ -28,6 +29,7 @@ const EMPTY_FORM: UpdateCompanySettingsInput = {
   dunningLevel2FeeCents: 500,
   dunningLevel3FeeCents: 1000,
   dunningInterestRatePercent: 9.89,
+  chartOfAccounts: "skr04",
 };
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
@@ -66,6 +68,7 @@ function CompanySettingsPage() {
         orderNumberPrefix: data.orderNumberPrefix,
         invoiceNumberPrefix: data.invoiceNumberPrefix,
         creditNoteNumberPrefix: data.creditNoteNumberPrefix,
+        posReceiptNumberPrefix: data.posReceiptNumberPrefix,
         dunningNumberPrefix: data.dunningNumberPrefix,
         dunningLevel1Days: data.dunningLevel1Days,
         dunningLevel2Days: data.dunningLevel2Days,
@@ -74,6 +77,7 @@ function CompanySettingsPage() {
         dunningLevel2FeeCents: data.dunningLevel2FeeCents,
         dunningLevel3FeeCents: data.dunningLevel3FeeCents,
         dunningInterestRatePercent: data.dunningInterestRatePercent,
+        chartOfAccounts: data.chartOfAccounts,
       });
     }
   }, [data]);
@@ -147,6 +151,25 @@ function CompanySettingsPage() {
         </section>
 
         <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink">Buchhaltung</h2>
+          <label className={labelClass}>
+            <span className={labelTextClass}>Kontenrahmen</span>
+            <select
+              className={inputClass}
+              value={form.chartOfAccounts}
+              onChange={(e) => field("chartOfAccounts", e.target.value as "skr03" | "skr04")}
+            >
+              <option value="skr04">SKR04</option>
+              <option value="skr03">SKR03</option>
+            </select>
+          </label>
+          <p className="text-xs text-ink-muted">
+            Beim Speichern wird ein reduzierter Standard-Kontenrahmen für die gewählte Variante einmalig angelegt (bereits vorhandene Konten
+            bleiben unangetastet).
+          </p>
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-sm font-semibold text-ink">Bankverbindung</h2>
           <label className={labelClass}>
             <span className={labelTextClass}>Bank</span>
@@ -166,7 +189,7 @@ function CompanySettingsPage() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-ink">Belegnummernkreise &amp; Zahlungsziel</h2>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <label className={labelClass}>
               <span className={labelTextClass}>Angebot-Präfix</span>
               <input className={inputClass} value={form.quoteNumberPrefix} onChange={(e) => field("quoteNumberPrefix", e.target.value)} />
@@ -185,6 +208,14 @@ function CompanySettingsPage() {
                 className={inputClass}
                 value={form.creditNoteNumberPrefix}
                 onChange={(e) => field("creditNoteNumberPrefix", e.target.value)}
+              />
+            </label>
+            <label className={labelClass}>
+              <span className={labelTextClass}>Kassenbon-Präfix</span>
+              <input
+                className={inputClass}
+                value={form.posReceiptNumberPrefix}
+                onChange={(e) => field("posReceiptNumberPrefix", e.target.value)}
               />
             </label>
           </div>

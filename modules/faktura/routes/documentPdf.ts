@@ -4,6 +4,7 @@ import { getDocument, setPdfStoragePath } from "../services/documents.js";
 import { getCustomer } from "../services/customers.js";
 import { getCompanySettings } from "../services/companySettings.js";
 import { renderDocumentPdf } from "../pdf/render.js";
+import { renderPosReceiptPdf } from "../pdf/renderPosReceipt.js";
 
 /**
  * Renders (or, for an already-issued document, re-serves the cached copy
@@ -22,7 +23,8 @@ export async function renderAndMaybeCachePdf(sdk: ModuleSdk, workspaceId: string
     return sdk.storage.read(document.pdfStoragePath);
   }
 
-  const buffer = await renderDocumentPdf(document, customer, company);
+  const buffer =
+    document.type === "pos_receipt" ? await renderPosReceiptPdf(document, company) : await renderDocumentPdf(document, customer, company);
 
   if (document.status === "issued") {
     const { storagePath } = await sdk.storage.write(`faktura/${workspaceId}/documents`, `${document.number}.pdf`, buffer);

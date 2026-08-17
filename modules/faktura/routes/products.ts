@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ModuleSdk } from "../manifest.js";
 import {
   listProducts,
+  listPosProducts,
   getProduct,
   createProduct,
   updateProduct,
@@ -30,6 +31,8 @@ function parseInput(body: unknown): ProductInput | null {
     basePriceCents: b.basePriceCents,
     taxRateBasisPoints: b.taxRateBasisPoints as FakturaTaxRateBasisPoints,
     sku: b.sku,
+    posEnabled: b.posEnabled,
+    posCategory: b.posCategory,
     priceTiers: b.priceTiers,
     customerPrices: b.customerPrices,
   };
@@ -41,6 +44,12 @@ export function registerProductRoutes(app: FastifyInstance, sdk: ModuleSdk): voi
     await sdk.requireModuleAccess(request, workspaceId, "faktura.products.view");
     const { includeArchived } = request.query as { includeArchived?: string };
     return listProducts(sdk, workspaceId, includeArchived === "true");
+  });
+
+  app.get("/api/v1/workspaces/:workspaceId/modules/faktura/products/pos", async (request) => {
+    const { workspaceId } = request.params as { workspaceId: string };
+    await sdk.requireModuleAccess(request, workspaceId, "faktura.pos.use");
+    return listPosProducts(sdk, workspaceId);
   });
 
   app.get("/api/v1/workspaces/:workspaceId/modules/faktura/products/:id", async (request, reply) => {

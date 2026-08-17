@@ -29,6 +29,8 @@ export interface ProductDto {
   basePriceCents: number;
   taxRateBasisPoints: FakturaTaxRateBasisPoints;
   sku: string;
+  posEnabled: boolean;
+  posCategory: string;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -42,6 +44,8 @@ export interface ProductListItemDto {
   unit: FakturaProductUnit;
   basePriceCents: number;
   taxRateBasisPoints: FakturaTaxRateBasisPoints;
+  posEnabled: boolean;
+  posCategory: string;
   archivedAt: string | null;
 }
 
@@ -69,6 +73,8 @@ function rowToDto(sdk: ModuleSdk, row: FakturaProductRow): ProductDto {
     basePriceCents: row.base_price_cents,
     taxRateBasisPoints: row.tax_rate_basis_points,
     sku: row.sku,
+    posEnabled: row.pos_enabled === 1,
+    posCategory: row.pos_category,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     archivedAt: row.archived_at,
@@ -91,6 +97,25 @@ export function listProducts(sdk: ModuleSdk, workspaceId: string, includeArchive
     unit: row.unit,
     basePriceCents: row.base_price_cents,
     taxRateBasisPoints: row.tax_rate_basis_points,
+    posEnabled: row.pos_enabled === 1,
+    posCategory: row.pos_category,
+    archivedAt: row.archived_at,
+  }));
+}
+
+/** Products enabled for the POS terminal grid (see web/pages/PosTerminalPage.tsx), grouped by category there. */
+export function listPosProducts(sdk: ModuleSdk, workspaceId: string): ProductListItemDto[] {
+  const rows = sdk.sqlite
+    .prepare("SELECT * FROM faktura_products WHERE workspace_id = ? AND pos_enabled = 1 AND archived_at IS NULL ORDER BY pos_category ASC, name ASC")
+    .all(workspaceId) as FakturaProductRow[];
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    unit: row.unit,
+    basePriceCents: row.base_price_cents,
+    taxRateBasisPoints: row.tax_rate_basis_points,
+    posEnabled: row.pos_enabled === 1,
+    posCategory: row.pos_category,
     archivedAt: row.archived_at,
   }));
 }
@@ -119,6 +144,8 @@ export interface ProductInput {
   basePriceCents: number;
   taxRateBasisPoints: FakturaTaxRateBasisPoints;
   sku?: string;
+  posEnabled?: boolean;
+  posCategory?: string;
   priceTiers?: Array<{ minQuantity: number; priceCents: number }>;
   customerPrices?: Array<{ customerId: string; priceCents: number; effectiveFrom: string }>;
 }
@@ -184,10 +211,24 @@ export function createProduct(sdk: ModuleSdk, workspaceId: string, input: Produc
   const now = sdk.nowIso();
   sdk.sqlite
     .prepare(
-      `INSERT INTO faktura_products (id, workspace_id, name, description, unit, unit_label, base_price_cents, tax_rate_basis_points, sku, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO faktura_products (id, workspace_id, name, description, unit, unit_label, base_price_cents, tax_rate_basis_points, sku, pos_enabled, pos_category, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(id, workspaceId, input.name.trim(), input.description ?? "", input.unit, input.unitLabel ?? "", input.basePriceCents, input.taxRateBasisPoints, input.sku ?? "", now, now);
+    .run(
+      id,
+      workspaceId,
+      input.name.trim(),
+      input.description ?? "",
+      input.unit,
+      input.unitLabel ?? "",
+      input.basePriceCents,
+      input.taxRateBasisPoints,
+      input.sku ?? "",
+      input.posEnabled ? 1 : 0,
+      input.posCategory ?? "",
+      now,
+      now,
+    );
   recordPriceHistory(sdk, id, null, input.basePriceCents, now, actorId);
   if (input.priceTiers) replaceTiers(sdk, id, input.priceTiers);
   if (input.customerPrices) replaceCustomerPrices(sdk, workspaceId, id, input.customerPrices, actorId);
@@ -203,10 +244,23 @@ export function updateProduct(sdk: ModuleSdk, workspaceId: string, productId: st
   const now = sdk.nowIso();
   sdk.sqlite
     .prepare(
-      `UPDATE faktura_products SET name = ?, description = ?, unit = ?, unit_label = ?, base_price_cents = ?, tax_rate_basis_points = ?, sku = ?, updated_at = ?
+      `UPDATE faktura_products SET name = ?, description = ?, unit = ?, unit_label = ?, base_price_cents = ?, tax_rate_basis_points = ?, sku = ?, pos_enabled = ?, pos_category = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
     )
-    .run(input.name.trim(), input.description ?? "", input.unit, input.unitLabel ?? "", input.basePriceCents, input.taxRateBasisPoints, input.sku ?? "", now, productId, workspaceId);
+    .run(
+      input.name.trim(),
+      input.description ?? "",
+      input.unit,
+      input.unitLabel ?? "",
+      input.basePriceCents,
+      input.taxRateBasisPoints,
+      input.sku ?? "",
+      input.posEnabled ? 1 : 0,
+      input.posCategory ?? "",
+      now,
+      productId,
+      workspaceId,
+    );
 
   if (input.basePriceCents !== existing.base_price_cents) {
     recordPriceHistory(sdk, productId, null, input.basePriceCents, now, actorId);

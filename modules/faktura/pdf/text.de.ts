@@ -9,6 +9,7 @@ export const documentTypeLabel = {
   order: "Auftragsbestätigung",
   invoice: "Rechnung",
   credit_note: "Gutschrift",
+  pos_receipt: "Kassenbon",
 } as const;
 
 export const unitLabelDe: Record<string, string> = {

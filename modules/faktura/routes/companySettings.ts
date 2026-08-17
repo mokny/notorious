@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ModuleSdk } from "../manifest.js";
 import { getCompanySettings, upsertCompanySettings, type UpdateCompanySettingsInput } from "../services/companySettings.js";
+import { seedChartOfAccounts } from "../services/accounts.js";
 import { recordAudit } from "../services/audit.js";
 
 export function registerCompanySettingsRoutes(app: FastifyInstance, sdk: ModuleSdk): void {
@@ -41,6 +42,7 @@ export function registerCompanySettingsRoutes(app: FastifyInstance, sdk: ModuleS
       orderNumberPrefix: body.orderNumberPrefix ?? "AB",
       invoiceNumberPrefix: body.invoiceNumberPrefix ?? "RE",
       creditNoteNumberPrefix: body.creditNoteNumberPrefix ?? "GS",
+      posReceiptNumberPrefix: body.posReceiptNumberPrefix ?? "BON",
       dunningNumberPrefix: body.dunningNumberPrefix ?? "MA",
       dunningLevel1Days: body.dunningLevel1Days ?? 7,
       dunningLevel2Days: body.dunningLevel2Days ?? 14,
@@ -49,9 +51,11 @@ export function registerCompanySettingsRoutes(app: FastifyInstance, sdk: ModuleS
       dunningLevel2FeeCents: body.dunningLevel2FeeCents ?? 500,
       dunningLevel3FeeCents: body.dunningLevel3FeeCents ?? 1000,
       dunningInterestRatePercent: body.dunningInterestRatePercent ?? 9.89,
+      chartOfAccounts: body.chartOfAccounts === "skr03" ? "skr03" : "skr04",
     };
 
     const dto = upsertCompanySettings(sdk, workspaceId, input);
+    seedChartOfAccounts(sdk, workspaceId, input.chartOfAccounts);
     recordAudit(sdk, {
       workspaceId,
       entityType: "company_settings",

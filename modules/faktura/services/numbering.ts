@@ -3,12 +3,14 @@ import type { FakturaDocumentRow, FakturaDocumentType } from "../db/types.js";
 import { getNumberPrefixes, getCompanySettings } from "./companySettings.js";
 import { getDocument, resolveDisclaimerText, type DocumentDto } from "./documents.js";
 import { getCompanyTaxFlags } from "./companySettings.js";
+import { proposeSalesDocumentBookings } from "./bookings.js";
 
-const PREFIX_KEY: Record<FakturaDocumentType, "quote" | "order" | "invoice" | "credit_note"> = {
+const PREFIX_KEY: Record<FakturaDocumentType, "quote" | "order" | "invoice" | "credit_note" | "pos_receipt"> = {
   quote: "quote",
   order: "order",
   invoice: "invoice",
   credit_note: "credit_note",
+  pos_receipt: "pos_receipt",
 };
 
 /**
@@ -49,7 +51,7 @@ function formatNumber(prefix: string, year: number, sequence: number): string {
  * document is immutable - `updateDraftDocument`/`deleteDraftDocument`
  * refuse anything not in `draft` status (see services/documents.ts).
  */
-export function issueDocument(sdk: ModuleSdk, workspaceId: string, documentId: string): DocumentDto {
+export function issueDocument(sdk: ModuleSdk, workspaceId: string, documentId: string, actorId: string): DocumentDto {
   const tx = sdk.sqlite.transaction(() => {
     const row = sdk.sqlite
       .prepare("SELECT * FROM faktura_documents WHERE id = ? AND workspace_id = ?")
@@ -89,7 +91,11 @@ export function issueDocument(sdk: ModuleSdk, workspaceId: string, documentId: s
   });
   tx();
 
-  return getDocument(sdk, workspaceId, documentId)!;
+  const document = getDocument(sdk, workspaceId, documentId)!;
+  if (document.type === "invoice" || document.type === "credit_note" || document.type === "pos_receipt") {
+    proposeSalesDocumentBookings(sdk, workspaceId, actorId, document);
+  }
+  return document;
 }
 
 /** Voids an issued document without deleting it (GoBD: issued documents are never removed). Drafts should be deleted instead, not cancelled. */

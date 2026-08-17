@@ -45,6 +45,8 @@ function ProductDetailPage() {
   const [basePrice, setBasePrice] = useState("0,00");
   const [taxRate, setTaxRate] = useState<TaxRateBasisPoints>(1900);
   const [sku, setSku] = useState("");
+  const [posEnabled, setPosEnabled] = useState(false);
+  const [posCategory, setPosCategory] = useState("");
   const [tiers, setTiers] = useState<TierForm[]>([]);
   const [customerPrices, setCustomerPrices] = useState<CustomerPriceForm[]>([]);
 
@@ -57,6 +59,8 @@ function ProductDetailPage() {
       setBasePrice((product.basePriceCents / 100).toFixed(2).replace(".", ","));
       setTaxRate(product.taxRateBasisPoints);
       setSku(product.sku);
+      setPosEnabled(product.posEnabled);
+      setPosCategory(product.posCategory);
       setTiers(product.priceTiers.map((t) => ({ minQuantity: String(t.minQuantity), price: (t.priceCents / 100).toFixed(2).replace(".", ",") })));
       setCustomerPrices(
         product.customerPrices.map((p) => ({ customerId: p.customerId, price: (p.priceCents / 100).toFixed(2).replace(".", ","), effectiveFrom: p.effectiveFrom.slice(0, 10) })),
@@ -75,6 +79,8 @@ function ProductDetailPage() {
         basePriceCents,
         taxRateBasisPoints: taxRate,
         sku,
+        posEnabled,
+        posCategory,
         priceTiers: tiers
           .filter((t) => t.minQuantity.trim())
           .map((t) => ({ minQuantity: Number(t.minQuantity), priceCents: parseCentsInput(t.price) ?? 0 })),
@@ -144,6 +150,20 @@ function ProductDetailPage() {
             <span className={labelTextClass}>SKU / Artikelnummer</span>
             <input className={inputClass} value={sku} onChange={(e) => setSku(e.target.value)} />
           </label>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink">Kasse</h2>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={posEnabled} onChange={(e) => setPosEnabled(e.target.checked)} />
+            <span>Am Kassen-Terminal anzeigen</span>
+          </label>
+          {posEnabled && (
+            <label className={labelClass}>
+              <span className={labelTextClass}>Kassen-Kategorie</span>
+              <input className={inputClass} value={posCategory} onChange={(e) => setPosCategory(e.target.value)} placeholder="z. B. Getränke" />
+            </label>
+          )}
         </section>
 
         <section className="space-y-3">

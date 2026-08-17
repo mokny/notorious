@@ -19,6 +19,7 @@ export interface CompanySettingsDto {
   orderNumberPrefix: string;
   invoiceNumberPrefix: string;
   creditNoteNumberPrefix: string;
+  posReceiptNumberPrefix: string;
   dunningNumberPrefix: string;
   dunningLevel1Days: number;
   dunningLevel2Days: number;
@@ -27,6 +28,7 @@ export interface CompanySettingsDto {
   dunningLevel2FeeCents: number;
   dunningLevel3FeeCents: number;
   dunningInterestRatePercent: number;
+  chartOfAccounts: "skr03" | "skr04";
   updatedAt: string | null;
 }
 
@@ -48,6 +50,7 @@ const DEFAULTS: Omit<CompanySettingsDto, "updatedAt"> = {
   orderNumberPrefix: "AB",
   invoiceNumberPrefix: "RE",
   creditNoteNumberPrefix: "GS",
+  posReceiptNumberPrefix: "BON",
   dunningNumberPrefix: "MA",
   dunningLevel1Days: 7,
   dunningLevel2Days: 14,
@@ -56,6 +59,7 @@ const DEFAULTS: Omit<CompanySettingsDto, "updatedAt"> = {
   dunningLevel2FeeCents: 500,
   dunningLevel3FeeCents: 1000,
   dunningInterestRatePercent: 9.89,
+  chartOfAccounts: "skr04",
 };
 
 function toDto(row: FakturaCompanySettingsRow): CompanySettingsDto {
@@ -77,6 +81,7 @@ function toDto(row: FakturaCompanySettingsRow): CompanySettingsDto {
     orderNumberPrefix: row.order_number_prefix,
     invoiceNumberPrefix: row.invoice_number_prefix,
     creditNoteNumberPrefix: row.credit_note_number_prefix,
+    posReceiptNumberPrefix: row.pos_receipt_number_prefix,
     dunningNumberPrefix: row.dunning_number_prefix,
     dunningLevel1Days: row.dunning_level_1_days,
     dunningLevel2Days: row.dunning_level_2_days,
@@ -85,6 +90,7 @@ function toDto(row: FakturaCompanySettingsRow): CompanySettingsDto {
     dunningLevel2FeeCents: row.dunning_level_2_fee_cents,
     dunningLevel3FeeCents: row.dunning_level_3_fee_cents,
     dunningInterestRatePercent: row.dunning_interest_rate_percent,
+    chartOfAccounts: row.chart_of_accounts,
     updatedAt: row.updated_at,
   };
 }
@@ -105,22 +111,34 @@ export function getCompanyTaxFlags(sdk: ModuleSdk, workspaceId: string): { isKle
   return { isKleinunternehmer: row ? row.is_kleinunternehmer === 1 : false };
 }
 
+/** Reads the active chart of accounts without pulling in the whole DTO - used by services/accounts.ts::getAccountByPurpose and services/bookings.ts. */
+export function getChartOfAccounts(sdk: ModuleSdk, workspaceId: string): "skr03" | "skr04" {
+  const row = sdk.sqlite
+    .prepare("SELECT chart_of_accounts FROM faktura_company_settings WHERE workspace_id = ?")
+    .get(workspaceId) as Pick<FakturaCompanySettingsRow, "chart_of_accounts"> | undefined;
+  return row?.chart_of_accounts ?? DEFAULTS.chartOfAccounts;
+}
+
 export function getNumberPrefixes(
   sdk: ModuleSdk,
   workspaceId: string,
-): { quote: string; order: string; invoice: string; credit_note: string } {
+): { quote: string; order: string; invoice: string; credit_note: string; pos_receipt: string } {
   const row = sdk.sqlite
     .prepare(
-      "SELECT quote_number_prefix, order_number_prefix, invoice_number_prefix, credit_note_number_prefix FROM faktura_company_settings WHERE workspace_id = ?",
+      "SELECT quote_number_prefix, order_number_prefix, invoice_number_prefix, credit_note_number_prefix, pos_receipt_number_prefix FROM faktura_company_settings WHERE workspace_id = ?",
     )
     .get(workspaceId) as
-    | Pick<FakturaCompanySettingsRow, "quote_number_prefix" | "order_number_prefix" | "invoice_number_prefix" | "credit_note_number_prefix">
+    | Pick<
+        FakturaCompanySettingsRow,
+        "quote_number_prefix" | "order_number_prefix" | "invoice_number_prefix" | "credit_note_number_prefix" | "pos_receipt_number_prefix"
+      >
     | undefined;
   return {
     quote: row?.quote_number_prefix ?? DEFAULTS.quoteNumberPrefix,
     order: row?.order_number_prefix ?? DEFAULTS.orderNumberPrefix,
     invoice: row?.invoice_number_prefix ?? DEFAULTS.invoiceNumberPrefix,
     credit_note: row?.credit_note_number_prefix ?? DEFAULTS.creditNoteNumberPrefix,
+    pos_receipt: row?.pos_receipt_number_prefix ?? DEFAULTS.posReceiptNumberPrefix,
   };
 }
 
@@ -182,6 +200,7 @@ export interface UpdateCompanySettingsInput {
   orderNumberPrefix: string;
   invoiceNumberPrefix: string;
   creditNoteNumberPrefix: string;
+  posReceiptNumberPrefix: string;
   dunningNumberPrefix: string;
   dunningLevel1Days: number;
   dunningLevel2Days: number;
@@ -190,6 +209,7 @@ export interface UpdateCompanySettingsInput {
   dunningLevel2FeeCents: number;
   dunningLevel3FeeCents: number;
   dunningInterestRatePercent: number;
+  chartOfAccounts: "skr03" | "skr04";
 }
 
 export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input: UpdateCompanySettingsInput): CompanySettingsDto {
@@ -199,11 +219,11 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
       `INSERT INTO faktura_company_settings (
          workspace_id, legal_name, street, postal_code, city, country, tax_number, vat_id,
          is_kleinunternehmer, bank_name, iban, bic, default_payment_terms_days,
-         quote_number_prefix, order_number_prefix, invoice_number_prefix, credit_note_number_prefix,
+         quote_number_prefix, order_number_prefix, invoice_number_prefix, credit_note_number_prefix, pos_receipt_number_prefix,
          dunning_number_prefix, dunning_level_1_days, dunning_level_2_days, dunning_level_3_days,
          dunning_level_1_fee_cents, dunning_level_2_fee_cents, dunning_level_3_fee_cents, dunning_interest_rate_percent,
-         updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         chart_of_accounts, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(workspace_id) DO UPDATE SET
          legal_name = excluded.legal_name,
          street = excluded.street,
@@ -221,6 +241,7 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
          order_number_prefix = excluded.order_number_prefix,
          invoice_number_prefix = excluded.invoice_number_prefix,
          credit_note_number_prefix = excluded.credit_note_number_prefix,
+         pos_receipt_number_prefix = excluded.pos_receipt_number_prefix,
          dunning_number_prefix = excluded.dunning_number_prefix,
          dunning_level_1_days = excluded.dunning_level_1_days,
          dunning_level_2_days = excluded.dunning_level_2_days,
@@ -229,6 +250,7 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
          dunning_level_2_fee_cents = excluded.dunning_level_2_fee_cents,
          dunning_level_3_fee_cents = excluded.dunning_level_3_fee_cents,
          dunning_interest_rate_percent = excluded.dunning_interest_rate_percent,
+         chart_of_accounts = excluded.chart_of_accounts,
          updated_at = excluded.updated_at`,
     )
     .run(
@@ -249,6 +271,7 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
       input.orderNumberPrefix.trim() || DEFAULTS.orderNumberPrefix,
       input.invoiceNumberPrefix.trim() || DEFAULTS.invoiceNumberPrefix,
       input.creditNoteNumberPrefix.trim() || DEFAULTS.creditNoteNumberPrefix,
+      input.posReceiptNumberPrefix.trim() || DEFAULTS.posReceiptNumberPrefix,
       input.dunningNumberPrefix.trim() || DEFAULTS.dunningNumberPrefix,
       input.dunningLevel1Days,
       input.dunningLevel2Days,
@@ -257,6 +280,7 @@ export function upsertCompanySettings(sdk: ModuleSdk, workspaceId: string, input
       input.dunningLevel2FeeCents,
       input.dunningLevel3FeeCents,
       input.dunningInterestRatePercent,
+      input.chartOfAccounts,
       updatedAt,
     );
   return getCompanySettings(sdk, workspaceId);

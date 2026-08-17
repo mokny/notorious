@@ -18,6 +18,7 @@ export interface CompanySettingsDto {
   orderNumberPrefix: string;
   invoiceNumberPrefix: string;
   creditNoteNumberPrefix: string;
+  posReceiptNumberPrefix: string;
   dunningNumberPrefix: string;
   dunningLevel1Days: number;
   dunningLevel2Days: number;
@@ -26,6 +27,7 @@ export interface CompanySettingsDto {
   dunningLevel2FeeCents: number;
   dunningLevel3FeeCents: number;
   dunningInterestRatePercent: number;
+  chartOfAccounts: "skr03" | "skr04";
   updatedAt: string | null;
 }
 
@@ -116,6 +118,8 @@ export interface ProductDto {
   basePriceCents: number;
   taxRateBasisPoints: TaxRateBasisPoints;
   sku: string;
+  posEnabled: boolean;
+  posCategory: string;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -129,6 +133,8 @@ export interface ProductListItemDto {
   unit: ProductUnit;
   basePriceCents: number;
   taxRateBasisPoints: TaxRateBasisPoints;
+  posEnabled: boolean;
+  posCategory: string;
   archivedAt: string | null;
 }
 
@@ -140,6 +146,8 @@ export interface ProductInput {
   basePriceCents: number;
   taxRateBasisPoints: TaxRateBasisPoints;
   sku?: string;
+  posEnabled?: boolean;
+  posCategory?: string;
   priceTiers?: Array<{ minQuantity: number; priceCents: number }>;
   customerPrices?: Array<{ customerId: string; priceCents: number; effectiveFrom: string }>;
 }
@@ -281,6 +289,83 @@ export interface PaymentInput {
   notes?: string;
 }
 
+export interface PosShiftDto {
+  id: string;
+  openedBy: string;
+  openedAt: string;
+  openingBalanceCents: number;
+  status: "open" | "closed";
+  closedBy: string | null;
+  closedAt: string | null;
+  countedCashCents: number | null;
+  expectedCashCents: number | null;
+  differenceCents: number | null;
+}
+
+export type BookingStatus = "proposed" | "confirmed" | "reversed";
+export type BookingSourceType = "invoice" | "credit_note" | "payment" | "expense";
+
+export interface BookingDto {
+  id: string;
+  bookingDate: string;
+  debitAccountId: string;
+  creditAccountId: string;
+  amountCents: number;
+  description: string;
+  taxRateBasisPoints: TaxRateBasisPoints | null;
+  status: BookingStatus;
+  sourceEntityType: BookingSourceType;
+  sourceEntityId: string;
+  reversesBookingId: string | null;
+  createdBy: string;
+  createdAt: string;
+  confirmedBy: string | null;
+  confirmedAt: string | null;
+}
+
+export type ExpensePaymentMethod = "bank_transfer" | "cash" | "direct_debit" | "other" | "open";
+
+export interface ExpenseDto {
+  id: string;
+  supplierId: string | null;
+  expenseAccountId: string;
+  description: string;
+  amountCents: number;
+  taxRateBasisPoints: TaxRateBasisPoints;
+  expenseDate: string;
+  paymentMethod: ExpensePaymentMethod;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ExpenseInput {
+  supplierId?: string | null;
+  expenseAccountId: string;
+  description: string;
+  amountCents: number;
+  taxRateBasisPoints: TaxRateBasisPoints;
+  expenseDate: string;
+  paymentMethod: ExpensePaymentMethod;
+}
+
+export type AccountType = "revenue" | "expense" | "asset" | "liability" | "equity";
+
+export interface AccountDto {
+  id: string;
+  code: string;
+  name: string;
+  accountType: AccountType;
+  isSystem: boolean;
+  archivedAt: string | null;
+  createdAt: string;
+}
+
+export interface AccountInput {
+  code: string;
+  name: string;
+  accountType: AccountType;
+}
+
 export type DunningStatus = "draft" | "sent";
 
 export interface DunningLetterDto {
@@ -310,7 +395,7 @@ export interface OverdueInvoiceDto {
   suggestedLevel: 1 | 2 | 3 | null;
 }
 
-export type AttachmentEntityType = "customer" | "order";
+export type AttachmentEntityType = "customer" | "order" | "expense";
 
 export interface AttachmentDto {
   id: string;
@@ -342,6 +427,7 @@ export const fakturaApi = {
   },
   products: {
     list: (workspaceId: string) => apiRequest<ProductListItemDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/products`),
+    listPos: (workspaceId: string) => apiRequest<ProductListItemDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/products/pos`),
     get: (workspaceId: string, id: string) =>
       apiRequest<ProductDto & { priceHistory: Array<{ customerId: string | null; priceCents: number; effectiveFrom: string; createdAt: string }> }>(
         `/api/v1/workspaces/${workspaceId}/modules/faktura/products/${id}`,
@@ -403,6 +489,51 @@ export const fakturaApi = {
       }),
     remove: (workspaceId: string, id: string) =>
       apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/faktura/payments/${id}`, { method: "DELETE" }),
+  },
+  pos: {
+    activeShift: (workspaceId: string) => apiRequest<PosShiftDto | null>(`/api/v1/workspaces/${workspaceId}/modules/faktura/pos/shifts/active`),
+    shifts: (workspaceId: string) => apiRequest<PosShiftDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/pos/shifts`),
+    openShift: (workspaceId: string, openingBalanceCents: number) =>
+      apiRequest<PosShiftDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/pos/shifts`, { method: "POST", body: { openingBalanceCents } }),
+    closeShift: (workspaceId: string, id: string, countedCashCents: number) =>
+      apiRequest<PosShiftDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/pos/shifts/${id}/close`, {
+        method: "POST",
+        body: { countedCashCents },
+      }),
+    sale: (workspaceId: string, lines: Array<{ productId: string; quantity: number }>, paymentMethod: PaymentMethod) =>
+      apiRequest<{ document: DocumentDto; payment: PaymentDto }>(`/api/v1/workspaces/${workspaceId}/modules/faktura/pos/sale`, {
+        method: "POST",
+        body: { lines, paymentMethod },
+      }),
+  },
+  bookings: {
+    list: (workspaceId: string, status?: BookingStatus) =>
+      apiRequest<BookingDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/bookings`, { query: { status } }),
+    get: (workspaceId: string, id: string) => apiRequest<BookingDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/bookings/${id}`),
+    confirm: (workspaceId: string, id: string) =>
+      apiRequest<BookingDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/bookings/${id}/confirm`, { method: "POST" }),
+    confirmBulk: (workspaceId: string, ids: string[]) =>
+      apiRequest<BookingDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/bookings/confirm-bulk`, { method: "POST", body: { ids } }),
+    reject: (workspaceId: string, id: string) =>
+      apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/faktura/bookings/${id}`, { method: "DELETE" }),
+    reverse: (workspaceId: string, id: string) =>
+      apiRequest<BookingDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/bookings/${id}/reverse`, { method: "POST" }),
+  },
+  expenses: {
+    list: (workspaceId: string) => apiRequest<ExpenseDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/expenses`),
+    get: (workspaceId: string, id: string) => apiRequest<ExpenseDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/expenses/${id}`),
+    create: (workspaceId: string, input: ExpenseInput) =>
+      apiRequest<ExpenseDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/expenses`, { method: "POST", body: input }),
+  },
+  accounts: {
+    list: (workspaceId: string) => apiRequest<AccountDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/accounts`),
+    seed: (workspaceId: string) => apiRequest<AccountDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/accounts/seed`, { method: "POST" }),
+    create: (workspaceId: string, input: AccountInput) =>
+      apiRequest<AccountDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/accounts`, { method: "POST", body: input }),
+    update: (workspaceId: string, id: string, input: AccountInput) =>
+      apiRequest<AccountDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/accounts/${id}`, { method: "PUT", body: input }),
+    archive: (workspaceId: string, id: string) =>
+      apiRequest<void>(`/api/v1/workspaces/${workspaceId}/modules/faktura/accounts/${id}`, { method: "DELETE" }),
   },
   dunning: {
     overdue: (workspaceId: string) => apiRequest<OverdueInvoiceDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/dunning/overdue`),

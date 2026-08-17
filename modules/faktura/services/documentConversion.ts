@@ -16,6 +16,7 @@ const ALLOWED_CONVERSIONS: Record<FakturaDocumentType, FakturaDocumentType> = {
   order: "invoice",
   invoice: "credit_note",
   credit_note: "credit_note", // unreachable - credit notes have no further conversion target
+  pos_receipt: "credit_note", // a POS sale can still be corrected with a credit note, same as an invoice
 };
 
 function toLineInput(line: FakturaDocumentLineRow): DocumentLineInput {

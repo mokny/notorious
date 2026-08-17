@@ -1,6 +1,7 @@
 import type { ModuleSdk } from "../manifest.js";
 import type { FakturaPaymentRow, FakturaPaymentMethod } from "../db/types.js";
 import { requireDocument } from "./documents.js";
+import { proposePaymentBooking } from "./bookings.js";
 
 export interface PaymentDto {
   id: string;
@@ -66,7 +67,7 @@ export interface PaymentInput {
 
 export function recordPayment(sdk: ModuleSdk, workspaceId: string, invoiceId: string, actorId: string, input: PaymentInput): PaymentDto {
   const document = requireDocument(sdk, workspaceId, invoiceId);
-  if (document.type !== "invoice") throw new Error("Payments can only be recorded against invoices");
+  if (document.type !== "invoice" && document.type !== "pos_receipt") throw new Error("Payments can only be recorded against invoices or POS receipts");
   if (document.status !== "issued") throw new Error("Payments can only be recorded against issued invoices");
 
   const id = sdk.newId();
@@ -77,7 +78,9 @@ export function recordPayment(sdk: ModuleSdk, workspaceId: string, invoiceId: st
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(id, workspaceId, invoiceId, input.amountCents, input.paidAt, input.method, input.reference ?? "", input.notes ?? "", actorId, now);
-  return rowToDto(sdk.sqlite.prepare("SELECT * FROM faktura_payments WHERE id = ?").get(id) as FakturaPaymentRow);
+  const payment = rowToDto(sdk.sqlite.prepare("SELECT * FROM faktura_payments WHERE id = ?").get(id) as FakturaPaymentRow);
+  proposePaymentBooking(sdk, workspaceId, actorId, payment);
+  return payment;
 }
 
 export function deletePayment(sdk: ModuleSdk, workspaceId: string, paymentId: string): boolean {

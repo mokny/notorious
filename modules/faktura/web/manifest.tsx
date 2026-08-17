@@ -10,6 +10,13 @@ import { DocumentsListPage } from "./pages/DocumentsListPage.js";
 import { DocumentDetailPage } from "./pages/DocumentDetailPage.js";
 import { DunningListPage } from "./pages/DunningListPage.js";
 import { DunningDetailPage } from "./pages/DunningDetailPage.js";
+import { AccountsPage } from "./pages/AccountsPage.js";
+import { ExpensesListPage } from "./pages/ExpensesListPage.js";
+import { ExpenseDetailPage } from "./pages/ExpenseDetailPage.js";
+import { BookingsInboxPage } from "./pages/BookingsInboxPage.js";
+import { BookingsJournalPage } from "./pages/BookingsJournalPage.js";
+import { PosShiftPage } from "./pages/PosShiftPage.js";
+import { PosTerminalPage } from "./pages/PosTerminalPage.js";
 
 /**
  * Faktura - German invoicing/accounting module, Phase 1. Nav sub-items and
@@ -28,10 +35,22 @@ const manifest: ModuleWebManifest = {
     { label: "Belege", path: "belege" },
     { label: "Mahnungen", path: "mahnungen" },
     { label: "Lieferanten", path: "lieferanten" },
+    { label: "Ausgaben", path: "ausgaben" },
+    { label: "Buchungen", path: "buchungen" },
+    { label: "Kontenrahmen", path: "kontenrahmen" },
+    { label: "Kassenbuch", path: "kassenbuch" },
+    { label: "Kasse", path: "kasse" },
     { label: "Einstellungen", path: "einstellungen" },
   ],
   routes: [
+    { path: "kasse", element: <PosTerminalPage /> },
     { path: "einstellungen", element: <CompanySettingsPage /> },
+    { path: "kontenrahmen", element: <AccountsPage /> },
+    { path: "ausgaben", element: <ExpensesListPage /> },
+    { path: "ausgaben/:id", element: <ExpenseDetailPage /> },
+    { path: "buchungen", element: <BookingsInboxPage /> },
+    { path: "journal", element: <BookingsJournalPage /> },
+    { path: "kassenbuch", element: <PosShiftPage /> },
     { path: "kunden", element: <CustomersListPage /> },
     { path: "kunden/:id", element: <CustomerDetailPage /> },
     { path: "produkte", element: <ProductsListPage /> },

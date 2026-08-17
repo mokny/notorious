@@ -10,6 +10,11 @@ import { registerAttachmentRoutes } from "./routes/attachments.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
 import { registerDunningRoutes } from "./routes/dunning.js";
 import { registerDunningPdfRoutes } from "./routes/dunningPdf.js";
+import { registerAccountRoutes } from "./routes/accounts.js";
+import { registerExpenseRoutes } from "./routes/expenses.js";
+import { registerBookingRoutes } from "./routes/bookings.js";
+import { registerDatevExportRoutes } from "./routes/datevExport.js";
+import { registerPosRoutes } from "./routes/pos.js";
 
 /**
  * Structural copy of `packages/server/src/modules/moduleRegistry/sdk.ts`'s
@@ -64,6 +69,9 @@ const manifest = {
     { key: "faktura.documents.view", label: "Belege ansehen" },
     { key: "faktura.documents.manage", label: "Beleg-Entwürfe bearbeiten" },
     { key: "faktura.documents.issue", label: "Belege ausstellen" },
+    { key: "faktura.accounting.view", label: "Buchhaltung ansehen" },
+    { key: "faktura.accounting.manage", label: "Buchhaltung verwalten (Ausgaben, Buchungen, Export)" },
+    { key: "faktura.pos.use", label: "Kasse benutzen" },
   ],
 
   registerRoutes(app: FastifyInstance, sdk: ModuleSdk): void {
@@ -80,12 +88,21 @@ const manifest = {
     registerPaymentRoutes(app, sdk);
     registerDunningRoutes(app, sdk);
     registerDunningPdfRoutes(app, sdk);
+    registerAccountRoutes(app, sdk);
+    registerExpenseRoutes(app, sdk);
+    registerBookingRoutes(app, sdk);
+    registerDatevExportRoutes(app, sdk);
+    registerPosRoutes(app, sdk);
   },
 
   async purge(workspaceId: string, sdk: ModuleSdk): Promise<void> {
     const tx = sdk.sqlite.transaction((wsId: string) => {
       sdk.sqlite.prepare("DELETE FROM faktura_audit_log WHERE workspace_id = ?").run(wsId);
       sdk.sqlite.prepare("DELETE FROM faktura_dunning_letters WHERE workspace_id = ?").run(wsId);
+      sdk.sqlite.prepare("DELETE FROM faktura_bookings WHERE workspace_id = ?").run(wsId);
+      sdk.sqlite.prepare("DELETE FROM faktura_pos_shifts WHERE workspace_id = ?").run(wsId);
+      sdk.sqlite.prepare("DELETE FROM faktura_expenses WHERE workspace_id = ?").run(wsId);
+      sdk.sqlite.prepare("DELETE FROM faktura_accounts WHERE workspace_id = ?").run(wsId);
       sdk.sqlite.prepare("DELETE FROM faktura_payments WHERE workspace_id = ?").run(wsId);
       sdk.sqlite.prepare("DELETE FROM faktura_attachments WHERE workspace_id = ?").run(wsId);
       sdk.sqlite
