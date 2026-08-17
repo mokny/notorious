@@ -25,6 +25,7 @@ import { ShareDialog } from "../components/ShareDialog.js";
 import { ExportMenu } from "../components/ExportMenu.js";
 import { ObjectSlugButton } from "../components/ObjectSlugButton.js";
 import { ObjectSettingsDialog } from "../components/ObjectSettingsDialog.js";
+import { SubscribeButton } from "../components/SubscribeButton.js";
 import { PresencePanel } from "../components/PresencePanel.js";
 import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "../components/nav/IOSMenu.js";
 import { useAuth } from "../context/AuthContext.js";
@@ -509,6 +510,10 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 <Icon name="user" className="h-4 w-4" />
               </span>
             )}
+            {/* Members-only (see SubscribeButton.tsx's own doc comment) - an
+                anonymous share visitor has no account for a subscription to
+                belong to. */}
+            {!share && <SubscribeButton objectId={object.id} />}
             {/* Only shown once a cover is set - that's the only case where
                 the plain title input above is hidden entirely (see the
                 `!object.cover` guard around it), so this is the sole visible

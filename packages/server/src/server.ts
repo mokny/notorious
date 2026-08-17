@@ -8,6 +8,7 @@ import { startAiUsageScheduler } from "./modules/ai/scheduler.js";
 import { startFeedScheduler } from "./modules/feeds/scheduler.js";
 import { startAutoUpdateScheduler } from "./modules/admin/autoUpdateScheduler.js";
 import { startFailedLoginCleanup } from "./modules/admin/failedLoginCleanup.js";
+import { startSubscriptionScheduler } from "./modules/subscriptions/scheduler.js";
 
 const app = await buildApp();
 
@@ -18,6 +19,7 @@ startAiUsageScheduler();
 startFeedScheduler();
 startAutoUpdateScheduler();
 startFailedLoginCleanup();
+startSubscriptionScheduler();
 await initScriptEngine();
 
 app

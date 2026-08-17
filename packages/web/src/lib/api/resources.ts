@@ -345,6 +345,12 @@ export const commentApi = {
 };
 
 /** Members-only, full stop - see modules/notifications/routes.ts. */
+export const subscriptionApi = {
+  status: (objectId: string) => apiRequest<{ subscribed: boolean }>(`/api/v1/objects/${objectId}/subscription`),
+  subscribe: (objectId: string) => apiRequest<void>(`/api/v1/objects/${objectId}/subscription`, { method: "POST" }),
+  unsubscribe: (objectId: string) => apiRequest<void>(`/api/v1/objects/${objectId}/subscription`, { method: "DELETE" }),
+};
+
 export const notificationApi = {
   list: (workspaceId: string) => apiRequest<Notification[]>(`/api/v1/workspaces/${workspaceId}/notifications`),
   unreadCount: (workspaceId: string) => apiRequest<{ count: number }>(`/api/v1/workspaces/${workspaceId}/notifications/unread-count`),

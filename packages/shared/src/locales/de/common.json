@@ -71,6 +71,8 @@
       "objectLocked": "Dieses Objekt ist vor Änderungen gesperrt",
       "disableReverify": "Erneute Verifizierung deaktivieren",
       "requireReverify": "Erneute Verifizierung erforderlich",
+      "unsubscribeFromObject": "Abo für Änderungen beenden",
+      "subscribeToObject": "Änderungen abonnieren",
       "hideDetails": "Details ausblenden",
       "showDetails": "Details anzeigen",
       "unpinFromSidebar": "Von Seitenleiste lösen",
@@ -461,6 +463,10 @@
     },
     "mention": {
       "title": "{{actor}} hat dich in „{{title}}“ erwähnt"
+    },
+    "objectUpdate": {
+      "title": "{{actor}} hat „{{title}}“ aktualisiert",
+      "titleMultiple": "{{actor}} hat {{count}} Änderungen an „{{title}}“ vorgenommen"
     },
     "chat": {
       "attachment": "Anhang gesendet",

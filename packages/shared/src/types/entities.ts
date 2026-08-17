@@ -504,7 +504,7 @@ export interface Notification {
   objectId: string;
   objectTitle: string;
   commentId: string | null;
-  source: "comment" | "mention-comment" | "mention-block" | "mention-field";
+  source: "comment" | "mention-comment" | "mention-block" | "mention-field" | "subscription";
   blockId: string | null;
   fieldKey: string | null;
   actorName: string;

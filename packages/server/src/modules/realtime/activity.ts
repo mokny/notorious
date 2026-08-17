@@ -6,6 +6,7 @@ import { newId, nowIso } from "../../lib/ids.js";
 import { broadcast } from "./hub.js";
 import { maybeScheduleAutomation } from "../scripting/automation.js";
 import { maybeDispatchWebhooks, scheduleWebhookUpdate } from "../webhooks/service.js";
+import { enqueueSubscriberNotifications } from "../subscriptions/service.js";
 
 /** `ActivityEntry["action"]` has no "restored" case (see that type's own doc comment) - callers that need a webhook event distinct from the generic "updated" one (just the restore route today) pass this explicitly instead of relying on the action->event mapping below. */
 const ACTION_TO_WEBHOOK_EVENT: Partial<Record<ActivityEntry["action"], WebhookEvent>> = {
@@ -76,6 +77,10 @@ export async function recordAndBroadcast(input: RecordChangeInput): Promise<void
 
   if (!input.skipAutomationTrigger && input.objectId) {
     maybeScheduleAutomation(input.objectId);
+  }
+
+  if (input.objectId) {
+    await enqueueSubscriberNotifications(input.workspaceId, input.objectId, input.actorId);
   }
 
   if (input.entity === "object") {

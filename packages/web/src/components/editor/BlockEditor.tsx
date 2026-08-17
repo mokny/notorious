@@ -557,28 +557,60 @@ export function BlockEditor({
     selection?.addRange(range);
   }
 
+  /** Where a paste-created block should be inserted - the currently focused block's parent/position, same derivation `handlePaste`'s internal-block-copy branch below already used. */
+  function currentInsertionPoint(): { parentBlockId: string | null; afterBlockId: string | null } {
+    const activeBlockId = (document.activeElement as HTMLElement | null)?.closest("[data-block-id]")?.getAttribute("data-block-id") ?? null;
+    const parentBlockId = activeBlockId ? ((blocks ?? []).find((b) => b.id === activeBlockId)?.parentBlockId ?? null) : null;
+    const afterBlockId = activeBlockId ?? (tree[tree.length - 1]?.id ?? null);
+    return { parentBlockId, afterBlockId };
+  }
+
   /**
-   * Recognizes a paste carrying the hidden `data-notorious-blocks` marker
-   * (see lib/blockClipboard.ts) - a copy of one or more whole blocks made
-   * from this same app - and reconstructs them as real sibling blocks
-   * instead of falling through to TipTap's own HTML/markdown paste, which
-   * would flatten e.g. a table or checklist block into plain text. Any other
-   * paste (external content, or a same-app text-selection copy, which never
-   * carries the marker - see BlockContextMenu.tsx) is left alone entirely.
+   * Recognizes two special external-paste shapes before letting anything
+   * else fall through to TipTap's own HTML/markdown paste:
+   *
+   * 1. The hidden `data-notorious-blocks` marker (see lib/blockClipboard.ts)
+   *    - a copy of one or more whole blocks made from this same app - and
+   *    reconstructs them as real sibling blocks instead of flattening e.g. a
+   *    table or checklist block into plain text.
+   * 2. Raw image binary data (a copied screenshot, or a file copied from the
+   *    OS file manager) - uploaded and inserted the same way a dropped file
+   *    is (see `handleFilesDropped`), always as a new block right after the
+   *    currently focused one regardless of where the cursor sits within it.
+   *
+   * Any other paste (external text/links, a same-app text-selection copy -
+   * which never carries the marker, see BlockContextMenu.tsx) is left alone.
    */
   async function handlePaste(event: ClipboardEvent<HTMLDivElement>): Promise<void> {
     if (effectiveReadOnly) return;
     const html = event.clipboardData.getData("text/html");
-    if (!html) return;
-    const payload = parseNotoriousClipboardPayload(html);
-    if (!payload || payload.blocks.length === 0) return;
+    const payload = html ? parseNotoriousClipboardPayload(html) : null;
+    if (payload && payload.blocks.length > 0) {
+      event.preventDefault();
+      const { parentBlockId, afterBlockId: startAfterBlockId } = currentInsertionPoint();
+      let afterBlockId = startAfterBlockId;
+      for (const pasted of payload.blocks) {
+        const created = await createMutation.mutateAsync({ parentBlockId, afterBlockId, type: pasted.type, content: pasted.content });
+        afterBlockId = created.id;
+      }
+      return;
+    }
+
+    const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
     event.preventDefault();
-    const activeBlockId = (document.activeElement as HTMLElement | null)?.closest("[data-block-id]")?.getAttribute("data-block-id") ?? null;
-    const parentBlockId = activeBlockId ? ((blocks ?? []).find((b) => b.id === activeBlockId)?.parentBlockId ?? null) : null;
-    let afterBlockId = activeBlockId ?? (tree[tree.length - 1]?.id ?? null);
-    for (const pasted of payload.blocks) {
-      const created = await createMutation.mutateAsync({ parentBlockId, afterBlockId, type: pasted.type, content: pasted.content });
-      afterBlockId = created.id;
+    const { parentBlockId, afterBlockId: startAfterBlockId } = currentInsertionPoint();
+    setIsUploadingFiles(true);
+    try {
+      let afterBlockId = startAfterBlockId;
+      for (const file of imageFiles) {
+        const asset = await fileApi.upload(workspaceId, file, objectId);
+        const { type, content } = blockContentForFile(file.type, file.name, fileApi.downloadUrl(asset.id), asset.id, asset.size);
+        const created = await createMutation.mutateAsync({ parentBlockId, afterBlockId, type, content });
+        afterBlockId = created.id;
+      }
+    } finally {
+      setIsUploadingFiles(false);
     }
   }
 

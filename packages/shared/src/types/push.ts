@@ -26,4 +26,4 @@ export type PushNotificationPayload =
   | { type: "call-closed"; tag: string }
   | { type: "chat-message"; title: string; body: string; conversationId: string; url: string; badge?: number; suppressWhenFocused?: boolean }
   | { type: "chat-reaction"; title: string; body: string; conversationId: string; url: string; suppressWhenFocused?: boolean }
-  | { type: "comment-reply" | "mention" | "ai-budget" | "backup-failed" | "reminder" | "auto-update"; title: string; body: string; url: string; suppressWhenFocused?: boolean };
+  | { type: "comment-reply" | "mention" | "ai-budget" | "backup-failed" | "reminder" | "auto-update" | "object-update"; title: string; body: string; url: string; suppressWhenFocused?: boolean };

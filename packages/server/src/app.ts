@@ -43,6 +43,7 @@ import { registerPresenceRoutes } from "./modules/presence/routes.js";
 import { registerUserRoutes } from "./modules/users/routes.js";
 import { registerCommentRoutes } from "./modules/comments/routes.js";
 import { registerNotificationRoutes } from "./modules/notifications/routes.js";
+import { registerSubscriptionRoutes } from "./modules/subscriptions/routes.js";
 import { registerChatRoutes } from "./modules/chat/routes.js";
 import { registerCallRoutes } from "./modules/calls/routes.js";
 import { registerFeedRoutes } from "./modules/feeds/routes.js";
@@ -135,6 +136,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerUserRoutes(app);
   await registerCommentRoutes(app);
   await registerNotificationRoutes(app);
+  await registerSubscriptionRoutes(app);
   await registerChatRoutes(app);
   await registerCallRoutes(app);
   await registerFeedRoutes(app);

@@ -16,6 +16,7 @@ import { ShareDialog } from "../ShareDialog.js";
 import { ExportMenu } from "../ExportMenu.js";
 import { ObjectSlugButton } from "../ObjectSlugButton.js";
 import { ObjectSettingsDialog } from "../ObjectSettingsDialog.js";
+import { SubscribeButton } from "../SubscribeButton.js";
 import { CoverMenuItem } from "../CoverMenuItem.js";
 import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "./IOSMenu.js";
 import { Icon } from "../ui/Icon.js";
@@ -291,6 +292,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
               <ExportMenu variant="menuItem" workspaceId={workspaceId} objectId={object.id} title={title} />
               {!shareToken && (
                 <>
+                  <SubscribeButton variant="menuItem" objectId={object.id} />
                   <ObjectSlugButton variant="menuItem" objectId={object.id} slug={object.slug} disabled={isLocked} />
                   <IOSMenuItem
                     icon={pinned ? "pin-off" : "pin"}

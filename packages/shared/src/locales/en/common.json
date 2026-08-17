@@ -72,6 +72,8 @@
       "objectLocked": "This object is locked against edits",
       "disableReverify": "Disable reverification",
       "requireReverify": "Require reverification",
+      "unsubscribeFromObject": "Unsubscribe from updates",
+      "subscribeToObject": "Subscribe to updates",
       "hideDetails": "Hide details",
       "showDetails": "Show details",
       "unpinFromSidebar": "Unpin from sidebar",
@@ -462,6 +464,10 @@
     },
     "mention": {
       "title": "{{actor}} mentioned you in \"{{title}}\""
+    },
+    "objectUpdate": {
+      "title": "{{actor}} updated \"{{title}}\"",
+      "titleMultiple": "{{actor}} made {{count}} changes to \"{{title}}\""
     },
     "chat": {
       "attachment": "Sent an attachment",

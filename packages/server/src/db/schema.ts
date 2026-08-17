@@ -734,6 +734,57 @@ export const adminNotifications = sqliteTable("admin_notifications", {
   readAt: text("read_at"),
 });
 
+// One row per (object, user) a member has explicitly opted into - see
+// modules/subscriptions/. Purely explicit (no auto-subscribe on
+// create/comment) - unlike notifyCommentParticipants' implicit "thread
+// follower" model above, which stays independent of this table.
+export const objectSubscriptions = sqliteTable(
+  "object_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    objectId: text("object_id")
+      .notNull()
+      .references(() => objects.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.objectId, table.userId), index("idx_object_subscriptions_user_id").on(table.userId)],
+);
+
+// One row per (object, subscriber) currently inside its debounce window -
+// see modules/subscriptions/scheduler.ts. Every new activity on the object
+// (recordAndBroadcast) bumps `dueAt` forward and `changeCount` up instead of
+// inserting a new row, so a burst of edits collapses into a single delivered
+// notification once the object goes quiet for the debounce window; the row
+// is deleted once delivered.
+export const pendingSubscriptionNotifications = sqliteTable(
+  "pending_subscription_notifications",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    objectId: text("object_id")
+      .notNull()
+      .references(() => objects.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastActorId: text("last_actor_id")
+      .notNull()
+      .references(() => users.id),
+    changeCount: integer("change_count").notNull().default(1),
+    dueAt: text("due_at").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [unique().on(table.objectId, table.userId), index("idx_pending_subscription_notifications_due_at").on(table.dueAt)],
+);
+
 export const pushSubscriptions = sqliteTable("push_subscriptions", {
   id: text("id").primaryKey(),
   userId: text("user_id")

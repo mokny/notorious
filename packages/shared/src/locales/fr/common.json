@@ -66,6 +66,8 @@
       "objectLocked": "Cet objet est verrouillé contre les modifications",
       "disableReverify": "Désactiver la revérification",
       "requireReverify": "Exiger une revérification",
+      "unsubscribeFromObject": "Se désabonner des mises à jour",
+      "subscribeToObject": "S'abonner aux mises à jour",
       "hideDetails": "Masquer les détails",
       "showDetails": "Afficher les détails",
       "unpinFromSidebar": "Détacher de la barre latérale",
@@ -456,6 +458,10 @@
     },
     "mention": {
       "title": "{{actor}} t'a mentionné dans « {{title}} »"
+    },
+    "objectUpdate": {
+      "title": "{{actor}} a mis à jour « {{title}} »",
+      "titleMultiple": "{{actor}} a apporté {{count}} modifications à « {{title}} »"
     },
     "chat": {
       "attachment": "A envoyé une pièce jointe",
