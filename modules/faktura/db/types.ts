@@ -177,6 +177,7 @@ export interface FakturaDocumentRow {
   /** Unused placeholder for a future real TSE (Kassensicherungsverordnung) integration - see migrations/0010. */
   tse_signature: string | null;
   tse_transaction_number: string | null;
+  public_share_token: string | null;
 }
 
 export interface FakturaDocumentLineRow {

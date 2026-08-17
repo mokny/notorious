@@ -1,14 +1,49 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fakturaApi, type PaymentMethod, type ProductListItemDto } from "../api.js";
 import { PosProductGrid } from "../components/PosProductGrid.js";
 import { PosCart, type CartItem } from "../components/PosCart.js";
 
+/**
+ * Requests a screen wake lock so the tablet display never dims/locks during
+ * a shift (staff hands are usually full, not on the screen between sales),
+ * and re-acquires it whenever the tab becomes visible again - the Wake Lock
+ * API releases the lock automatically when a tab is backgrounded, and does
+ * not re-acquire itself once the tab is foregrounded again.
+ */
+function useWakeLock(enabled: boolean): void {
+  useEffect(() => {
+    if (!enabled || !("wakeLock" in navigator)) return;
+    let sentinel: WakeLockSentinel | null = null;
+
+    async function acquire() {
+      try {
+        sentinel = await navigator.wakeLock.request("screen");
+      } catch {
+        // Wake lock can be refused (e.g. low battery, unsupported context) -
+        // the terminal still works, it just won't prevent screen standby.
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") void acquire();
+    }
+
+    void acquire();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      void sentinel?.release();
+    };
+  }, [enabled]);
+}
+
 /** Kassen-Terminal: Kategorie-Kacheln, Produkt-Grid, Warenkorb, Kassieren - touch-optimiert für ein Tablet am Verkaufsstand. Erfordert eine offene Kassenschicht (siehe web/pages/PosShiftPage.tsx). NICHT KassenSichV-konform (siehe services/pos.ts). */
 function PosTerminalPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const queryClient = useQueryClient();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: activeShift } = useQuery({
     queryKey: ["module-faktura-pos-active-shift", workspaceId],
@@ -21,9 +56,28 @@ function PosTerminalPage() {
     enabled: Boolean(workspaceId) && Boolean(activeShift),
   });
 
+  useWakeLock(Boolean(activeShift));
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [lastReceiptUrl, setLastReceiptUrl] = useState<string | null>(null);
+  const [lastDocumentId, setLastDocumentId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    function handleChange() {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    }
+    document.addEventListener("fullscreenchange", handleChange);
+    return () => document.removeEventListener("fullscreenchange", handleChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void containerRef.current?.requestFullscreen();
+    }
+  }
 
   function addToCart(product: ProductListItemDto) {
     setCart((prev) => {
@@ -50,7 +104,7 @@ function PosTerminalPage() {
       ),
     onSuccess: (result) => {
       setCart([]);
-      setLastReceiptUrl(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${result.document.id}/pdf`);
+      setLastDocumentId(result.document.id);
       void queryClient.invalidateQueries({ queryKey: ["module-faktura-pos-active-shift", workspaceId] });
     },
   });
@@ -68,15 +122,31 @@ function PosTerminalPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-4 px-4 py-4">
+    <div ref={containerRef} className="flex h-[calc(100vh-4rem)] gap-4 bg-surface px-4 py-4">
       <div className="w-2/3">
+        <div className="mb-2 flex justify-end">
+          <button type="button" onClick={toggleFullscreen} className="rounded-md border border-border px-3 py-1.5 text-sm">
+            {isFullscreen ? "Vollbild beenden" : "Vollbild"}
+          </button>
+        </div>
         <PosProductGrid products={products ?? []} onAdd={addToCart} />
       </div>
       <div className="w-1/3 space-y-2">
-        {lastReceiptUrl && (
-          <a href={lastReceiptUrl} target="_blank" rel="noreferrer" className="block rounded-md border border-border p-2 text-center text-sm text-accent">
-            Letzter Bon
-          </a>
+        {lastDocumentId && (
+          <div className="flex items-center gap-3 rounded-md border border-border p-2">
+            <img src={fakturaApi.documents.qrUrl(workspaceId!, lastDocumentId)} alt="QR-Code für den letzten Bon" className="h-20 w-20" />
+            <div className="flex-1 text-xs">
+              <p className="text-ink-muted">Bon per QR-Code herunterladen</p>
+              <a
+                href={`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${lastDocumentId}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent underline"
+              >
+                oder hier öffnen
+              </a>
+            </div>
+          </div>
         )}
         {checkoutMutation.isError && (
           <p className="text-xs text-red-500">{checkoutMutation.error instanceof Error ? checkoutMutation.error.message : "Fehler."}</p>

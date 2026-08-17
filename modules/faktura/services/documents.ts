@@ -424,6 +424,30 @@ export function setPdfStoragePath(sdk: ModuleSdk, workspaceId: string, documentI
   sdk.sqlite.prepare("UPDATE faktura_documents SET pdf_storage_path = ? WHERE id = ? AND workspace_id = ?").run(storagePath, documentId, workspaceId);
 }
 
+/** Returns (creating on first call) an opaque, unguessable token a customer can use to fetch this one document's PDF without logging in - see routes/documentPdf.ts's public route. Reuses `sdk.newId()` (a random UUID) as the token itself rather than minting a second random value. */
+export function ensurePublicShareToken(sdk: ModuleSdk, workspaceId: string, documentId: string): string {
+  const row = sdk.sqlite
+    .prepare("SELECT public_share_token FROM faktura_documents WHERE id = ? AND workspace_id = ?")
+    .get(documentId, workspaceId) as Pick<FakturaDocumentRow, "public_share_token"> | undefined;
+  if (!row) throw new Error("Document not found");
+  if (row.public_share_token) return row.public_share_token;
+
+  const token = sdk.newId();
+  sdk.sqlite.prepare("UPDATE faktura_documents SET public_share_token = ? WHERE id = ? AND workspace_id = ?").run(token, documentId, workspaceId);
+  return token;
+}
+
+/** Looks up a document by its public share token, across all workspaces (the token itself is the only "credential") - used only by the unauthenticated public receipt-download route, never anywhere a workspace is already known. */
+export function getDocumentByPublicToken(sdk: ModuleSdk, token: string): { workspaceId: string; document: DocumentDto } | null {
+  const row = sdk.sqlite.prepare("SELECT id, workspace_id FROM faktura_documents WHERE public_share_token = ?").get(token) as
+    | Pick<FakturaDocumentRow, "id" | "workspace_id">
+    | undefined;
+  if (!row) return null;
+  const document = getDocument(sdk, row.workspace_id, row.id);
+  if (!document) return null;
+  return { workspaceId: row.workspace_id, document };
+}
+
 /** Hard-deletes a draft document (never issued documents - those are cancelled, not deleted, see numbering.ts). */
 export function deleteDraftDocument(sdk: ModuleSdk, workspaceId: string, documentId: string): boolean {
   const existing = sdk.sqlite

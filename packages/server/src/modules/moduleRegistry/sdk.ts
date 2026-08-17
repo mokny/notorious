@@ -8,6 +8,7 @@ import { requireUser, type AuthenticatedUser } from "../../plugins/session.js";
 import { requireModuleAccess } from "./access.js";
 import { absoluteStoragePath, writeUploadedBytes, deleteUploadedBytes, deleteUploadedSubpath } from "../../lib/storage.js";
 import { sendMail, type SendMailInput } from "../../lib/mailer.js";
+import { env } from "../../env.js";
 
 /**
  * What `/modules/<id>/manifest.ts` gets passed into `registerRoutes`/`purge`
@@ -49,6 +50,8 @@ export interface ModuleSdk {
   };
   /** Sends an email via the instance's configured SMTP relay (see env.ts/lib/mailer.ts) - throws if SMTP isn't configured. */
   sendEmail: (input: SendMailInput) => Promise<void>;
+  /** This instance's public-facing origin (env.ts's `WEB_ORIGIN`, default `http://localhost:5173`) - for building fully-qualified URLs a module needs to hand to a third party (e.g. a QR code a customer scans with their own device), where a relative path wouldn't work. */
+  webOrigin: string;
 }
 
 export function createModuleSdk(moduleId: string): ModuleSdk {
@@ -66,5 +69,6 @@ export function createModuleSdk(moduleId: string): ModuleSdk {
       deleteSubpath: deleteUploadedSubpath,
     },
     sendEmail: sendMail,
+    webOrigin: env.webOrigin,
   };
 }

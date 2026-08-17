@@ -476,6 +476,7 @@ export const fakturaApi = {
       apiRequest<DocumentDto>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/convert`, { method: "POST", body: { targetType } }),
     derived: (workspaceId: string, id: string) =>
       apiRequest<DocumentDto[]>(`/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/derived`),
+    qrUrl: (workspaceId: string, id: string) => `/api/v1/workspaces/${workspaceId}/modules/faktura/documents/${id}/qr`,
   },
   payments: {
     list: (workspaceId: string, invoiceId: string) =>
