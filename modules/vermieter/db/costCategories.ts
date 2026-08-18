@@ -39,6 +39,18 @@ export const VERMIETER_COST_CATEGORIES: VermieterCostCategory[] = [
     taxDeductibleDefault: true,
   },
   { key: "allgemeinstrom", label: "Allgemeinstrom", defaultAllocationKey: "sqm", apportionable: true, taxDeductibleDefault: true },
+  /**
+   * Betriebsstrom der Heizungsanlage (pumps/controls, not fuel) - explicitly
+   * umlagefähig under §2 Nr. 4 BetrKV, distinct from "heizung" (fuel/
+   * Brennstoffkosten) and "allgemeinstrom" (general building electricity).
+   * defaultAllocationKey deliberately 'sqm', not 'units' or 'consumption':
+   * submetering a shared heating system's own electricity use per unit isn't
+   * typical practice, so there's no natural consumption basis - and this is
+   * the same kind of "general building system electricity" cost as
+   * allgemeinstrom, which already defaults to 'sqm', so mirroring that
+   * precedent keeps the two electricity categories consistent.
+   */
+  { key: "strom_heizungsanlage", label: "Strom Heizungsanlage", defaultAllocationKey: "sqm", apportionable: true, taxDeductibleDefault: true },
   {
     key: "verwaltungskosten",
     label: "Verwaltungskosten",

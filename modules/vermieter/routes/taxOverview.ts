@@ -4,6 +4,7 @@ import { computeTaxOverview } from "../services/taxOverview.js";
 import { requireProperty } from "../services/properties.js";
 import { renderTaxOverviewPdf, renderTaxOverviewCsv } from "../pdf/taxOverviewPdf.js";
 import { getProperty } from "../services/properties.js";
+import { buildCostCategoryLabelMap } from "../services/customCostCategories.js";
 
 export function registerTaxOverviewRoutes(app: FastifyInstance, sdk: ModuleSdk): void {
   app.get("/api/v1/workspaces/:workspaceId/modules/vermieter/properties/:propertyId/tax-overview", async (request, reply) => {
@@ -34,7 +35,8 @@ export function registerTaxOverviewRoutes(app: FastifyInstance, sdk: ModuleSdk):
       return { message: "Property not found" };
     }
     const overview = computeTaxOverview(sdk, workspaceId, propertyId, parsedYear);
-    const buffer = await renderTaxOverviewPdf(property, overview);
+    const categoryLabels = buildCostCategoryLabelMap(sdk, workspaceId);
+    const buffer = await renderTaxOverviewPdf(property, overview, categoryLabels);
     reply.header("Content-Type", "application/pdf");
     reply.header("Content-Disposition", `inline; filename="Steuerübersicht-${property.name}-${parsedYear}.pdf"`);
     return reply.send(buffer);
@@ -47,7 +49,8 @@ export function registerTaxOverviewRoutes(app: FastifyInstance, sdk: ModuleSdk):
     const parsedYear = year ? Number(year) : new Date().getFullYear();
     requireProperty(sdk, workspaceId, propertyId);
     const overview = computeTaxOverview(sdk, workspaceId, propertyId, parsedYear);
-    const csv = renderTaxOverviewCsv(overview);
+    const categoryLabels = buildCostCategoryLabelMap(sdk, workspaceId);
+    const csv = renderTaxOverviewCsv(overview, categoryLabels);
     reply.header("Content-Type", "text/csv; charset=utf-8");
     reply.header("Content-Disposition", `attachment; filename="steuerübersicht-${parsedYear}.csv"`);
     return reply.send(csv);

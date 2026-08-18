@@ -13,6 +13,7 @@ import { registerReceiptDocumentRoutes } from "./routes/receiptDocuments.js";
 import { registerReceiptsExportPdfRoutes } from "./routes/receiptsExportPdf.js";
 import { registerLandlordProfileRoutes } from "./routes/landlordProfile.js";
 import { registerCategoryAllocationDefaultRoutes } from "./routes/categoryAllocationDefaults.js";
+import { registerCustomCostCategoryRoutes } from "./routes/customCostCategories.js";
 import { registerStatementRoutes } from "./routes/statements.js";
 import { registerStatementPdfRoutes } from "./routes/statementPdf.js";
 import { registerReserveRoutes } from "./routes/reserve.js";
@@ -96,6 +97,7 @@ const manifest = {
     registerReceiptDocumentRoutes(app, sdk);
     registerLandlordProfileRoutes(app, sdk);
     registerCategoryAllocationDefaultRoutes(app, sdk);
+    registerCustomCostCategoryRoutes(app, sdk);
     registerStatementRoutes(app, sdk);
     registerStatementPdfRoutes(app, sdk);
     registerReceiptsExportPdfRoutes(app, sdk);

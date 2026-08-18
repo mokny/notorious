@@ -300,6 +300,25 @@ export interface VermieterReserveTransactionRow {
   created_at: string;
 }
 
+/**
+ * Workspace-defined custom cost category, additive to the hardcoded
+ * VERMIETER_COST_CATEGORIES list - see migrations/0015 and
+ * services/customCostCategories.ts. `key` is an immutable, auto-generated
+ * slug; `archived_at` is a soft-delete (see that migration's doc comment).
+ */
+export interface VermieterCustomCostCategoryRow {
+  id: string;
+  workspace_id: string;
+  key: string;
+  label: string;
+  apportionable: 0 | 1;
+  default_allocation_key: Exclude<VermieterAllocationKey, "external_provider">;
+  tax_deductible_default: 0 | 1;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
 export interface VermieterLandlordProfileRow {
   workspace_id: string;
   name: string;

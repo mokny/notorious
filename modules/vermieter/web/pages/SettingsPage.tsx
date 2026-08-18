@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { vermieterApi, type LandlordProfileInput, type CategoryDefaultAllocationKey } from "../api.js";
-import { VERMIETER_COST_CATEGORIES, ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
+import { vermieterApi, type LandlordProfileInput, type CategoryDefaultAllocationKey, type CustomCostCategoryInput } from "../api.js";
+import { ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
+import { useVermieterCostCategories, VERMIETER_CUSTOM_CATEGORIES_QUERY_KEY, type MergedVermieterCostCategory } from "../hooks/useVermieterCostCategories.js";
 import { Modal } from "../../../../packages/web/src/components/ui/Modal.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
@@ -92,6 +93,8 @@ function SettingsPage() {
     mutationFn: () => vermieterApi.landlordProfile.update(workspaceId!, form),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
   });
+
+  const { categories } = useVermieterCostCategories(workspaceId);
 
   const categoryDefaultsQueryKey = ["module-vermieter-category-allocation-defaults", workspaceId];
   const { data: categoryDefaults } = useQuery({
@@ -190,6 +193,8 @@ function SettingsPage() {
         </div>
       </form>
 
+      <CustomCostCategoriesPanel workspaceId={workspaceId!} />
+
       <section className="space-y-3 rounded-md border border-border p-4">
         <div>
           <h2 className="text-sm font-semibold">Standard-Umlageschlüssel je Kostenart</h2>
@@ -200,7 +205,7 @@ function SettingsPage() {
           </p>
         </div>
         <ul className="divide-y divide-border">
-          {VERMIETER_COST_CATEGORIES.map((category) => {
+          {categories.map((category) => {
             const entry = categoryDefaults?.find((d) => d.costCategoryKey === category.key);
             const value = entry?.allocationKey ?? (category.defaultAllocationKey as CategoryDefaultAllocationKey);
             const isOverridden = entry?.isOverridden ?? false;
@@ -306,6 +311,233 @@ function SettingsPage() {
         )}
       </Modal>
     </div>
+  );
+}
+
+const EMPTY_CUSTOM_CATEGORY_FORM: CustomCostCategoryInput = {
+  label: "",
+  apportionable: true,
+  defaultAllocationKey: "sqm",
+  taxDeductibleDefault: true,
+};
+
+/**
+ * "Eigene Kostenarten" (item: custom cost categories): lets a landlord add a
+ * cost type the built-in list (db/costCategories.ts) doesn't cover, e.g. a
+ * building-specific cost. Placed right above the allocation-defaults
+ * section since both configure per-category metadata and a newly created
+ * custom category immediately shows up in that section (and every other
+ * category picker in this module) via useVermieterCostCategories.
+ */
+function CustomCostCategoriesPanel({ workspaceId }: { workspaceId: string }) {
+  const queryClient = useQueryClient();
+  const { customCategories, archivedCustomCategories } = useVermieterCostCategories(workspaceId);
+  const queryKey = VERMIETER_CUSTOM_CATEGORIES_QUERY_KEY(workspaceId);
+  const invalidate = () => void queryClient.invalidateQueries({ queryKey });
+
+  const [form, setForm] = useState<CustomCostCategoryInput>(EMPTY_CUSTOM_CATEGORY_FORM);
+  const [archivedNotice, setArchivedNotice] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const createMutation = useMutation({
+    mutationFn: () => vermieterApi.customCostCategories.create(workspaceId, form),
+    onSuccess: () => {
+      setForm(EMPTY_CUSTOM_CATEGORY_FORM);
+      invalidate();
+    },
+  });
+
+  function handleCreate(event: FormEvent) {
+    event.preventDefault();
+    if (form.label.trim()) createMutation.mutate();
+  }
+
+  const updateMutation = useMutation({
+    mutationFn: ({ key, input }: { key: string; input: Partial<CustomCostCategoryInput> }) =>
+      vermieterApi.customCostCategories.update(workspaceId, key, input),
+    onSuccess: invalidate,
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (key: string) => vermieterApi.customCostCategories.remove(workspaceId, key),
+    onSuccess: (result, key) => {
+      const category = customCategories.find((c) => c.key === key);
+      if (result.archived) {
+        setArchivedNotice(
+          `„${category?.label ?? key}“ wird bereits verwendet und wurde daher nur archiviert (nicht mehr auswählbar, aber bestehende Daten bleiben erhalten).`,
+        );
+      }
+      invalidate();
+    },
+  });
+
+  return (
+    <section className="space-y-3 rounded-md border border-border p-4">
+      <div>
+        <h2 className="text-sm font-semibold">Eigene Kostenarten</h2>
+        <p className="text-xs text-ink-muted">
+          Zusätzliche Kostenarten für Kosten, die die eingebaute Liste nicht abdeckt. "Umlagefähig" richtet sich nach §2 BetrKV: nur
+          umlagefähige Kostenarten dürfen in einer Nebenkostenabrechnung auf Mieter umgelegt werden – nicht umlagefähige Kosten (z. B.
+          Verwaltung, Reparaturen) trägt der Vermieter selbst, können aber weiterhin steuerlich absetzbar sein.
+        </p>
+      </div>
+
+      {archivedNotice && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+          {archivedNotice}
+        </p>
+      )}
+
+      {customCategories.length > 0 && (
+        <ul className="divide-y divide-border">
+          {customCategories.map((category) => (
+            <CustomCategoryRow
+              key={category.key}
+              category={category}
+              onSave={(input) => updateMutation.mutate({ key: category.key, input })}
+              onRemove={() => removeMutation.mutate(category.key)}
+              removePending={removeMutation.isPending}
+            />
+          ))}
+        </ul>
+      )}
+
+      <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3 rounded-md border border-border/60 bg-surface p-3">
+        <label className={`${labelClass} col-span-2`}>
+          <span className={labelTextClass}>Bezeichnung *</span>
+          <input
+            className={inputClass}
+            value={form.label}
+            onChange={(e) => setForm((prev) => ({ ...prev, label: e.target.value }))}
+            placeholder="z. B. Wärmepumpen-Wartung"
+          />
+        </label>
+        <label className={labelClass}>
+          <span className={labelTextClass}>Standard-Umlageschlüssel</span>
+          <select
+            className={inputClass}
+            value={form.defaultAllocationKey}
+            onChange={(e) => setForm((prev) => ({ ...prev, defaultAllocationKey: e.target.value as CategoryDefaultAllocationKey }))}
+          >
+            {CATEGORY_DEFAULT_ALLOCATION_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {ALLOCATION_KEY_LABEL_DE[key]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-col justify-end gap-1.5">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.apportionable}
+              onChange={(e) => setForm((prev) => ({ ...prev, apportionable: e.target.checked }))}
+            />
+            <span>Umlagefähig (§2 BetrKV)</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.taxDeductibleDefault}
+              onChange={(e) => setForm((prev) => ({ ...prev, taxDeductibleDefault: e.target.checked }))}
+            />
+            <span>Steuerlich absetzbar</span>
+          </label>
+        </div>
+        <div className="col-span-2 flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={createMutation.isPending || !form.label.trim()}
+            className="rounded-md bg-accent px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          >
+            Neue Kostenart anlegen
+          </button>
+          {createMutation.isError && <span className="text-xs text-red-500">Fehler beim Anlegen.</span>}
+        </div>
+      </form>
+
+      {archivedCustomCategories.length > 0 && (
+        <div className="space-y-2">
+          <button type="button" className="text-xs text-accent hover:underline" onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? "Archivierte Kostenarten ausblenden" : `Archivierte Kostenarten anzeigen (${archivedCustomCategories.length})`}
+          </button>
+          {showArchived && (
+            <ul className="divide-y divide-border opacity-70">
+              {archivedCustomCategories.map((category) => (
+                <li key={category.key} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span>{category.label}</span>
+                  <span className="text-xs text-ink-muted">
+                    {category.apportionable ? "Umlagefähig" : "Nicht umlagefähig"} · {ALLOCATION_KEY_LABEL_DE[category.defaultAllocationKey]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CustomCategoryRow({
+  category,
+  onSave,
+  onRemove,
+  removePending,
+}: {
+  category: MergedVermieterCostCategory;
+  onSave: (input: Partial<CustomCostCategoryInput>) => void;
+  onRemove: () => void;
+  removePending: boolean;
+}) {
+  const [label, setLabel] = useState(category.label);
+
+  useEffect(() => setLabel(category.label), [category.label]);
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+      <input
+        className="w-48 rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onBlur={() => {
+          if (label.trim() && label !== category.label) onSave({ label });
+        }}
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={category.apportionable} onChange={(e) => onSave({ apportionable: e.target.checked })} />
+          <span>Umlagefähig</span>
+        </label>
+        <label className="flex items-center gap-1.5 text-xs">
+          <input
+            type="checkbox"
+            checked={category.taxDeductibleDefault}
+            onChange={(e) => onSave({ taxDeductibleDefault: e.target.checked })}
+          />
+          <span>Steuerlich absetzbar</span>
+        </label>
+        <select
+          className="rounded-md border border-border bg-surface px-2 py-1 text-xs"
+          value={category.defaultAllocationKey}
+          onChange={(e) => onSave({ defaultAllocationKey: e.target.value as CategoryDefaultAllocationKey })}
+        >
+          {CATEGORY_DEFAULT_ALLOCATION_KEYS.map((key) => (
+            <option key={key} value={key}>
+              {ALLOCATION_KEY_LABEL_DE[key]}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={removePending}
+          onClick={onRemove}
+          className="rounded-md border border-border px-2 py-1 text-xs text-ink-muted hover:bg-surface-hover disabled:opacity-40"
+        >
+          Löschen
+        </button>
+      </div>
+    </li>
   );
 }
 

@@ -2,7 +2,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
 import { vermieterApi, type VermieterEstimationMethod } from "../api.js";
-import { getCostCategory } from "../../db/costCategories.js";
+import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
 import { allocationKeyLabel } from "../../pdf/text.de.js";
 
 /** Mirrors modules/vermieter/pdf/text.de.ts's wording so the web view and the PDF explain estimated values consistently. */
@@ -17,6 +17,7 @@ function StatementDetailPage() {
   const { workspaceId, id } = useParams<{ workspaceId: string; id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { getCategoryLabel } = useVermieterCostCategories(workspaceId);
 
   const { data: statement } = useQuery({
     queryKey: ["module-vermieter-statement", workspaceId, id],
@@ -117,7 +118,7 @@ function StatementDetailPage() {
               <tbody className="divide-y divide-border">
                 {lines.map((line) => (
                   <tr key={line.id}>
-                    <td className="px-3 py-2">{getCostCategory(line.costCategoryKey)?.label ?? line.costCategoryKey}</td>
+                    <td className="px-3 py-2">{getCategoryLabel(line.costCategoryKey)}</td>
                     <td className="px-3 py-2">{allocationKeyLabel(line.allocationKeyUsed, line.externalProviderName)}</td>
                     <td className="px-3 py-2 text-right">{formatCents(line.totalPropertyCostCents)}</td>
                     <td className="px-3 py-2 text-right font-medium">

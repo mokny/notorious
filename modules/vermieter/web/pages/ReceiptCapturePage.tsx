@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { parseCentsInput } from "@notorious/shared";
 import { vermieterApi, type VermieterAllocationKey } from "../api.js";
-import { VERMIETER_COST_CATEGORIES, ALLOCATION_KEY_LABEL_DE, getCostCategory } from "../../db/costCategories.js";
+import { ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
 import { useDefaultSingleSelection } from "../hooks/useDefaultSingleSelection.js";
+import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
@@ -34,6 +35,8 @@ function ReceiptCapturePage() {
   const [propertyId, setPropertyId] = useState("");
   useDefaultSingleSelection(properties, propertyId, setPropertyId);
 
+  const { categories, getCategory } = useVermieterCostCategories(workspaceId);
+
   const { data: costCircuits } = useQuery({
     queryKey: ["module-vermieter-cost-circuits", workspaceId, propertyId],
     queryFn: () => vermieterApi.costCircuits.list(workspaceId!, propertyId),
@@ -47,13 +50,13 @@ function ReceiptCapturePage() {
     enabled: Boolean(workspaceId),
   });
   function effectiveDefaultAllocationKey(key: string): VermieterAllocationKey {
-    return categoryAllocationDefaults?.find((d) => d.costCategoryKey === key)?.allocationKey ?? getCostCategory(key)?.defaultAllocationKey ?? "sqm";
+    return categoryAllocationDefaults?.find((d) => d.costCategoryKey === key)?.allocationKey ?? getCategory(key)?.defaultAllocationKey ?? "sqm";
   }
 
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("0,00");
   const [receiptDate, setReceiptDate] = useState(today());
-  const [categoryKey, setCategoryKey] = useState(VERMIETER_COST_CATEGORIES[0]!.key);
+  const [categoryKey, setCategoryKey] = useState(categories[0]!.key);
   const [allocationOverride, setAllocationOverride] = useState<VermieterAllocationKey | "">("");
   const [description, setDescription] = useState("");
   const [taxDeductible, setTaxDeductible] = useState(true);
@@ -88,7 +91,7 @@ function ReceiptCapturePage() {
     if (propertyId && categoryKey && parseCentsInput(amount) && receiptDate) createMutation.mutate();
   }
 
-  const category = getCostCategory(categoryKey);
+  const category = getCategory(categoryKey);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-6 py-10">
@@ -127,8 +130,8 @@ function ReceiptCapturePage() {
         </label>
         <label className={labelClass}>
           <span className={labelTextClass}>Kostenkategorie *</span>
-          <select className={inputClass} value={categoryKey} onChange={(e) => { setCategoryKey(e.target.value); setTaxDeductible(getCostCategory(e.target.value)?.taxDeductibleDefault ?? true); }}>
-            {VERMIETER_COST_CATEGORIES.map((c) => (
+          <select className={inputClass} value={categoryKey} onChange={(e) => { setCategoryKey(e.target.value); setTaxDeductible(getCategory(e.target.value)?.taxDeductibleDefault ?? true); }}>
+            {categories.map((c) => (
               <option key={c.key} value={c.key}>
                 {c.label}
               </option>

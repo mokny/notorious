@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
 import { vermieterApi } from "../api.js";
-import { getCostCategory, VERMIETER_COST_CATEGORIES } from "../../db/costCategories.js";
+import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
 
 const inputClass = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 
@@ -13,6 +13,7 @@ function ReceiptsListPage() {
   const [propertyId, setPropertyId] = useState("");
   const [categoryKey, setCategoryKey] = useState("");
   const [year, setYear] = useState("");
+  const { categories, getCategoryLabel } = useVermieterCostCategories(workspaceId);
 
   const { data: properties } = useQuery({
     queryKey: ["module-vermieter-properties", workspaceId],
@@ -52,7 +53,7 @@ function ReceiptsListPage() {
         </select>
         <select className={inputClass} value={categoryKey} onChange={(e) => setCategoryKey(e.target.value)}>
           <option value="">Alle Kategorien</option>
-          {VERMIETER_COST_CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <option key={category.key} value={category.key}>
               {category.label}
             </option>
@@ -69,8 +70,8 @@ function ReceiptsListPage() {
               className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm hover:bg-surface-hover"
             >
               <span className="flex flex-col">
-                <span className="font-medium">{receipt.vendor || getCostCategory(receipt.costCategoryKey)?.label || receipt.costCategoryKey}</span>
-                <span className="text-xs text-ink-muted">{getCostCategory(receipt.costCategoryKey)?.label ?? receipt.costCategoryKey}</span>
+                <span className="font-medium">{receipt.vendor || getCategoryLabel(receipt.costCategoryKey)}</span>
+                <span className="text-xs text-ink-muted">{getCategoryLabel(receipt.costCategoryKey)}</span>
               </span>
               <span className="flex items-center gap-3 text-xs text-ink-muted">
                 <span>{receipt.receiptDate}</span>

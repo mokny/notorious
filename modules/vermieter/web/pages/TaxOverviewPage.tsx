@@ -3,8 +3,8 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
 import { vermieterApi } from "../api.js";
-import { getCostCategory } from "../../db/costCategories.js";
 import { useDefaultSingleSelection } from "../hooks/useDefaultSingleSelection.js";
+import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
 
 const inputClass = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 
@@ -20,6 +20,7 @@ function TaxOverviewPage() {
   const [propertyId, setPropertyId] = useState("");
   useDefaultSingleSelection(properties, propertyId, setPropertyId);
   const [year, setYear] = useState(new Date().getFullYear());
+  const { getCategoryLabel } = useVermieterCostCategories(workspaceId);
 
   const { data: overview } = useQuery({
     queryKey: ["module-vermieter-tax-overview", workspaceId, propertyId, year],
@@ -69,7 +70,7 @@ function TaxOverviewPage() {
             <ul className="divide-y divide-border rounded-lg border border-border text-sm">
               {overview.expensesByCategoryKey.map((entry) => (
                 <li key={entry.costCategoryKey} className="flex items-center justify-between px-3 py-2">
-                  <span>{getCostCategory(entry.costCategoryKey)?.label ?? entry.costCategoryKey}</span>
+                  <span>{getCategoryLabel(entry.costCategoryKey)}</span>
                   <span>{formatCents(entry.amountCents)}</span>
                 </li>
               ))}

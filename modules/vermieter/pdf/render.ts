@@ -1,6 +1,5 @@
 import PDFDocument from "pdfkit";
 import { formatCents } from "@notorious/shared";
-import { getCostCategory } from "../db/costCategories.js";
 import { allocationKeyLabel, STATEMENT_CLOSING_TEXT, ESTIMATED_VALUE_FOOTNOTE, VACANCY_PAGE_TITLE, VACANCY_PAGE_INTRO_TEXT } from "./text.de.js";
 import { generateTenantExplanationParagraph } from "./explanationText.js";
 import { proratedLinesForSegment } from "../services/statementCalculation.js";
@@ -37,6 +36,14 @@ export function renderStatementPdf(
   lines: StatementLineDto[],
   tenantSummaries: TenantSummaryForPdf[],
   vacancySummaries: UnitVacancySummaryDto[] = [],
+  /**
+   * `costCategoryKey -> label` lookup covering both built-in and this
+   * workspace's custom categories (see services/customCostCategories.ts::
+   * buildCostCategoryLabelMap) - resolved once by the caller (routes/
+   * statementPdf.ts) rather than making this otherwise-pure renderer
+   * workspace/DB-aware. Falls back to the raw key for any miss.
+   */
+  categoryLabels: Record<string, string> = {},
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN });
@@ -49,7 +56,7 @@ export function renderStatementPdf(
 
     tenantSummaries.forEach((summary, index) => {
       if (index > 0) doc.addPage();
-      renderTenantSection(doc, property, propertyAddress, landlord, statement, lines, summary, tenantSummaries);
+      renderTenantSection(doc, property, propertyAddress, landlord, statement, lines, summary, tenantSummaries, categoryLabels);
     });
 
     if (tenantSummaries.length === 0) {
@@ -62,7 +69,7 @@ export function renderStatementPdf(
     // services/statements.ts::getStatementVacancySummary's doc comment.
     if (vacancySummaries.length > 0) {
       doc.addPage();
-      renderVacancyPage(doc, propertyAddress, statement, vacancySummaries);
+      renderVacancyPage(doc, propertyAddress, statement, vacancySummaries, categoryLabels);
     }
 
     doc.end();
@@ -74,6 +81,7 @@ function renderVacancyPage(
   propertyAddress: string,
   statement: StatementDto,
   vacancySummaries: UnitVacancySummaryDto[],
+  categoryLabels: Record<string, string>,
 ): void {
   doc.fontSize(15).fillColor("#000000").text(VACANCY_PAGE_TITLE, PAGE_MARGIN, PAGE_MARGIN, { width: 495 });
   doc
@@ -126,7 +134,7 @@ function renderVacancyPage(
           doc.addPage();
           y = PAGE_MARGIN;
         }
-        const label = getCostCategory(category.costCategoryKey)?.label ?? category.costCategoryKey;
+        const label = categoryLabels[category.costCategoryKey] ?? category.costCategoryKey;
         doc.fontSize(9).fillColor("#222222");
         doc.text(label, colCat.x, y, { width: colCat.width });
         doc.text(String(category.vacancyDays), colDays.x, y, { width: colDays.width, align: "right" });
@@ -148,6 +156,7 @@ function renderTenantSection(
   allLines: StatementLineDto[],
   summary: TenantSummaryForPdf,
   allSummaries: TenantSummaryForPdf[],
+  categoryLabels: Record<string, string>,
 ): void {
   doc.fontSize(8).fillColor("#666666").text(
     [landlord.name, landlord.street, `${landlord.postalCode} ${landlord.city}`].filter(Boolean).join(" · "),
@@ -226,7 +235,7 @@ function renderTenantSection(
       doc.addPage();
       tableY = PAGE_MARGIN;
     }
-    const categoryLabel = getCostCategory(line.costCategoryKey)?.label ?? line.costCategoryKey;
+    const categoryLabel = categoryLabels[line.costCategoryKey] ?? line.costCategoryKey;
     const sharePercent = line.totalPropertyCostCents > 0 ? `${((line.unitShareCents / line.totalPropertyCostCents) * 100).toFixed(1)}%` : "-";
     const keyLabel = allocationKeyLabel(line.allocationKeyUsed, line.externalProviderName);
 
@@ -300,7 +309,7 @@ function renderTenantSection(
   // Uses doc.y (pdfkit tracks the cursor after each `text()` call) to decide
   // page breaks, since a long explanation's final height isn't known ahead
   // of time.
-  const explanation = generateTenantExplanationParagraph(unitLines, summary);
+  const explanation = generateTenantExplanationParagraph(unitLines, summary, categoryLabels);
   doc.fontSize(9).fillColor("#222222");
   doc.y = tableY;
   if (doc.y > 700) {

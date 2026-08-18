@@ -1,7 +1,6 @@
 import PDFDocument from "pdfkit";
 import { PDFDocument as PdfLibDocument } from "pdf-lib";
 import { formatCents } from "@notorious/shared";
-import { getCostCategory } from "../db/costCategories.js";
 import type { ReceiptDto } from "../services/receipts.js";
 import type { ReceiptDocumentDto } from "../services/receiptDocuments.js";
 
@@ -11,7 +10,7 @@ function formatDate(iso: string): string {
 }
 
 /** Renders a one-page pdfkit overview ("date, vendor, category, amount" + attached-document filenames) for one receipt, as a standalone PDF buffer to be merged into the export via pdf-lib. */
-function renderOverviewPage(receipt: ReceiptDto, documents: ReceiptDocumentDto[]): Promise<Buffer> {
+function renderOverviewPage(receipt: ReceiptDto, documents: ReceiptDocumentDto[], categoryLabels: Record<string, string>): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 50 });
     const chunks: Buffer[] = [];
@@ -29,7 +28,7 @@ function renderOverviewPage(receipt: ReceiptDto, documents: ReceiptDocumentDto[]
     };
     row("Datum:", formatDate(receipt.receiptDate));
     row("Lieferant/Anbieter:", receipt.vendor || "-");
-    row("Kostenart:", getCostCategory(receipt.costCategoryKey)?.label ?? receipt.costCategoryKey);
+    row("Kostenart:", categoryLabels[receipt.costCategoryKey] ?? receipt.costCategoryKey);
     row("Betrag:", formatCents(receipt.amountCents));
     if (receipt.description) row("Beschreibung:", receipt.description);
     y += 10;
@@ -132,11 +131,13 @@ export interface ReceiptForExport {
 export async function renderReceiptsExportPdf(
   receipts: ReceiptForExport[],
   readDocumentFile: (document: ReceiptDocumentDto) => Promise<Buffer>,
+  /** `costCategoryKey -> label` lookup (built-in + custom) - see pdf/render.ts's identical parameter for why this is resolved once by the caller instead of here. */
+  categoryLabels: Record<string, string> = {},
 ): Promise<Buffer> {
   const finalDoc = await PdfLibDocument.create();
 
   for (const { receipt, documents } of receipts) {
-    const overviewBuffer = await renderOverviewPage(receipt, documents);
+    const overviewBuffer = await renderOverviewPage(receipt, documents, categoryLabels);
     await appendPdfBufferPages(finalDoc, overviewBuffer);
 
     for (const document of documents) {

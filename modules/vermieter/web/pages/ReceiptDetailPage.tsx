@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents, parseCentsInput } from "@notorious/shared";
 import { vermieterApi, type ReceiptDocumentDto, type ReceiptDocumentOcrResult, type ReceiptInput, type VermieterAllocationKey } from "../api.js";
-import { VERMIETER_COST_CATEGORIES, ALLOCATION_KEY_LABEL_DE, getCostCategory } from "../../db/costCategories.js";
+import { ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
+import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
@@ -64,13 +65,14 @@ function ReceiptDetailPage() {
     enabled: Boolean(workspaceId) && Boolean(receipt?.propertyId),
   });
   /** Effective per-category default allocation key (workspace override if set, else the built-in default) - keeps this page's "Standard" suggestion consistent with what Settings lets the landlord configure, instead of always showing the hardcoded built-in value. */
+  const { categories, getCategory } = useVermieterCostCategories(workspaceId);
   const { data: categoryAllocationDefaults } = useQuery({
     queryKey: ["module-vermieter-category-allocation-defaults", workspaceId],
     queryFn: () => vermieterApi.categoryAllocationDefaults.list(workspaceId!),
     enabled: Boolean(workspaceId),
   });
   function effectiveDefaultAllocationKey(key: string): VermieterAllocationKey {
-    return categoryAllocationDefaults?.find((d) => d.costCategoryKey === key)?.allocationKey ?? getCostCategory(key)?.defaultAllocationKey ?? "sqm";
+    return categoryAllocationDefaults?.find((d) => d.costCategoryKey === key)?.allocationKey ?? getCategory(key)?.defaultAllocationKey ?? "sqm";
   }
   const documentsQueryKey = ["module-vermieter-receipt-documents", workspaceId, id];
   const { data: documents } = useQuery({
@@ -82,7 +84,7 @@ function ReceiptDetailPage() {
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("0,00");
   const [receiptDate, setReceiptDate] = useState("");
-  const [categoryKey, setCategoryKey] = useState(VERMIETER_COST_CATEGORIES[0]!.key);
+  const [categoryKey, setCategoryKey] = useState(categories[0]!.key);
   const [allocationOverride, setAllocationOverride] = useState<VermieterAllocationKey | "">("");
   const [description, setDescription] = useState("");
   const [taxDeductible, setTaxDeductible] = useState(true);
@@ -206,7 +208,7 @@ function ReceiptDetailPage() {
   }
 
   const property = properties?.find((p) => p.id === receipt?.propertyId);
-  const category = getCostCategory(categoryKey);
+  const category = getCategory(categoryKey);
 
   if (!receipt) return null;
 
@@ -403,7 +405,7 @@ function ReceiptDetailPage() {
         <label className={labelClass}>
           <span className={labelTextClass}>Kostenkategorie *</span>
           <select className={inputClass} value={categoryKey} onChange={(e) => setCategoryKey(e.target.value)}>
-            {VERMIETER_COST_CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c.key} value={c.key}>
                 {c.label}
               </option>

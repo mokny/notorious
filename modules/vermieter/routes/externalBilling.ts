@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ModuleSdk } from "../manifest.js";
-import { getCostCategory } from "../db/costCategories.js";
+import { resolveCostCategory } from "../services/customCostCategories.js";
 import type { VermieterBillingMode } from "../db/types.js";
 import {
   listCircuitCategorySettings,
@@ -69,7 +69,7 @@ export function registerExternalBillingRoutes(app: FastifyInstance, sdk: ModuleS
       reply.code(404);
       return { message: "Cost circuit not found" };
     }
-    if (!getCostCategory(categoryKey)) {
+    if (!resolveCostCategory(sdk, workspaceId, categoryKey)) {
       reply.code(400);
       return { message: "Unknown cost category" };
     }

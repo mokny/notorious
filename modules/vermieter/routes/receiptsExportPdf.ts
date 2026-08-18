@@ -3,6 +3,7 @@ import type { ModuleSdk } from "../manifest.js";
 import { requireStatementRow } from "../services/statements.js";
 import { listReceiptsInPeriod, getReceipt } from "../services/receipts.js";
 import { listReceiptDocuments, getReceiptDocumentRow } from "../services/receiptDocuments.js";
+import { buildCostCategoryLabelMap } from "../services/customCostCategories.js";
 import { renderReceiptsExportPdf, type ReceiptForExport } from "../pdf/receiptsExportPdf.js";
 
 /**
@@ -39,11 +40,16 @@ export function registerReceiptsExportPdfRoutes(app: FastifyInstance, sdk: Modul
       return { receipt, documents };
     });
 
-    const buffer = await renderReceiptsExportPdf(receiptsForExport, async (document) => {
-      const row = getReceiptDocumentRow(sdk, workspaceId, document.receiptId, document.id);
-      if (!row) throw new Error("Document not found");
-      return sdk.storage.read(row.storage_path);
-    });
+    const categoryLabels = buildCostCategoryLabelMap(sdk, workspaceId);
+    const buffer = await renderReceiptsExportPdf(
+      receiptsForExport,
+      async (document) => {
+        const row = getReceiptDocumentRow(sdk, workspaceId, document.receiptId, document.id);
+        if (!row) throw new Error("Document not found");
+        return sdk.storage.read(row.storage_path);
+      },
+      categoryLabels,
+    );
 
     reply.header("Content-Type", "application/pdf");
     reply.header("Content-Disposition", `inline; filename="Belege-${id}.pdf"`);

@@ -1,6 +1,6 @@
 import type { ModuleSdk } from "../manifest.js";
 import type { VermieterAllocationKey, VermieterReceiptRow } from "../db/types.js";
-import { getCostCategory } from "../db/costCategories.js";
+import { resolveCostCategory } from "./customCostCategories.js";
 import { getDefaultCostCircuitId } from "./costCircuits.js";
 
 export interface ReceiptDto {
@@ -114,7 +114,7 @@ export interface ReceiptInput {
 export function createReceipt(sdk: ModuleSdk, workspaceId: string, input: ReceiptInput): ReceiptDto {
   const id = sdk.newId();
   const now = sdk.nowIso();
-  const category = getCostCategory(input.costCategoryKey);
+  const category = resolveCostCategory(sdk, workspaceId, input.costCategoryKey);
   const taxDeductible = input.taxDeductible ?? category?.taxDeductibleDefault ?? false;
   const costCircuitId = input.costCircuitId ?? getDefaultCostCircuitId(sdk, workspaceId, input.propertyId);
   sdk.sqlite

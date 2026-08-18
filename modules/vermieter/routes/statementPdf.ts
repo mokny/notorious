@@ -5,6 +5,7 @@ import { getProperty } from "../services/properties.js";
 import { getLandlordProfile } from "../services/landlordProfile.js";
 import { getUnit } from "../services/units.js";
 import { listTenantsForLease } from "../services/tenants.js";
+import { buildCostCategoryLabelMap } from "../services/customCostCategories.js";
 import { renderStatementPdf, type TenantSummaryForPdf } from "../pdf/render.js";
 
 /**
@@ -34,7 +35,8 @@ async function renderAndMaybeCachePdf(sdk: ModuleSdk, workspaceId: string, state
   });
 
   const vacancySummaries = getStatementVacancySummary(sdk, workspaceId, statement, lines);
-  const buffer = await renderStatementPdf(property, landlord, statement, lines, summariesForPdf, vacancySummaries);
+  const categoryLabels = buildCostCategoryLabelMap(sdk, workspaceId);
+  const buffer = await renderStatementPdf(property, landlord, statement, lines, summariesForPdf, vacancySummaries, categoryLabels);
 
   if (statement.status === "final") {
     const { storagePath } = await sdk.storage.write(`vermieter/${workspaceId}/statements`, `${statementId}.pdf`, buffer);

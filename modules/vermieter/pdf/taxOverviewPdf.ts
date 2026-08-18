@@ -1,12 +1,16 @@
 import PDFDocument from "pdfkit";
 import { formatCents } from "@notorious/shared";
-import { getCostCategory } from "../db/costCategories.js";
 import type { TaxOverviewDto } from "../services/taxOverview.js";
 import type { PropertyDto } from "../services/properties.js";
 
 const PAGE_MARGIN = 50;
 
-export function renderTaxOverviewPdf(property: PropertyDto, overview: TaxOverviewDto): Promise<Buffer> {
+export function renderTaxOverviewPdf(
+  property: PropertyDto,
+  overview: TaxOverviewDto,
+  /** `costCategoryKey -> label` lookup (built-in + custom) - see pdf/render.ts's identical parameter for why this is resolved once by the caller instead of here. */
+  categoryLabels: Record<string, string> = {},
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN });
     const chunks: Buffer[] = [];
@@ -37,7 +41,7 @@ export function renderTaxOverviewPdf(property: PropertyDto, overview: TaxOvervie
     doc.fontSize(11).text("Werbungskosten nach Kategorie", PAGE_MARGIN, y);
     y += 18;
     for (const entry of overview.expensesByCategoryKey) {
-      const label = getCostCategory(entry.costCategoryKey)?.label ?? entry.costCategoryKey;
+      const label = categoryLabels[entry.costCategoryKey] ?? entry.costCategoryKey;
       row(label, entry.amountCents);
     }
 
@@ -49,7 +53,7 @@ export function renderTaxOverviewPdf(property: PropertyDto, overview: TaxOvervie
 }
 
 /** Simple CSV export - one row per expense category plus the summary rows, cents kept as plain integers (not German-formatted) so it round-trips through spreadsheet tools without locale ambiguity. */
-export function renderTaxOverviewCsv(overview: TaxOverviewDto): string {
+export function renderTaxOverviewCsv(overview: TaxOverviewDto, categoryLabels: Record<string, string> = {}): string {
   const lines: string[] = ["Posten;BetragCent"];
   lines.push(`Mieteinnahmen;${overview.rentIncomeCents}`);
   lines.push(`Abzugsfaehige Werbungskosten;${-overview.deductibleExpensesCents}`);
@@ -58,7 +62,7 @@ export function renderTaxOverviewCsv(overview: TaxOverviewDto): string {
   lines.push("");
   lines.push("Kategorie;BetragCent");
   for (const entry of overview.expensesByCategoryKey) {
-    const label = getCostCategory(entry.costCategoryKey)?.label ?? entry.costCategoryKey;
+    const label = categoryLabels[entry.costCategoryKey] ?? entry.costCategoryKey;
     lines.push(`${label};${entry.amountCents}`);
   }
   return lines.join("\n");

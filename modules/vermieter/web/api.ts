@@ -200,6 +200,41 @@ export interface CategoryAllocationDefaultDto {
   updatedAt: string | null;
 }
 
+/**
+ * Workspace-defined custom cost category - additive to the hardcoded
+ * VERMIETER_COST_CATEGORIES list (see db/costCategories.ts), for a cost type
+ * a specific landlord's building needs that the built-in list doesn't
+ * cover. Mirrors services/customCostCategories.ts's CustomCostCategoryDto.
+ * `key` is server-generated (a slug derived from `label` on create) and
+ * immutable afterwards - PATCH/DELETE address a category by this key, never
+ * by label.
+ */
+export interface CustomCostCategoryDto {
+  key: string;
+  label: string;
+  apportionable: boolean;
+  defaultAllocationKey: CategoryDefaultAllocationKey;
+  taxDeductibleDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** Set once this category is hidden from future selection (still referenced by existing data - see deleteCustomCostCategory's doc comment) - null while active. */
+  archivedAt: string | null;
+}
+
+export interface CustomCostCategoryInput {
+  label: string;
+  apportionable: boolean;
+  defaultAllocationKey: CategoryDefaultAllocationKey;
+  taxDeductibleDefault: boolean;
+}
+
+/** Result of DELETE .../custom-cost-categories/:key - a category never referenced anywhere is hard-deleted, one that IS referenced is archived instead (see services/customCostCategories.ts::deleteCustomCostCategory's doc comment). */
+export interface DeleteCustomCostCategoryResult {
+  ok: true;
+  deleted: boolean;
+  archived: boolean;
+}
+
 export type VermieterBillingMode = "calculated" | "external_provider";
 
 /**
@@ -635,6 +670,17 @@ export const vermieterApi = {
       }),
     remove: (workspaceId: string, categoryKey: string) =>
       apiRequest<CategoryAllocationDefaultDto>(`${base(workspaceId)}/category-allocation-defaults/${categoryKey}`, { method: "DELETE" }),
+  },
+  /** Workspace-defined custom cost categories - mirrors routes/customCostCategories.ts. Prefer the useVermieterCostCategories hook over calling this directly from a component; it merges these with the hardcoded built-ins. */
+  customCostCategories: {
+    list: (workspaceId: string, includeArchived = false) =>
+      apiRequest<CustomCostCategoryDto[]>(`${base(workspaceId)}/custom-cost-categories`, { query: { includeArchived } }),
+    create: (workspaceId: string, input: CustomCostCategoryInput) =>
+      apiRequest<CustomCostCategoryDto>(`${base(workspaceId)}/custom-cost-categories`, { method: "POST", body: input }),
+    update: (workspaceId: string, key: string, input: Partial<CustomCostCategoryInput>) =>
+      apiRequest<CustomCostCategoryDto>(`${base(workspaceId)}/custom-cost-categories/${key}`, { method: "PATCH", body: input }),
+    remove: (workspaceId: string, key: string) =>
+      apiRequest<DeleteCustomCostCategoryResult>(`${base(workspaceId)}/custom-cost-categories/${key}`, { method: "DELETE" }),
   },
   statements: {
     list: (workspaceId: string, propertyId?: string) => apiRequest<StatementDto[]>(`${base(workspaceId)}/statements`, { query: { propertyId } }),

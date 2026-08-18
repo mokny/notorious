@@ -1,4 +1,5 @@
 import type { ModuleSdk } from "../manifest.js";
+import { purgeCustomCostCategories } from "./customCostCategories.js";
 
 /**
  * Deletes every Vermieter business/transactional record for a workspace -
@@ -36,6 +37,16 @@ export function resetVermieterData(sdk: ModuleSdk, workspaceId: string, options:
     }
   });
   tx(workspaceId);
+  // Custom cost categories are workspace-wide settings, not property-scoped
+  // (same reasoning as vermieter_category_allocation_defaults above) - only
+  // remove them alongside the whole-module purge (manifest.ts::purge(),
+  // keepLandlordProfile: false), never from the in-app "reset module but
+  // keep it enabled" action (keepLandlordProfile: true) or any of the
+  // property-scoped reset scopes below, which must leave workspace-wide
+  // category configuration untouched.
+  if (!options.keepLandlordProfile) {
+    purgeCustomCostCategories(sdk, workspaceId);
+  }
 }
 
 /**

@@ -12,7 +12,7 @@ import {
   type VermieterBillingMode,
 } from "../api.js";
 import { UnitMetersPanel } from "../components/UnitMetersPanel.js";
-import { VERMIETER_COST_CATEGORIES } from "../../db/costCategories.js";
+import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
@@ -579,6 +579,7 @@ function CircuitAdvancedPanel({
   memberUnits: { id: string; label: string }[];
 }) {
   const queryClient = useQueryClient();
+  const { categories } = useVermieterCostCategories(workspaceId);
   const settingsKey = ["module-vermieter-circuit-category-settings", workspaceId, circuit.id];
   const { data: settings } = useQuery({
     queryKey: settingsKey,
@@ -602,7 +603,7 @@ function CircuitAdvancedPanel({
         </p>
       </div>
       <ul className="divide-y divide-border/60">
-        {VERMIETER_COST_CATEGORIES.map((category) => (
+        {categories.map((category) => (
           <CategorySettingRow
             key={category.key}
             workspaceId={workspaceId}

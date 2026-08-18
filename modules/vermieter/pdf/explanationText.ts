@@ -1,5 +1,4 @@
 import { formatCents } from "@notorious/shared";
-import { getCostCategory } from "../db/costCategories.js";
 import { ESTIMATION_METHOD_EXPLANATION_DE } from "./text.de.js";
 import type { StatementLineDto, TenantSummaryDto } from "../services/statements.js";
 
@@ -34,8 +33,8 @@ function pct(shareCents: number, totalCents: number): string {
   return totalCents > 0 ? `${((shareCents / totalCents) * 100).toFixed(2).replace(".", ",")} %` : "0 %";
 }
 
-function categoryLabel(key: string): string {
-  return getCostCategory(key)?.label ?? key;
+function categoryLabel(categoryLabels: Record<string, string>, key: string): string {
+  return categoryLabels[key] ?? key;
 }
 
 /** German-locale number formatting ("62,50"), matching pct()'s comma-decimal convention. */
@@ -71,46 +70,47 @@ function basisSentence(kind: "sqm" | "persons" | "units" | "consumption", numera
   return ` Ihr ermittelter Verbrauch beträgt ${num} von insgesamt ${den} Verbrauchseinheiten im Abrechnungskreis (${num} ÷ ${den} = ${ratioPct}).`;
 }
 
-function sentenceForAllocationLine(line: StatementLineDto): string {
+function sentenceForAllocationLine(line: StatementLineDto, categoryLabels: Record<string, string>): string {
   const categoryTotal = formatCents(line.totalPropertyCostCents);
   const share = pct(line.unitShareCents, line.totalPropertyCostCents);
   const amount = formatCents(line.unitShareCents);
   const days = `${line.daysOccupied} von ${line.daysTotal} Tagen`;
+  const label = categoryLabel(categoryLabels, line.costCategoryKey);
 
   if (line.allocationKeyUsed === "sqm") {
     return (
-      `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Wohnfläche verteilt. Bezogen auf Ihren Belegungszeitraum ` +
+      `${label} (Gesamtkosten: ${categoryTotal}) wurde nach Wohnfläche verteilt. Bezogen auf Ihren Belegungszeitraum ` +
       `(${days} im Abrechnungszeitraum) entfällt auf Ihre Einheit ein Anteil von ${share}, das entspricht ${amount}.` +
       basisSentence("sqm", line.basisNumerator, line.basisDenominator)
     );
   }
   if (line.allocationKeyUsed === "persons") {
     return (
-      `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Personenzahl verteilt. Bezogen auf Ihren Belegungszeitraum ` +
+      `${label} (Gesamtkosten: ${categoryTotal}) wurde nach Personenzahl verteilt. Bezogen auf Ihren Belegungszeitraum ` +
       `(${days} im Abrechnungszeitraum) entfällt auf Ihren Haushalt ein Anteil von ${share}, das entspricht ${amount}.` +
       basisSentence("persons", line.basisNumerator, line.basisDenominator)
     );
   }
   if (line.allocationKeyUsed === "units") {
     return (
-      `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Anzahl der Einheiten (Kopfteil) verteilt. Bezogen auf Ihren ` +
+      `${label} (Gesamtkosten: ${categoryTotal}) wurde nach Anzahl der Einheiten (Kopfteil) verteilt. Bezogen auf Ihren ` +
       `Belegungszeitraum (${days} im Abrechnungszeitraum) entfällt auf Ihre Einheit ein Anteil von ${share}, das entspricht ${amount}.` +
       basisSentence("units", line.basisNumerator, line.basisDenominator)
     );
   }
   if (line.allocationKeyUsed === "fixed_manual") {
-    return `${categoryLabel(line.costCategoryKey)} (${amount}) wurde Ihnen als Einzelbeleg direkt zugeordnet, unabhängig von einem allgemeinen Verteilerschlüssel.`;
+    return `${label} (${amount}) wurde Ihnen als Einzelbeleg direkt zugeordnet, unabhängig von einem allgemeinen Verteilerschlüssel.`;
   }
   if (line.allocationKeyUsed === "external_provider") {
     const provider = line.externalProviderName ?? "einem externen Abrechnungsdienstleister";
-    return `Die Kosten für ${categoryLabel(line.costCategoryKey)} (${amount}) wurden von ${provider} extern abgerechnet und direkt für Ihre Einheit übernommen.`;
+    return `Die Kosten für ${label} (${amount}) wurden von ${provider} extern abgerechnet und direkt für Ihre Einheit übernommen.`;
   }
   // consumption
   const estimationClause = line.isEstimated && line.estimationMethod
     ? ` Der zugrunde gelegte Verbrauchswert wurde ${ESTIMATION_METHOD_EXPLANATION_DE[line.estimationMethod]}.`
     : " Grundlage ist Ihr tatsächlich gemessener Verbrauch.";
   return (
-    `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Verbrauch verteilt. Ihr Anteil beträgt ${share}, das entspricht ${amount}.` +
+    `${label} (Gesamtkosten: ${categoryTotal}) wurde nach Verbrauch verteilt. Ihr Anteil beträgt ${share}, das entspricht ${amount}.` +
     basisSentence("consumption", line.basisNumerator, line.basisDenominator) +
     estimationClause
   );
@@ -158,7 +158,11 @@ function sentenceForHeatingLines(sqmLine: StatementLineDto, consumptionLine: Sta
  * begin with - see statementCalculation.ts's vacancy-bucket doc comment),
  * ending with the prepayments-vs-cost reconciliation sentence.
  */
-export function generateTenantExplanationParagraph(unitLines: StatementLineDto[], summary: TenantSummaryDto): string {
+export function generateTenantExplanationParagraph(
+  unitLines: StatementLineDto[],
+  summary: TenantSummaryDto,
+  categoryLabels: Record<string, string> = {},
+): string {
   const chargedLines = unitLines.filter((line) => line.unitShareCents !== 0 || line.totalPropertyCostCents !== 0);
   const heatingLines = chargedLines.filter((line) => line.costCategoryKey === "heizung");
   const otherLines = chargedLines.filter((line) => line.costCategoryKey !== "heizung");
@@ -169,9 +173,9 @@ export function generateTenantExplanationParagraph(unitLines: StatementLineDto[]
   if (heatingSqm && heatingConsumption) {
     sentences.push(sentenceForHeatingLines(heatingSqm, heatingConsumption));
   } else {
-    for (const line of heatingLines) sentences.push(sentenceForAllocationLine(line));
+    for (const line of heatingLines) sentences.push(sentenceForAllocationLine(line, categoryLabels));
   }
-  for (const line of otherLines) sentences.push(sentenceForAllocationLine(line));
+  for (const line of otherLines) sentences.push(sentenceForAllocationLine(line, categoryLabels));
 
   const totalAllocated = formatCents(summary.totalAllocatedCostCents);
   const prepayments = formatCents(summary.totalPrepaymentsCents);

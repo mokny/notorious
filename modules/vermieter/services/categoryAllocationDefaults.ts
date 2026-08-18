@@ -1,6 +1,6 @@
 import type { ModuleSdk } from "../manifest.js";
-import { VERMIETER_COST_CATEGORIES, getCostCategory } from "../db/costCategories.js";
 import type { VermieterAllocationKey } from "../db/types.js";
+import { listAllCostCategoriesForWorkspace, resolveCostCategory } from "./customCostCategories.js";
 
 /**
  * Per-workspace override of a cost category's default allocation key - see
@@ -58,7 +58,7 @@ function overrideRow(sdk: ModuleSdk, workspaceId: string, costCategoryKey: strin
 export function resolveCategoryDefaultAllocationKey(sdk: ModuleSdk, workspaceId: string, costCategoryKey: string): VermieterAllocationKey {
   const override = overrideRow(sdk, workspaceId, costCategoryKey);
   if (override) return override.allocation_key;
-  return getCostCategory(costCategoryKey)?.defaultAllocationKey ?? "sqm";
+  return resolveCostCategory(sdk, workspaceId, costCategoryKey)?.defaultAllocationKey ?? "sqm";
 }
 
 /**
@@ -74,7 +74,7 @@ export function resolveAllCategoryDefaultAllocationKeys(sdk: ModuleSdk, workspac
     .all(workspaceId) as VermieterCategoryAllocationDefaultRow[];
   const overrideByCategory = new Map(overrides.map((row) => [row.cost_category_key, row.allocation_key]));
   const map = new Map<string, VermieterAllocationKey>();
-  for (const category of VERMIETER_COST_CATEGORIES) {
+  for (const category of listAllCostCategoriesForWorkspace(sdk, workspaceId)) {
     map.set(category.key, overrideByCategory.get(category.key) ?? category.defaultAllocationKey);
   }
   return map;
@@ -86,7 +86,7 @@ export function listCategoryAllocationDefaults(sdk: ModuleSdk, workspaceId: stri
     .prepare("SELECT * FROM vermieter_category_allocation_defaults WHERE workspace_id = ?")
     .all(workspaceId) as VermieterCategoryAllocationDefaultRow[];
   const overrideByCategory = new Map(overrides.map((row) => [row.cost_category_key, row]));
-  return VERMIETER_COST_CATEGORIES.map((category) => {
+  return listAllCostCategoriesForWorkspace(sdk, workspaceId).map((category) => {
     const override = overrideByCategory.get(category.key);
     return {
       costCategoryKey: category.key,
@@ -111,7 +111,7 @@ export function setCategoryAllocationDefault(
   costCategoryKey: string,
   allocationKey: CategoryDefaultAllocationKey,
 ): SetCategoryAllocationDefaultResult {
-  const category = getCostCategory(costCategoryKey);
+  const category = resolveCostCategory(sdk, workspaceId, costCategoryKey);
   if (!category) return { ok: false, reason: "unknown_category" };
   const now = sdk.nowIso();
   const existing = overrideRow(sdk, workspaceId, costCategoryKey);
@@ -147,7 +147,7 @@ export interface ResetCategoryAllocationDefaultResult {
 
 /** Removes a workspace's override for one category, reverting its effective default back to the hardcoded built-in value. A no-op (not an error) if no override existed. */
 export function resetCategoryAllocationDefault(sdk: ModuleSdk, workspaceId: string, costCategoryKey: string): ResetCategoryAllocationDefaultResult {
-  const category = getCostCategory(costCategoryKey);
+  const category = resolveCostCategory(sdk, workspaceId, costCategoryKey);
   if (!category) return { ok: false, reason: "unknown_category" };
   sdk.sqlite
     .prepare("DELETE FROM vermieter_category_allocation_defaults WHERE workspace_id = ? AND cost_category_key = ?")
