@@ -125,7 +125,7 @@ function renderTenantSection(
     const sharePercent = line.totalPropertyCostCents > 0 ? `${((line.unitShareCents / line.totalPropertyCostCents) * 100).toFixed(1)}%` : "-";
     doc.text(categoryLabel, colCategory.x, tableY, { width: colCategory.width });
     doc.text(formatCents(line.totalPropertyCostCents), colTotal.x, tableY, { width: colTotal.width, align: "right" });
-    doc.text(allocationKeyLabel(line.allocationKeyUsed), colKey.x, tableY, { width: colKey.width });
+    doc.text(allocationKeyLabel(line.allocationKeyUsed, line.externalProviderName), colKey.x, tableY, { width: colKey.width });
     doc.text(sharePercent, colShareLabel.x, tableY, { width: colShareLabel.width, align: "right" });
     // Estimated (§9a HeizkostenV substitute) lines get a trailing "*"
     // marker so a substitute value never looks identical to a real metered

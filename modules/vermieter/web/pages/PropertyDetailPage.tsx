@@ -2,8 +2,17 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents, parseCentsInput } from "@notorious/shared";
-import { vermieterApi, type CostCircuitDto, type PropertyInput, type UnitInput } from "../api.js";
+import {
+  vermieterApi,
+  type CircuitCategorySettingDto,
+  type CostCircuitDto,
+  type ExternalCostAllocationDto,
+  type PropertyInput,
+  type UnitInput,
+  type VermieterBillingMode,
+} from "../api.js";
 import { UnitMetersPanel } from "../components/UnitMetersPanel.js";
+import { VERMIETER_COST_CATEGORIES } from "../../db/costCategories.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
@@ -419,6 +428,7 @@ function CostCircuitRow({
 }) {
   const [editingUnits, setEditingUnits] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [nameDraft, setNameDraft] = useState(circuit.name);
   const [unitDraft, setUnitDraft] = useState<string[]>(circuit.unitIds);
 
@@ -484,23 +494,30 @@ function CostCircuitRow({
             )}
           </span>
         )}
-        {!circuit.isDefault && !renaming && (
+        {!renaming && (
           <span className="flex items-center gap-3 text-xs text-ink-muted">
-            <button type="button" className="hover:text-accent" onClick={() => setRenaming(true)}>
-              Umbenennen
-            </button>
-            <button
-              type="button"
-              className="hover:text-accent"
-              onClick={() => {
-                setUnitDraft(circuit.unitIds);
-                setEditingUnits((v) => !v);
-              }}
-            >
-              {editingUnits ? "Abbrechen" : "Einheiten bearbeiten"}
-            </button>
-            <button type="button" className="hover:text-red-500" onClick={handleDelete}>
-              Löschen
+            {!circuit.isDefault && (
+              <>
+                <button type="button" className="hover:text-accent" onClick={() => setRenaming(true)}>
+                  Umbenennen
+                </button>
+                <button
+                  type="button"
+                  className="hover:text-accent"
+                  onClick={() => {
+                    setUnitDraft(circuit.unitIds);
+                    setEditingUnits((v) => !v);
+                  }}
+                >
+                  {editingUnits ? "Abbrechen" : "Einheiten bearbeiten"}
+                </button>
+                <button type="button" className="hover:text-red-500" onClick={handleDelete}>
+                  Löschen
+                </button>
+              </>
+            )}
+            <button type="button" className="hover:text-accent" onClick={() => setShowAdvanced((v) => !v)}>
+              {showAdvanced ? "Erweitert ausblenden" : "Erweitert"}
             </button>
           </span>
         )}
@@ -533,7 +550,369 @@ function CostCircuitRow({
           {circuit.unitIds.length > 0 ? circuit.unitIds.map(unitLabel).join(", ") : "Keine Einheiten zugeordnet"}
         </p>
       )}
+
+      {showAdvanced && (
+        <CircuitAdvancedPanel
+          workspaceId={workspaceId}
+          circuit={circuit}
+          memberUnits={circuit.isDefault ? activeUnits : activeUnits.filter((u) => circuit.unitIds.includes(u.id))}
+        />
+      )}
     </li>
+  );
+}
+
+/**
+ * "Erweitert"-Bereich eines Abrechnungskreises: pro Kostenkategorie umschaltbar
+ * zwischen "Selbst berechnet" (Standard, unser eigener Umlageschlüssel-Algorithmus)
+ * und "Extern abgerechnet" (Techem/ista/Minol o.ä. hat bereits fertige Beträge pro
+ * Einheit geliefert) - siehe modules/vermieter/services/externalBilling.ts. Bewusst
+ * eingeklappt/sekundär, weil die meisten Vermieter das nie anfassen müssen.
+ */
+function CircuitAdvancedPanel({
+  workspaceId,
+  circuit,
+  memberUnits,
+}: {
+  workspaceId: string;
+  circuit: CostCircuitDto;
+  memberUnits: { id: string; label: string }[];
+}) {
+  const queryClient = useQueryClient();
+  const settingsKey = ["module-vermieter-circuit-category-settings", workspaceId, circuit.id];
+  const { data: settings } = useQuery({
+    queryKey: settingsKey,
+    queryFn: () => vermieterApi.costCircuits.categorySettings.list(workspaceId, circuit.id),
+  });
+
+  function settingFor(categoryKey: string): CircuitCategorySettingDto | undefined {
+    return settings?.find((s) => s.costCategoryKey === categoryKey);
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-border/60 bg-surface p-3">
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold text-ink">Abrechnungsart je Kostenkategorie</h3>
+        <p className="text-xs text-ink-muted">
+          Standardmäßig berechnet Notorious die Kostenanteile jeder Einheit selbst (nach Fläche, Verbrauch, Personenzahl o. ä.).
+          Wenn stattdessen ein externer Dienstleister wie Techem oder ista die Heizkosten abliest und dir eine fertige Abrechnung
+          mit den Kosten pro Wohnung schickt, kannst du das hier pro Kategorie umstellen und die Beträge aus dieser Abrechnung
+          direkt eintragen, statt eigene Zählerstände zu erfassen. Betrifft meist nur Heizung und Warmwasser – für alle anderen
+          Kategorien bei „Selbst berechnet" bleiben ist der Normalfall.
+        </p>
+      </div>
+      <ul className="divide-y divide-border/60">
+        {VERMIETER_COST_CATEGORIES.map((category) => (
+          <CategorySettingRow
+            key={category.key}
+            workspaceId={workspaceId}
+            circuit={circuit}
+            categoryKey={category.key}
+            categoryLabel={category.label}
+            setting={settingFor(category.key)}
+            memberUnits={memberUnits}
+            onSettingChanged={() => void queryClient.invalidateQueries({ queryKey: settingsKey })}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CategorySettingRow({
+  workspaceId,
+  circuit,
+  categoryKey,
+  categoryLabel,
+  setting,
+  memberUnits,
+  onSettingChanged,
+}: {
+  workspaceId: string;
+  circuit: CostCircuitDto;
+  categoryKey: string;
+  categoryLabel: string;
+  setting: CircuitCategorySettingDto | undefined;
+  memberUnits: { id: string; label: string }[];
+  onSettingChanged: () => void;
+}) {
+  const isExternal = setting?.billingMode === "external_provider";
+  const [providerDraft, setProviderDraft] = useState(setting?.providerName ?? "");
+  const [expanded, setExpanded] = useState(false);
+
+  const setModeMutation = useMutation({
+    mutationFn: (input: { billingMode: VermieterBillingMode; providerName?: string | null }) =>
+      vermieterApi.costCircuits.categorySettings.set(workspaceId, circuit.id, categoryKey, input),
+    onSuccess: onSettingChanged,
+  });
+
+  function toggleMode(next: VermieterBillingMode) {
+    if (next === "calculated") {
+      setModeMutation.mutate({ billingMode: "calculated" });
+      setExpanded(false);
+    } else {
+      setModeMutation.mutate({ billingMode: "external_provider", providerName: providerDraft || null });
+      setExpanded(true);
+    }
+  }
+
+  return (
+    <li className="space-y-2 py-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium">{categoryLabel}</span>
+        <div className="flex items-center gap-2">
+          <select
+            className="rounded-md border border-border bg-surface px-2 py-1 text-xs"
+            value={isExternal ? "external_provider" : "calculated"}
+            onChange={(e) => toggleMode(e.target.value as VermieterBillingMode)}
+          >
+            <option value="calculated">Selbst berechnet</option>
+            <option value="external_provider">Extern abgerechnet (Techem/ista o. ä.)</option>
+          </select>
+          {isExternal && (
+            <button type="button" className="text-accent hover:underline" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? "Einträge ausblenden" : "Beträge verwalten"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isExternal && (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setModeMutation.mutate({ billingMode: "external_provider", providerName: providerDraft || null });
+          }}
+        >
+          <label className="space-y-1">
+            <span className="text-ink-muted">Dienstleister</span>
+            <input
+              className="rounded-md border border-border bg-surface px-2 py-1 text-xs"
+              value={providerDraft}
+              onChange={(e) => setProviderDraft(e.target.value)}
+              placeholder="z. B. Techem, ista"
+            />
+          </label>
+          <button type="submit" className="rounded-md border border-border px-2 py-1 text-xs" disabled={setModeMutation.isPending}>
+            Speichern
+          </button>
+        </form>
+      )}
+
+      {isExternal && expanded && (
+        <ExternalAllocationsTable workspaceId={workspaceId} circuit={circuit} categoryKey={categoryKey} memberUnits={memberUnits} />
+      )}
+    </li>
+  );
+}
+
+const EMPTY_ALLOCATION_FORM = { unitId: "", periodStart: "", periodEnd: "", amount: "0,00", providerReference: "" };
+
+function ExternalAllocationsTable({
+  workspaceId,
+  circuit,
+  categoryKey,
+  memberUnits,
+}: {
+  workspaceId: string;
+  circuit: CostCircuitDto;
+  categoryKey: string;
+  memberUnits: { id: string; label: string }[];
+}) {
+  const queryClient = useQueryClient();
+  const allocationsKey = ["module-vermieter-external-allocations", workspaceId, circuit.id, categoryKey];
+  const { data: allocations } = useQuery({
+    queryKey: allocationsKey,
+    queryFn: () => vermieterApi.costCircuits.externalAllocations.list(workspaceId, circuit.id, { categoryKey }),
+  });
+
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_ALLOCATION_FORM, unitId: memberUnits[0]?.id ?? "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const invalidate = () => void queryClient.invalidateQueries({ queryKey: allocationsKey });
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      vermieterApi.costCircuits.externalAllocations.create(workspaceId, circuit.id, {
+        costCategoryKey: categoryKey,
+        unitId: form.unitId,
+        periodStart: form.periodStart,
+        periodEnd: form.periodEnd,
+        amountCents: parseCentsInput(form.amount) ?? 0,
+        providerReference: form.providerReference || null,
+      }),
+    onSuccess: () => {
+      setForm({ ...EMPTY_ALLOCATION_FORM, unitId: memberUnits[0]?.id ?? "" });
+      setShowForm(false);
+      invalidate();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (allocationId: string) =>
+      vermieterApi.costCircuits.externalAllocations.update(workspaceId, circuit.id, allocationId, {
+        unitId: form.unitId,
+        periodStart: form.periodStart,
+        periodEnd: form.periodEnd,
+        amountCents: parseCentsInput(form.amount) ?? 0,
+        providerReference: form.providerReference || null,
+      }),
+    onSuccess: () => {
+      setEditingId(null);
+      setForm({ ...EMPTY_ALLOCATION_FORM, unitId: memberUnits[0]?.id ?? "" });
+      invalidate();
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (allocationId: string) => vermieterApi.costCircuits.externalAllocations.remove(workspaceId, circuit.id, allocationId),
+    onSuccess: invalidate,
+  });
+
+  function unitLabel(unitId: string): string {
+    return memberUnits.find((u) => u.id === unitId)?.label ?? unitId;
+  }
+
+  function startEdit(allocation: ExternalCostAllocationDto) {
+    setEditingId(allocation.id);
+    setForm({
+      unitId: allocation.unitId,
+      periodStart: allocation.periodStart,
+      periodEnd: allocation.periodEnd,
+      amount: (allocation.amountCents / 100).toFixed(2).replace(".", ","),
+      providerReference: allocation.providerReference ?? "",
+    });
+    setShowForm(true);
+  }
+
+  function cancelForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ ...EMPTY_ALLOCATION_FORM, unitId: memberUnits[0]?.id ?? "" });
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-border/60 bg-surface-hover p-2">
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-ink-muted">
+            <tr>
+              <th className="px-2 py-1 text-left">Einheit</th>
+              <th className="px-2 py-1 text-left">Zeitraum</th>
+              <th className="px-2 py-1 text-right">Betrag</th>
+              <th className="px-2 py-1 text-left">Referenz</th>
+              <th className="px-2 py-1" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {allocations?.map((allocation) => (
+              <tr key={allocation.id}>
+                <td className="px-2 py-1">{unitLabel(allocation.unitId)}</td>
+                <td className="px-2 py-1">
+                  {allocation.periodStart} – {allocation.periodEnd}
+                </td>
+                <td className="px-2 py-1 text-right">{formatCents(allocation.amountCents)}</td>
+                <td className="px-2 py-1">{allocation.providerReference || "–"}</td>
+                <td className="px-2 py-1 text-right whitespace-nowrap">
+                  <button type="button" className="text-accent hover:underline" onClick={() => startEdit(allocation)}>
+                    Bearbeiten
+                  </button>{" "}
+                  <button type="button" className="text-ink-muted hover:text-red-500" onClick={() => removeMutation.mutate(allocation.id)}>
+                    Löschen
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {allocations?.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-2 py-1 text-ink-muted">
+                  Noch keine Beträge erfasst.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {!showForm ? (
+        <button type="button" className="rounded-md border border-border px-2 py-1 text-xs" onClick={() => setShowForm(true)}>
+          + Eintrag hinzufügen
+        </button>
+      ) : (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!form.unitId || !form.periodStart || !form.periodEnd) return;
+            if (editingId) updateMutation.mutate(editingId);
+            else createMutation.mutate();
+          }}
+        >
+          <label className="space-y-1">
+            <span className="text-ink-muted">Einheit</span>
+            <select
+              className="rounded-md border border-border bg-surface px-2 py-1 text-xs"
+              value={form.unitId}
+              onChange={(e) => setForm((f) => ({ ...f, unitId: e.target.value }))}
+              required
+            >
+              <option value="">–</option>
+              {memberUnits.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-ink-muted">Von</span>
+            <input
+              type="date"
+              className="rounded-md border border-border bg-surface px-2 py-1 text-xs"
+              value={form.periodStart}
+              onChange={(e) => setForm((f) => ({ ...f, periodStart: e.target.value }))}
+              required
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-ink-muted">Bis</span>
+            <input
+              type="date"
+              className="rounded-md border border-border bg-surface px-2 py-1 text-xs"
+              value={form.periodEnd}
+              onChange={(e) => setForm((f) => ({ ...f, periodEnd: e.target.value }))}
+              required
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-ink-muted">Betrag (€)</span>
+            <input
+              className="w-24 rounded-md border border-border bg-surface px-2 py-1 text-xs"
+              value={form.amount}
+              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+              required
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-ink-muted">Referenz</span>
+            <input
+              className="rounded-md border border-border bg-surface px-2 py-1 text-xs"
+              value={form.providerReference}
+              onChange={(e) => setForm((f) => ({ ...f, providerReference: e.target.value }))}
+              placeholder="z. B. Belegnummer"
+            />
+          </label>
+          <button type="submit" className="rounded-md bg-accent px-2 py-1 text-xs text-white">
+            {editingId ? "Speichern" : "Hinzufügen"}
+          </button>
+          <button type="button" className="text-xs text-ink-muted" onClick={cancelForm}>
+            Abbrechen
+          </button>
+        </form>
+      )}
+    </div>
   );
 }
 

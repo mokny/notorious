@@ -23,6 +23,8 @@ export function resetVermieterData(sdk: ModuleSdk, workspaceId: string, options:
     sdk.sqlite.prepare("DELETE FROM vermieter_meter_readings WHERE workspace_id = ?").run(wsId);
     sdk.sqlite.prepare("DELETE FROM vermieter_meters WHERE workspace_id = ?").run(wsId);
     sdk.sqlite.prepare("DELETE FROM vermieter_units WHERE workspace_id = ?").run(wsId);
+    sdk.sqlite.prepare("DELETE FROM vermieter_external_cost_allocations WHERE workspace_id = ?").run(wsId);
+    sdk.sqlite.prepare("DELETE FROM vermieter_circuit_category_settings WHERE workspace_id = ?").run(wsId);
     sdk.sqlite
       .prepare("DELETE FROM vermieter_cost_circuit_units WHERE circuit_id IN (SELECT id FROM vermieter_cost_circuits WHERE workspace_id = ?)")
       .run(wsId);
@@ -105,6 +107,8 @@ export function resetPropertiesScope(sdk: ModuleSdk, workspaceId: string): void 
     sdk.sqlite.prepare("DELETE FROM vermieter_meter_readings WHERE workspace_id = ?").run(wsId);
     sdk.sqlite.prepare("DELETE FROM vermieter_meters WHERE workspace_id = ?").run(wsId);
     sdk.sqlite.prepare("DELETE FROM vermieter_units WHERE workspace_id = ?").run(wsId);
+    sdk.sqlite.prepare("DELETE FROM vermieter_external_cost_allocations WHERE workspace_id = ?").run(wsId);
+    sdk.sqlite.prepare("DELETE FROM vermieter_circuit_category_settings WHERE workspace_id = ?").run(wsId);
     sdk.sqlite
       .prepare("DELETE FROM vermieter_cost_circuit_units WHERE circuit_id IN (SELECT id FROM vermieter_cost_circuits WHERE workspace_id = ?)")
       .run(wsId);

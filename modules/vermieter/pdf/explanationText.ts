@@ -10,13 +10,19 @@ import type { StatementLineDto, TenantSummaryDto } from "../services/statements.
  * computed `StatementLineDto`/`TenantSummaryDto` rows the table above it
  * renders from (see pdf/render.ts) - nothing is recomputed independently -
  * so the text is guaranteed to stay internally consistent with the table
- * even as the allocation math evolves, at the cost of only being able to
- * describe fractions the persisted rows actually carry (unit-share ÷
- * total-property-cost, and days-occupied ÷ days-total; see
- * services/statementCalculation.ts's StatementLineResult - there is no
- * separately persisted "your sqm ÷ circuit sqm" figure, so that fraction is
- * expressed as the combined weight-day share percentage instead, which is
- * the mathematically equivalent number the table itself shows).
+ * even as the allocation math evolves.
+ *
+ * Every percentage/fraction mentioned is immediately followed by the raw
+ * numbers that produced it: the days-occupied ÷ days-total fraction (always
+ * available), and - for sqm/persons/units/consumption lines - the
+ * allocation-basis numerator/denominator persisted on the line
+ * (`basisNumerator`/`basisDenominator`, e.g. "your unit's 62.5 m² of the
+ * circuit's 310 m² total" - see services/statementCalculation.ts's
+ * `basisSentence` counterpart and migrations/0013). `fixed_manual` lines
+ * have no allocation-key fraction to begin with (their whole point is
+ * bypassing one), and `external_provider` lines are an authoritative
+ * transcribed figure, not a derived percentage - both get their own
+ * fraction-free prose instead (see sentenceForAllocationLine below).
  */
 
 function formatDate(iso: string): string {
@@ -32,6 +38,39 @@ function categoryLabel(key: string): string {
   return getCostCategory(key)?.label ?? key;
 }
 
+/** German-locale number formatting ("62,50"), matching pct()'s comma-decimal convention. */
+function formatNumber(value: number, decimals = 2): string {
+  return value.toFixed(decimals).replace(".", ",");
+}
+
+/**
+ * The "why this percentage" sentence: shows the raw allocation-basis
+ * numerator/denominator (see StatementLineDto.basisNumerator/
+ * basisDenominator) alongside the division that produces the percentage, in
+ * the style of the module brief's own example ("Ihre Einheit hat 62,5 m²
+ * Wohnfläche von insgesamt 310 m² im Abrechnungskreis (62,5 ÷ 310 = 20,16
+ * %)."). Returns "" when the line has no persisted basis figures (older
+ * pre-migration statements, or an allocation key this doesn't apply to) so
+ * callers can simply append it without a conditional.
+ */
+function basisSentence(kind: "sqm" | "persons" | "units" | "consumption", numerator: number | null, denominator: number | null): string {
+  if (numerator === null || denominator === null || denominator <= 0) return "";
+  const decimals = kind === "sqm" || kind === "consumption" ? 2 : 0;
+  const num = formatNumber(numerator, decimals);
+  const den = formatNumber(denominator, decimals);
+  const ratioPct = `${((numerator / denominator) * 100).toFixed(2).replace(".", ",")} %`;
+  if (kind === "sqm") {
+    return ` Ihre Einheit hat ${num} m² Wohnfläche von insgesamt ${den} m² im Abrechnungskreis (${num} ÷ ${den} = ${ratioPct}).`;
+  }
+  if (kind === "persons") {
+    return ` Ihr Haushalt umfasst ${num} Personen von insgesamt ${den} Personen im Abrechnungskreis (${num} ÷ ${den} = ${ratioPct}).`;
+  }
+  if (kind === "units") {
+    return ` Ihre Einheit zählt als 1 von ${den} Einheiten im Abrechnungskreis (1 ÷ ${den} = ${ratioPct}).`;
+  }
+  return ` Ihr ermittelter Verbrauch beträgt ${num} von insgesamt ${den} Verbrauchseinheiten im Abrechnungskreis (${num} ÷ ${den} = ${ratioPct}).`;
+}
+
 function sentenceForAllocationLine(line: StatementLineDto): string {
   const categoryTotal = formatCents(line.totalPropertyCostCents);
   const share = pct(line.unitShareCents, line.totalPropertyCostCents);
@@ -39,22 +78,42 @@ function sentenceForAllocationLine(line: StatementLineDto): string {
   const days = `${line.daysOccupied} von ${line.daysTotal} Tagen`;
 
   if (line.allocationKeyUsed === "sqm") {
-    return `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Wohnfläche verteilt. Bezogen auf Ihren Belegungszeitraum (${days} im Abrechnungszeitraum) entfällt auf Ihre Einheit ein Anteil von ${share}, das entspricht ${amount}.`;
+    return (
+      `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Wohnfläche verteilt. Bezogen auf Ihren Belegungszeitraum ` +
+      `(${days} im Abrechnungszeitraum) entfällt auf Ihre Einheit ein Anteil von ${share}, das entspricht ${amount}.` +
+      basisSentence("sqm", line.basisNumerator, line.basisDenominator)
+    );
   }
   if (line.allocationKeyUsed === "persons") {
-    return `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Personenzahl verteilt. Bezogen auf Ihren Belegungszeitraum (${days} im Abrechnungszeitraum) entfällt auf Ihren Haushalt ein Anteil von ${share}, das entspricht ${amount}.`;
+    return (
+      `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Personenzahl verteilt. Bezogen auf Ihren Belegungszeitraum ` +
+      `(${days} im Abrechnungszeitraum) entfällt auf Ihren Haushalt ein Anteil von ${share}, das entspricht ${amount}.` +
+      basisSentence("persons", line.basisNumerator, line.basisDenominator)
+    );
   }
   if (line.allocationKeyUsed === "units") {
-    return `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Anzahl der Einheiten (Kopfteil) verteilt. Bezogen auf Ihren Belegungszeitraum (${days} im Abrechnungszeitraum) entfällt auf Ihre Einheit ein Anteil von ${share}, das entspricht ${amount}.`;
+    return (
+      `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Anzahl der Einheiten (Kopfteil) verteilt. Bezogen auf Ihren ` +
+      `Belegungszeitraum (${days} im Abrechnungszeitraum) entfällt auf Ihre Einheit ein Anteil von ${share}, das entspricht ${amount}.` +
+      basisSentence("units", line.basisNumerator, line.basisDenominator)
+    );
   }
   if (line.allocationKeyUsed === "fixed_manual") {
     return `${categoryLabel(line.costCategoryKey)} (${amount}) wurde Ihnen als Einzelbeleg direkt zugeordnet, unabhängig von einem allgemeinen Verteilerschlüssel.`;
+  }
+  if (line.allocationKeyUsed === "external_provider") {
+    const provider = line.externalProviderName ?? "einem externen Abrechnungsdienstleister";
+    return `Die Kosten für ${categoryLabel(line.costCategoryKey)} (${amount}) wurden von ${provider} extern abgerechnet und direkt für Ihre Einheit übernommen.`;
   }
   // consumption
   const estimationClause = line.isEstimated && line.estimationMethod
     ? ` Der zugrunde gelegte Verbrauchswert wurde ${ESTIMATION_METHOD_EXPLANATION_DE[line.estimationMethod]}.`
     : " Grundlage ist Ihr tatsächlich gemessener Verbrauch.";
-  return `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Verbrauch verteilt. Ihr Anteil beträgt ${share}, das entspricht ${amount}.${estimationClause}`;
+  return (
+    `${categoryLabel(line.costCategoryKey)} (Gesamtkosten: ${categoryTotal}) wurde nach Verbrauch verteilt. Ihr Anteil beträgt ${share}, das entspricht ${amount}.` +
+    basisSentence("consumption", line.basisNumerator, line.basisDenominator) +
+    estimationClause
+  );
 }
 
 /**
@@ -82,8 +141,12 @@ function sentenceForHeatingLines(sqmLine: StatementLineDto, consumptionLine: Sta
   return (
     `Heizkosten wurden gemäß §7 HeizkostenV in einen verbrauchsunabhängigen Grundkosten-Anteil und einen verbrauchsabhängigen ` +
     `Verbrauchskosten-Anteil aufgeteilt. Der Grundkosten-Anteil (Gesamtkosten: ${grundTotal}) wird nach Wohnfläche verteilt: Ihr Anteil ` +
-    `beträgt ${grundShare}, das entspricht ${grundAmount}. Der Verbrauchskosten-Anteil (Gesamtkosten: ${verbrauchTotal}) wird nach Verbrauch ` +
-    `verteilt: Ihr Anteil beträgt ${verbrauchShare}, das entspricht ${verbrauchAmount}.${estimationClause} In Summe ergibt sich für Heizung ` +
+    `beträgt ${grundShare}, das entspricht ${grundAmount}.` +
+    basisSentence("sqm", sqmLine.basisNumerator, sqmLine.basisDenominator) +
+    ` Der Verbrauchskosten-Anteil (Gesamtkosten: ${verbrauchTotal}) wird nach Verbrauch ` +
+    `verteilt: Ihr Anteil beträgt ${verbrauchShare}, das entspricht ${verbrauchAmount}.` +
+    basisSentence("consumption", consumptionLine.basisNumerator, consumptionLine.basisDenominator) +
+    `${estimationClause} In Summe ergibt sich für Heizung ` +
     `ein Betrag von ${sumAmount}.`
   );
 }

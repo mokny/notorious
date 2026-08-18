@@ -21,6 +21,7 @@ function parseInput(body: unknown): LeaseInput | null {
   if (typeof b.nkPrepaymentCents !== "number" || !Number.isInteger(b.nkPrepaymentCents) || b.nkPrepaymentCents < 0) return null;
   if (!Array.isArray(b.tenantIds)) return null;
   if (b.status && !VALID_STATUS.includes(b.status)) return null;
+  if (b.personCount != null && (typeof b.personCount !== "number" || !Number.isInteger(b.personCount) || b.personCount < 0)) return null;
   return {
     unitId: b.unitId,
     startDate: b.startDate,
@@ -33,6 +34,9 @@ function parseInput(body: unknown): LeaseInput | null {
     status: b.status,
     notes: b.notes,
     tenantIds: b.tenantIds as string[],
+    // Omitted/null -> createLease defaults to tenantIds.length, see
+    // LeaseInput.personCount's doc comment.
+    personCount: b.personCount ?? null,
   };
 }
 
@@ -74,6 +78,10 @@ export function registerLeaseRoutes(app: FastifyInstance, sdk: ModuleSdk): void 
     if ("coldRentCents" in body || "nkPrepaymentCents" in body) {
       reply.code(400);
       return { message: "Use POST .../leases/:id/rent-changes to change cold rent or NK prepayment" };
+    }
+    if ("personCount" in body && (typeof body.personCount !== "number" || !Number.isInteger(body.personCount) || body.personCount < 0)) {
+      reply.code(400);
+      return { message: "personCount must be a non-negative integer" };
     }
     const updated = updateLease(sdk, workspaceId, id, body);
     if (!updated) {

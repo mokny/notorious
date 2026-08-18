@@ -13,6 +13,7 @@ import { listReceiptsInPeriod } from "./receipts.js";
 import { listMeters, consumptionInPeriod, priorComparablePeriod } from "./meters.js";
 import { listRentPaymentsInPeriod } from "./rentPayments.js";
 import { listCostCircuits, getDefaultCostCircuitId } from "./costCircuits.js";
+import { listCircuitCategorySettingsForCircuits, listExternalAllocationsOverlappingPeriod } from "./externalBilling.js";
 import {
   computeStatementLines,
   computeTenantSummaries,
@@ -21,6 +22,8 @@ import {
   type CalcConsumptionByUnit,
   type CalcUnit,
   type CalcCostCircuit,
+  type CalcCircuitCategorySetting,
+  type CalcExternalAllocation,
 } from "./statementCalculation.js";
 
 export interface StatementLineDto {
@@ -37,6 +40,12 @@ export interface StatementLineDto {
   /** True when unitShareCents is a §9a HeizkostenV substitute value rather than a real meter reading - see services/meterSubstitute.ts. Additive field. */
   isEstimated: boolean;
   estimationMethod: VermieterEstimationMethod | null;
+  /** The unit's own raw allocation-basis value that produces this line's percentage - see pdf/explanationText.ts. Null for fixed_manual/external_provider lines. Additive field. */
+  basisNumerator: number | null;
+  /** The circuit-wide total of that same basis. Additive field. */
+  basisDenominator: number | null;
+  /** The metering-service name this line's cost was transcribed from - only set when allocationKeyUsed === 'external_provider'. Additive field. */
+  externalProviderName: string | null;
 }
 
 export interface TenantSummaryDto {
@@ -92,6 +101,9 @@ function lineRowToDto(row: VermieterStatementLineRow): StatementLineDto {
     daysTotal: row.days_total,
     isEstimated: row.is_estimated === 1,
     estimationMethod: row.estimation_method,
+    basisNumerator: row.basis_numerator,
+    basisDenominator: row.basis_denominator,
+    externalProviderName: row.external_provider_name,
   };
 }
 
@@ -219,6 +231,29 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
   const costCircuitDtos = listCostCircuits(sdk, workspaceId, input.propertyId);
   const costCircuits: CalcCostCircuit[] = costCircuitDtos.map((c) => ({ id: c.id, unitIds: c.unitIds }));
   const defaultCircuitId = getDefaultCostCircuitId(sdk, workspaceId, input.propertyId);
+  const circuitIds = costCircuitDtos.map((c) => c.id);
+
+  // External metering-service billing (Techem, ista, ...) - see
+  // services/externalBilling.ts and services/statementCalculation.ts::
+  // computeExternalProviderLines. Only (circuit, category) pairs explicitly
+  // opted into 'external_provider' change anything; everything else stays
+  // in the existing 'calculated' allocation-key pipeline.
+  const circuitCategorySettingDtos = listCircuitCategorySettingsForCircuits(sdk, workspaceId, circuitIds);
+  const circuitCategorySettings: CalcCircuitCategorySetting[] = circuitCategorySettingDtos.map((s) => ({
+    costCircuitId: s.costCircuitId,
+    costCategoryKey: s.costCategoryKey,
+    billingMode: s.billingMode,
+    providerName: s.providerName,
+  }));
+  const externalAllocationDtos = listExternalAllocationsOverlappingPeriod(sdk, workspaceId, circuitIds, input.periodStart, input.periodEnd);
+  const externalAllocations: CalcExternalAllocation[] = externalAllocationDtos.map((a) => ({
+    unitId: a.unitId,
+    costCircuitId: a.costCircuitId,
+    costCategoryKey: a.costCategoryKey,
+    periodStart: a.periodStart,
+    periodEnd: a.periodEnd,
+    amountCents: a.amountCents,
+  }));
 
   const leaseSegments: CalcLeaseSegment[] = [];
   for (const unit of unitDtos) {
@@ -226,7 +261,11 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
     for (const lease of leases) {
       const clipped = clampDateRange(lease.start_date, lease.end_date ?? input.periodEnd, input.periodStart, input.periodEnd);
       if (!clipped) continue;
-      const personCount = listTenantsForLease(sdk, lease.id).length;
+      // person_count is the lease's independently-controlled headcount (see
+      // services/leases.ts); fall back to counting linked tenants only for
+      // the never-normally-null DB edge case (pre-migration rows are
+      // backfilled, and createLease always sets a concrete value).
+      const personCount = lease.person_count ?? listTenantsForLease(sdk, lease.id).length;
       leaseSegments.push({ leaseId: lease.id, unitId: unit.id, segmentStart: clipped.start, segmentEnd: clipped.end, personCount });
     }
   }
@@ -281,6 +320,8 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
     receipts,
     consumption,
     heatingConsumptionSharePercent: input.heatingConsumptionSharePercent ?? 70,
+    circuitCategorySettings,
+    externalAllocations,
   });
 
   const prepaymentsByLease = new Map<string, number>();
@@ -308,8 +349,8 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
       sdk.sqlite
         .prepare(
           `INSERT INTO vermieter_statement_lines
-           (id, statement_id, unit_id, lease_id, cost_category_key, allocation_key_used, total_property_cost_cents, unit_share_cents, vacancy_share_cents, days_occupied, days_total, is_estimated, estimation_method, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, statement_id, unit_id, lease_id, cost_category_key, allocation_key_used, total_property_cost_cents, unit_share_cents, vacancy_share_cents, days_occupied, days_total, is_estimated, estimation_method, basis_numerator, basis_denominator, external_provider_name, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           sdk.newId(),
@@ -325,6 +366,9 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
           line.daysTotal,
           line.isEstimated ? 1 : 0,
           line.estimationMethod,
+          line.basisNumerator,
+          line.basisDenominator,
+          line.externalProviderName,
           now,
         );
     }

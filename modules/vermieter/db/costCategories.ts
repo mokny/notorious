@@ -66,4 +66,6 @@ export const ALLOCATION_KEY_LABEL_DE: Record<VermieterAllocationKey, string> = {
   units: "nach Anzahl Einheiten",
   consumption: "nach Verbrauch",
   fixed_manual: "individuell",
+  /** Generic fallback - pdf/text.de.ts::allocationKeyLabel() prefers a provider-specific label ("Extern (Techem)") when a provider name is available. */
+  external_provider: "extern abgerechnet",
 };

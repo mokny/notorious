@@ -116,6 +116,8 @@ export interface LeaseDto {
   status: VermieterLeaseStatus;
   notes: string;
   tenantIds: string[];
+  /** Explicit headcount used by the 'persons' allocation key - independent of tenantIds.length, can be edited separately (e.g. children living in the unit who aren't named tenants). */
+  personCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -132,6 +134,8 @@ export interface LeaseInput {
   status?: VermieterLeaseStatus;
   notes?: string;
   tenantIds: string[];
+  /** Omitted/null on create -> server defaults to tenantIds.length. */
+  personCount?: number | null;
 }
 
 /** Fields updateLease() accepts - coldRentCents/nkPrepaymentCents are excluded, they can only change via a rent-change. */
@@ -182,7 +186,9 @@ export interface RentPaymentInput {
   note?: string;
 }
 
-export type VermieterAllocationKey = "sqm" | "persons" | "units" | "consumption" | "fixed_manual";
+export type VermieterAllocationKey = "sqm" | "persons" | "units" | "consumption" | "fixed_manual" | "external_provider";
+
+export type VermieterBillingMode = "calculated" | "external_provider";
 
 /**
  * Abrechnungskreis (cost circuit): the subset of a property's units that
@@ -200,6 +206,51 @@ export interface CostCircuitDto {
   unitIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * External metering-service billing (Techem, ista, Minol, ...) - mirrors
+ * modules/vermieter/services/externalBilling.ts. A CircuitCategorySettingDto
+ * only exists (as a row) when a landlord has opted a (circuit, category)
+ * pool into 'external_provider' billing; absence means the implicit
+ * 'calculated' default.
+ */
+export interface CircuitCategorySettingDto {
+  id: string;
+  costCircuitId: string;
+  costCategoryKey: string;
+  billingMode: VermieterBillingMode;
+  providerName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CircuitCategorySettingInput {
+  billingMode: VermieterBillingMode;
+  providerName?: string | null;
+}
+
+/** One landlord-transcribed per-unit amount from a metering provider's own finished statement, for one cost circuit + category + period. */
+export interface ExternalCostAllocationDto {
+  id: string;
+  costCircuitId: string;
+  costCategoryKey: string;
+  unitId: string;
+  periodStart: string;
+  periodEnd: string;
+  amountCents: number;
+  providerReference: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalCostAllocationInput {
+  costCategoryKey: string;
+  unitId: string;
+  periodStart: string;
+  periodEnd: string;
+  amountCents: number;
+  providerReference?: string | null;
 }
 
 export interface ReceiptDto {
@@ -311,6 +362,12 @@ export interface StatementLineDto {
   /** True when unitShareCents is a §9a HeizkostenV substitute value rather than a real meter reading. */
   isEstimated: boolean;
   estimationMethod: VermieterEstimationMethod | null;
+  /** The unit's own raw allocation-basis value that produces this line's percentage (e.g. its m²). Null for fixed_manual/external_provider lines. */
+  basisNumerator: number | null;
+  /** The circuit-wide total of that same basis. */
+  basisDenominator: number | null;
+  /** The metering-service name this line's cost was transcribed from - only set when allocationKeyUsed === 'external_provider'. Not an estimate - an authoritative transcribed figure. */
+  externalProviderName: string | null;
 }
 
 export interface TenantSummaryDto {
@@ -440,6 +497,35 @@ export const vermieterApi = {
       apiRequest<CostCircuitDto>(`${base(workspaceId)}/properties/${propertyId}/cost-circuits/${id}/units`, { method: "PUT", body: { unitIds } }),
     remove: (workspaceId: string, propertyId: string, id: string) =>
       apiRequest<void>(`${base(workspaceId)}/properties/${propertyId}/cost-circuits/${id}`, { method: "DELETE" }),
+    /** Per-(circuit, category) billing-mode toggle ('calculated' vs 'external_provider') - mirrors routes/externalBilling.ts's category-settings routes. */
+    categorySettings: {
+      list: (workspaceId: string, costCircuitId: string) =>
+        apiRequest<CircuitCategorySettingDto[]>(`${base(workspaceId)}/cost-circuits/${costCircuitId}/category-settings`),
+      set: (workspaceId: string, costCircuitId: string, categoryKey: string, input: CircuitCategorySettingInput) =>
+        apiRequest<CircuitCategorySettingDto>(`${base(workspaceId)}/cost-circuits/${costCircuitId}/category-settings/${categoryKey}`, {
+          method: "PUT",
+          body: input,
+        }),
+      remove: (workspaceId: string, costCircuitId: string, categoryKey: string) =>
+        apiRequest<void>(`${base(workspaceId)}/cost-circuits/${costCircuitId}/category-settings/${categoryKey}`, { method: "DELETE" }),
+    },
+    /** Landlord-transcribed per-unit amounts from a provider's (Techem/ista) finished statement - mirrors routes/externalBilling.ts's external-allocations routes. */
+    externalAllocations: {
+      list: (workspaceId: string, costCircuitId: string, filters?: { categoryKey?: string; periodStart?: string; periodEnd?: string }) =>
+        apiRequest<ExternalCostAllocationDto[]>(`${base(workspaceId)}/cost-circuits/${costCircuitId}/external-allocations`, { query: filters }),
+      create: (workspaceId: string, costCircuitId: string, input: ExternalCostAllocationInput) =>
+        apiRequest<ExternalCostAllocationDto>(`${base(workspaceId)}/cost-circuits/${costCircuitId}/external-allocations`, {
+          method: "POST",
+          body: input,
+        }),
+      update: (workspaceId: string, costCircuitId: string, allocationId: string, input: Partial<ExternalCostAllocationInput>) =>
+        apiRequest<ExternalCostAllocationDto>(`${base(workspaceId)}/cost-circuits/${costCircuitId}/external-allocations/${allocationId}`, {
+          method: "PATCH",
+          body: input,
+        }),
+      remove: (workspaceId: string, costCircuitId: string, allocationId: string) =>
+        apiRequest<void>(`${base(workspaceId)}/cost-circuits/${costCircuitId}/external-allocations/${allocationId}`, { method: "DELETE" }),
+    },
   },
   meters: {
     list: (workspaceId: string, unitId?: string) => apiRequest<MeterDto[]>(`${base(workspaceId)}/meters`, { query: { unitId } }),

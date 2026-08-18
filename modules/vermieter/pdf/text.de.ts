@@ -8,7 +8,9 @@ import type { VermieterAllocationKey, VermieterEstimationMethod } from "../db/ty
 
 export { ALLOCATION_KEY_LABEL_DE };
 
-export function allocationKeyLabel(key: VermieterAllocationKey): string {
+/** `providerName` (only meaningful for `key === 'external_provider'`) produces a provider-specific label ("Extern (Techem)") instead of the generic ALLOCATION_KEY_LABEL_DE fallback - see migrations/0012's doc comment. */
+export function allocationKeyLabel(key: VermieterAllocationKey, providerName?: string | null): string {
+  if (key === "external_provider" && providerName) return `Extern (${providerName})`;
   return ALLOCATION_KEY_LABEL_DE[key] ?? key;
 }
 

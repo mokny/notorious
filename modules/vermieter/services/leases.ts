@@ -15,6 +15,8 @@ export interface LeaseDto {
   status: VermieterLeaseStatus;
   notes: string;
   tenantIds: string[];
+  /** Explicit headcount used by the 'persons' allocation key - independent of tenantIds.length (see LeaseInput.personCount's doc comment). Always a concrete number in output (falls back to tenantIds.length only for the never-normally-null DB edge case). */
+  personCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +48,7 @@ function rowToDto(sdk: ModuleSdk, row: VermieterLeaseRow): LeaseDto {
     status: row.status,
     notes: row.notes,
     tenantIds: tenantRows.map((t) => t.tenant_id),
+    personCount: row.person_count ?? tenantRows.length,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -110,17 +113,28 @@ export interface LeaseInput {
   status?: VermieterLeaseStatus;
   notes?: string;
   tenantIds: string[];
+  /**
+   * Explicit "Personenzahl" headcount for the 'persons' allocation key - a
+   * landlord may need e.g. 3 even though only 1 formal tenant/Hauptmieter is
+   * on the lease (two children also live there), so this is independent of
+   * tenantIds.length rather than derived from it. Omitted/null on create ->
+   * defaults to tenantIds.length. On update it's never silently recomputed
+   * from a tenantIds change - same independence model as coldRentCents,
+   * which is only ever changed via changeLeaseRent, not updateLease.
+   */
+  personCount?: number | null;
 }
 
 export function createLease(sdk: ModuleSdk, workspaceId: string, input: LeaseInput): LeaseDto {
   const id = sdk.newId();
   const now = sdk.nowIso();
+  const personCount = input.personCount ?? input.tenantIds.length;
   const tx = sdk.sqlite.transaction(() => {
     sdk.sqlite
       .prepare(
         `INSERT INTO vermieter_leases
-         (id, workspace_id, unit_id, start_date, end_date, cold_rent_cents, nk_prepayment_cents, deposit_cents, deposit_paid_date, deposit_returned_date, status, notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, workspace_id, unit_id, start_date, end_date, cold_rent_cents, nk_prepayment_cents, deposit_cents, deposit_paid_date, deposit_returned_date, status, notes, person_count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -135,6 +149,7 @@ export function createLease(sdk: ModuleSdk, workspaceId: string, input: LeaseInp
         input.depositReturnedDate ?? null,
         input.status ?? "active",
         input.notes?.trim() ?? "",
+        personCount,
         now,
         now,
       );
@@ -168,7 +183,7 @@ export function updateLease(
     sdk.sqlite
       .prepare(
         `UPDATE vermieter_leases SET
-         unit_id = ?, start_date = ?, end_date = ?, deposit_cents = ?, deposit_paid_date = ?, deposit_returned_date = ?, status = ?, notes = ?, updated_at = ?
+         unit_id = ?, start_date = ?, end_date = ?, deposit_cents = ?, deposit_paid_date = ?, deposit_returned_date = ?, status = ?, notes = ?, person_count = ?, updated_at = ?
          WHERE id = ? AND workspace_id = ?`,
       )
       .run(
@@ -180,6 +195,10 @@ export function updateLease(
         input.depositReturnedDate !== undefined ? input.depositReturnedDate : existing.depositReturnedDate,
         input.status ?? existing.status,
         input.notes !== undefined ? input.notes.trim() : existing.notes,
+        // Independent field - never silently recomputed from a tenantIds
+        // change in this same call, see LeaseInput.personCount's doc
+        // comment. Only an explicit number overrides it.
+        typeof input.personCount === "number" ? input.personCount : existing.personCount,
         now,
         leaseId,
         workspaceId,

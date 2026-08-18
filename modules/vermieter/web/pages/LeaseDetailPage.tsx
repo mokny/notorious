@@ -58,6 +58,8 @@ function LeaseDetailPage() {
   const [depositReturnedDate, setDepositReturnedDate] = useState("");
   const [status, setStatus] = useState<VermieterLeaseStatus>("active");
   const [notes, setNotes] = useState("");
+  const [personCount, setPersonCount] = useState<number | "">("");
+  const [personCountTouched, setPersonCountTouched] = useState(false);
 
   useEffect(() => {
     if (lease) {
@@ -72,8 +74,17 @@ function LeaseDetailPage() {
       setDepositReturnedDate(lease.depositReturnedDate ?? "");
       setStatus(lease.status);
       setNotes(lease.notes);
+      setPersonCount(lease.personCount);
+      setPersonCountTouched(true);
     }
   }, [lease]);
+
+  // Neuanlage: solange der Nutzer die Personenzahl nicht selbst angefasst hat,
+  // folgt sie automatisch der Anzahl ausgewählter Mieter (matcht den
+  // Server-Default beim Anlegen), bleibt aber jederzeit direkt überschreibbar.
+  useEffect(() => {
+    if (isNew && !personCountTouched) setPersonCount(tenantIds.length);
+  }, [isNew, personCountTouched, tenantIds.length]);
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -89,6 +100,7 @@ function LeaseDetailPage() {
         status,
         notes,
         tenantIds,
+        personCount: personCount === "" ? null : personCount,
       };
       return vermieterApi.leases.create(workspaceId!, input);
     },
@@ -110,6 +122,7 @@ function LeaseDetailPage() {
         status,
         notes,
         tenantIds,
+        personCount: personCount === "" ? undefined : personCount,
       };
       return vermieterApi.leases.update(workspaceId!, id!, input);
     },
@@ -178,6 +191,25 @@ function LeaseDetailPage() {
             ))}
             {tenants?.length === 0 && <span className="text-xs text-ink-muted">Keine Mieter angelegt.</span>}
           </div>
+        </label>
+
+        <label className={labelClass}>
+          <span className={labelTextClass}>Anzahl Personen</span>
+          <input
+            type="number"
+            min={0}
+            className={`${inputClass} max-w-[8rem]`}
+            value={personCount}
+            onChange={(e) => {
+              setPersonCountTouched(true);
+              setPersonCount(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)));
+            }}
+          />
+          <span className="block text-xs text-ink-muted">
+            Kann von der Anzahl der oben ausgewählten Mieter abweichen, z. B. wenn auch Kinder in der Wohnung leben, die nicht
+            als eigener Mietvertragspartner geführt werden. Diese Zahl wird nur gebraucht, wenn eine Kostenkategorie „nach
+            Personenzahl" abgerechnet wird (z. B. oft die Müllabfuhr).
+          </span>
         </label>
 
         <div className="grid grid-cols-2 gap-3">

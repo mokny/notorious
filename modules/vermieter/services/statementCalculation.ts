@@ -1,4 +1,4 @@
-import type { VermieterAllocationKey, VermieterEstimationMethod } from "../db/types.js";
+import type { VermieterAllocationKey, VermieterBillingMode, VermieterEstimationMethod } from "../db/types.js";
 import { getCostCategory } from "../db/costCategories.js";
 import { resolveCircuitConsumption, type UnitConsumptionInput } from "./meterSubstitute.js";
 
@@ -38,7 +38,7 @@ export interface CalcCostCircuit {
   unitIds: string[];
 }
 
-/** One lease's coverage of a unit, clipped to the statement period. `personCount` is simply the number of tenants linked to the lease (see services/tenants.ts::listTenantsForLease) - the spec's agreed simplification for a "Personenzahl" headcount rather than a separate occupant-count field. */
+/** One lease's coverage of a unit, clipped to the statement period. `personCount` is the lease's explicit `person_count` field (falls back to linked-tenant count only if that's somehow null - see services/leases.ts and db/types.ts::VermieterLeaseRow). */
 export interface CalcLeaseSegment {
   leaseId: string;
   unitId: string;
@@ -56,6 +56,29 @@ export interface CalcReceipt {
   targetUnitId: string | null;
   /** Which Abrechnungskreis this receipt's cost pool belongs to - always a concrete circuit id (services/receipts.ts resolves the property's default circuit when none was given). */
   costCircuitId: string;
+}
+
+/** Per (cost circuit, cost category) external-billing opt-in - see migrations/0012 and services/externalBilling.ts. Only pairs with `billingMode === 'external_provider'` change engine behavior; everything else stays in 'calculated' mode by omission. */
+export interface CalcCircuitCategorySetting {
+  costCircuitId: string;
+  costCategoryKey: string;
+  billingMode: VermieterBillingMode;
+  providerName: string | null;
+}
+
+/**
+ * One landlord-transcribed per-unit amount from an external provider's own
+ * finished statement (see migrations/0012). `periodStart`/`periodEnd` are
+ * the PROVIDER's own period, which need not exactly match the statement's -
+ * see computeExternalProviderLines's day-overlap proration.
+ */
+export interface CalcExternalAllocation {
+  unitId: string;
+  costCircuitId: string;
+  costCategoryKey: string;
+  periodStart: string;
+  periodEnd: string;
+  amountCents: number;
 }
 
 /**
@@ -92,6 +115,12 @@ export interface StatementLineResult {
   isEstimated: boolean;
   /** 'metered' | one of the substitute methods for consumption-based lines; null for every other allocation key. */
   estimationMethod: VermieterEstimationMethod | null;
+  /** The unit's own raw allocation-basis value (sqm/persons/1/resolved consumption) that produces this line's percentage - see pdf/explanationText.ts. Null for fixed_manual/external_provider lines, which have no allocation-key fraction to explain. */
+  basisNumerator: number | null;
+  /** The circuit-wide total of that same basis - the denominator paired with basisNumerator. */
+  basisDenominator: number | null;
+  /** The metering-service name this line's cost was transcribed from - only set when allocationKeyUsed === 'external_provider'. */
+  externalProviderName: string | null;
 }
 
 export interface TenantSummaryResult {
@@ -112,6 +141,10 @@ export interface StatementCalculationInput {
   consumption: CalcConsumptionByUnit[];
   /** Verbrauchskosten share of Heizung costs, 0-100. HeizkostenV §7 mandates at least 50%, standard/default 70. The remaining share is Grundkosten, allocated by qm. */
   heatingConsumptionSharePercent: number;
+  /** Per (circuit, category) external-billing opt-ins - see CalcCircuitCategorySetting's doc comment. Only entries with billingMode === 'external_provider' change anything; everything else is 'calculated' by omission. */
+  circuitCategorySettings: CalcCircuitCategorySetting[];
+  /** Landlord-transcribed external per-unit amounts - see CalcExternalAllocation's doc comment. Only consulted for (circuit, category) pairs actually in 'external_provider' mode. */
+  externalAllocations: CalcExternalAllocation[];
 }
 
 export interface StatementCalculationResult {
@@ -143,18 +176,27 @@ interface CategoryBucket {
   totalCents: number;
 }
 
+/** Builds the `${circuitId}::${categoryKey}` lookup key shared by the external-billing exclusion set and computeExternalProviderLines. */
+function circuitCategoryKey(costCircuitId: string, costCategoryKey: string): string {
+  return `${costCircuitId}::${costCategoryKey}`;
+}
+
 /**
  * Groups receipts (excluding `fixed_manual`-overridden ones, which bypass
- * this entirely - see computeFixedManualLines) into per-(circuit, category,
- * effective allocation key) cost buckets. A category can appear in more than
- * one bucket for the same circuit if some of its receipts were individually
- * overridden to a different allocation key, or if it has receipts in more
- * than one circuit.
+ * this entirely - see computeFixedManualLines - and excluding any
+ * (circuit, category) pair opted into `external_provider` billing, which
+ * bypasses the whole allocation-key pipeline in favor of transcribed
+ * external amounts - see computeExternalProviderLines) into per-(circuit,
+ * category, effective allocation key) cost buckets. A category can appear in
+ * more than one bucket for the same circuit if some of its receipts were
+ * individually overridden to a different allocation key, or if it has
+ * receipts in more than one circuit.
  */
-export function computeCategoryTotals(receipts: CalcReceipt[]): Map<string, CategoryBucket> {
+export function computeCategoryTotals(receipts: CalcReceipt[], externalModePairs: Set<string> = new Set()): Map<string, CategoryBucket> {
   const buckets = new Map<string, CategoryBucket>();
   for (const receipt of receipts) {
     if (receipt.allocationKeyOverride === "fixed_manual") continue; // handled separately, per-receipt
+    if (externalModePairs.has(circuitCategoryKey(receipt.costCircuitId, receipt.costCategoryKey))) continue; // handled separately, see computeExternalProviderLines
     const category = getCostCategory(receipt.costCategoryKey);
     const allocationKey = receipt.allocationKeyOverride ?? category?.defaultAllocationKey ?? "sqm";
     const bucketKey = `${receipt.costCircuitId}::${receipt.costCategoryKey}::${allocationKey}`;
@@ -174,6 +216,8 @@ interface UnitDayWeights {
   daysOccupied: number;
   /** The single occupying lease's segment, when there's exactly one covering the whole occupied span - used to attribute a statement_line's `lease_id`. Mid-period tenant changes (>1 segment) leave this null; the per-tenant breakdown for those still comes from tenantSummaries. */
   soleLeaseId: string | null;
+  /** The unit's own steady-state basis value (sqm / 1 / last-known headcount) - independent of days, this is the "your unit has X of the basis" numerator pdf/explanationText.ts shows alongside the day-occupied fraction. */
+  referenceWeight: number;
 }
 
 /**
@@ -221,11 +265,11 @@ function computeUnitDayWeights(
     const vacancyWeightDays = referenceWeight * vacancyDays;
     const soleLeaseId = segments.length === 1 ? (segments[0]?.leaseId ?? null) : null;
 
-    return { unitId: unit.id, occupiedWeightDays, vacancyWeightDays, daysOccupied, soleLeaseId };
+    return { unitId: unit.id, occupiedWeightDays, vacancyWeightDays, daysOccupied, soleLeaseId, referenceWeight };
   });
 }
 
-/** Allocates `totalCents` across `units` (a circuit's member units) for one of the day-prorated bases (sqm/persons/units). */
+/** Allocates `totalCents` across `units` (a circuit's member units) for one of the day-prorated bases (sqm/persons/units). Also returns each unit's raw basis numerator/denominator (see UnitDayWeights.referenceWeight) for the PDF explanation's fraction display - independent of the cost split itself. */
 function allocateByDayWeights(
   basis: "sqm" | "persons" | "units",
   totalCents: number,
@@ -233,17 +277,20 @@ function allocateByDayWeights(
   leaseSegments: CalcLeaseSegment[],
   periodStart: string,
   periodEnd: string,
-): { unitId: string; unitShareCents: number; vacancyShareCents: number; daysOccupied: number }[] {
+): { unitId: string; unitShareCents: number; vacancyShareCents: number; daysOccupied: number; basisNumerator: number; basisDenominator: number }[] {
   const weights = computeUnitDayWeights(basis, units, leaseSegments, periodStart, periodEnd);
   const totalWeightDays = weights.reduce((sum, w) => sum + w.occupiedWeightDays + w.vacancyWeightDays, 0);
+  const basisDenominator = weights.reduce((sum, w) => sum + w.referenceWeight, 0);
   if (totalWeightDays <= 0) {
-    return weights.map((w) => ({ unitId: w.unitId, unitShareCents: 0, vacancyShareCents: 0, daysOccupied: w.daysOccupied }));
+    return weights.map((w) => ({ unitId: w.unitId, unitShareCents: 0, vacancyShareCents: 0, daysOccupied: w.daysOccupied, basisNumerator: w.referenceWeight, basisDenominator }));
   }
   return weights.map((w) => ({
     unitId: w.unitId,
     unitShareCents: roundCents((totalCents * w.occupiedWeightDays) / totalWeightDays),
     vacancyShareCents: roundCents((totalCents * w.vacancyWeightDays) / totalWeightDays),
     daysOccupied: w.daysOccupied,
+    basisNumerator: w.referenceWeight,
+    basisDenominator,
   }));
 }
 
@@ -322,6 +369,9 @@ function computeHeatingLines(
       daysTotal,
       isEstimated: false,
       estimationMethod: null,
+      basisNumerator: grund.basisNumerator,
+      basisDenominator: grund.basisDenominator,
+      externalProviderName: null,
     });
 
     // Verbrauchskosten: proportional to each unit's resolved consumption
@@ -346,6 +396,9 @@ function computeHeatingLines(
       daysTotal,
       isEstimated: resolvedUnit?.isEstimated ?? false,
       estimationMethod: resolvedUnit?.method ?? null,
+      basisNumerator: resolvedUnit?.value ?? null,
+      basisDenominator: totalConsumption > 0 ? totalConsumption : null,
+      externalProviderName: null,
     });
   }
   return lines;
@@ -390,6 +443,9 @@ function computeConsumptionLines(
       daysTotal,
       isEstimated: resolvedUnit?.isEstimated ?? false,
       estimationMethod: resolvedUnit?.method ?? null,
+      basisNumerator: resolvedUnit?.value ?? null,
+      basisDenominator: totalConsumption > 0 ? totalConsumption : null,
+      externalProviderName: null,
     };
   });
 }
@@ -428,6 +484,9 @@ function computeFixedManualLines(
         daysTotal,
         isEstimated: false,
         estimationMethod: null,
+        basisNumerator: null,
+        basisDenominator: null,
+        externalProviderName: null,
       });
       continue;
     }
@@ -447,6 +506,9 @@ function computeFixedManualLines(
           daysTotal,
           isEstimated: false,
           estimationMethod: null,
+          basisNumerator: null,
+          basisDenominator: null,
+          externalProviderName: null,
         });
       }
     }
@@ -454,10 +516,92 @@ function computeFixedManualLines(
   return lines;
 }
 
+/**
+ * (circuit, category) pairs opted into `external_provider` billing (see
+ * migrations/0012) skip the whole allocation-key pipeline entirely - instead
+ * each unit's cost is the landlord's own transcribed external-provider
+ * amount (see CalcExternalAllocation), summed across any allocation rows
+ * whose PROVIDER period overlaps the statement period, pro-rated by
+ * day-overlap when a row only partially overlaps (the common case is an
+ * exact period match, where the proration factor is simply 1 - see the
+ * module brief's "don't over-engineer" note on this). There is no "vacancy"
+ * concept here - a unit's external total is charged in full, then split
+ * across its own lease segments' occupied days by the shared downstream
+ * logic in computeTenantSummaries, exactly like every other allocation key.
+ */
+function computeExternalProviderLines(
+  settings: CalcCircuitCategorySetting[],
+  externalAllocations: CalcExternalAllocation[],
+  costCircuits: CalcCostCircuit[],
+  units: CalcUnit[],
+  periodStart: string,
+  periodEnd: string,
+): StatementLineResult[] {
+  const daysTotal = daysBetweenInclusive(periodStart, periodEnd);
+  const allUnitsById = unitsById(units);
+  const circuitsById = new Map(costCircuits.map((c) => [c.id, c]));
+  const externalSettings = settings.filter((s) => s.billingMode === "external_provider");
+  const lines: StatementLineResult[] = [];
+
+  for (const setting of externalSettings) {
+    const circuitUnitIds = circuitsById.get(setting.costCircuitId)?.unitIds ?? [];
+    const circuitUnits = circuitUnitIds.map((id) => allUnitsById.get(id)).filter((u): u is CalcUnit => !!u);
+    const relevantAllocations = externalAllocations.filter(
+      (a) => a.costCircuitId === setting.costCircuitId && a.costCategoryKey === setting.costCategoryKey,
+    );
+
+    const totalsByUnit = new Map<string, number>();
+    for (const allocation of relevantAllocations) {
+      const overlap = clampDateRange(allocation.periodStart, allocation.periodEnd, periodStart, periodEnd);
+      if (!overlap) continue; // this provider period doesn't touch the statement period at all
+      const overlapDays = daysBetweenInclusive(overlap.start, overlap.end);
+      const providerPeriodDays = daysBetweenInclusive(allocation.periodStart, allocation.periodEnd);
+      const fraction = providerPeriodDays > 0 ? overlapDays / providerPeriodDays : 0;
+      const prorated = roundCents(allocation.amountCents * fraction);
+      totalsByUnit.set(allocation.unitId, (totalsByUnit.get(allocation.unitId) ?? 0) + prorated);
+    }
+
+    const poolTotalCents = Array.from(totalsByUnit.values()).reduce((sum, v) => sum + v, 0);
+
+    for (const unit of circuitUnits) {
+      lines.push({
+        unitId: unit.id,
+        costCategoryKey: setting.costCategoryKey,
+        allocationKeyUsed: "external_provider",
+        totalPropertyCostCents: poolTotalCents,
+        unitShareCents: totalsByUnit.get(unit.id) ?? 0,
+        vacancyShareCents: 0,
+        daysOccupied: daysTotal,
+        daysTotal,
+        isEstimated: false,
+        estimationMethod: null,
+        basisNumerator: null,
+        basisDenominator: null,
+        externalProviderName: setting.providerName,
+      });
+    }
+  }
+  return lines;
+}
+
 /** Full per-unit/per-category statement line breakdown for a property + period, grouped per (cost circuit, category). */
 export function computeStatementLines(input: StatementCalculationInput): StatementLineResult[] {
-  const { periodStart, periodEnd, units, costCircuits, leaseSegments, receipts, consumption, heatingConsumptionSharePercent } = input;
-  const buckets = computeCategoryTotals(receipts);
+  const {
+    periodStart,
+    periodEnd,
+    units,
+    costCircuits,
+    leaseSegments,
+    receipts,
+    consumption,
+    heatingConsumptionSharePercent,
+    circuitCategorySettings,
+    externalAllocations,
+  } = input;
+  const externalModePairs = new Set(
+    circuitCategorySettings.filter((s) => s.billingMode === "external_provider").map((s) => circuitCategoryKey(s.costCircuitId, s.costCategoryKey)),
+  );
+  const buckets = computeCategoryTotals(receipts, externalModePairs);
   const lines: StatementLineResult[] = [];
   const allUnitsById = unitsById(units);
   const circuitsById = new Map(costCircuits.map((c) => [c.id, c]));
@@ -479,6 +623,7 @@ export function computeStatementLines(input: StatementCalculationInput): Stateme
       continue;
     }
     if (bucket.allocationKey === "fixed_manual") continue; // never reached - computeCategoryTotals excludes these
+    if (bucket.allocationKey === "external_provider") continue; // never reached - receipts never carry this override, only circuit/category settings do
     const shares = allocateByDayWeights(bucket.allocationKey, bucket.totalCents, circuitUnits, circuitLeaseSegments, periodStart, periodEnd);
     const daysTotal = daysBetweenInclusive(periodStart, periodEnd);
     for (const share of shares) {
@@ -493,11 +638,15 @@ export function computeStatementLines(input: StatementCalculationInput): Stateme
         daysTotal,
         isEstimated: false,
         estimationMethod: null,
+        basisNumerator: share.basisNumerator,
+        basisDenominator: share.basisDenominator,
+        externalProviderName: null,
       });
     }
   }
 
   lines.push(...computeFixedManualLines(receipts, costCircuits, units, periodStart, periodEnd));
+  lines.push(...computeExternalProviderLines(circuitCategorySettings, externalAllocations, costCircuits, units, periodStart, periodEnd));
   return lines;
 }
 

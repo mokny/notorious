@@ -2,7 +2,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
 import { vermieterApi, type VermieterEstimationMethod } from "../api.js";
-import { getCostCategory, ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
+import { getCostCategory } from "../../db/costCategories.js";
+import { allocationKeyLabel } from "../../pdf/text.de.js";
 
 /** Mirrors modules/vermieter/pdf/text.de.ts's wording so the web view and the PDF explain estimated values consistently. */
 const ESTIMATION_METHOD_LABEL_DE: Record<Exclude<VermieterEstimationMethod, "metered">, string> = {
@@ -117,7 +118,7 @@ function StatementDetailPage() {
                 {lines.map((line) => (
                   <tr key={line.id}>
                     <td className="px-3 py-2">{getCostCategory(line.costCategoryKey)?.label ?? line.costCategoryKey}</td>
-                    <td className="px-3 py-2">{ALLOCATION_KEY_LABEL_DE[line.allocationKeyUsed]}</td>
+                    <td className="px-3 py-2">{allocationKeyLabel(line.allocationKeyUsed, line.externalProviderName)}</td>
                     <td className="px-3 py-2 text-right">{formatCents(line.totalPropertyCostCents)}</td>
                     <td className="px-3 py-2 text-right font-medium">
                       {formatCents(line.unitShareCents)}
@@ -128,6 +129,14 @@ function StatementDetailPage() {
                         >
                           *
                         </sup>
+                      )}
+                      {line.allocationKeyUsed === "external_provider" && (
+                        <span
+                          className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-normal text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                          title="Kein Schätzwert - Betrag stammt unverändert aus der Abrechnung des externen Dienstleisters."
+                        >
+                          Extern{line.externalProviderName ? `: ${line.externalProviderName}` : ""}
+                        </span>
                       )}
                     </td>
                   </tr>

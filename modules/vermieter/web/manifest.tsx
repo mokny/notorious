@@ -1,4 +1,5 @@
 import type { ModuleWebManifest } from "../../../packages/web/src/modules/types.js";
+import { GuidePage } from "./pages/GuidePage.js";
 import { PropertiesListPage } from "./pages/PropertiesListPage.js";
 import { PropertyDetailPage } from "./pages/PropertyDetailPage.js";
 import { LeasesListPage } from "./pages/LeasesListPage.js";
@@ -24,6 +25,7 @@ const manifest: ModuleWebManifest = {
   navLabel: "Vermieter",
   navIcon: "building",
   subItems: [
+    { label: "Anleitung", path: "anleitung" },
     { label: "Immobilien", path: "immobilien" },
     { label: "Mietverträge", path: "mietvertraege" },
     { label: "Mieter", path: "mieter" },
@@ -34,6 +36,7 @@ const manifest: ModuleWebManifest = {
     { label: "Einstellungen", path: "einstellungen" },
   ],
   routes: [
+    { path: "anleitung", element: <GuidePage /> },
     { path: "immobilien", element: <PropertiesListPage /> },
     { path: "immobilien/:id", element: <PropertyDetailPage /> },
     { path: "mietvertraege", element: <LeasesListPage /> },

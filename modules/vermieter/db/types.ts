@@ -83,6 +83,8 @@ export interface VermieterLeaseRow {
   deposit_returned_date: string | null;
   status: VermieterLeaseStatus;
   notes: string;
+  /** Explicit headcount used by the 'persons' allocation key, independent of the linked-tenant count (see services/leases.ts). Nullable at the column level only for safety; the create/update flow always keeps it populated. */
+  person_count: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -121,7 +123,46 @@ export interface VermieterRentPaymentRow {
   updated_at: string;
 }
 
-export type VermieterAllocationKey = "sqm" | "persons" | "units" | "consumption" | "fixed_manual";
+export type VermieterAllocationKey = "sqm" | "persons" | "units" | "consumption" | "fixed_manual" | "external_provider";
+
+export type VermieterBillingMode = "calculated" | "external_provider";
+
+/**
+ * Per (cost circuit, cost category) opt-in into external metering-service
+ * billing (Techem, ista, Minol, ...) - see migrations/0012 and
+ * services/externalBilling.ts. Rows only exist where a landlord has
+ * explicitly configured billing_mode = 'external_provider'; absence of a row
+ * for a given (circuit, category) means the default 'calculated' mode.
+ */
+export interface VermieterCircuitCategorySettingRow {
+  id: string;
+  workspace_id: string;
+  cost_circuit_id: string;
+  cost_category_key: string;
+  billing_mode: VermieterBillingMode;
+  provider_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * One landlord-transcribed per-unit amount from an external provider's own
+ * finished statement, for one (circuit, category) pool and a specific
+ * provider period - see migrations/0012 and services/externalBilling.ts.
+ */
+export interface VermieterExternalCostAllocationRow {
+  id: string;
+  workspace_id: string;
+  cost_circuit_id: string;
+  cost_category_key: string;
+  unit_id: string;
+  period_start: string;
+  period_end: string;
+  amount_cents: number;
+  provider_reference: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface VermieterReceiptRow {
   id: string;
@@ -205,6 +246,12 @@ export interface VermieterStatementLineRow {
   is_estimated: 0 | 1;
   /** Which substitute method produced this line's value ('metered' when not estimated), null for non-consumption allocation keys where the concept doesn't apply. */
   estimation_method: VermieterEstimationMethod | null;
+  /** The unit's own raw allocation-basis value (sqm/persons/1/resolved consumption) that produced this line's percentage - see migrations/0013 and pdf/explanationText.ts. Null for fixed_manual/external_provider lines. */
+  basis_numerator: number | null;
+  /** The circuit-wide total of that same basis (sum across the circuit's member units) - the denominator paired with basis_numerator. */
+  basis_denominator: number | null;
+  /** The metering-service name (e.g. "Techem") this line's cost was transcribed from, only set when allocation_key_used = 'external_provider' - see migrations/0012. */
+  external_provider_name: string | null;
   created_at: string;
 }
 
