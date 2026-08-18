@@ -4,6 +4,18 @@ import { useQuery } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
 import { vermieterApi, type VermieterLeaseStatus } from "../api.js";
 
+function formatUnitWithTenants(
+  unitLabel: string,
+  tenantIds: string[],
+  tenantsById: Map<string, string>,
+  status: VermieterLeaseStatus,
+): string {
+  const names = tenantIds.map((id) => tenantsById.get(id) ?? "Unbekannt");
+  const namesPart = names.length > 0 ? names.join(", ") : "kein Mieter zugeordnet";
+  const statusPart = status === "active" ? "wohnt noch dort" : "Mietverhältnis beendet";
+  return `${unitLabel} (${namesPart} – ${statusPart})`;
+}
+
 const inputClass = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 
 /** Liste aller Mietverträge, filterbar nach Immobilie/Einheit und Status. */
@@ -27,6 +39,12 @@ function LeasesListPage() {
     queryFn: () => vermieterApi.leases.list(workspaceId!),
     enabled: Boolean(workspaceId),
   });
+  const { data: tenants } = useQuery({
+    queryKey: ["module-vermieter-tenants", workspaceId],
+    queryFn: () => vermieterApi.tenants.list(workspaceId!),
+    enabled: Boolean(workspaceId),
+  });
+  const tenantsById = new Map((tenants ?? []).map((tenant) => [tenant.id, tenant.name] as const));
 
   const filtered = (leases ?? []).filter((lease) => {
     if (statusFilter && lease.status !== statusFilter) return false;
@@ -71,7 +89,9 @@ function LeasesListPage() {
                 to={`/w/${workspaceId}/modules/vermieter/mietvertraege/${lease.id}`}
                 className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm hover:bg-surface-hover"
               >
-                <span className="font-medium">{unit?.label ?? lease.unitId}</span>
+                <span className="font-medium">
+                  {formatUnitWithTenants(unit?.label ?? lease.unitId, lease.tenantIds, tenantsById, lease.status)}
+                </span>
                 <span className="flex items-center gap-3 text-xs text-ink-muted">
                   <span>{formatCents(lease.coldRentCents + lease.nkPrepaymentCents)}/Monat</span>
                   <span>{lease.status === "active" ? "Aktiv" : "Beendet"}</span>
