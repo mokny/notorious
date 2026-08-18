@@ -179,11 +179,13 @@ export function generateTenantExplanationParagraph(
 
   const totalAllocated = formatCents(summary.totalAllocatedCostCents);
   const prepayments = formatCents(summary.totalPrepaymentsCents);
-  const balanceLabel = summary.balanceCents >= 0 ? "Nachzahlung" : "Guthaben";
+  const isNachzahlung = summary.balanceCents >= 0;
+  const balanceLabel = isNachzahlung ? "Nachzahlung" : "Guthaben";
+  const balanceArticle = isNachzahlung ? "eine" : "ein";
   const balanceAmount = formatCents(Math.abs(summary.balanceCents));
   sentences.push(
     `Ihre Gesamtkosten für den Zeitraum vom ${formatDate(summary.segmentStart)} bis ${formatDate(summary.segmentEnd)} betragen ${totalAllocated}. ` +
-      `Abzüglich Ihrer in diesem Zeitraum geleisteten Vorauszahlungen von ${prepayments} ergibt sich eine ${balanceLabel} in Höhe von ${balanceAmount}.`,
+      `Abzüglich Ihrer in diesem Zeitraum geleisteten Vorauszahlungen von ${prepayments} ergibt sich ${balanceArticle} ${balanceLabel} in Höhe von ${balanceAmount}.`,
   );
 
   return sentences.join(" ");
