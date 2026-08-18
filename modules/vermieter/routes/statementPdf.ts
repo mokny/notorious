@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { ModuleSdk } from "../manifest.js";
-import { getStatement, getStatementLines, getTenantSummaries, setStatementPdfStoragePath } from "../services/statements.js";
+import { getStatement, getStatementLines, getTenantSummaries, getStatementVacancySummary, setStatementPdfStoragePath } from "../services/statements.js";
 import { getProperty } from "../services/properties.js";
 import { getLandlordProfile } from "../services/landlordProfile.js";
 import { getUnit } from "../services/units.js";
@@ -33,7 +33,8 @@ async function renderAndMaybeCachePdf(sdk: ModuleSdk, workspaceId: string, state
     return { ...summary, unitLabel: unit?.label ?? summary.unitId, tenantNames: tenants.map((t) => t.name) };
   });
 
-  const buffer = await renderStatementPdf(property, landlord, statement, lines, summariesForPdf);
+  const vacancySummaries = getStatementVacancySummary(sdk, workspaceId, statement, lines);
+  const buffer = await renderStatementPdf(property, landlord, statement, lines, summariesForPdf, vacancySummaries);
 
   if (statement.status === "final") {
     const { storagePath } = await sdk.storage.write(`vermieter/${workspaceId}/statements`, `${statementId}.pdf`, buffer);

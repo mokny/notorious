@@ -188,6 +188,18 @@ export interface RentPaymentInput {
 
 export type VermieterAllocationKey = "sqm" | "persons" | "units" | "consumption" | "fixed_manual" | "external_provider";
 
+/** The subset of VermieterAllocationKey a category-level default may be - mirrors services/categoryAllocationDefaults.ts's CategoryDefaultAllocationKey (deliberately excludes 'external_provider', which is opted into per circuit+category, not a category default). */
+export type CategoryDefaultAllocationKey = Exclude<VermieterAllocationKey, "external_provider">;
+
+/** One cost category's current effective default allocation key for this workspace - mirrors services/categoryAllocationDefaults.ts's CategoryAllocationDefaultDto. `allocationKey` is always pre-filled with the effective value (workspace override if set, else `builtInAllocationKey`). */
+export interface CategoryAllocationDefaultDto {
+  costCategoryKey: string;
+  builtInAllocationKey: CategoryDefaultAllocationKey;
+  allocationKey: CategoryDefaultAllocationKey;
+  isOverridden: boolean;
+  updatedAt: string | null;
+}
+
 export type VermieterBillingMode = "calculated" | "external_provider";
 
 /**
@@ -612,6 +624,17 @@ export const vermieterApi = {
     get: (workspaceId: string) => apiRequest<LandlordProfileDto>(`${base(workspaceId)}/landlord-profile`),
     update: (workspaceId: string, input: LandlordProfileInput) =>
       apiRequest<LandlordProfileDto>(`${base(workspaceId)}/landlord-profile`, { method: "PUT", body: input }),
+  },
+  /** Per-workspace override of a cost category's default allocation key - mirrors routes/categoryAllocationDefaults.ts. `list` always returns one entry per known cost category, pre-filled with its effective value. */
+  categoryAllocationDefaults: {
+    list: (workspaceId: string) => apiRequest<CategoryAllocationDefaultDto[]>(`${base(workspaceId)}/category-allocation-defaults`),
+    set: (workspaceId: string, categoryKey: string, allocationKey: CategoryDefaultAllocationKey) =>
+      apiRequest<CategoryAllocationDefaultDto>(`${base(workspaceId)}/category-allocation-defaults/${categoryKey}`, {
+        method: "PUT",
+        body: { allocationKey },
+      }),
+    remove: (workspaceId: string, categoryKey: string) =>
+      apiRequest<CategoryAllocationDefaultDto>(`${base(workspaceId)}/category-allocation-defaults/${categoryKey}`, { method: "DELETE" }),
   },
   statements: {
     list: (workspaceId: string, propertyId?: string) => apiRequest<StatementDto[]>(`${base(workspaceId)}/statements`, { query: { propertyId } }),

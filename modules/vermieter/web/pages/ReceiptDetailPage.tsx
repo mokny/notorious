@@ -63,6 +63,15 @@ function ReceiptDetailPage() {
     queryFn: () => vermieterApi.costCircuits.list(workspaceId!, receipt!.propertyId),
     enabled: Boolean(workspaceId) && Boolean(receipt?.propertyId),
   });
+  /** Effective per-category default allocation key (workspace override if set, else the built-in default) - keeps this page's "Standard" suggestion consistent with what Settings lets the landlord configure, instead of always showing the hardcoded built-in value. */
+  const { data: categoryAllocationDefaults } = useQuery({
+    queryKey: ["module-vermieter-category-allocation-defaults", workspaceId],
+    queryFn: () => vermieterApi.categoryAllocationDefaults.list(workspaceId!),
+    enabled: Boolean(workspaceId),
+  });
+  function effectiveDefaultAllocationKey(key: string): VermieterAllocationKey {
+    return categoryAllocationDefaults?.find((d) => d.costCategoryKey === key)?.allocationKey ?? getCostCategory(key)?.defaultAllocationKey ?? "sqm";
+  }
   const documentsQueryKey = ["module-vermieter-receipt-documents", workspaceId, id];
   const { data: documents } = useQuery({
     queryKey: documentsQueryKey,
@@ -402,14 +411,15 @@ function ReceiptDetailPage() {
           </select>
           {category && (
             <span className="text-xs text-ink-muted">
-              {category.apportionable ? "Umlagefähig" : "Nicht umlagefähig"} · Standard-Umlageschlüssel: {ALLOCATION_KEY_LABEL_DE[category.defaultAllocationKey]}
+              {category.apportionable ? "Umlagefähig" : "Nicht umlagefähig"} · Standard-Umlageschlüssel:{" "}
+              {ALLOCATION_KEY_LABEL_DE[effectiveDefaultAllocationKey(categoryKey)]}
             </span>
           )}
         </label>
         <label className={labelClass}>
           <span className={labelTextClass}>Umlageschlüssel überschreiben</span>
           <select className={inputClass} value={allocationOverride} onChange={(e) => setAllocationOverride(e.target.value as VermieterAllocationKey | "")}>
-            <option value="">Standard verwenden ({category ? ALLOCATION_KEY_LABEL_DE[category.defaultAllocationKey] : "–"})</option>
+            <option value="">Standard verwenden ({category ? ALLOCATION_KEY_LABEL_DE[effectiveDefaultAllocationKey(categoryKey)] : "–"})</option>
             {(Object.keys(ALLOCATION_KEY_LABEL_DE) as VermieterAllocationKey[]).map((key) => (
               <option key={key} value={key}>
                 {ALLOCATION_KEY_LABEL_DE[key]}

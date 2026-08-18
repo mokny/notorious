@@ -28,6 +28,15 @@ export const ESTIMATION_METHOD_EXPLANATION_DE: Record<VermieterEstimationMethod,
 export const ESTIMATED_VALUE_FOOTNOTE =
   "* Verbrauch geschätzt nach §9a HeizkostenV, da kein Zähler vorhanden.";
 
+export const VACANCY_PAGE_TITLE = "Leerstandsübersicht";
+
+/** Explanatory intro sentence at the top of the statement PDF's Leerstand (vacancy) page - see pdf/render.ts's renderVacancyPage. */
+export const VACANCY_PAGE_INTRO_TEXT =
+  "Für die nachfolgend aufgeführten Einheiten bestand im Abrechnungszeitraum zeitweise kein Mietverhältnis. Die in dieser " +
+  "Zeit anfallenden Betriebskosten trägt gemäß §556 BGB allein der Vermieter - sie werden keinem Mieter in Rechnung " +
+  "gestellt und sind in den vorstehenden Mieterabrechnungen nicht enthalten. Diese Seite dient ausschließlich der " +
+  "Dokumentation für den Vermieter.";
+
 export const STATEMENT_CLOSING_TEXT =
   "Bei Fragen zu dieser Abrechnung wenden Sie sich bitte an die oben genannte Adresse. Etwaige Einwände " +
   "gegen diese Abrechnung sollten innerhalb angemessener Frist schriftlich mitgeteilt werden. Dieses Schreiben " +

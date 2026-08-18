@@ -1,10 +1,10 @@
 import PDFDocument from "pdfkit";
 import { formatCents } from "@notorious/shared";
 import { getCostCategory } from "../db/costCategories.js";
-import { allocationKeyLabel, STATEMENT_CLOSING_TEXT, ESTIMATED_VALUE_FOOTNOTE } from "./text.de.js";
+import { allocationKeyLabel, STATEMENT_CLOSING_TEXT, ESTIMATED_VALUE_FOOTNOTE, VACANCY_PAGE_TITLE, VACANCY_PAGE_INTRO_TEXT } from "./text.de.js";
 import { generateTenantExplanationParagraph } from "./explanationText.js";
 import { proratedLinesForSegment } from "../services/statementCalculation.js";
-import type { StatementDto, StatementLineDto, TenantSummaryDto } from "../services/statements.js";
+import type { StatementDto, StatementLineDto, TenantSummaryDto, UnitVacancySummaryDto } from "../services/statements.js";
 import type { PropertyDto } from "../services/properties.js";
 import type { LandlordProfileDto } from "../services/landlordProfile.js";
 
@@ -36,6 +36,7 @@ export function renderStatementPdf(
   statement: StatementDto,
   lines: StatementLineDto[],
   tenantSummaries: TenantSummaryForPdf[],
+  vacancySummaries: UnitVacancySummaryDto[] = [],
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN });
@@ -55,8 +56,87 @@ export function renderStatementPdf(
       doc.fontSize(11).text("Keine Mieterabschnitte für diesen Abrechnungszeitraum.", PAGE_MARGIN, PAGE_MARGIN);
     }
 
+    // One additional page at the end summarizing landlord-borne vacancy
+    // across the whole statement (all units/circuits, all categories) -
+    // skipped entirely when no unit had any vacancy in this period, see
+    // services/statements.ts::getStatementVacancySummary's doc comment.
+    if (vacancySummaries.length > 0) {
+      doc.addPage();
+      renderVacancyPage(doc, propertyAddress, statement, vacancySummaries);
+    }
+
     doc.end();
   });
+}
+
+function renderVacancyPage(
+  doc: PDFKit.PDFDocument,
+  propertyAddress: string,
+  statement: StatementDto,
+  vacancySummaries: UnitVacancySummaryDto[],
+): void {
+  doc.fontSize(15).fillColor("#000000").text(VACANCY_PAGE_TITLE, PAGE_MARGIN, PAGE_MARGIN, { width: 495 });
+  doc
+    .fontSize(10)
+    .fillColor("#333333")
+    .text(`${propertyAddress} · Zeitraum ${formatDate(statement.periodStart)} – ${formatDate(statement.periodEnd)}`, PAGE_MARGIN, doc.y + 4, {
+      width: 495,
+    });
+
+  doc.fontSize(9).fillColor("#222222").text(VACANCY_PAGE_INTRO_TEXT, PAGE_MARGIN, doc.y + 14, { width: 495, align: "justify" });
+
+  let y = doc.y + 20;
+  for (const unit of vacancySummaries) {
+    if (y > 680) {
+      doc.addPage();
+      y = PAGE_MARGIN;
+    }
+    doc.fontSize(11).fillColor("#000000").text(`Einheit: ${unit.unitLabel}`, PAGE_MARGIN, y, { width: 495 });
+    y = doc.y + 4;
+
+    const rangesText = unit.vacancyRanges.map((r) => `${formatDate(r.start)} – ${formatDate(r.end)}`).join(", ");
+    doc.fontSize(9).fillColor("#333333").text(`Leerstandszeitraum: ${rangesText}`, PAGE_MARGIN, y, { width: 495 });
+    y = doc.y + 2;
+    doc.text(
+      `Leerstandstage gesamt: ${unit.vacancyDays} · Vermieter-Anteil gesamt: ${formatCents(unit.totalVacancyShareCents)}`,
+      PAGE_MARGIN,
+      y,
+      { width: 495 },
+    );
+    y = doc.y + 10;
+
+    // Per-category breakdown only when there's more than one category with
+    // vacancy-borne cost - a single category would just repeat the totals
+    // line above.
+    if (unit.categories.length > 1) {
+      const colCat = { x: PAGE_MARGIN, width: 260 };
+      const colDays = { x: PAGE_MARGIN + 270, width: 100 };
+      const colShare = { x: PAGE_MARGIN + 380, width: 115 };
+
+      doc.fontSize(9).fillColor("#000000");
+      doc.moveTo(PAGE_MARGIN, y - 3).lineTo(PAGE_MARGIN + 495, y - 3).strokeColor("#cccccc").stroke();
+      doc.text("Kostenart", colCat.x, y, { width: colCat.width });
+      doc.text("Leerstandstage", colDays.x, y, { width: colDays.width, align: "right" });
+      doc.text("Vermieter-Anteil", colShare.x, y, { width: colShare.width, align: "right" });
+      y += 14;
+      doc.moveTo(PAGE_MARGIN, y - 3).lineTo(PAGE_MARGIN + 495, y - 3).strokeColor("#cccccc").stroke();
+
+      for (const category of unit.categories) {
+        if (y > 720) {
+          doc.addPage();
+          y = PAGE_MARGIN;
+        }
+        const label = getCostCategory(category.costCategoryKey)?.label ?? category.costCategoryKey;
+        doc.fontSize(9).fillColor("#222222");
+        doc.text(label, colCat.x, y, { width: colCat.width });
+        doc.text(String(category.vacancyDays), colDays.x, y, { width: colDays.width, align: "right" });
+        doc.text(formatCents(category.vacancyShareCents), colShare.x, y, { width: colShare.width, align: "right" });
+        y += 14;
+      }
+    }
+
+    y += 18;
+  }
 }
 
 function renderTenantSection(
@@ -98,11 +178,24 @@ function renderTenantSection(
     );
 
   let tableY = titleY + 40;
-  const colCategory = { x: PAGE_MARGIN, width: 150 };
-  const colTotal = { x: PAGE_MARGIN + 150, width: 90 };
-  const colKey = { x: PAGE_MARGIN + 240, width: 110 };
-  const colShareLabel = { x: PAGE_MARGIN + 350, width: 60 };
-  const colAmount = { x: PAGE_MARGIN + 410, width: 85 };
+  // Column layout: explicit ~10-12pt gaps between every column (not just
+  // contiguous boxes) - a prior layout butted columns directly against each
+  // other with zero gap, which looked especially cramped between the
+  // right-aligned "Gesamtkosten Objekt" and the left-aligned
+  // "Verteilerschlüssel" right next to it (their text visually touched).
+  // "Verteilerschlüssel" also gets extra width and a smaller body font (8pt
+  // vs the other columns' 9pt) since its content (e.g. "Extern (Techem)")
+  // tends to run longer than the other columns' short numbers/percentages;
+  // long provider names still wrap to a second line within the column
+  // rather than stealing space from neighbors - see the dynamic row-height
+  // calculation in the render loop below. Total width (110+85+120+55+83 +
+  // gaps 10+12+10+10 = 495) still exactly matches the old total, staying
+  // within the page margins.
+  const colCategory = { x: PAGE_MARGIN, width: 110 };
+  const colTotal = { x: PAGE_MARGIN + 120, width: 85 };
+  const colKey = { x: PAGE_MARGIN + 217, width: 120 };
+  const colShareLabel = { x: PAGE_MARGIN + 347, width: 55 };
+  const colAmount = { x: PAGE_MARGIN + 412, width: 83 };
 
   doc.fontSize(9).fillColor("#000000");
   doc.moveTo(PAGE_MARGIN, tableY - 4).lineTo(PAGE_MARGIN + 495, tableY - 4).strokeColor("#cccccc").stroke();
@@ -135,17 +228,28 @@ function renderTenantSection(
     }
     const categoryLabel = getCostCategory(line.costCategoryKey)?.label ?? line.costCategoryKey;
     const sharePercent = line.totalPropertyCostCents > 0 ? `${((line.unitShareCents / line.totalPropertyCostCents) * 100).toFixed(1)}%` : "-";
-    doc.text(categoryLabel, colCategory.x, tableY, { width: colCategory.width });
+    const keyLabel = allocationKeyLabel(line.allocationKeyUsed, line.externalProviderName);
+
+    // "Verteilerschlüssel" runs at a smaller font (8pt vs 9pt for the rest
+    // of the row) and is allowed to wrap to a second line within its own
+    // column (e.g. a longer provider name) instead of overflowing into
+    // "Ihr Anteil" - measure its actual wrapped height first so the row
+    // (and every column in it) advances far enough to clear it.
+    doc.fontSize(8);
+    const keyLabelHeight = doc.heightOfString(keyLabel, { width: colKey.width });
+    const rowHeight = Math.max(16, keyLabelHeight + 5);
+
+    doc.fontSize(9).text(categoryLabel, colCategory.x, tableY, { width: colCategory.width });
     doc.text(formatCents(line.totalPropertyCostCents), colTotal.x, tableY, { width: colTotal.width, align: "right" });
-    doc.text(allocationKeyLabel(line.allocationKeyUsed, line.externalProviderName), colKey.x, tableY, { width: colKey.width });
-    doc.text(sharePercent, colShareLabel.x, tableY, { width: colShareLabel.width, align: "right" });
+    doc.fontSize(8).text(keyLabel, colKey.x, tableY, { width: colKey.width });
+    doc.fontSize(9).text(sharePercent, colShareLabel.x, tableY, { width: colShareLabel.width, align: "right" });
     // Estimated (§9a HeizkostenV substitute) lines get a trailing "*"
     // marker so a substitute value never looks identical to a real metered
     // one in the output - see ESTIMATED_VALUE_FOOTNOTE below.
     const amountText = line.isEstimated ? `${formatCents(line.unitShareCents)} *` : formatCents(line.unitShareCents);
     if (line.isEstimated) hasEstimatedLine = true;
     doc.text(amountText, colAmount.x, tableY, { width: colAmount.width, align: "right" });
-    tableY += 16;
+    tableY += rowHeight;
   }
 
   tableY += 8;

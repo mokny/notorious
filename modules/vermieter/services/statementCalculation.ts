@@ -1,5 +1,4 @@
 import type { VermieterAllocationKey, VermieterBillingMode, VermieterEstimationMethod } from "../db/types.js";
-import { getCostCategory } from "../db/costCategories.js";
 import { resolveCircuitConsumption, type UnitConsumptionInput } from "./meterSubstitute.js";
 
 /**
@@ -145,6 +144,8 @@ export interface StatementCalculationInput {
   circuitCategorySettings: CalcCircuitCategorySetting[];
   /** Landlord-transcribed external per-unit amounts - see CalcExternalAllocation's doc comment. Only consulted for (circuit, category) pairs actually in 'external_provider' mode. */
   externalAllocations: CalcExternalAllocation[];
+  /** Per-workspace EFFECTIVE default allocation key for every cost category (workspace override merged with the hardcoded built-in default) - see computeCategoryTotals's doc comment and services/categoryAllocationDefaults.ts. */
+  categoryDefaultAllocationKeys: Map<string, VermieterAllocationKey>;
 }
 
 export interface StatementCalculationResult {
@@ -191,14 +192,24 @@ function circuitCategoryKey(costCircuitId: string, costCategoryKey: string): str
  * more than one bucket for the same circuit if some of its receipts were
  * individually overridden to a different allocation key, or if it has
  * receipts in more than one circuit.
+ *
+ * `categoryDefaultAllocationKeys` is the per-workspace EFFECTIVE default for
+ * every category (workspace override merged with the hardcoded
+ * VERMIETER_COST_CATEGORIES fallback - see
+ * services/categoryAllocationDefaults.ts::resolveAllCategoryDefaultAllocationKeys),
+ * precomputed by the caller (services/statements.ts) so this otherwise-pure
+ * engine never needs sdk/DB access itself - see the module-level doc comment.
  */
-export function computeCategoryTotals(receipts: CalcReceipt[], externalModePairs: Set<string> = new Set()): Map<string, CategoryBucket> {
+export function computeCategoryTotals(
+  receipts: CalcReceipt[],
+  categoryDefaultAllocationKeys: Map<string, VermieterAllocationKey>,
+  externalModePairs: Set<string> = new Set(),
+): Map<string, CategoryBucket> {
   const buckets = new Map<string, CategoryBucket>();
   for (const receipt of receipts) {
     if (receipt.allocationKeyOverride === "fixed_manual") continue; // handled separately, per-receipt
     if (externalModePairs.has(circuitCategoryKey(receipt.costCircuitId, receipt.costCategoryKey))) continue; // handled separately, see computeExternalProviderLines
-    const category = getCostCategory(receipt.costCategoryKey);
-    const allocationKey = receipt.allocationKeyOverride ?? category?.defaultAllocationKey ?? "sqm";
+    const allocationKey = receipt.allocationKeyOverride ?? categoryDefaultAllocationKeys.get(receipt.costCategoryKey) ?? "sqm";
     const bucketKey = `${receipt.costCircuitId}::${receipt.costCategoryKey}::${allocationKey}`;
     const bucket = buckets.get(bucketKey);
     if (bucket) bucket.totalCents += receipt.amountCents;
@@ -597,11 +608,12 @@ export function computeStatementLines(input: StatementCalculationInput): Stateme
     heatingConsumptionSharePercent,
     circuitCategorySettings,
     externalAllocations,
+    categoryDefaultAllocationKeys,
   } = input;
   const externalModePairs = new Set(
     circuitCategorySettings.filter((s) => s.billingMode === "external_provider").map((s) => circuitCategoryKey(s.costCircuitId, s.costCategoryKey)),
   );
-  const buckets = computeCategoryTotals(receipts, externalModePairs);
+  const buckets = computeCategoryTotals(receipts, categoryDefaultAllocationKeys, externalModePairs);
   const lines: StatementLineResult[] = [];
   const allUnitsById = unitsById(units);
   const circuitsById = new Map(costCircuits.map((c) => [c.id, c]));

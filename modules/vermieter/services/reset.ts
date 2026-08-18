@@ -32,6 +32,7 @@ export function resetVermieterData(sdk: ModuleSdk, workspaceId: string, options:
     sdk.sqlite.prepare("DELETE FROM vermieter_properties WHERE workspace_id = ?").run(wsId);
     if (!options.keepLandlordProfile) {
       sdk.sqlite.prepare("DELETE FROM vermieter_landlord_profile WHERE workspace_id = ?").run(wsId);
+      sdk.sqlite.prepare("DELETE FROM vermieter_category_allocation_defaults WHERE workspace_id = ?").run(wsId);
     }
   });
   tx(workspaceId);

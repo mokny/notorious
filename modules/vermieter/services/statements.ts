@@ -14,10 +14,12 @@ import { listMeters, consumptionInPeriod, priorComparablePeriod } from "./meters
 import { listRentPaymentsInPeriod } from "./rentPayments.js";
 import { listCostCircuits, getDefaultCostCircuitId } from "./costCircuits.js";
 import { listCircuitCategorySettingsForCircuits, listExternalAllocationsOverlappingPeriod } from "./externalBilling.js";
+import { resolveAllCategoryDefaultAllocationKeys } from "./categoryAllocationDefaults.js";
 import {
   computeStatementLines,
   computeTenantSummaries,
   clampDateRange,
+  daysBetweenInclusive,
   type CalcLeaseSegment,
   type CalcConsumptionByUnit,
   type CalcUnit,
@@ -311,6 +313,8 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
     };
   });
 
+  const categoryDefaultAllocationKeys = resolveAllCategoryDefaultAllocationKeys(sdk, workspaceId);
+
   const lines = computeStatementLines({
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
@@ -322,6 +326,7 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
     heatingConsumptionSharePercent: input.heatingConsumptionSharePercent ?? 70,
     circuitCategorySettings,
     externalAllocations,
+    categoryDefaultAllocationKeys,
   });
 
   const prepaymentsByLease = new Map<string, number>();
@@ -425,4 +430,106 @@ export function deleteStatement(sdk: ModuleSdk, workspaceId: string, id: string)
   });
   tx();
   return true;
+}
+
+export interface UnitVacancyCategoryBreakdown {
+  costCategoryKey: string;
+  vacancyDays: number;
+  vacancyShareCents: number;
+}
+
+/** One unit's landlord-borne vacancy summary for a statement's period - see getStatementVacancySummary. Only units with vacancyDays > 0 are ever produced. */
+export interface UnitVacancySummaryDto {
+  unitId: string;
+  unitLabel: string;
+  /** One or more gaps within the statement period not covered by any lease - a unit can have more than one vacancy gap (e.g. a tenant moved out, a new one moved in later). */
+  vacancyRanges: { start: string; end: string }[];
+  /** Sum of daysBetweenInclusive across vacancyRanges. */
+  vacancyDays: number;
+  /** Sum of vacancy_share_cents across every statement line for this unit, any category. */
+  totalVacancyShareCents: number;
+  /** Per-category breakdown, only categories with a non-zero vacancy-borne cost. */
+  categories: UnitVacancyCategoryBreakdown[];
+}
+
+/** The gaps in `periodStart..periodEnd` not covered by any of `ranges` (each individually clipped within the period already, but not necessarily sorted or non-overlapping - e.g. two back-to-back leases with no gap between them, or a data-entry overlap). */
+function complementRanges(ranges: { start: string; end: string }[], periodStart: string, periodEnd: string): { start: string; end: string }[] {
+  const sorted = [...ranges].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  const gaps: { start: string; end: string }[] = [];
+  let cursor = periodStart;
+  for (const range of sorted) {
+    if (range.start > cursor) {
+      const gapEnd = addDays(range.start, -1);
+      if (gapEnd >= cursor) gaps.push({ start: cursor, end: gapEnd });
+    }
+    if (range.end >= cursor) cursor = addDays(range.end, 1);
+  }
+  if (cursor <= periodEnd) gaps.push({ start: cursor, end: periodEnd });
+  return gaps;
+}
+
+function addDays(iso: string, days: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Re-derives, for one already-generated statement, which units had any
+ * vacancy (days not covered by any lease) during its period, their specific
+ * vacancy date range(s), and the vacancy-borne cost already persisted on the
+ * statement's lines (`vacancyShareCents` - landlord-borne, never charged to
+ * any tenant, see statementCalculation.ts's vacancy-bucket doc comment).
+ *
+ * Vacancy date RANGES aren't themselves persisted anywhere (only day counts
+ * are, per line) - this walks the same lease-overlap query
+ * `generateStatement` used at generation time
+ * (`listLeasesOverlappingPeriod`) to reconstruct them from the unit's lease
+ * segments' coverage of the period, then takes the complement. A lease's own
+ * start/end dates don't change retroactively once a statement exists, so
+ * this stays consistent with the statement's original generation even if
+ * re-run later.
+ *
+ * Only returns units with `vacancyDays > 0` - see pdf/render.ts, which skips
+ * the whole Leerstand page entirely when this returns an empty array.
+ */
+export function getStatementVacancySummary(sdk: ModuleSdk, workspaceId: string, statement: StatementDto, lines: StatementLineDto[]): UnitVacancySummaryDto[] {
+  const unitDtos = listUnits(sdk, workspaceId, statement.propertyId, false);
+  const linesByUnit = new Map<string, StatementLineDto[]>();
+  for (const line of lines) {
+    const list = linesByUnit.get(line.unitId) ?? [];
+    list.push(line);
+    linesByUnit.set(line.unitId, list);
+  }
+
+  const summaries: UnitVacancySummaryDto[] = [];
+  for (const unit of unitDtos) {
+    const leases = listLeasesOverlappingPeriod(sdk, workspaceId, unit.id, statement.periodStart, statement.periodEnd);
+    const occupiedRanges: { start: string; end: string }[] = [];
+    for (const lease of leases) {
+      const clipped = clampDateRange(lease.start_date, lease.end_date ?? statement.periodEnd, statement.periodStart, statement.periodEnd);
+      if (clipped) occupiedRanges.push(clipped);
+    }
+    const vacancyRanges = complementRanges(occupiedRanges, statement.periodStart, statement.periodEnd);
+    const vacancyDays = vacancyRanges.reduce((sum, r) => sum + daysBetweenInclusive(r.start, r.end), 0);
+    if (vacancyDays <= 0) continue;
+
+    const unitLines = linesByUnit.get(unit.id) ?? [];
+    const categoryTotals = new Map<string, { vacancyDays: number; vacancyShareCents: number }>();
+    for (const line of unitLines) {
+      if (line.vacancyShareCents === 0) continue;
+      const entry = categoryTotals.get(line.costCategoryKey) ?? { vacancyDays: line.daysTotal - line.daysOccupied, vacancyShareCents: 0 };
+      entry.vacancyShareCents += line.vacancyShareCents;
+      categoryTotals.set(line.costCategoryKey, entry);
+    }
+    const categories: UnitVacancyCategoryBreakdown[] = Array.from(categoryTotals.entries()).map(([costCategoryKey, v]) => ({
+      costCategoryKey,
+      vacancyDays: v.vacancyDays,
+      vacancyShareCents: v.vacancyShareCents,
+    }));
+    const totalVacancyShareCents = categories.reduce((sum, c) => sum + c.vacancyShareCents, 0);
+
+    summaries.push({ unitId: unit.id, unitLabel: unit.label, vacancyRanges, vacancyDays, totalVacancyShareCents, categories });
+  }
+  return summaries;
 }

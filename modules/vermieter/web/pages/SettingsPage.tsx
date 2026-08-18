@@ -1,13 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { vermieterApi, type LandlordProfileInput } from "../api.js";
+import { vermieterApi, type LandlordProfileInput, type CategoryDefaultAllocationKey } from "../api.js";
+import { VERMIETER_COST_CATEGORIES, ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
 import { Modal } from "../../../../packages/web/src/components/ui/Modal.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
 const labelTextClass = "text-xs font-medium text-ink-muted";
 const RESET_CONFIRMATION_PHRASE = "ZURÜCKSETZEN";
+
+/** The five allocation keys a category-level default may be set to - mirrors services/categoryAllocationDefaults.ts's OVERRIDABLE_ALLOCATION_KEYS (deliberately excludes 'external_provider', same order as the per-receipt override select on ReceiptCapturePage/ReceiptDetailPage). */
+const CATEGORY_DEFAULT_ALLOCATION_KEYS = Object.keys(ALLOCATION_KEY_LABEL_DE).filter(
+  (key): key is CategoryDefaultAllocationKey => key !== "external_provider",
+);
 
 type ResetActionKey = "receipts" | "statements" | "leases" | "properties" | "full";
 
@@ -85,6 +91,24 @@ function SettingsPage() {
   const saveMutation = useMutation({
     mutationFn: () => vermieterApi.landlordProfile.update(workspaceId!, form),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const categoryDefaultsQueryKey = ["module-vermieter-category-allocation-defaults", workspaceId];
+  const { data: categoryDefaults } = useQuery({
+    queryKey: categoryDefaultsQueryKey,
+    queryFn: () => vermieterApi.categoryAllocationDefaults.list(workspaceId!),
+    enabled: Boolean(workspaceId),
+  });
+
+  const setCategoryDefaultMutation = useMutation({
+    mutationFn: ({ categoryKey, allocationKey }: { categoryKey: string; allocationKey: CategoryDefaultAllocationKey }) =>
+      vermieterApi.categoryAllocationDefaults.set(workspaceId!, categoryKey, allocationKey),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: categoryDefaultsQueryKey }),
+  });
+
+  const resetCategoryDefaultMutation = useMutation({
+    mutationFn: (categoryKey: string) => vermieterApi.categoryAllocationDefaults.remove(workspaceId!, categoryKey),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: categoryDefaultsQueryKey }),
   });
 
   const [activeReset, setActiveReset] = useState<ResetActionKey | null>(null);
@@ -165,6 +189,60 @@ function SettingsPage() {
           {saveMutation.isError && <span className="text-xs text-red-500">Fehler beim Speichern.</span>}
         </div>
       </form>
+
+      <section className="space-y-3 rounded-md border border-border p-4">
+        <div>
+          <h2 className="text-sm font-semibold">Standard-Umlageschlüssel je Kostenart</h2>
+          <p className="text-xs text-ink-muted">
+            Legt fest, mit welchem Umlageschlüssel Belege einer Kostenart standardmäßig verteilt werden, sofern nicht am einzelnen
+            Beleg ein abweichender Umlageschlüssel gesetzt ist. Wirkt sich nur auf künftig erstellte Abrechnungen aus – bereits
+            generierte Abrechnungen ändern sich dadurch nicht rückwirkend.
+          </p>
+        </div>
+        <ul className="divide-y divide-border">
+          {VERMIETER_COST_CATEGORIES.map((category) => {
+            const entry = categoryDefaults?.find((d) => d.costCategoryKey === category.key);
+            const value = entry?.allocationKey ?? (category.defaultAllocationKey as CategoryDefaultAllocationKey);
+            const isOverridden = entry?.isOverridden ?? false;
+            return (
+              <li key={category.key} className="flex items-center justify-between gap-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium text-ink">{category.label}</p>
+                  {isOverridden && entry && (
+                    <p className="text-xs text-ink-muted">(Standard der Software: {ALLOCATION_KEY_LABEL_DE[entry.builtInAllocationKey]})</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <select
+                    className="w-48 rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+                    value={value}
+                    onChange={(e) =>
+                      setCategoryDefaultMutation.mutate({
+                        categoryKey: category.key,
+                        allocationKey: e.target.value as CategoryDefaultAllocationKey,
+                      })
+                    }
+                  >
+                    {CATEGORY_DEFAULT_ALLOCATION_KEYS.map((key) => (
+                      <option key={key} value={key}>
+                        {ALLOCATION_KEY_LABEL_DE[key]}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!isOverridden || resetCategoryDefaultMutation.isPending}
+                    onClick={() => resetCategoryDefaultMutation.mutate(category.key)}
+                    className="rounded-md border border-border px-2 py-1.5 text-xs text-ink-muted hover:bg-surface-hover disabled:opacity-40"
+                  >
+                    Zurücksetzen
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
       <section className="space-y-3 rounded-md border border-red-300 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
         <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">Gefahrenbereich</h2>
