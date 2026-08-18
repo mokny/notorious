@@ -75,6 +75,7 @@
     "rss-parser": "^3.13.0",
     "sharp": "^0.32.6",
     "ssh2-sftp-client": "^12.1.1",
+    "tesseract.js": "^5.1.1",
     "unified": "^11.0.5",
     "unzipper": "^0.12.3",
     "web-push": "^3.6.7",
