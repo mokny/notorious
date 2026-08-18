@@ -265,7 +265,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
           <Icon name="more" className="h-5 w-5" />
         </button>
 
-        <IOSMenu open={menuOpen} onClose={() => setMenuOpen(false)}>
+        <IOSMenu open={menuOpen} onClose={() => setMenuOpen(false)} widthClassName="w-60 max-h-[60vh] overflow-y-auto">
           {onObjectPage && object && !shareToken && isOwner && (
             <IOSMenuGroup>
               <IOSMenuItem
