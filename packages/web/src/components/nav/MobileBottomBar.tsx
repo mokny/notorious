@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { sortObjectTypesForDisplay } from "@notorious/shared";
-import { schemaApi, objectApi, workspaceApi, chatApi } from "../../lib/api/resources.js";
+import { sortObjectTypesForDisplay, type ModuleSummary } from "@notorious/shared";
+import { schemaApi, objectApi, workspaceApi, chatApi, moduleApi } from "../../lib/api/resources.js";
 import { isSharedSession } from "../../lib/api/shareMode.js";
 import { useKeyboardInset } from "../../hooks/useKeyboardInset.js";
 import { useAuth } from "../../context/AuthContext.js";
 import { useSearchOverlay } from "../../context/SearchOverlayContext.js";
 import { useChatOverlay } from "../../context/ChatOverlayContext.js";
-import { IOSMenu, IOSMenuGroup, IOSMenuItem } from "./IOSMenu.js";
+import { IOSMenu, IOSMenuGroup, IOSMenuItem, IOSMenuSubmenu } from "./IOSMenu.js";
+import { MODULE_WEB_MANIFESTS } from "../../modules/registry.js";
 import { Icon } from "../ui/Icon.js";
 
 /**
@@ -32,6 +33,7 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
   const { open: openSearch } = useSearchOverlay();
   const { open: openChat } = useChatOverlay();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [modulesMenuOpen, setModulesMenuOpen] = useState(false);
   const keyboardInset = useKeyboardInset();
 
   // Same "parse it off the URL" approach as MobileTopBar.tsx - this is a
@@ -57,6 +59,17 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
     enabled: !shareToken,
   });
   const chatUnreadCount = chatConversations?.filter((c) => c.unreadCount > 0).length ?? 0;
+
+  // Same "enabled and I hold at least one permission" filter as ModulesNav.tsx
+  // (desktop sidebar) - kept in sync so a member never sees a module button
+  // here that they can't actually do anything with there.
+  const { data: modules } = useQuery({
+    queryKey: ["modules", workspaceId],
+    queryFn: () => moduleApi.list(workspaceId),
+    enabled: !shareToken,
+  });
+  const enabledModuleIds = new Set((modules ?? []).filter((m: ModuleSummary) => m.enabled && m.myPermissions.length > 0).map((m) => m.id));
+  const visibleModules = MODULE_WEB_MANIFESTS.filter((m) => enabledModuleIds.has(m.id));
 
   const isOwner = Boolean(user && workspace && workspace.ownerId === user.id);
   const isLocked = Boolean(object?.lockedAt);
@@ -156,6 +169,52 @@ export function MobileBottomBar({ workspaceId, dashboardObjectId }: { workspaceI
                   ))}
                 </IOSMenuGroup>
               )}
+            </IOSMenu>
+          </div>
+        )}
+
+        {!shareToken && visibleModules.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setModulesMenuOpen((v) => !v)}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-surface hover:text-ink"
+              title={t("nav.mobile.modules")}
+            >
+              <Icon name="puzzle" className="h-5 w-5" />
+            </button>
+
+            <IOSMenu open={modulesMenuOpen} onClose={() => setModulesMenuOpen(false)} side="top" widthClassName="w-60 max-h-80 overflow-y-auto">
+              <IOSMenuGroup>
+                {visibleModules.map((manifest) =>
+                  manifest.subItems.length === 0 ? (
+                    <IOSMenuItem
+                      key={manifest.id}
+                      icon={manifest.navIcon}
+                      label={manifest.navLabel}
+                      onClick={() => {
+                        setModulesMenuOpen(false);
+                        navigate(`/w/${workspaceId}/modules/${manifest.id}/${manifest.routes[0]?.path ?? ""}`);
+                      }}
+                    />
+                  ) : (
+                    <IOSMenuSubmenu key={manifest.id} id={manifest.id} icon={manifest.navIcon} label={manifest.navLabel}>
+                      <IOSMenuGroup>
+                        {manifest.subItems.map((sub) => (
+                          <IOSMenuItem
+                            key={sub.path}
+                            icon="chevron-right"
+                            label={sub.label}
+                            onClick={() => {
+                              setModulesMenuOpen(false);
+                              navigate(`/w/${workspaceId}/modules/${manifest.id}/${sub.path}`);
+                            }}
+                          />
+                        ))}
+                      </IOSMenuGroup>
+                    </IOSMenuSubmenu>
+                  ),
+                )}
+              </IOSMenuGroup>
             </IOSMenu>
           </div>
         )}
