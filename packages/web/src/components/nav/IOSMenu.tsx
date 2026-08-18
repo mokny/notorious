@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Icon } from "../ui/Icon.js";
 
@@ -12,15 +13,21 @@ interface IOSMenuProps {
   children: React.ReactNode;
 }
 
-/** Which nested `IOSMenuSubmenu` (if any) is currently pushed on top of the root panel - see that component below. */
-const IOSMenuNavContext = createContext<{ activePanel: string | null; setActivePanel: (id: string | null) => void } | null>(null);
+interface IOSMenuNavCtxValue {
+  /** Which nested `IOSMenuSubmenu` (if any) is currently pushed on top of the root panel. */
+  activePanel: string | null;
+  setActivePanel: (id: string | null) => void;
+  /** Portal target a submenu's content is rendered into - see IOSMenuSubmenu's doc comment for why. */
+  portalNode: HTMLDivElement | null;
+}
+const IOSMenuNavContext = createContext<IOSMenuNavCtxValue | null>(null);
 
 /**
  * Native-iOS-context-menu-styled dropdown shell - shared by MobileTopBar.tsx's
- * breadcrumb/"…" menus, MobileBottomBar.tsx's "new object" picker, and
- * WorkspaceLayout.tsx's desktop sidebar menus, so every dropdown in the app
- * looks and behaves the same: rounded, blurred, grouped by IOSMenuGroup with
- * thin dividers, scale+fade in from the trigger's corner.
+ * breadcrumb/"…" menus, MobileBottomBar.tsx's "new object"/"modules" pickers,
+ * and WorkspaceLayout.tsx's desktop sidebar menus, so every dropdown in the
+ * app looks and behaves the same: rounded, blurred, grouped by IOSMenuGroup
+ * with thin dividers, scale+fade in from the trigger's corner.
  *
  * The backdrop is the *only* mechanism for "tap outside closes this,
  * without also activating whatever was under the tap" - it's a full-screen
@@ -33,6 +40,7 @@ const IOSMenuNavContext = createContext<{ activePanel: string | null; setActiveP
 export function IOSMenu({ open, onClose, align = "end", side = "bottom", widthClassName = "w-60", children }: IOSMenuProps) {
   const yOffset = side === "top" ? 4 : -4;
   const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [portalNode, setPortalNode] = useState<HTMLDivElement | null>(null);
   // A submenu pushed open shouldn't still be showing the next time this same
   // trigger reopens the menu - reset to the root panel on every close.
   useEffect(() => {
@@ -50,9 +58,20 @@ export function IOSMenu({ open, onClose, align = "end", side = "bottom", widthCl
             exit={{ opacity: 0, scale: 0.92, y: yOffset }}
             transition={{ duration: 0.14, ease: [0.2, 0, 0, 1] }}
             style={{ transformOrigin: `${side === "top" ? "bottom" : "top"} ${align === "end" ? "right" : "left"}` }}
-            className={`absolute z-50 ${side === "top" ? "bottom-full mb-2" : "top-full mt-2"} ${align === "end" ? "right-0" : "left-0"} ${widthClassName} overflow-hidden rounded-2xl border border-border/60 bg-surface-raised/90 shadow-2xl backdrop-blur-xl`}
+            className={`absolute z-50 ${side === "top" ? "bottom-full mb-2" : "top-full mt-2"} ${align === "end" ? "right-0" : "left-0"} overflow-hidden rounded-2xl border border-border/60 bg-surface-raised/90 shadow-2xl backdrop-blur-xl`}
           >
-            <IOSMenuNavContext.Provider value={{ activePanel, setActivePanel }}>{children}</IOSMenuNavContext.Provider>
+            <IOSMenuNavContext.Provider value={{ activePanel, setActivePanel, portalNode }}>
+              {/* CSS-grid stacking: the root panel and the active submenu's
+                  portalled panel (if any) both sit in this same grid cell, so
+                  the grid's auto row-track height - and with it this whole
+                  menu, animated by `layout` - always matches whichever one is
+                  actually showing, instead of staying pinned to the root
+                  panel's size while a taller (or shorter) submenu is open. */}
+              <motion.div layout="size" transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }} className={`grid ${widthClassName} overflow-y-auto`}>
+                <div className="col-start-1 row-start-1">{children}</div>
+                <div ref={setPortalNode} className="pointer-events-none col-start-1 row-start-1" />
+              </motion.div>
+            </IOSMenuNavContext.Provider>
           </motion.div>
         </>
       )}
@@ -100,11 +119,17 @@ interface IOSMenuSubmenuProps {
 
 /**
  * A row that pushes a nested panel of its own `children` over the menu,
- * iOS-context-menu style, with a back row to return to the root. Renders its
- * trigger row inline (so it composes with `IOSMenuGroup` like any other
- * item), and - only while active - an absolutely-positioned overlay panel
- * that slides in from the right and fully covers the root content; both
- * live in the same DOM position so no parent needs to know a submenu exists.
+ * iOS-context-menu style, with a back row to return to the root.
+ *
+ * The panel itself is rendered through a portal into IOSMenu's `portalNode`
+ * (a grid cell stacked directly on top of the root panel's cell) rather than
+ * inline here - `IOSMenuSubmenu` is nested arbitrarily deep inside the root
+ * panel's own content (e.g. within an `IOSMenuGroup`), so its natural DOM
+ * position can't itself be a same-cell grid sibling of the root panel. The
+ * portal is what lets the panel's real height (however many items *this*
+ * submenu has) drive the shared grid cell's auto size, instead of being
+ * boxed into a `position: absolute; inset: 0` that would just inherit
+ * whatever height the root panel happens to have.
  */
 export function IOSMenuSubmenu({ id, icon, label, disabled, children }: IOSMenuSubmenuProps) {
   const nav = useContext(IOSMenuNavContext);
@@ -121,26 +146,30 @@ export function IOSMenuSubmenu({ id, icon, label, disabled, children }: IOSMenuS
         <span className="min-w-0 flex-1 truncate">{label}</span>
         <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
       </button>
-      <AnimatePresence>
-        {isActive && (
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
-            className="absolute inset-0 z-10 overflow-y-auto rounded-2xl bg-surface-raised/95 backdrop-blur-xl"
-          >
-            <button
-              onClick={() => nav.setActivePanel(null)}
-              className="flex min-h-11 w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left text-[15px] font-medium text-ink active:bg-surface"
-            >
-              <Icon name="chevron-left" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
-              <span className="min-w-0 flex-1 truncate">{label}</span>
-            </button>
-            {children}
-          </motion.div>
+      {nav.portalNode &&
+        createPortal(
+          <AnimatePresence>
+            {isActive && (
+              <motion.div
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+                className="pointer-events-auto min-h-full bg-surface-raised/95"
+              >
+                <button
+                  onClick={() => nav.setActivePanel(null)}
+                  className="flex min-h-11 w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left text-[15px] font-medium text-ink active:bg-surface"
+                >
+                  <Icon name="chevron-left" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                </button>
+                {children}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          nav.portalNode,
         )}
-      </AnimatePresence>
     </>
   );
 }
