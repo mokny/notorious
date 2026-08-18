@@ -39,25 +39,27 @@ function ModuleNavGroup({ workspaceId, manifest }: { workspaceId: string; manife
 
   if (manifest.subItems.length === 0) {
     return (
-      <NavLink to={`${base}/${manifest.routes[0]?.path ?? ""}`} className={({ isActive }) => navLinkClass(isActive)}>
-        <Icon name={manifest.navIcon} className="h-4 w-4" /> {manifest.navLabel}
+      <NavLink to={`${base}/${manifest.routes[0]?.path ?? ""}`} className={({ isActive }) => navLinkClass(isActive)} title={manifest.navLabel}>
+        <Icon name={manifest.navIcon} className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{manifest.navLabel}</span>
       </NavLink>
     );
   }
 
   return (
-    <div>
-      <button onClick={() => setOpen((v) => !v)} className={navLinkClass(false, "w-full justify-between")}>
-        <span className="flex items-center gap-2">
-          <Icon name={manifest.navIcon} className="h-4 w-4" /> {manifest.navLabel}
+    <div className="min-w-0">
+      <button onClick={() => setOpen((v) => !v)} className={navLinkClass(false, "w-full justify-between")} title={manifest.navLabel}>
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <Icon name={manifest.navIcon} className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate">{manifest.navLabel}</span>
         </span>
-        <Icon name={open ? "chevron-up" : "chevron-down"} className="h-3.5 w-3.5" />
+        <Icon name={open ? "chevron-up" : "chevron-down"} className="h-3.5 w-3.5 shrink-0" />
       </button>
       {open && (
-        <div className="ml-4 space-y-0.5 border-l border-border pl-2">
+        <div className="ml-4 min-w-0 space-y-0.5 border-l border-border pl-2">
           {manifest.subItems.map((sub) => (
-            <NavLink key={sub.path} to={`${base}/${sub.path}`} className={({ isActive }) => navLinkClass(isActive)}>
-              {sub.label}
+            <NavLink key={sub.path} to={`${base}/${sub.path}`} className={({ isActive }) => navLinkClass(isActive)} title={sub.label}>
+              <span className="min-w-0 flex-1 truncate">{sub.label}</span>
             </NavLink>
           ))}
         </div>

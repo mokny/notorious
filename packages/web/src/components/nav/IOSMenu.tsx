@@ -68,8 +68,8 @@ export function IOSMenu({ open, onClose, align = "end", side = "bottom", widthCl
                   actually showing, instead of staying pinned to the root
                   panel's size while a taller (or shorter) submenu is open. */}
               <motion.div layout="size" transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }} className={`grid ${widthClassName} overflow-y-auto`}>
-                <div className="col-start-1 row-start-1">{children}</div>
-                <div ref={setPortalNode} className="pointer-events-none col-start-1 row-start-1" />
+                <div className="col-start-1 row-start-1 min-w-0">{children}</div>
+                <div ref={setPortalNode} className="pointer-events-none col-start-1 row-start-1 min-w-0" />
               </motion.div>
             </IOSMenuNavContext.Provider>
           </motion.div>
@@ -102,7 +102,7 @@ export function IOSMenuItem({ icon, label, onClick, destructive, disabled }: IOS
         destructive ? "text-red-500 active:bg-red-500/10" : "text-ink active:bg-surface"
       }`}
     >
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
       <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${destructive ? "text-red-500" : "text-ink-muted"}`} />
     </button>
   );
@@ -143,7 +143,7 @@ export function IOSMenuSubmenu({ id, icon, label, disabled, children }: IOSMenuS
         disabled={disabled}
         className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-[15px] text-ink disabled:opacity-40 active:bg-surface"
       >
-        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
         <Icon name={icon} className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
       </button>
       {nav.portalNode &&
@@ -162,7 +162,7 @@ export function IOSMenuSubmenu({ id, icon, label, disabled, children }: IOSMenuS
                   className="flex min-h-11 w-full items-center gap-2 border-b border-border/60 px-3 py-2.5 text-left text-[15px] font-medium text-ink active:bg-surface"
                 >
                   <Icon name="chevron-left" className="h-[18px] w-[18px] shrink-0 text-ink-muted" />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
                 </button>
                 {children}
               </motion.div>
