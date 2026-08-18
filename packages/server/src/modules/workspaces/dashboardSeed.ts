@@ -2,9 +2,9 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs/promises";
 import matter from "gray-matter";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../../db/client.js";
-import { objectTypes } from "../../db/schema.js";
+import { objectTypes, workspaces } from "../../db/schema.js";
 import { createObject } from "../objects/service.js";
 import { replaceAllBlocks } from "../blocks/service.js";
 import { markdownToBlockTree } from "../blocks/markdown.js";
@@ -50,5 +50,48 @@ export async function seedDashboardNote(workspaceId: string, userId: string): Pr
   } catch (error) {
     console.warn("[workspaces] Skipping dashboard note seed:", error);
     return null;
+  }
+}
+
+/**
+ * Every workspace must always have a dashboard object (see workspaces/routes.ts's PATCH
+ * handler, which refuses to ever null the pointer out again). This is the guaranteed-to-succeed
+ * fallback for whenever `seedDashboardNote` can't run (missing/malformed seed file) - a bare
+ * empty "Dashboard" note, with none of the seed file's content/icon.
+ */
+export async function createFallbackDashboardNote(workspaceId: string, userId: string): Promise<string> {
+  const noteType = await db
+    .select({ id: objectTypes.id })
+    .from(objectTypes)
+    .where(and(eq(objectTypes.workspaceId, workspaceId), eq(objectTypes.key, "note")))
+    .limit(1);
+  const noteTypeId = noteType[0]?.id;
+  if (!noteTypeId) throw new Error(`Note object type not found for workspace ${workspaceId}`);
+
+  const object = await createObject(workspaceId, userId, {
+    objectTypeId: noteTypeId,
+    title: "Dashboard",
+    icon: null,
+    values: {},
+  });
+  return object.id;
+}
+
+/**
+ * Boot-time backfill for workspaces created before this invariant existed, whose
+ * `dashboardObjectId` is still null (either the seed file was missing/malformed at the time, or
+ * they predate the dashboard feature entirely). Called once from server.ts on every startup -
+ * a no-op once every workspace has been backfilled.
+ */
+export async function ensureAllWorkspaceDashboards(): Promise<void> {
+  const rows = await db
+    .select({ id: workspaces.id, ownerId: workspaces.ownerId })
+    .from(workspaces)
+    .where(isNull(workspaces.dashboardObjectId));
+
+  for (const row of rows) {
+    const dashboardObjectId = await createFallbackDashboardNote(row.id, row.ownerId);
+    await db.update(workspaces).set({ dashboardObjectId }).where(eq(workspaces.id, row.id));
+    console.warn(`[workspaces] Backfilled missing dashboard for workspace ${row.id}`);
   }
 }

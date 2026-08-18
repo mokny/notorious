@@ -22,7 +22,7 @@ import {
 import { newId, nowIso } from "../../lib/ids.js";
 import { badRequest, notFound } from "../../lib/httpError.js";
 import { seedSystemObjectTypes } from "../schema/systemTypes.js";
-import { seedDashboardNote } from "./dashboardSeed.js";
+import { seedDashboardNote, createFallbackDashboardNote } from "./dashboardSeed.js";
 import { positionBetween } from "../../lib/position.js";
 import { deleteWorkspaceFilesFromDisk } from "../files/service.js";
 import { removeWorkspaceFromIndex } from "../search/indexer.js";
@@ -55,10 +55,11 @@ export async function createWorkspace(
   });
   await seedSystemObjectTypes(id);
 
-  const dashboardObjectId = await seedDashboardNote(id, ownerId);
-  if (dashboardObjectId) {
-    await db.update(workspaces).set({ dashboardObjectId }).where(eq(workspaces.id, id));
-  }
+  // A workspace must always have a dashboard - if the seed-file-based note fails (missing/
+  // malformed docs/dashboard-seed.md), fall back to a bare empty note rather than leaving
+  // dashboardObjectId null.
+  const dashboardObjectId = (await seedDashboardNote(id, ownerId)) ?? (await createFallbackDashboardNote(id, ownerId));
+  await db.update(workspaces).set({ dashboardObjectId }).where(eq(workspaces.id, id));
 
   return {
     id,

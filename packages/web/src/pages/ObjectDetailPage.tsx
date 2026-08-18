@@ -510,6 +510,14 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                 <Icon name="user" className="h-4 w-4" />
               </span>
             )}
+            {/* Visible to everyone, not just the owner - explains why the delete
+                menu item is disabled for this object (see the trash IOSMenuItem
+                below). */}
+            {isDashboard && (
+              <span className="shrink-0 p-1.5 text-accent" title={t("objectDetail.isDashboardTooltip")}>
+                <Icon name="layout-dashboard" className="h-4 w-4" />
+              </span>
+            )}
             {/* Members-only (see SubscribeButton.tsx's own doc comment) - an
                 anonymous share visitor has no account for a subscription to
                 belong to. */}
@@ -578,14 +586,19 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                           setMenuOpen(false);
                         }}
                       />
-                      <IOSMenuItem
-                        icon="layout-dashboard"
-                        label={isDashboard ? t("objectDetail.removeAsDashboard") : t("objectDetail.setAsDashboard")}
-                        onClick={() => {
-                          dashboardMutation.mutate(isDashboard ? null : object.id);
-                          setMenuOpen(false);
-                        }}
-                      />
+                      {/* Owner-only - a workspace must always have a dashboard, so this only ever
+                          offers to switch it to a different object, never to unset it (see
+                          workspaces/routes.ts's PATCH handler, which rejects dashboardObjectId: null). */}
+                      {isOwner && !isDashboard && (
+                        <IOSMenuItem
+                          icon="layout-dashboard"
+                          label={t("objectDetail.setAsDashboard")}
+                          onClick={() => {
+                            dashboardMutation.mutate(object.id);
+                            setMenuOpen(false);
+                          }}
+                        />
+                      )}
                       {/* Owner-only kill-switch for comments, deliberately
                           sitting right next to Share - the two controls
                           answer the same kind of question ("who can interact
@@ -613,7 +626,7 @@ export function ObjectDetailPage({ workspaceId: workspaceIdProp, objectId: objec
                       icon="trash"
                       label={t("objectDetail.deleteObject")}
                       destructive
-                      disabled={isDeleting || isLocked || isOwnerOnlyBlocked}
+                      disabled={isDeleting || isLocked || isOwnerOnlyBlocked || isDashboard}
                       onClick={() => {
                         setMenuOpen(false);
                         handleDelete();

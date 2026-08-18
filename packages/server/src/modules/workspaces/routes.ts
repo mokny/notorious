@@ -203,7 +203,12 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
       await requireWorkspaceRole(id, user.id, "owner");
     }
 
-    if (input.dashboardObjectId) {
+    // Setting the dashboard is owner-only (unlike the rest of this route's fields, editor+) - see
+    // the same pattern above for company banner fields. A workspace must always have a dashboard,
+    // so unsetting it (null) without pointing at a replacement object is rejected outright.
+    if ("dashboardObjectId" in input) {
+      await requireWorkspaceRole(id, user.id, "owner");
+      if (!input.dashboardObjectId) throw badRequest("A workspace must always have a dashboard");
       const objectWorkspaceId = await getObjectWorkspaceId(input.dashboardObjectId);
       if (objectWorkspaceId !== id) throw badRequest("Dashboard object must belong to this workspace");
     }

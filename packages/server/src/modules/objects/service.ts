@@ -10,9 +10,9 @@ import type {
   ViewSort,
 } from "@notorious/shared";
 import { db } from "../../db/client.js";
-import { objects, relations, objectValues, objectTypes, blocks } from "../../db/schema.js";
+import { objects, relations, objectValues, objectTypes, blocks, workspaces } from "../../db/schema.js";
 import { newId, nowIso } from "../../lib/ids.js";
-import { notFound, locked, conflict, forbidden } from "../../lib/httpError.js";
+import { notFound, locked, conflict, forbidden, badRequest } from "../../lib/httpError.js";
 import { slugify, randomSlugSuffix } from "../../lib/slug.js";
 import { listProperties } from "../schema/service.js";
 import { resolveValuesForObjects } from "./valueResolver.js";
@@ -395,7 +395,22 @@ async function writeStoredValues(
   }
 }
 
+/** True if this object is currently set as its own workspace's dashboard - the one object a
+ * workspace can never be left without (see workspaces/routes.ts's PATCH handler). Checked by
+ * both archiveObject and deleteObject below, since archiving makes an object just as
+ * unreachable via normal navigation as deleting it does. */
+async function isWorkspaceDashboard(objectId: string): Promise<boolean> {
+  const workspaceId = await getObjectWorkspaceId(objectId);
+  const rows = await db
+    .select({ dashboardObjectId: workspaces.dashboardObjectId })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1);
+  return rows[0]?.dashboardObjectId === objectId;
+}
+
 export async function archiveObject(objectId: string): Promise<void> {
+  if (await isWorkspaceDashboard(objectId)) throw badRequest("Cannot archive the workspace dashboard object");
   await db.update(objects).set({ archivedAt: nowIso() }).where(eq(objects.id, objectId));
 }
 
@@ -404,6 +419,8 @@ export async function restoreObject(objectId: string): Promise<void> {
 }
 
 export async function deleteObject(objectId: string): Promise<void> {
+  if (await isWorkspaceDashboard(objectId)) throw badRequest("Cannot delete the workspace dashboard object");
+
   // Uploaded files aren't foreign-keyed to their object (their `objectId`
   // column is a plain string, not a reference) so deleting the object row
   // wouldn't touch them - list them first, while we still can, so the ones

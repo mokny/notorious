@@ -302,14 +302,19 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                       setMenuOpen(false);
                     }}
                   />
-                  <IOSMenuItem
-                    icon="layout-dashboard"
-                    label={isDashboard ? t("nav.mobile.removeAsDashboard") : t("nav.mobile.setAsDashboard")}
-                    onClick={() => {
-                      dashboardMutation.mutate(isDashboard ? null : object.id);
-                      setMenuOpen(false);
-                    }}
-                  />
+                  {/* Owner-only - a workspace must always have a dashboard, so this only ever
+                      offers to switch it to a different object, never to unset it (see
+                      workspaces/routes.ts's PATCH handler, which rejects dashboardObjectId: null). */}
+                  {isOwner && !isDashboard && (
+                    <IOSMenuItem
+                      icon="layout-dashboard"
+                      label={t("nav.mobile.setAsDashboard")}
+                      onClick={() => {
+                        dashboardMutation.mutate(object.id);
+                        setMenuOpen(false);
+                      }}
+                    />
+                  )}
                   {isOwner && (
                     <IOSMenuItem
                       icon={object.commentsDisabled ? "comment-off" : "comment"}
@@ -326,7 +331,7 @@ export function MobileTopBar({ workspaceId, workspaceName, workspaceIcon, dashbo
                     icon="trash"
                     label={t("nav.mobile.delete")}
                     destructive
-                    disabled={isLocked}
+                    disabled={isLocked || isDashboard}
                     onClick={() => {
                       setMenuOpen(false);
                       void deleteObject(title);

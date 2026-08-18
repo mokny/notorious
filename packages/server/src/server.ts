@@ -9,9 +9,11 @@ import { startFeedScheduler } from "./modules/feeds/scheduler.js";
 import { startAutoUpdateScheduler } from "./modules/admin/autoUpdateScheduler.js";
 import { startFailedLoginCleanup } from "./modules/admin/failedLoginCleanup.js";
 import { startSubscriptionScheduler } from "./modules/subscriptions/scheduler.js";
+import { ensureAllWorkspaceDashboards } from "./modules/workspaces/dashboardSeed.js";
 
 const app = await buildApp();
 
+await ensureAllWorkspaceDashboards();
 startReminderScheduler();
 startShareInboxCleanup();
 startBackupScheduler();
