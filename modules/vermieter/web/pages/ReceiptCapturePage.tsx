@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { parseCentsInput } from "@notorious/shared";
@@ -32,6 +32,12 @@ function ReceiptCapturePage() {
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<ReceiptOcrResult | null>(null);
 
+  const { data: costCircuits } = useQuery({
+    queryKey: ["module-vermieter-cost-circuits", workspaceId, propertyId],
+    queryFn: () => vermieterApi.costCircuits.list(workspaceId!, propertyId),
+    enabled: Boolean(workspaceId) && Boolean(propertyId),
+  });
+
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("0,00");
   const [receiptDate, setReceiptDate] = useState(today());
@@ -39,6 +45,12 @@ function ReceiptCapturePage() {
   const [allocationOverride, setAllocationOverride] = useState<VermieterAllocationKey | "">("");
   const [description, setDescription] = useState("");
   const [taxDeductible, setTaxDeductible] = useState(true);
+  const [costCircuitId, setCostCircuitId] = useState("");
+
+  useEffect(() => {
+    // Reset to "use the property's default circuit" whenever the property changes.
+    setCostCircuitId("");
+  }, [propertyId]);
 
   const ocrMutation = useMutation({
     mutationFn: (file: File) => vermieterApi.receipts.ocr(workspaceId!, file, propertyId || undefined),
@@ -63,6 +75,7 @@ function ReceiptCapturePage() {
         storagePath: ocrResult?.storagePath ?? null,
         ocrRawText: ocrResult?.rawText ?? null,
         taxDeductible,
+        costCircuitId: costCircuitId || null,
       }),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ["module-vermieter-receipts", workspaceId] });
@@ -173,6 +186,21 @@ function ReceiptCapturePage() {
               </option>
             ))}
           </select>
+        </label>
+        <label className={labelClass}>
+          <span className={labelTextClass}>Abrechnungskreis</span>
+          <select className={inputClass} value={costCircuitId} onChange={(e) => setCostCircuitId(e.target.value)}>
+            <option value="">Gesamtes Objekt (Standard)</option>
+            {costCircuits?.filter((c) => !c.isDefault).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-ink-muted">
+            Legt fest, welche Einheiten diese Kosten mittragen – wichtig z. B. wenn einzelne Wohnungen einen eigenen
+            Durchlauferhitzer haben und nicht am Kreis „Zentralheizung/Warmwasser" beteiligt sind.
+          </span>
         </label>
         <label className={labelClass}>
           <span className={labelTextClass}>Beschreibung</span>

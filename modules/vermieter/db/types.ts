@@ -137,8 +137,34 @@ export interface VermieterReceiptRow {
   storage_path: string | null;
   ocr_raw_text: string | null;
   tax_deductible: 0 | 1;
+  /** Which Abrechnungskreis (see VermieterCostCircuitRow) this receipt's cost pool belongs to. Nullable at the column level for pre-migration rows only - services/receipts.ts always resolves and writes a concrete circuit id (defaulting to the property's default circuit) on create/update. */
+  cost_circuit_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Abrechnungskreis (cost circuit): the subset of a property's units that
+ * actually share a given cost pool - e.g. only the units on the shared
+ * Zentralheizung, excluding units with their own electric
+ * Durchlauferhitzer. Every property has exactly one `is_default = 1`
+ * circuit ("Gesamtes Objekt") auto-created alongside the property and kept
+ * in sync with its unit list; additional circuits are opt-in and their
+ * membership is managed explicitly (see services/costCircuits.ts).
+ */
+export interface VermieterCostCircuitRow {
+  id: string;
+  workspace_id: string;
+  property_id: string;
+  name: string;
+  is_default: 0 | 1;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VermieterCostCircuitUnitRow {
+  circuit_id: string;
+  unit_id: string;
 }
 
 export type VermieterStatementStatus = "draft" | "final";
@@ -157,6 +183,12 @@ export interface VermieterStatementRow {
   finalized_at: string | null;
 }
 
+export type VermieterEstimationMethod =
+  | "metered"
+  | "substitute_own_history"
+  | "substitute_comparable_units"
+  | "substitute_sqm_fallback";
+
 export interface VermieterStatementLineRow {
   id: string;
   statement_id: string;
@@ -169,6 +201,10 @@ export interface VermieterStatementLineRow {
   vacancy_share_cents: number;
   days_occupied: number;
   days_total: number;
+  /** True when this line's consumption-based share is a §9a HeizkostenV substitute value rather than a real meter reading - see services/meterSubstitute.ts. Always 0 for non-consumption allocation keys. */
+  is_estimated: 0 | 1;
+  /** Which substitute method produced this line's value ('metered' when not estimated), null for non-consumption allocation keys where the concept doesn't apply. */
+  estimation_method: VermieterEstimationMethod | null;
   created_at: string;
 }
 

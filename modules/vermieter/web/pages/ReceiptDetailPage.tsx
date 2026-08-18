@@ -25,6 +25,11 @@ function ReceiptDetailPage() {
     queryFn: () => vermieterApi.properties.list(workspaceId!),
     enabled: Boolean(workspaceId),
   });
+  const { data: costCircuits } = useQuery({
+    queryKey: ["module-vermieter-cost-circuits", workspaceId, receipt?.propertyId],
+    queryFn: () => vermieterApi.costCircuits.list(workspaceId!, receipt!.propertyId),
+    enabled: Boolean(workspaceId) && Boolean(receipt?.propertyId),
+  });
 
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("0,00");
@@ -33,6 +38,7 @@ function ReceiptDetailPage() {
   const [allocationOverride, setAllocationOverride] = useState<VermieterAllocationKey | "">("");
   const [description, setDescription] = useState("");
   const [taxDeductible, setTaxDeductible] = useState(true);
+  const [costCircuitId, setCostCircuitId] = useState("");
 
   useEffect(() => {
     if (receipt) {
@@ -43,6 +49,7 @@ function ReceiptDetailPage() {
       setAllocationOverride(receipt.allocationKeyOverride ?? "");
       setDescription(receipt.description);
       setTaxDeductible(receipt.taxDeductible);
+      setCostCircuitId(receipt.costCircuitId);
     }
   }, [receipt]);
 
@@ -56,6 +63,7 @@ function ReceiptDetailPage() {
         allocationKeyOverride: allocationOverride || null,
         description,
         taxDeductible,
+        costCircuitId: costCircuitId || null,
       };
       return vermieterApi.receipts.update(workspaceId!, id!, input);
     },
@@ -133,6 +141,16 @@ function ReceiptDetailPage() {
             {(Object.keys(ALLOCATION_KEY_LABEL_DE) as VermieterAllocationKey[]).map((key) => (
               <option key={key} value={key}>
                 {ALLOCATION_KEY_LABEL_DE[key]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelClass}>
+          <span className={labelTextClass}>Abrechnungskreis</span>
+          <select className={inputClass} value={costCircuitId} onChange={(e) => setCostCircuitId(e.target.value)}>
+            {costCircuits?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.isDefault ? "Gesamtes Objekt (Standard)" : c.name}
               </option>
             ))}
           </select>

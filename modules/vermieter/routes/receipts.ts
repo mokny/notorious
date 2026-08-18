@@ -26,6 +26,7 @@ function parseInput(body: unknown): ReceiptInput | null {
     storagePath: b.storagePath ?? null,
     ocrRawText: b.ocrRawText ?? null,
     taxDeductible: b.taxDeductible,
+    costCircuitId: b.costCircuitId ?? null,
   };
 }
 

@@ -1,5 +1,6 @@
 import type { ModuleSdk } from "../manifest.js";
 import type { VermieterUnitRow } from "../db/types.js";
+import { addUnitToDefaultCostCircuit } from "./costCircuits.js";
 
 export interface UnitDto {
   id: string;
@@ -86,6 +87,7 @@ export function createUnit(sdk: ModuleSdk, workspaceId: string, input: UnitInput
       now,
       now,
     );
+  addUnitToDefaultCostCircuit(sdk, workspaceId, input.propertyId, id);
   return getUnit(sdk, workspaceId, id)!;
 }
 

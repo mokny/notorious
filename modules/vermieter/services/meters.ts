@@ -125,3 +125,21 @@ export function consumptionInPeriod(sdk: ModuleSdk, workspaceId: string, meterId
   if (!startReading || !endReading) return null;
   return Math.max(0, endReading.value - startReading.value);
 }
+
+/**
+ * The comparable prior period immediately preceding [periodStart, periodEnd]
+ * with the same day-length - used for the §9a HeizkostenV "own prior
+ * consumption" substitute-value branch (services/meterSubstitute.ts). E.g.
+ * for a calendar-year period this is simply the previous year's same dates.
+ */
+export function priorComparablePeriod(periodStart: string, periodEnd: string): { start: string; end: string } {
+  const startMs = new Date(`${periodStart}T00:00:00Z`).getTime();
+  const endMs = new Date(`${periodEnd}T00:00:00Z`).getTime();
+  const lengthMs = endMs - startMs + 86_400_000;
+  const priorEndMs = startMs - 86_400_000;
+  const priorStartMs = priorEndMs - lengthMs + 86_400_000;
+  return {
+    start: new Date(priorStartMs).toISOString().slice(0, 10),
+    end: new Date(priorEndMs).toISOString().slice(0, 10),
+  };
+}

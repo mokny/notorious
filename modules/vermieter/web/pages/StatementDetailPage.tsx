@@ -1,8 +1,15 @@
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
-import { vermieterApi } from "../api.js";
+import { vermieterApi, type VermieterEstimationMethod } from "../api.js";
 import { getCostCategory, ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
+
+/** Mirrors modules/vermieter/pdf/text.de.ts's wording so the web view and the PDF explain estimated values consistently. */
+const ESTIMATION_METHOD_LABEL_DE: Record<Exclude<VermieterEstimationMethod, "metered">, string> = {
+  substitute_own_history: "geschätzt anhand des eigenen Vorjahresverbrauchs (§9a HeizkostenV)",
+  substitute_comparable_units: "geschätzt anhand des Durchschnittsverbrauchs vergleichbarer Einheiten (§9a HeizkostenV)",
+  substitute_sqm_fallback: "geschätzt nach Wohnfläche, da kein Vergleichswert verfügbar war (§9a HeizkostenV)",
+};
 
 /** Detailansicht einer Nebenkostenabrechnung: Zeilen gruppiert je Einheit, Mieter-Salden, Finalisieren-Aktion, PDF-Download (ein PDF pro Abrechnung - siehe routes/statementPdf.ts, kein separates Pro-Mieter-PDF). */
 function StatementDetailPage() {
@@ -100,7 +107,17 @@ function StatementDetailPage() {
                     <td className="px-3 py-2">{getCostCategory(line.costCategoryKey)?.label ?? line.costCategoryKey}</td>
                     <td className="px-3 py-2">{ALLOCATION_KEY_LABEL_DE[line.allocationKeyUsed]}</td>
                     <td className="px-3 py-2 text-right">{formatCents(line.totalPropertyCostCents)}</td>
-                    <td className="px-3 py-2 text-right font-medium">{formatCents(line.unitShareCents)}</td>
+                    <td className="px-3 py-2 text-right font-medium">
+                      {formatCents(line.unitShareCents)}
+                      {line.isEstimated && (
+                        <sup
+                          className="ml-0.5 cursor-help text-accent"
+                          title={line.estimationMethod && line.estimationMethod !== "metered" ? ESTIMATION_METHOD_LABEL_DE[line.estimationMethod] : "Geschätzter Wert"}
+                        >
+                          *
+                        </sup>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -108,6 +125,16 @@ function StatementDetailPage() {
           </div>
         ))}
         {statement.lines.length === 0 && <p className="text-sm text-ink-muted">Keine Kostenzeilen (keine Belege im Zeitraum?).</p>}
+        {statement.lines.some((line) => line.isEstimated) && (
+          <div className="space-y-1 rounded-md border border-border/60 bg-surface-hover px-3 py-2 text-xs text-ink-muted">
+            <p className="font-medium text-ink">* Geschätzte Verbrauchswerte</p>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {[...new Set(statement.lines.filter((l) => l.isEstimated && l.estimationMethod).map((l) => l.estimationMethod))].map((method) => (
+                <li key={method}>{ESTIMATION_METHOD_LABEL_DE[method as Exclude<VermieterEstimationMethod, "metered">]}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <section className="space-y-2">

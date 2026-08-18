@@ -4,13 +4,15 @@ import type {
   VermieterStatementRow,
   VermieterStatementTenantSummaryRow,
   VermieterAllocationKey,
+  VermieterEstimationMethod,
 } from "../db/types.js";
 import { listUnits } from "./units.js";
 import { listLeasesOverlappingPeriod, rentInEffectOn } from "./leases.js";
 import { listTenantsForLease } from "./tenants.js";
 import { listReceiptsInPeriod } from "./receipts.js";
-import { listMeters, consumptionInPeriod } from "./meters.js";
+import { listMeters, consumptionInPeriod, priorComparablePeriod } from "./meters.js";
 import { listRentPaymentsInPeriod } from "./rentPayments.js";
+import { listCostCircuits, getDefaultCostCircuitId } from "./costCircuits.js";
 import {
   computeStatementLines,
   computeTenantSummaries,
@@ -18,6 +20,7 @@ import {
   type CalcLeaseSegment,
   type CalcConsumptionByUnit,
   type CalcUnit,
+  type CalcCostCircuit,
 } from "./statementCalculation.js";
 
 export interface StatementLineDto {
@@ -31,6 +34,9 @@ export interface StatementLineDto {
   vacancyShareCents: number;
   daysOccupied: number;
   daysTotal: number;
+  /** True when unitShareCents is a §9a HeizkostenV substitute value rather than a real meter reading - see services/meterSubstitute.ts. Additive field. */
+  isEstimated: boolean;
+  estimationMethod: VermieterEstimationMethod | null;
 }
 
 export interface TenantSummaryDto {
@@ -84,6 +90,8 @@ function lineRowToDto(row: VermieterStatementLineRow): StatementLineDto {
     vacancyShareCents: row.vacancy_share_cents,
     daysOccupied: row.days_occupied,
     daysTotal: row.days_total,
+    isEstimated: row.is_estimated === 1,
+    estimationMethod: row.estimation_method,
   };
 }
 
@@ -208,6 +216,10 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
   const unitDtos = listUnits(sdk, workspaceId, input.propertyId, false);
   const calcUnits: CalcUnit[] = unitDtos.map((u) => ({ id: u.id, sizeSqm: u.sizeSqm }));
 
+  const costCircuitDtos = listCostCircuits(sdk, workspaceId, input.propertyId);
+  const costCircuits: CalcCostCircuit[] = costCircuitDtos.map((c) => ({ id: c.id, unitIds: c.unitIds }));
+  const defaultCircuitId = getDefaultCostCircuitId(sdk, workspaceId, input.propertyId);
+
   const leaseSegments: CalcLeaseSegment[] = [];
   for (const unit of unitDtos) {
     const leases = listLeasesOverlappingPeriod(sdk, workspaceId, unit.id, input.periodStart, input.periodEnd);
@@ -226,26 +238,45 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
     amountCents: r.amount_cents,
     allocationKeyOverride: r.allocation_key_override,
     targetUnitId: r.target_unit_id,
+    costCircuitId: r.cost_circuit_id ?? defaultCircuitId,
   }));
+
+  const priorPeriod = priorComparablePeriod(input.periodStart, input.periodEnd);
+
+  /** Sums a unit's meters of one type within a period; null if that unit has none of that meter type, or none of them have a full reading pair for the period (no data at all - distinct from a real 0, see CalcConsumptionByUnit's doc comment). */
+  function sumMetersOfType(unitMeters: { id: string; type: string }[], type: string, periodStart: string, periodEnd: string): number | null {
+    const relevant = unitMeters.filter((m) => m.type === type);
+    if (relevant.length === 0) return null;
+    let total = 0;
+    let anyData = false;
+    for (const meter of relevant) {
+      const value = consumptionInPeriod(sdk, workspaceId, meter.id, periodStart, periodEnd);
+      if (value !== null) {
+        anyData = true;
+        total += value;
+      }
+    }
+    return anyData ? total : null;
+  }
 
   const consumption: CalcConsumptionByUnit[] = unitDtos.map((unit) => {
     const meters = listMeters(sdk, workspaceId, unit.id);
-    let heating = 0;
-    let coldWater = 0;
-    let hotWater = 0;
-    for (const meter of meters) {
-      const value = consumptionInPeriod(sdk, workspaceId, meter.id, input.periodStart, input.periodEnd) ?? 0;
-      if (meter.type === "heating") heating += value;
-      else if (meter.type === "cold_water") coldWater += value;
-      else if (meter.type === "hot_water") hotWater += value;
-    }
-    return { unitId: unit.id, heating, coldWater, hotWater };
+    return {
+      unitId: unit.id,
+      heating: sumMetersOfType(meters, "heating", input.periodStart, input.periodEnd),
+      coldWater: sumMetersOfType(meters, "cold_water", input.periodStart, input.periodEnd),
+      hotWater: sumMetersOfType(meters, "hot_water", input.periodStart, input.periodEnd),
+      priorHeating: sumMetersOfType(meters, "heating", priorPeriod.start, priorPeriod.end),
+      priorColdWater: sumMetersOfType(meters, "cold_water", priorPeriod.start, priorPeriod.end),
+      priorHotWater: sumMetersOfType(meters, "hot_water", priorPeriod.start, priorPeriod.end),
+    };
   });
 
   const lines = computeStatementLines({
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
     units: calcUnits,
+    costCircuits,
     leaseSegments,
     receipts,
     consumption,
@@ -277,8 +308,8 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
       sdk.sqlite
         .prepare(
           `INSERT INTO vermieter_statement_lines
-           (id, statement_id, unit_id, lease_id, cost_category_key, allocation_key_used, total_property_cost_cents, unit_share_cents, vacancy_share_cents, days_occupied, days_total, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, statement_id, unit_id, lease_id, cost_category_key, allocation_key_used, total_property_cost_cents, unit_share_cents, vacancy_share_cents, days_occupied, days_total, is_estimated, estimation_method, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           sdk.newId(),
@@ -292,6 +323,8 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
           line.vacancyShareCents,
           line.daysOccupied,
           line.daysTotal,
+          line.isEstimated ? 1 : 0,
+          line.estimationMethod,
           now,
         );
     }

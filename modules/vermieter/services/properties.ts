@@ -1,5 +1,6 @@
 import type { ModuleSdk } from "../manifest.js";
 import type { VermieterPropertyRow } from "../db/types.js";
+import { createDefaultCostCircuit } from "./costCircuits.js";
 
 export interface PropertyDto {
   id: string;
@@ -103,6 +104,7 @@ export function createProperty(sdk: ModuleSdk, workspaceId: string, input: Prope
       now,
       now,
     );
+  createDefaultCostCircuit(sdk, workspaceId, id);
   return getProperty(sdk, workspaceId, id)!;
 }
 

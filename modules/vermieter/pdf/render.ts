@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import { formatCents } from "@notorious/shared";
 import { getCostCategory } from "../db/costCategories.js";
-import { allocationKeyLabel, STATEMENT_CLOSING_TEXT } from "./text.de.js";
+import { allocationKeyLabel, STATEMENT_CLOSING_TEXT, ESTIMATED_VALUE_FOOTNOTE } from "./text.de.js";
 import type { StatementDto, StatementLineDto, TenantSummaryDto } from "../services/statements.js";
 import type { PropertyDto } from "../services/properties.js";
 import type { LandlordProfileDto } from "../services/landlordProfile.js";
@@ -104,6 +104,7 @@ function renderTenantSection(
 
   const unitLines = allLines.filter((line) => line.unitId === summary.unitId);
   let subtotalCents = 0;
+  let hasEstimatedLine = false;
   for (const line of unitLines) {
     if (line.unitShareCents === 0 && line.totalPropertyCostCents === 0) continue;
     if (tableY > 720) {
@@ -116,7 +117,12 @@ function renderTenantSection(
     doc.text(formatCents(line.totalPropertyCostCents), colTotal.x, tableY, { width: colTotal.width, align: "right" });
     doc.text(allocationKeyLabel(line.allocationKeyUsed), colKey.x, tableY, { width: colKey.width });
     doc.text(sharePercent, colShareLabel.x, tableY, { width: colShareLabel.width, align: "right" });
-    doc.text(formatCents(line.unitShareCents), colAmount.x, tableY, { width: colAmount.width, align: "right" });
+    // Estimated (§9a HeizkostenV substitute) lines get a trailing "*"
+    // marker so a substitute value never looks identical to a real metered
+    // one in the output - see ESTIMATED_VALUE_FOOTNOTE below.
+    const amountText = line.isEstimated ? `${formatCents(line.unitShareCents)} *` : formatCents(line.unitShareCents);
+    if (line.isEstimated) hasEstimatedLine = true;
+    doc.text(amountText, colAmount.x, tableY, { width: colAmount.width, align: "right" });
     tableY += 16;
     subtotalCents += line.unitShareCents;
   }
@@ -142,6 +148,11 @@ function renderTenantSection(
     .text(balanceLabel, PAGE_MARGIN + 260, tableY, { width: 150, align: "right" });
   doc.text(formatCents(Math.abs(summary.balanceCents)), colAmount.x, tableY, { width: colAmount.width, align: "right" });
   tableY += 30;
+
+  if (hasEstimatedLine) {
+    doc.fontSize(8).fillColor("#666666").text(ESTIMATED_VALUE_FOOTNOTE, PAGE_MARGIN, tableY, { width: 495 });
+    tableY += 14;
+  }
 
   doc.fontSize(8).fillColor("#333333").text(STATEMENT_CLOSING_TEXT, PAGE_MARGIN, tableY, { width: 495 });
 }

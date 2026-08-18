@@ -23,6 +23,10 @@ export function resetVermieterData(sdk: ModuleSdk, workspaceId: string, options:
     sdk.sqlite.prepare("DELETE FROM vermieter_meter_readings WHERE workspace_id = ?").run(wsId);
     sdk.sqlite.prepare("DELETE FROM vermieter_meters WHERE workspace_id = ?").run(wsId);
     sdk.sqlite.prepare("DELETE FROM vermieter_units WHERE workspace_id = ?").run(wsId);
+    sdk.sqlite
+      .prepare("DELETE FROM vermieter_cost_circuit_units WHERE circuit_id IN (SELECT id FROM vermieter_cost_circuits WHERE workspace_id = ?)")
+      .run(wsId);
+    sdk.sqlite.prepare("DELETE FROM vermieter_cost_circuits WHERE workspace_id = ?").run(wsId);
     sdk.sqlite.prepare("DELETE FROM vermieter_properties WHERE workspace_id = ?").run(wsId);
     if (!options.keepLandlordProfile) {
       sdk.sqlite.prepare("DELETE FROM vermieter_landlord_profile WHERE workspace_id = ?").run(wsId);

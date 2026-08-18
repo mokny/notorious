@@ -184,6 +184,24 @@ export interface RentPaymentInput {
 
 export type VermieterAllocationKey = "sqm" | "persons" | "units" | "consumption" | "fixed_manual";
 
+/**
+ * Abrechnungskreis (cost circuit): the subset of a property's units that
+ * share a given cost pool - e.g. only the units on the shared
+ * Zentralheizung, excluding units with their own electric
+ * Durchlauferhitzer. Every property has exactly one `isDefault` circuit
+ * ("Gesamtes Objekt") whose membership always mirrors the property's full
+ * unit list and can't be edited directly; additional circuits are opt-in.
+ */
+export interface CostCircuitDto {
+  id: string;
+  propertyId: string;
+  name: string;
+  isDefault: boolean;
+  unitIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ReceiptDto {
   id: string;
   propertyId: string;
@@ -197,6 +215,8 @@ export interface ReceiptDto {
   storagePath: string | null;
   ocrRawText: string | null;
   taxDeductible: boolean;
+  /** Which Abrechnungskreis this receipt's cost pool belongs to - always resolved server-side (defaults to the property's default circuit). */
+  costCircuitId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -213,6 +233,7 @@ export interface ReceiptInput {
   storagePath?: string | null;
   ocrRawText?: string | null;
   taxDeductible?: boolean;
+  costCircuitId?: string | null;
 }
 
 export interface ReceiptOcrResult {
@@ -238,6 +259,13 @@ export type LandlordProfileInput = Partial<Omit<LandlordProfileDto, "updatedAt">
 
 export type VermieterStatementStatus = "draft" | "final";
 
+/** Mirrors VermieterEstimationMethod (db/types.ts): 'metered' when a real reading was used, otherwise which §9a HeizkostenV substitute rule produced the value. */
+export type VermieterEstimationMethod =
+  | "metered"
+  | "substitute_own_history"
+  | "substitute_comparable_units"
+  | "substitute_sqm_fallback";
+
 export interface StatementLineDto {
   id: string;
   unitId: string;
@@ -249,6 +277,9 @@ export interface StatementLineDto {
   vacancyShareCents: number;
   daysOccupied: number;
   daysTotal: number;
+  /** True when unitShareCents is a §9a HeizkostenV substitute value rather than a real meter reading. */
+  isEstimated: boolean;
+  estimationMethod: VermieterEstimationMethod | null;
 }
 
 export interface TenantSummaryDto {
@@ -366,6 +397,18 @@ export const vermieterApi = {
     update: (workspaceId: string, id: string, input: Partial<UnitInput>) =>
       apiRequest<UnitDto>(`${base(workspaceId)}/units/${id}`, { method: "PATCH", body: input }),
     archive: (workspaceId: string, id: string) => apiRequest<void>(`${base(workspaceId)}/units/${id}`, { method: "DELETE" }),
+  },
+  costCircuits: {
+    list: (workspaceId: string, propertyId: string) =>
+      apiRequest<CostCircuitDto[]>(`${base(workspaceId)}/properties/${propertyId}/cost-circuits`),
+    create: (workspaceId: string, propertyId: string, name: string) =>
+      apiRequest<CostCircuitDto>(`${base(workspaceId)}/properties/${propertyId}/cost-circuits`, { method: "POST", body: { name } }),
+    rename: (workspaceId: string, propertyId: string, id: string, name: string) =>
+      apiRequest<CostCircuitDto>(`${base(workspaceId)}/properties/${propertyId}/cost-circuits/${id}`, { method: "PATCH", body: { name } }),
+    updateUnits: (workspaceId: string, propertyId: string, id: string, unitIds: string[]) =>
+      apiRequest<CostCircuitDto>(`${base(workspaceId)}/properties/${propertyId}/cost-circuits/${id}/units`, { method: "PUT", body: { unitIds } }),
+    remove: (workspaceId: string, propertyId: string, id: string) =>
+      apiRequest<void>(`${base(workspaceId)}/properties/${propertyId}/cost-circuits/${id}`, { method: "DELETE" }),
   },
   meters: {
     list: (workspaceId: string, unitId?: string) => apiRequest<MeterDto[]>(`${base(workspaceId)}/meters`, { query: { unitId } }),

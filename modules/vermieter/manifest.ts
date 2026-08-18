@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Database as SqliteDatabase } from "better-sqlite3";
 import { registerPropertyRoutes } from "./routes/properties.js";
 import { registerUnitRoutes } from "./routes/units.js";
+import { registerCostCircuitRoutes } from "./routes/costCircuits.js";
 import { registerMeterRoutes } from "./routes/meters.js";
 import { registerTenantRoutes } from "./routes/tenants.js";
 import { registerLeaseRoutes } from "./routes/leases.js";
@@ -81,6 +82,7 @@ const manifest = {
   registerRoutes(app: FastifyInstance, sdk: ModuleSdk): void {
     registerPropertyRoutes(app, sdk);
     registerUnitRoutes(app, sdk);
+    registerCostCircuitRoutes(app, sdk);
     registerMeterRoutes(app, sdk);
     registerTenantRoutes(app, sdk);
     registerLeaseRoutes(app, sdk);
