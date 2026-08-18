@@ -2,7 +2,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents, parseCentsInput } from "@notorious/shared";
-import { vermieterApi, type ReceiptDocumentDto, type ReceiptDocumentOcrResult, type ReceiptInput, type VermieterAllocationKey } from "../api.js";
+import {
+  vermieterApi,
+  type ReceiptDocumentDto,
+  type ReceiptDocumentOcrResult,
+  type ReceiptInput,
+  type VermieterAllocationKey,
+  type VermieterReceiptType,
+} from "../api.js";
 import { ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
 import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
 
@@ -83,6 +90,7 @@ function ReceiptDetailPage() {
 
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("0,00");
+  const [type, setType] = useState<VermieterReceiptType>("expense");
   const [receiptDate, setReceiptDate] = useState("");
   const [categoryKey, setCategoryKey] = useState(categories[0]!.key);
   const [allocationOverride, setAllocationOverride] = useState<VermieterAllocationKey | "">("");
@@ -94,6 +102,7 @@ function ReceiptDetailPage() {
     if (receipt) {
       setVendor(receipt.vendor);
       setAmount((receipt.amountCents / 100).toFixed(2).replace(".", ","));
+      setType(receipt.type);
       setReceiptDate(receipt.receiptDate);
       setCategoryKey(receipt.costCategoryKey);
       setAllocationOverride(receipt.allocationKeyOverride ?? "");
@@ -114,6 +123,7 @@ function ReceiptDetailPage() {
         description,
         taxDeductible,
         costCircuitId: costCircuitId || null,
+        type,
       };
       return vermieterApi.receipts.update(workspaceId!, id!, input);
     },
@@ -215,8 +225,13 @@ function ReceiptDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-6 py-10">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
+        <h1 className="flex items-center gap-2 text-xl font-semibold">
           {receipt.vendor || category?.label} · {formatCents(receipt.amountCents)}
+          {receipt.type === "credit" && (
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal text-green-800 dark:bg-green-950 dark:text-green-300">
+              Gutschrift
+            </span>
+          )}
         </h1>
         <button type="button" className="text-xs text-red-500 hover:underline" onClick={() => removeMutation.mutate()}>
           Löschen
@@ -388,6 +403,31 @@ function ReceiptDetailPage() {
       </section>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <span className={labelTextClass}>Art des Belegs *</span>
+          <div className="inline-flex overflow-hidden rounded-md border border-border text-sm">
+            <button
+              type="button"
+              onClick={() => setType("expense")}
+              className={`px-3 py-1.5 ${type === "expense" ? "bg-accent text-white" : "bg-surface text-ink-muted hover:bg-surface-hover"}`}
+            >
+              Ausgabe
+            </button>
+            <button
+              type="button"
+              onClick={() => setType("credit")}
+              className={`border-l border-border px-3 py-1.5 ${type === "credit" ? "bg-green-600 text-white" : "bg-surface text-ink-muted hover:bg-surface-hover"}`}
+            >
+              Gutschrift
+            </button>
+          </div>
+          {type === "credit" && (
+            <p className="text-xs text-ink-muted">
+              Betrag bitte weiterhin positiv eingeben – z. B. bei einer Rückerstattung/Gutschrift eines Versorgers. Der Betrag wird bei der
+              Erstellung einer Nebenkostenabrechnung automatisch von der Summe dieser Kostenkategorie abgezogen, statt sie zu erhöhen.
+            </p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <label className={labelClass}>
             <span className={labelTextClass}>Betrag (€) *</span>

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { parseCentsInput } from "@notorious/shared";
-import { vermieterApi, type VermieterAllocationKey } from "../api.js";
+import { vermieterApi, type VermieterAllocationKey, type VermieterReceiptType } from "../api.js";
 import { ALLOCATION_KEY_LABEL_DE } from "../../db/costCategories.js";
 import { useDefaultSingleSelection } from "../hooks/useDefaultSingleSelection.js";
 import { useVermieterCostCategories } from "../hooks/useVermieterCostCategories.js";
@@ -55,6 +55,7 @@ function ReceiptCapturePage() {
 
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("0,00");
+  const [type, setType] = useState<VermieterReceiptType>("expense");
   const [receiptDate, setReceiptDate] = useState(today());
   const [categoryKey, setCategoryKey] = useState(categories[0]!.key);
   const [allocationOverride, setAllocationOverride] = useState<VermieterAllocationKey | "">("");
@@ -79,6 +80,7 @@ function ReceiptCapturePage() {
         allocationKeyOverride: allocationOverride || null,
         taxDeductible,
         costCircuitId: costCircuitId || null,
+        type,
       }),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ["module-vermieter-receipts", workspaceId] });
@@ -114,6 +116,31 @@ function ReceiptCapturePage() {
       </label>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <span className={labelTextClass}>Art des Belegs *</span>
+          <div className="inline-flex overflow-hidden rounded-md border border-border text-sm">
+            <button
+              type="button"
+              onClick={() => setType("expense")}
+              className={`px-3 py-1.5 ${type === "expense" ? "bg-accent text-white" : "bg-surface text-ink-muted hover:bg-surface-hover"}`}
+            >
+              Ausgabe
+            </button>
+            <button
+              type="button"
+              onClick={() => setType("credit")}
+              className={`border-l border-border px-3 py-1.5 ${type === "credit" ? "bg-green-600 text-white" : "bg-surface text-ink-muted hover:bg-surface-hover"}`}
+            >
+              Gutschrift
+            </button>
+          </div>
+          {type === "credit" && (
+            <p className="text-xs text-ink-muted">
+              Betrag bitte weiterhin positiv eingeben – z. B. bei einer Rückerstattung/Gutschrift eines Versorgers. Der Betrag wird bei der
+              Erstellung einer Nebenkostenabrechnung automatisch von der Summe dieser Kostenkategorie abgezogen, statt sie zu erhöhen.
+            </p>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <label className={labelClass}>
             <span className={labelTextClass}>Betrag (€) *</span>

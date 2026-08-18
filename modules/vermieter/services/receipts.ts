@@ -1,5 +1,5 @@
 import type { ModuleSdk } from "../manifest.js";
-import type { VermieterAllocationKey, VermieterReceiptRow } from "../db/types.js";
+import type { VermieterAllocationKey, VermieterReceiptRow, VermieterReceiptType } from "../db/types.js";
 import { resolveCostCategory } from "./customCostCategories.js";
 import { getDefaultCostCircuitId } from "./costCircuits.js";
 
@@ -20,6 +20,8 @@ export interface ReceiptDto {
   taxDeductible: boolean;
   /** The Abrechnungskreis this receipt's cost pool belongs to (see services/costCircuits.ts) - additive field, always resolved server-side (defaults to the property's default circuit) so it's never null in practice even though the DB column is nullable. */
   costCircuitId: string;
+  /** 'expense' (default) or 'credit' (Gutschrift) - see db/types.ts::VermieterReceiptType. `amountCents` is ALWAYS positive regardless of type; the sign is only applied during statement/tax aggregation (services/statementCalculation.ts, services/taxOverview.ts), never stored here. */
+  type: VermieterReceiptType;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +41,7 @@ function rowToDto(row: VermieterReceiptRow): ReceiptDto {
     ocrRawText: row.ocr_raw_text,
     taxDeductible: row.tax_deductible === 1,
     costCircuitId: row.cost_circuit_id ?? "",
+    type: row.type,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -109,6 +112,8 @@ export interface ReceiptInput {
   taxDeductible?: boolean;
   /** Which Abrechnungskreis the cost belongs to. Omitted/null -> the property's default circuit ("Gesamtes Objekt"). */
   costCircuitId?: string | null;
+  /** Optional on create - defaults server-side to 'expense'. See ReceiptDto.type's doc comment. */
+  type?: VermieterReceiptType;
 }
 
 export function createReceipt(sdk: ModuleSdk, workspaceId: string, input: ReceiptInput): ReceiptDto {
@@ -117,11 +122,12 @@ export function createReceipt(sdk: ModuleSdk, workspaceId: string, input: Receip
   const category = resolveCostCategory(sdk, workspaceId, input.costCategoryKey);
   const taxDeductible = input.taxDeductible ?? category?.taxDeductibleDefault ?? false;
   const costCircuitId = input.costCircuitId ?? getDefaultCostCircuitId(sdk, workspaceId, input.propertyId);
+  const type = input.type ?? "expense";
   sdk.sqlite
     .prepare(
       `INSERT INTO vermieter_receipts
-       (id, workspace_id, property_id, cost_category_key, vendor, amount_cents, receipt_date, description, allocation_key_override, target_unit_id, storage_path, ocr_raw_text, tax_deductible, cost_circuit_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, workspace_id, property_id, cost_category_key, vendor, amount_cents, receipt_date, description, allocation_key_override, target_unit_id, storage_path, ocr_raw_text, tax_deductible, cost_circuit_id, type, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
@@ -140,6 +146,7 @@ export function createReceipt(sdk: ModuleSdk, workspaceId: string, input: Receip
       null,
       taxDeductible ? 1 : 0,
       costCircuitId,
+      type,
       now,
       now,
     );
@@ -154,7 +161,7 @@ export function updateReceipt(sdk: ModuleSdk, workspaceId: string, id: string, i
     .prepare(
       `UPDATE vermieter_receipts SET
        cost_category_key = ?, vendor = ?, amount_cents = ?, receipt_date = ?, description = ?,
-       allocation_key_override = ?, target_unit_id = ?, tax_deductible = ?, cost_circuit_id = ?, updated_at = ?
+       allocation_key_override = ?, target_unit_id = ?, tax_deductible = ?, cost_circuit_id = ?, type = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
     )
     .run(
@@ -167,6 +174,7 @@ export function updateReceipt(sdk: ModuleSdk, workspaceId: string, id: string, i
       input.targetUnitId !== undefined ? input.targetUnitId : existing.targetUnitId,
       (input.taxDeductible ?? existing.taxDeductible) ? 1 : 0,
       input.costCircuitId !== undefined && input.costCircuitId !== null ? input.costCircuitId : existing.costCircuitId,
+      input.type ?? existing.type,
       now,
       id,
       workspaceId,

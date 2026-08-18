@@ -191,6 +191,9 @@ export type VermieterAllocationKey = "sqm" | "persons" | "units" | "consumption"
 /** The subset of VermieterAllocationKey a category-level default may be - mirrors services/categoryAllocationDefaults.ts's CategoryDefaultAllocationKey (deliberately excludes 'external_provider', which is opted into per circuit+category, not a category default). */
 export type CategoryDefaultAllocationKey = Exclude<VermieterAllocationKey, "external_provider">;
 
+/** 'expense' (Rechnung, default) or 'credit' (Gutschrift - a positive amount SUBTRACTED from its cost category's pool at statement-generation time instead of added). See ReceiptDto.type's doc comment. */
+export type VermieterReceiptType = "expense" | "credit";
+
 /** One cost category's current effective default allocation key for this workspace - mirrors services/categoryAllocationDefaults.ts's CategoryAllocationDefaultDto. `allocationKey` is always pre-filled with the effective value (workspace override if set, else `builtInAllocationKey`). */
 export interface CategoryAllocationDefaultDto {
   costCategoryKey: string;
@@ -317,6 +320,8 @@ export interface ReceiptDto {
   taxDeductible: boolean;
   /** Which Abrechnungskreis this receipt's cost pool belongs to - always resolved server-side (defaults to the property's default circuit). */
   costCircuitId: string;
+  /** 'expense' (default) or 'credit' - see VermieterReceiptType's doc comment. `amountCents` is always positive regardless of type; a future receipt-form pass adds the type selector/badge, this is just the additive DTO/API shape. */
+  type: VermieterReceiptType;
   createdAt: string;
   updatedAt: string;
 }
@@ -336,6 +341,8 @@ export interface ReceiptInput {
   ocrRawText?: string | null;
   taxDeductible?: boolean;
   costCircuitId?: string | null;
+  /** Optional - defaults server-side to 'expense'. See ReceiptDto.type's doc comment. */
+  type?: VermieterReceiptType;
 }
 
 /** @deprecated Legacy single-photo OCR-before-create flow (`POST .../receipts/ocr`) - superseded by receiptDocuments.triggerOcr. Kept only for backward compat. */

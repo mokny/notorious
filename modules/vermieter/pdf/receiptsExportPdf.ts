@@ -30,6 +30,12 @@ function renderOverviewPage(receipt: ReceiptDto, documents: ReceiptDocumentDto[]
     row("Lieferant/Anbieter:", receipt.vendor || "-");
     row("Kostenart:", categoryLabels[receipt.costCategoryKey] ?? receipt.costCategoryKey);
     row("Betrag:", formatCents(receipt.amountCents));
+    // Only shown for a credit - a normal expense (the overwhelming default)
+    // stays exactly as before, no extra row - see ReceiptDto.type's doc
+    // comment: amountCents is always positive, this is the only place on
+    // this export page that tells the reader the amount REDUCES the cost
+    // category's total rather than adding to it.
+    if (receipt.type === "credit") row("Beleg-Typ:", "Gutschrift");
     if (receipt.description) row("Beschreibung:", receipt.description);
     y += 10;
     doc.fontSize(9).fillColor("#666666").text("Angehängte Dokumente:", 50, y, { width: 495 });

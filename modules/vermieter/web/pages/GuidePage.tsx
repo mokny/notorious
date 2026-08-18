@@ -93,8 +93,8 @@ function GuidePage() {
           Wenn ein externer Dienstleister wie Techem oder ista die Heizkosten abliest und dir eine fertige Abrechnung mit
           den Kosten pro Wohnung schickt, musst du keine eigenen Zählerstände erfassen. Trage stattdessen die Beträge aus
           dieser Abrechnung direkt ein: Öffne bei der betroffenen Immobilie den Bereich <strong>Abrechnungskreise</strong>,
-          klicke beim passenden Kreis auf „Erweitert" und stelle die Kostenkategorie (meist „Heizung" oder
-          „Wasser/Abwasser") von „Selbst berechnet" auf „Extern abgerechnet (Techem/ista o. ä.)" um. Danach kannst du über
+          klicke beim passenden Kreis auf „Erweitert" und stelle die Kostenkategorie (meist „Heizung", „Wasser" oder
+          „Abwasser") von „Selbst berechnet" auf „Extern abgerechnet (Techem/ista o. ä.)" um. Danach kannst du über
           „Beträge verwalten" für jede Einheit den Betrag, den Zeitraum und optional eine Referenznummer aus der
           Dienstleister-Abrechnung eintragen. Diese Beträge werden dann unverändert für die jeweilige Einheit übernommen,
           statt selbst berechnet zu werden.

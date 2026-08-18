@@ -46,6 +46,15 @@ export function computeAfaCents(purchasePriceCents: number | null, landValueCent
  * kosten aren't chargeable to tenants but are still deductible here) minus
  * linear AfA. NK-Vorauszahlungen themselves are excluded as a pass-through,
  * per `NK_PASSTHROUGH_SIMPLIFICATION_NOTE` - see that constant.
+ *
+ * A 'credit' (Gutschrift) receipt reduces deductible expenses rather than
+ * adding to them - same direction as services/statementCalculation.ts's
+ * cost-pool subtraction (a refund from a provider means you deducted more
+ * than you actually ended up paying). Summed and clamped at 0 PER CATEGORY
+ * first (mirroring computeCategoryTotals' per-pool clamp, so
+ * `expensesByCategoryKey` never shows a nonsensical negative expense for one
+ * category), then `deductibleExpensesCents` is the sum of those clamped
+ * per-category totals.
  */
 export function computeTaxOverview(sdk: ModuleSdk, workspaceId: string, propertyId: string, year: number): TaxOverviewDto {
   const property = requireProperty(sdk, workspaceId, propertyId);
@@ -72,10 +81,15 @@ export function computeTaxOverview(sdk: ModuleSdk, workspaceId: string, property
     .all(workspaceId, propertyId, yearStart, yearEnd) as VermieterReceiptRow[];
 
   const byCategory = new Map<string, number>();
-  let deductibleExpensesCents = 0;
   for (const receipt of receiptRows) {
-    deductibleExpensesCents += receipt.amount_cents;
-    byCategory.set(receipt.cost_category_key, (byCategory.get(receipt.cost_category_key) ?? 0) + receipt.amount_cents);
+    const signedAmountCents = receipt.type === "credit" ? -receipt.amount_cents : receipt.amount_cents;
+    byCategory.set(receipt.cost_category_key, (byCategory.get(receipt.cost_category_key) ?? 0) + signedAmountCents);
+  }
+  let deductibleExpensesCents = 0;
+  for (const [key, amountCents] of byCategory) {
+    const clamped = Math.max(0, amountCents);
+    byCategory.set(key, clamped);
+    deductibleExpensesCents += clamped;
   }
 
   const { afaCents, ratePercent } = computeAfaCents(property.purchase_price_cents, property.land_value_cents, property.building_year);

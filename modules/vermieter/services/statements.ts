@@ -280,6 +280,7 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
     allocationKeyOverride: r.allocation_key_override,
     targetUnitId: r.target_unit_id,
     costCircuitId: r.cost_circuit_id ?? defaultCircuitId,
+    type: r.type,
   }));
 
   const priorPeriod = priorComparablePeriod(input.periodStart, input.periodEnd);

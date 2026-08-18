@@ -3,17 +3,22 @@ import type {} from "@fastify/multipart";
 import type { ModuleSdk } from "../manifest.js";
 import { listReceipts, getReceipt, createReceipt, updateReceipt, deleteReceipt, type ReceiptInput } from "../services/receipts.js";
 import { runReceiptOcr } from "../services/ocr.js";
-import type { VermieterAllocationKey } from "../db/types.js";
+import type { VermieterAllocationKey, VermieterReceiptType } from "../db/types.js";
 
 const VALID_ALLOCATION_OVERRIDES: VermieterAllocationKey[] = ["sqm", "persons", "units", "consumption", "fixed_manual"];
+const VALID_RECEIPT_TYPES: VermieterReceiptType[] = ["expense", "credit"];
 
 function parseInput(body: unknown): ReceiptInput | null {
   const b = body as Partial<ReceiptInput> | null;
   if (!b || typeof b.propertyId !== "string" || !b.propertyId) return null;
   if (typeof b.costCategoryKey !== "string" || !b.costCategoryKey) return null;
+  // amountCents is always POSITIVE regardless of type ('expense' or
+  // 'credit') - the sign is applied only during statement/tax aggregation,
+  // never stored here. See ReceiptDto.type's doc comment.
   if (typeof b.amountCents !== "number" || !Number.isInteger(b.amountCents) || b.amountCents <= 0) return null;
   if (typeof b.receiptDate !== "string" || !b.receiptDate) return null;
   if (b.allocationKeyOverride && !VALID_ALLOCATION_OVERRIDES.includes(b.allocationKeyOverride)) return null;
+  if (b.type && !VALID_RECEIPT_TYPES.includes(b.type)) return null;
   return {
     propertyId: b.propertyId,
     costCategoryKey: b.costCategoryKey,
@@ -27,6 +32,7 @@ function parseInput(body: unknown): ReceiptInput | null {
     ocrRawText: b.ocrRawText ?? null,
     taxDeductible: b.taxDeductible,
     costCircuitId: b.costCircuitId ?? null,
+    type: b.type,
   };
 }
 

@@ -70,12 +70,22 @@ function ReceiptsListPage() {
               className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm hover:bg-surface-hover"
             >
               <span className="flex flex-col">
-                <span className="font-medium">{receipt.vendor || getCategoryLabel(receipt.costCategoryKey)}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  {receipt.vendor || getCategoryLabel(receipt.costCategoryKey)}
+                  {receipt.type === "credit" && (
+                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-normal text-green-800 dark:bg-green-950 dark:text-green-300">
+                      Gutschrift
+                    </span>
+                  )}
+                </span>
                 <span className="text-xs text-ink-muted">{getCategoryLabel(receipt.costCategoryKey)}</span>
               </span>
               <span className="flex items-center gap-3 text-xs text-ink-muted">
                 <span>{receipt.receiptDate}</span>
-                <span className="font-medium text-ink">{formatCents(receipt.amountCents)}</span>
+                <span className={`font-medium ${receipt.type === "credit" ? "text-green-700 dark:text-green-400" : "text-ink"}`}>
+                  {receipt.type === "credit" ? "− " : ""}
+                  {formatCents(receipt.amountCents)}
+                </span>
               </span>
             </Link>
           </li>

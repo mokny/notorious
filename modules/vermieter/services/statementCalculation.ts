@@ -1,4 +1,4 @@
-import type { VermieterAllocationKey, VermieterBillingMode, VermieterEstimationMethod } from "../db/types.js";
+import type { VermieterAllocationKey, VermieterBillingMode, VermieterEstimationMethod, VermieterReceiptType } from "../db/types.js";
 import { resolveCircuitConsumption, type UnitConsumptionInput } from "./meterSubstitute.js";
 
 /**
@@ -50,11 +50,19 @@ export interface CalcLeaseSegment {
 export interface CalcReceipt {
   id: string;
   costCategoryKey: string;
+  /** Always a POSITIVE amount, regardless of `type` - see `type`'s doc comment. */
   amountCents: number;
   allocationKeyOverride: VermieterAllocationKey | null;
   targetUnitId: string | null;
   /** Which Abrechnungskreis this receipt's cost pool belongs to - always a concrete circuit id (services/receipts.ts resolves the property's default circuit when none was given). */
   costCircuitId: string;
+  /** 'expense' (default) adds `amountCents` to its (circuit, category) pool; 'credit' (Gutschrift) SUBTRACTS it instead - see computeCategoryTotals/computeFixedManualLines and db/types.ts::VermieterReceiptType. */
+  type: VermieterReceiptType;
+}
+
+/** `receipt.amountCents`, signed for pool aggregation: positive for 'expense', negative for 'credit'. `amountCents` itself is never negative in storage - see CalcReceipt.type's doc comment. */
+function signedAmountCents(receipt: Pick<CalcReceipt, "amountCents" | "type">): number {
+  return receipt.type === "credit" ? -receipt.amountCents : receipt.amountCents;
 }
 
 /** Per (cost circuit, cost category) external-billing opt-in - see migrations/0012 and services/externalBilling.ts. Only pairs with `billingMode === 'external_provider'` change engine behavior; everything else stays in 'calculated' mode by omission. */
@@ -199,6 +207,16 @@ function circuitCategoryKey(costCircuitId: string, costCategoryKey: string): str
  * services/categoryAllocationDefaults.ts::resolveAllCategoryDefaultAllocationKeys),
  * precomputed by the caller (services/statements.ts) so this otherwise-pure
  * engine never needs sdk/DB access itself - see the module-level doc comment.
+ *
+ * A 'credit' receipt's `amountCents` is SUBTRACTED from its bucket instead of
+ * added (see signedAmountCents/CalcReceipt.type) - e.g. a Gutschrift from the
+ * water utility for the "wasser" category reduces that pool's total. Each
+ * bucket's running total is clamped at 0 once every receipt has been folded
+ * in (never mid-loop, so multiple credits/expenses in any order net out
+ * correctly first) so credits exceeding a pool's expenses can't produce a
+ * negative "Gesamtkosten" or push downstream percentage/share math into
+ * negative or NaN territory - it simply floors at "nothing to allocate this
+ * period" rather than crediting tenants for more than was actually spent.
  */
 export function computeCategoryTotals(
   receipts: CalcReceipt[],
@@ -211,9 +229,13 @@ export function computeCategoryTotals(
     if (externalModePairs.has(circuitCategoryKey(receipt.costCircuitId, receipt.costCategoryKey))) continue; // handled separately, see computeExternalProviderLines
     const allocationKey = receipt.allocationKeyOverride ?? categoryDefaultAllocationKeys.get(receipt.costCategoryKey) ?? "sqm";
     const bucketKey = `${receipt.costCircuitId}::${receipt.costCategoryKey}::${allocationKey}`;
+    const signedAmount = signedAmountCents(receipt);
     const bucket = buckets.get(bucketKey);
-    if (bucket) bucket.totalCents += receipt.amountCents;
-    else buckets.set(bucketKey, { costCircuitId: receipt.costCircuitId, costCategoryKey: receipt.costCategoryKey, allocationKey, totalCents: receipt.amountCents });
+    if (bucket) bucket.totalCents += signedAmount;
+    else buckets.set(bucketKey, { costCircuitId: receipt.costCircuitId, costCategoryKey: receipt.costCategoryKey, allocationKey, totalCents: signedAmount });
+  }
+  for (const bucket of buckets.values()) {
+    if (bucket.totalCents < 0) bucket.totalCents = 0;
   }
   return buckets;
 }
@@ -415,7 +437,7 @@ function computeHeatingLines(
   return lines;
 }
 
-/** 100%-by-resolved-consumption allocation (real metered value or §9a substitute), e.g. for Wasser/Abwasser, scoped to a circuit's member units. */
+/** 100%-by-resolved-consumption allocation (real metered value or §9a substitute), e.g. for Wasser/Abwasser (now two separate categories, "wasser"/"abwasser" - see db/costCategories.ts), scoped to a circuit's member units. */
 function computeConsumptionLines(
   costCategoryKey: string,
   totalCents: number,
@@ -469,6 +491,16 @@ function computeConsumptionLines(
  * rather than silently dropping the cost) - callers should validate
  * `targetUnitId` is set at receipt-intake time to avoid relying on this
  * fallback.
+ *
+ * A 'credit' receipt here is signed negative and then clamped at 0 (per
+ * receipt, since - unlike computeCategoryTotals - each fixed_manual receipt
+ * produces its own independent line rather than being netted against others
+ * in a shared pool): a standalone Gutschrift charged straight to one unit
+ * simply contributes nothing rather than a negative charge. Netting a
+ * fixed_manual credit against a same-unit fixed_manual expense receipt is
+ * out of scope for this pass (an unusual combination in practice - a
+ * Gutschrift would ordinarily use the same allocation key as the expense it
+ * offsets, i.e. go through computeCategoryTotals instead).
  */
 function computeFixedManualLines(
   receipts: CalcReceipt[],
@@ -483,13 +515,14 @@ function computeFixedManualLines(
   const overridden = receipts.filter((r) => r.allocationKeyOverride === "fixed_manual");
   const lines: StatementLineResult[] = [];
   for (const receipt of overridden) {
+    const amountCents = Math.max(0, signedAmountCents(receipt));
     if (receipt.targetUnitId) {
       lines.push({
         unitId: receipt.targetUnitId,
         costCategoryKey: receipt.costCategoryKey,
         allocationKeyUsed: "fixed_manual",
-        totalPropertyCostCents: receipt.amountCents,
-        unitShareCents: receipt.amountCents,
+        totalPropertyCostCents: amountCents,
+        unitShareCents: amountCents,
         vacancyShareCents: 0,
         daysOccupied: daysTotal,
         daysTotal,
@@ -504,13 +537,13 @@ function computeFixedManualLines(
     const circuitUnitIds = circuitsById.get(receipt.costCircuitId)?.unitIds ?? [];
     const circuitUnits = circuitUnitIds.map((id) => allUnitsById.get(id)).filter((u): u is CalcUnit => !!u);
     if (circuitUnits.length > 0) {
-      const perUnit = roundCents(receipt.amountCents / circuitUnits.length);
+      const perUnit = roundCents(amountCents / circuitUnits.length);
       for (const unit of circuitUnits) {
         lines.push({
           unitId: unit.id,
           costCategoryKey: receipt.costCategoryKey,
           allocationKeyUsed: "fixed_manual",
-          totalPropertyCostCents: receipt.amountCents,
+          totalPropertyCostCents: amountCents,
           unitShareCents: perUnit,
           vacancyShareCents: 0,
           daysOccupied: daysTotal,

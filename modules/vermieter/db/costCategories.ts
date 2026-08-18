@@ -22,7 +22,23 @@ export interface VermieterCostCategory {
  */
 export const VERMIETER_COST_CATEGORIES: VermieterCostCategory[] = [
   { key: "grundsteuer", label: "Grundsteuer", defaultAllocationKey: "sqm", apportionable: true, taxDeductibleDefault: true },
-  { key: "wasser_abwasser", label: "Wasser/Abwasser", defaultAllocationKey: "consumption", apportionable: true, taxDeductibleDefault: true },
+  /**
+   * Split from the former combined "wasser_abwasser" key into two separate
+   * built-ins (Wasser, Abwasser) - both keep the exact same metadata the
+   * combined entry had. This is purely a cost-CATEGORY split; it doesn't
+   * touch meter-kind grouping at all - meters have their own independent
+   * `type` field ('heating'|'cold_water'|'hot_water'|'electricity'|'other',
+   * see db/types.ts::VermieterMeterType), and the §9a HeizkostenV
+   * consumption-resolution machinery (services/meterSubstitute.ts,
+   * statementCalculation.ts::computeConsumptionLines) groups cold+hot water
+   * meter readings into one consumption figure per unit regardless of which
+   * cost category('ies) that figure ends up allocating - it was never keyed
+   * off "wasser_abwasser" specifically. Both new categories default to
+   * 'consumption' just like the combined one did, so both keep working with
+   * that same machinery unchanged.
+   */
+  { key: "wasser", label: "Wasser", defaultAllocationKey: "consumption", apportionable: true, taxDeductibleDefault: true },
+  { key: "abwasser", label: "Abwasser", defaultAllocationKey: "consumption", apportionable: true, taxDeductibleDefault: true },
   { key: "heizung", label: "Heizung (Brennstoffkosten)", defaultAllocationKey: "consumption", apportionable: true, taxDeductibleDefault: true },
   { key: "heizungswartung", label: "Heizungswartung", defaultAllocationKey: "sqm", apportionable: true, taxDeductibleDefault: true },
   { key: "muellabfuhr", label: "Müllabfuhr", defaultAllocationKey: "persons", apportionable: true, taxDeductibleDefault: true },

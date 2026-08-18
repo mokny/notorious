@@ -164,6 +164,9 @@ export interface VermieterExternalCostAllocationRow {
   updated_at: string;
 }
 
+/** 'expense' (Rechnung, the default - adds to a cost category's pool) or 'credit' (Gutschrift - entered as a POSITIVE amount like an expense, but SUBTRACTED from the pool during aggregation - see migrations/0016, services/statementCalculation.ts, services/taxOverview.ts). */
+export type VermieterReceiptType = "expense" | "credit";
+
 export interface VermieterReceiptRow {
   id: string;
   workspace_id: string;
@@ -180,6 +183,8 @@ export interface VermieterReceiptRow {
   tax_deductible: 0 | 1;
   /** Which Abrechnungskreis (see VermieterCostCircuitRow) this receipt's cost pool belongs to. Nullable at the column level for pre-migration rows only - services/receipts.ts always resolves and writes a concrete circuit id (defaulting to the property's default circuit) on create/update. */
   cost_circuit_id: string | null;
+  /** See VermieterReceiptType's doc comment - migrations/0016. */
+  type: VermieterReceiptType;
   created_at: string;
   updated_at: string;
 }

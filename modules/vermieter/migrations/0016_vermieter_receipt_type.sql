@@ -1,0 +1,15 @@
+-- Vermieter module - adds a 'type' field to receipts distinguishing a normal
+-- expense (Rechnung) from a credit (Gutschrift), e.g. a refund from a
+-- utility provider for a specific cost category. A Gutschrift is entered
+-- with a POSITIVE amount just like an expense (same full receipt-intake
+-- flow: category, circuit, date, vendor, description, attached documents,
+-- OCR) - amount_cents never goes negative in storage. The sign is applied
+-- only at aggregation time (services/statementCalculation.ts's
+-- computeCategoryTotals, services/taxOverview.ts's deductible-expenses sum),
+-- where a credit's amount is SUBTRACTED from its category's running total
+-- instead of added - see those services' doc comments for the exact
+-- clamping behavior when credits exceed expenses for a pool.
+--
+-- Defaults to 'expense' so every pre-migration row (and any caller that
+-- doesn't pass `type` on create) keeps behaving exactly as before.
+ALTER TABLE vermieter_receipts ADD COLUMN type TEXT NOT NULL DEFAULT 'expense' CHECK (type IN ('expense', 'credit'));
