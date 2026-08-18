@@ -212,7 +212,9 @@ export interface ReceiptDto {
   description: string;
   allocationKeyOverride: VermieterAllocationKey | null;
   targetUnitId: string | null;
+  /** @deprecated Legacy single-document field from before multi-document attachments - always null for receipts created after this pass. Use `receiptDocuments` instead. */
   storagePath: string | null;
+  /** @deprecated See storagePath. */
   ocrRawText: string | null;
   taxDeductible: boolean;
   /** Which Abrechnungskreis this receipt's cost pool belongs to - always resolved server-side (defaults to the property's default circuit). */
@@ -230,15 +232,44 @@ export interface ReceiptInput {
   description?: string;
   allocationKeyOverride?: VermieterAllocationKey | null;
   targetUnitId?: string | null;
+  /** @deprecated Ignored by the server - see ReceiptDto.storagePath's doc comment. Kept only for backward type compat, don't set from new code. */
   storagePath?: string | null;
+  /** @deprecated See storagePath. */
   ocrRawText?: string | null;
   taxDeductible?: boolean;
   costCircuitId?: string | null;
 }
 
+/** @deprecated Legacy single-photo OCR-before-create flow (`POST .../receipts/ocr`) - superseded by receiptDocuments.triggerOcr. Kept only for backward compat. */
 export interface ReceiptOcrResult {
   storagePath: string;
   rawText: string;
+  guessedAmountCents: number | null;
+  guessedDate: string | null;
+  guessedVendor: string | null;
+}
+
+export type VermieterReceiptDocumentOcrStatus = "none" | "pending" | "done" | "failed";
+
+/** One scanned photo or uploaded PDF attached to a receipt - a receipt can have any number of these (migrations/0010). */
+export interface ReceiptDocumentDto {
+  id: string;
+  receiptId: string;
+  mimeType: string;
+  originalFilename: string;
+  ocrStatus: VermieterReceiptDocumentOcrStatus;
+  pageCount: number | null;
+  createdAt: string;
+}
+
+export interface ReceiptDocumentDetailDto extends ReceiptDocumentDto {
+  ocrRawText: string | null;
+}
+
+/** Result of manually triggering OCR on one document (`POST .../documents/:documentId/ocr`) - a guess to review, never auto-applied to the receipt's fields. */
+export interface ReceiptDocumentOcrResult {
+  ocrStatus: VermieterReceiptDocumentOcrStatus;
+  rawText: string | null;
   guessedAmountCents: number | null;
   guessedDate: string | null;
   guessedVendor: string | null;
@@ -450,13 +481,46 @@ export const vermieterApi = {
     update: (workspaceId: string, id: string, input: Partial<ReceiptInput>) =>
       apiRequest<ReceiptDto>(`${base(workspaceId)}/receipts/${id}`, { method: "PATCH", body: input }),
     remove: (workspaceId: string, id: string) => apiRequest<void>(`${base(workspaceId)}/receipts/${id}`, { method: "DELETE" }),
+    /** @deprecated Legacy single-photo OCR-before-create flow - use receiptDocuments instead. */
     ocr: (workspaceId: string, file: File, propertyId?: string) => {
       const formData = new FormData();
       formData.append("file", file);
       if (propertyId) formData.append("propertyId", propertyId);
       return apiUpload<ReceiptOcrResult>(`${base(workspaceId)}/receipts/ocr`, formData);
     },
+    /** @deprecated Only serves pre-migration receipts that still have a legacy storagePath - see ReceiptDto.storagePath's doc comment. */
     photoUrl: (workspaceId: string, id: string) => `${base(workspaceId)}/receipts/${id}/photo`,
+  },
+  /**
+   * Multi-document receipt attachments (item 3 of the "Belege/Abrechnungen
+   * v2" pass) - mirrors modules/vermieter/routes/receiptDocuments.ts. OCR is
+   * never triggered automatically; `triggerOcr` is the only thing that runs
+   * it, on demand, per document, matching the "OCR starten" button.
+   */
+  receiptDocuments: {
+    list: (workspaceId: string, receiptId: string) =>
+      apiRequest<ReceiptDocumentDto[]>(`${base(workspaceId)}/receipts/${receiptId}/documents`),
+    get: (workspaceId: string, receiptId: string, documentId: string) =>
+      apiRequest<ReceiptDocumentDetailDto>(`${base(workspaceId)}/receipts/${receiptId}/documents/${documentId}`),
+    /** Uploads ONE already-complete file (image or PDF) as its own document - no OCR run. */
+    upload: (workspaceId: string, receiptId: string, file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return apiUpload<ReceiptDocumentDto>(`${base(workspaceId)}/receipts/${receiptId}/documents`, formData);
+    },
+    /** Camera multi-page-scan flow: several page images combined server-side into one multi-page PDF document. */
+    combinePages: (workspaceId: string, receiptId: string, images: File[]) => {
+      const formData = new FormData();
+      for (const image of images) formData.append("images", image);
+      return apiUpload<ReceiptDocumentDto>(`${base(workspaceId)}/receipts/${receiptId}/documents/combine-pages`, formData);
+    },
+    /** Manually runs OCR for one document ("OCR starten") - returns a guess for the caller to review/apply, never auto-applied. */
+    triggerOcr: (workspaceId: string, receiptId: string, documentId: string) =>
+      apiRequest<ReceiptDocumentOcrResult>(`${base(workspaceId)}/receipts/${receiptId}/documents/${documentId}/ocr`, { method: "POST" }),
+    fileUrl: (workspaceId: string, receiptId: string, documentId: string) =>
+      `${base(workspaceId)}/receipts/${receiptId}/documents/${documentId}/file`,
+    remove: (workspaceId: string, receiptId: string, documentId: string) =>
+      apiRequest<void>(`${base(workspaceId)}/receipts/${receiptId}/documents/${documentId}`, { method: "DELETE" }),
   },
   landlordProfile: {
     get: (workspaceId: string) => apiRequest<LandlordProfileDto>(`${base(workspaceId)}/landlord-profile`),
@@ -471,6 +535,8 @@ export const vermieterApi = {
     finalize: (workspaceId: string, id: string) => apiRequest<StatementDto>(`${base(workspaceId)}/statements/${id}/finalize`, { method: "POST" }),
     remove: (workspaceId: string, id: string) => apiRequest<void>(`${base(workspaceId)}/statements/${id}`, { method: "DELETE" }),
     pdfUrl: (workspaceId: string, id: string) => `${base(workspaceId)}/statements/${id}/pdf`,
+    /** "Belege für Mieter" export (item 4): one PDF with every receipt that fed this statement's cost lines, each followed by its attached documents. */
+    exportReceiptsPdfUrl: (workspaceId: string, id: string) => `${base(workspaceId)}/statements/${id}/receipts-export-pdf`,
   },
   reserve: {
     get: (workspaceId: string, propertyId: string) =>
@@ -490,6 +556,23 @@ export const vermieterApi = {
   reminders: {
     check: (workspaceId: string) => apiRequest<RemindersCheckResult>(`${base(workspaceId)}/reminders/check`),
   },
-  reset: (workspaceId: string, confirmationText: string) =>
-    apiRequest<{ ok: true }>(`${base(workspaceId)}/reset`, { method: "POST", body: { confirmationText } }),
+  /**
+   * Scoped "danger zone" resets (item 7) - `full` is the original
+   * whole-module reset (broadest, kept as-is); the other four each delete
+   * only their own slice of data, gated by their own confirmation phrase
+   * (see modules/vermieter/routes/reset.ts's exported phrase constants -
+   * the strings below must match those exactly).
+   */
+  reset: {
+    full: (workspaceId: string, confirmationText: string) =>
+      apiRequest<{ ok: true }>(`${base(workspaceId)}/reset`, { method: "POST", body: { confirmationText } }),
+    receipts: (workspaceId: string, confirmationText: string) =>
+      apiRequest<{ ok: true }>(`${base(workspaceId)}/reset/receipts`, { method: "POST", body: { confirmationText } }),
+    statements: (workspaceId: string, confirmationText: string) =>
+      apiRequest<{ ok: true }>(`${base(workspaceId)}/reset/statements`, { method: "POST", body: { confirmationText } }),
+    leases: (workspaceId: string, confirmationText: string) =>
+      apiRequest<{ ok: true }>(`${base(workspaceId)}/reset/leases`, { method: "POST", body: { confirmationText } }),
+    properties: (workspaceId: string, confirmationText: string) =>
+      apiRequest<{ ok: true }>(`${base(workspaceId)}/reset/properties`, { method: "POST", body: { confirmationText } }),
+  },
 };

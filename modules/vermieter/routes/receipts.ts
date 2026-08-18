@@ -88,11 +88,18 @@ export function registerReceiptRoutes(app: FastifyInstance, sdk: ModuleSdk): voi
     reply.code(204);
   });
 
+  // @deprecated Legacy single-photo OCR-before-create flow, kept working
+  // as-is for backward compatibility but superseded by the multi-document
+  // flow: POST .../receipts/:id/documents (upload, no OCR) followed by
+  // POST .../receipts/:id/documents/:documentId/ocr (manual OCR trigger) -
+  // see routes/receiptDocuments.ts. New frontend code should use that
+  // instead; this endpoint's returned `storagePath` is no longer consumed
+  // by createReceipt (see ReceiptInput.storagePath's doc comment).
+  //
   // Runs OCR over an uploaded receipt photo and returns a best-effort guess
   // WITHOUT creating a receipt row - the caller reviews/corrects the guess
-  // and then calls POST .../receipts normally with `storagePath` set to
-  // what this endpoint returned, so the (already resized+stored) image
-  // isn't re-uploaded. See services/ocr.ts's doc comment.
+  // and then calls POST .../receipts normally. See services/ocr.ts's doc
+  // comment.
   app.post("/api/v1/workspaces/:workspaceId/modules/vermieter/receipts/ocr", async (request, reply) => {
     const { workspaceId } = request.params as { workspaceId: string };
     await sdk.requireModuleAccess(request, workspaceId, "vermieter.receipts.manage");

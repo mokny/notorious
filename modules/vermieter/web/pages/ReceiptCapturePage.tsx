@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { parseCentsInput } from "@notorious/shared";
-import { vermieterApi, type ReceiptOcrResult, type VermieterAllocationKey } from "../api.js";
+import { vermieterApi, type VermieterAllocationKey } from "../api.js";
 import { VERMIETER_COST_CATEGORIES, ALLOCATION_KEY_LABEL_DE, getCostCategory } from "../../db/costCategories.js";
+import { useDefaultSingleSelection } from "../hooks/useDefaultSingleSelection.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
@@ -11,16 +12,18 @@ const labelTextClass = "text-xs font-medium text-ink-muted";
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
- * Beleg erfassen: Foto hochladen -> OCR-Endpunkt liefert einen Guess
- * (persistiert nichts) -> Review-Formular mit editierbaren, vom Guess
- * vorbelegten Feldern -> POST erstellt den eigentlichen Beleg. Zwei-Schritt-
- * Fluss passend zum Backend-Design (siehe modules/vermieter/routes/receipts.ts).
+ * Beleg erfassen: reine Stammdaten-Eingabe (Immobilie, Betrag, Datum,
+ * Kategorie, ...) - Foto/PDF-Erfassung und die manuelle OCR-Texterkennung
+ * laufen erst danach auf ReceiptDetailPage gegen die echte Beleg-ID (siehe
+ * dessen Doc-Kommentar), statt hier gegen einen noch nicht existierenden
+ * Beleg zu buffern. Das entspricht dem bisherigen Ablauf dieser Seite
+ * (erst speichern, dann zur Detailseite navigieren) und vermeidet doppelte
+ * Dokumenten-Verwaltungs-UI auf beiden Seiten.
  */
 function ReceiptCapturePage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: properties } = useQuery({
     queryKey: ["module-vermieter-properties", workspaceId],
@@ -29,8 +32,7 @@ function ReceiptCapturePage() {
   });
 
   const [propertyId, setPropertyId] = useState("");
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [ocrResult, setOcrResult] = useState<ReceiptOcrResult | null>(null);
+  useDefaultSingleSelection(properties, propertyId, setPropertyId);
 
   const { data: costCircuits } = useQuery({
     queryKey: ["module-vermieter-cost-circuits", workspaceId, propertyId],
@@ -52,16 +54,6 @@ function ReceiptCapturePage() {
     setCostCircuitId("");
   }, [propertyId]);
 
-  const ocrMutation = useMutation({
-    mutationFn: (file: File) => vermieterApi.receipts.ocr(workspaceId!, file, propertyId || undefined),
-    onSuccess: (result) => {
-      setOcrResult(result);
-      if (result.guessedAmountCents != null) setAmount((result.guessedAmountCents / 100).toFixed(2).replace(".", ","));
-      if (result.guessedDate) setReceiptDate(result.guessedDate);
-      if (result.guessedVendor) setVendor(result.guessedVendor);
-    },
-  });
-
   const createMutation = useMutation({
     mutationFn: () =>
       vermieterApi.receipts.create(workspaceId!, {
@@ -72,8 +64,6 @@ function ReceiptCapturePage() {
         receiptDate,
         description,
         allocationKeyOverride: allocationOverride || null,
-        storagePath: ocrResult?.storagePath ?? null,
-        ocrRawText: ocrResult?.rawText ?? null,
         taxDeductible,
         costCircuitId: costCircuitId || null,
       }),
@@ -82,11 +72,6 @@ function ReceiptCapturePage() {
       navigate(`/w/${workspaceId}/modules/vermieter/belege/${saved.id}`);
     },
   });
-
-  function handleFileSelected(file: File) {
-    setPhotoPreviewUrl(URL.createObjectURL(file));
-    ocrMutation.mutate(file);
-  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -98,6 +83,10 @@ function ReceiptCapturePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-6 py-10">
       <h1 className="text-xl font-semibold">Beleg erfassen</h1>
+      <p className="text-sm text-ink-muted">
+        Zuerst die Eckdaten erfassen – Foto/PDF scannen oder hochladen und die Texterkennung starten kannst du direkt danach auf der
+        Belegseite.
+      </p>
 
       <label className={labelClass}>
         <span className={labelTextClass}>Immobilie *</span>
@@ -110,41 +99,6 @@ function ReceiptCapturePage() {
           ))}
         </select>
       </label>
-
-      {!photoPreviewUrl && (
-        <div className="rounded-md border border-dashed border-border p-6 text-center">
-          <button type="button" className="rounded-md bg-accent px-4 py-2 text-sm text-white" onClick={() => fileInputRef.current?.click()}>
-            Foto auswählen
-          </button>
-          <p className="mt-2 text-xs text-ink-muted">Der Beleg wird per lokaler Texterkennung (OCR) vorausgefüllt – bitte anschließend prüfen.</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFileSelected(file);
-              e.target.value = "";
-            }}
-          />
-        </div>
-      )}
-
-      {photoPreviewUrl && (
-        <div className="flex gap-4">
-          <img src={photoPreviewUrl} alt="Beleg" className="h-40 w-32 shrink-0 rounded-md border border-border object-cover" />
-          <div className="flex-1 space-y-2">
-            {ocrMutation.isPending && <p className="text-sm text-ink-muted">Texterkennung läuft…</p>}
-            {ocrMutation.isSuccess && <p className="text-sm text-ink-muted">Texterkennung abgeschlossen – bitte Felder unten prüfen.</p>}
-            {ocrMutation.isError && <p className="text-sm text-red-500">Texterkennung fehlgeschlagen – bitte Felder manuell ausfüllen.</p>}
-            <button type="button" className="text-xs text-accent" onClick={() => fileInputRef.current?.click()}>
-              Anderes Foto wählen
-            </button>
-          </div>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">

@@ -221,6 +221,28 @@ export interface VermieterStatementTenantSummaryRow {
   created_at: string;
 }
 
+export type VermieterReceiptDocumentOcrStatus = "none" | "pending" | "done" | "failed";
+
+/**
+ * One attached file (photo or PDF) for a receipt. A receipt can have zero or
+ * more of these - see services/receiptDocuments.ts. Replaces
+ * VermieterReceiptRow.storage_path/ocr_raw_text going forward (those two
+ * columns stay in place, unused, for pre-migration data - see
+ * migrations/0010's doc comment).
+ */
+export interface VermieterReceiptDocumentRow {
+  id: string;
+  workspace_id: string;
+  receipt_id: string;
+  storage_path: string;
+  mime_type: string;
+  original_filename: string;
+  ocr_status: VermieterReceiptDocumentOcrStatus;
+  ocr_raw_text: string | null;
+  page_count: number | null;
+  created_at: string;
+}
+
 export interface VermieterReserveTransactionRow {
   id: string;
   workspace_id: string;

@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
 import { vermieterApi, type VermieterEstimationMethod } from "../api.js";
@@ -14,6 +14,7 @@ const ESTIMATION_METHOD_LABEL_DE: Record<Exclude<VermieterEstimationMethod, "met
 /** Detailansicht einer Nebenkostenabrechnung: Zeilen gruppiert je Einheit, Mieter-Salden, Finalisieren-Aktion, PDF-Download (ein PDF pro Abrechnung - siehe routes/statementPdf.ts, kein separates Pro-Mieter-PDF). */
 function StatementDetailPage() {
   const { workspaceId, id } = useParams<{ workspaceId: string; id: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: statement } = useQuery({
@@ -39,7 +40,10 @@ function StatementDetailPage() {
 
   const removeMutation = useMutation({
     mutationFn: () => vermieterApi.statements.remove(workspaceId!, id!),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["module-vermieter-statements", workspaceId] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["module-vermieter-statements", workspaceId] });
+      navigate(`/w/${workspaceId}/modules/vermieter/abrechnungen`);
+    },
   });
 
   if (!statement) return null;
@@ -73,6 +77,14 @@ function StatementDetailPage() {
             className="rounded-md border border-border px-3 py-1.5 text-sm"
           >
             PDF herunterladen
+          </a>
+          <a
+            href={vermieterApi.statements.exportReceiptsPdfUrl(workspaceId!, id!)}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md border border-border px-3 py-1.5 text-sm"
+          >
+            Belege für Mieter exportieren (PDF)
           </a>
           {statement.status === "draft" && (
             <>

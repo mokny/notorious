@@ -13,7 +13,9 @@ export interface ReceiptDto {
   description: string;
   allocationKeyOverride: VermieterAllocationKey | null;
   targetUnitId: string | null;
+  /** @deprecated Legacy single-document fields from before multi-document attachments (migrations/0010, services/receiptDocuments.ts). No longer written by createReceipt/updateReceipt - use listReceiptDocuments/GET .../receipts/:id/documents instead. Kept only so pre-migration data/DTO shape stays readable. */
   storagePath: string | null;
+  /** @deprecated See storagePath. */
   ocrRawText: string | null;
   taxDeductible: boolean;
   /** The Abrechnungskreis this receipt's cost pool belongs to (see services/costCircuits.ts) - additive field, always resolved server-side (defaults to the property's default circuit) so it's never null in practice even though the DB column is nullable. */
@@ -100,7 +102,9 @@ export interface ReceiptInput {
   description?: string;
   allocationKeyOverride?: VermieterAllocationKey | null;
   targetUnitId?: string | null;
+  /** @deprecated Ignored by createReceipt/updateReceipt - see ReceiptDto.storagePath's doc comment. Kept only so old API callers don't get a type error; the column is always written NULL now. */
   storagePath?: string | null;
+  /** @deprecated See storagePath. */
   ocrRawText?: string | null;
   taxDeductible?: boolean;
   /** Which Abrechnungskreis the cost belongs to. Omitted/null -> the property's default circuit ("Gesamtes Objekt"). */
@@ -130,8 +134,10 @@ export function createReceipt(sdk: ModuleSdk, workspaceId: string, input: Receip
       input.description?.trim() ?? "",
       input.allocationKeyOverride ?? null,
       input.targetUnitId ?? null,
-      input.storagePath ?? null,
-      input.ocrRawText ?? null,
+      // storage_path/ocr_raw_text are always NULL for new rows now - see
+      // ReceiptInput.storagePath's doc comment and migrations/0010.
+      null,
+      null,
       taxDeductible ? 1 : 0,
       costCircuitId,
       now,

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatCents } from "@notorious/shared";
 import { vermieterApi } from "../api.js";
 import { getCostCategory } from "../../db/costCategories.js";
+import { useDefaultSingleSelection } from "../hooks/useDefaultSingleSelection.js";
 
 const inputClass = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 
@@ -17,6 +18,7 @@ function TaxOverviewPage() {
   });
 
   const [propertyId, setPropertyId] = useState("");
+  useDefaultSingleSelection(properties, propertyId, setPropertyId);
   const [year, setYear] = useState(new Date().getFullYear());
 
   const { data: overview } = useQuery({

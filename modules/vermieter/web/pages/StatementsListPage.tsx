@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { vermieterApi } from "../api.js";
 import { RemindersBanner } from "../components/RemindersBanner.js";
+import { useDefaultSingleSelection } from "../hooks/useDefaultSingleSelection.js";
 
 const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
@@ -29,6 +30,7 @@ function StatementsListPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [propertyId, setPropertyId] = useState("");
+  useDefaultSingleSelection(properties, propertyId, setPropertyId);
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [heatingShare, setHeatingShare] = useState(70);

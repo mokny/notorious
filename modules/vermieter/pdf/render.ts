@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import { formatCents } from "@notorious/shared";
 import { getCostCategory } from "../db/costCategories.js";
 import { allocationKeyLabel, STATEMENT_CLOSING_TEXT, ESTIMATED_VALUE_FOOTNOTE } from "./text.de.js";
+import { generateTenantExplanationParagraph } from "./explanationText.js";
 import type { StatementDto, StatementLineDto, TenantSummaryDto } from "../services/statements.js";
 import type { PropertyDto } from "../services/properties.js";
 import type { LandlordProfileDto } from "../services/landlordProfile.js";
@@ -79,11 +80,20 @@ function renderTenantSection(
   doc.text(`Einheit: ${summary.unitLabel}`, PAGE_MARGIN, addressTop + 28);
 
   const titleY = addressTop + 70;
+  // Deliberately the tenant's own occupied span (summary.segmentStart/
+  // segmentEnd - a lease segment clipped to the statement period, see
+  // services/statementCalculation.ts's CalcLeaseSegment), NOT the
+  // statement's overall period: a lease that started or ended mid-period
+  // must never see the full statement period quoted here, since the table
+  // below only ever charges them for their own occupied days.
   doc
     .fontSize(15)
-    .text(`Nebenkostenabrechnung für den Zeitraum ${formatDate(statement.periodStart)} – ${formatDate(statement.periodEnd)}`, PAGE_MARGIN, titleY, {
-      width: 495,
-    });
+    .text(
+      `Nebenkostenabrechnung für den Zeitraum ${formatDate(summary.segmentStart)} – ${formatDate(summary.segmentEnd)}`,
+      PAGE_MARGIN,
+      titleY,
+      { width: 495 },
+    );
 
   let tableY = titleY + 40;
   const colCategory = { x: PAGE_MARGIN, width: 150 };
@@ -154,5 +164,33 @@ function renderTenantSection(
     tableY += 14;
   }
 
+  tableY += 10;
+  if (tableY > 680) {
+    doc.addPage();
+    tableY = PAGE_MARGIN;
+  }
+  doc.fontSize(10).fillColor("#000000").text("Erläuterung Ihrer Kostenanteile", PAGE_MARGIN, tableY, { width: 495 });
+  tableY = doc.y + 6;
+
+  // Detailed per-line prose explanation (item 2 of this pass's brief) - lets
+  // pdfkit wrap naturally (justify, fixed width) rather than the table's
+  // manual column layout, since this is running text, not tabular data.
+  // Uses doc.y (pdfkit tracks the cursor after each `text()` call) to decide
+  // page breaks, since a long explanation's final height isn't known ahead
+  // of time.
+  const explanation = generateTenantExplanationParagraph(unitLines, summary);
+  doc.fontSize(9).fillColor("#222222");
+  doc.y = tableY;
+  if (doc.y > 700) {
+    doc.addPage();
+    doc.y = PAGE_MARGIN;
+  }
+  doc.text(explanation, PAGE_MARGIN, doc.y, { width: 495, align: "justify" });
+  tableY = doc.y + 20;
+
+  if (tableY > 700) {
+    doc.addPage();
+    tableY = PAGE_MARGIN;
+  }
   doc.fontSize(8).fillColor("#333333").text(STATEMENT_CLOSING_TEXT, PAGE_MARGIN, tableY, { width: 495 });
 }

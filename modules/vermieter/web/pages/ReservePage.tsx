@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatCents, parseCentsInput } from "@notorious/shared";
 import { vermieterApi } from "../api.js";
+import { useDefaultSingleSelection } from "../hooks/useDefaultSingleSelection.js";
 
 const inputClass = "rounded-md border border-border bg-surface px-2 py-1.5 text-sm";
 const labelClass = "block space-y-1 text-sm";
@@ -21,6 +22,7 @@ function ReservePage() {
   });
 
   const [propertyId, setPropertyId] = useState("");
+  useDefaultSingleSelection(properties, propertyId, setPropertyId);
   const reserveKey = ["module-vermieter-reserve", workspaceId, propertyId];
   const { data: reserve } = useQuery({
     queryKey: reserveKey,

@@ -1,4 +1,8 @@
 import { createWorker } from "tesseract.js";
+// pdf-parse is CJS-only (`module.exports = pdf`); esModuleInterop (set in
+// tsconfig.base.json, inherited by modules/tsconfig.json) makes this default
+// import resolve to the callable directly.
+import pdfParse from "pdf-parse";
 
 export interface OcrGuess {
   rawText: string;
@@ -10,25 +14,65 @@ export interface OcrGuess {
 /**
  * Local OCR (German language pack) over an uploaded receipt-photo buffer,
  * plus a deliberately simple best-effort structured guess - this is a
- * "user reviews and corrects before saving" flow (see routes/receipts.ts's
- * `/receipts/ocr` endpoint), not a receipt-parsing product, so the
- * heuristics below stay simple rather than trying to handle every receipt
- * layout.
+ * "user reviews and corrects before saving" flow (see
+ * routes/receiptDocuments.ts's manual "OCR starten" endpoint), not a
+ * receipt-parsing product, so the heuristics below stay simple rather than
+ * trying to handle every receipt layout.
  */
 export async function runReceiptOcr(imageBuffer: Buffer): Promise<OcrGuess> {
   const worker = await createWorker("deu");
   try {
     const { data } = await worker.recognize(imageBuffer);
     const rawText = data.text ?? "";
-    return {
-      rawText,
-      guessedAmountCents: guessAmountCents(rawText),
-      guessedDate: guessDate(rawText),
-      guessedVendor: guessVendor(rawText),
-    };
+    return guessFromText(rawText);
   } finally {
     await worker.terminate();
   }
+}
+
+/**
+ * PDF entry point (see routes/receiptDocuments.ts's manual OCR-trigger
+ * route). Coverage is deliberately two-tier:
+ *
+ *  1. Direct text extraction (`pdf-parse`, a pure-JS PDF.js-based reader,
+ *     no native binary) - covers the common "Rechnung als PDF" case, e.g. an
+ *     emailed/downloaded invoice that was never a scanned image to begin
+ *     with. This is the well-supported path.
+ *  2. A scanned/image-only PDF (no embedded text layer, or only a
+ *     near-empty one) would need per-page rasterization + tesseract, the
+ *     same as the image flow. There is no clean pure-JS rasterizer in this
+ *     repo's dependency set (pdfjs-dist's rendering path needs a `canvas`
+ *     binding, which is a native dependency - the same category of risk
+ *     this module's manifest.ts/routes/receipts.ts already documents
+ *     avoiding for `sharp`). So that fallback is NOT implemented here: a
+ *     scanned PDF just yields whatever thin text pdf-parse can find (often
+ *     none), `ocr_status` still moves to 'done' since the attempt did run,
+ *     and the caller sees an (accurately) mostly-empty `rawText`/guesses
+ *     rather than a silently wrong OCR result. A future pass wanting real
+ *     scanned-PDF OCR would need either a native rasterizer dependency or
+ *     an external/queued rendering step.
+ */
+export async function runReceiptPdfOcr(pdfBuffer: Buffer): Promise<OcrGuess & { pageCount: number }> {
+  const parsed = await pdfParse(pdfBuffer);
+  const rawText = parsed.text ?? "";
+  const guess = guessFromText(rawText);
+  return { ...guess, pageCount: parsed.numpages ?? 1 };
+}
+
+/** Dispatches on mime type - the single entry point routes/receiptDocuments.ts's manual OCR-trigger route calls. */
+export async function runReceiptDocumentOcr(buffer: Buffer, mimeType: string): Promise<OcrGuess & { pageCount: number | null }> {
+  if (mimeType === "application/pdf") return runReceiptPdfOcr(buffer);
+  const guess = await runReceiptOcr(buffer);
+  return { ...guess, pageCount: null };
+}
+
+function guessFromText(rawText: string): OcrGuess {
+  return {
+    rawText,
+    guessedAmountCents: guessAmountCents(rawText),
+    guessedDate: guessDate(rawText),
+    guessedVendor: guessVendor(rawText),
+  };
 }
 
 /**
