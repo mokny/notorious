@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { PDFDocument as PdfLibDocument } from "pdf-lib";
+import { PDFDocument as PdfLibDocument, StandardFonts, rgb } from "pdf-lib";
 import { formatCents } from "@notorious/shared";
 import type { ReceiptDto } from "../services/receipts.js";
 import type { ReceiptDocumentDto } from "../services/receiptDocuments.js";
@@ -154,6 +154,30 @@ export async function renderReceiptsExportPdf(
 
   if (receipts.length === 0) {
     await appendPdfBufferPages(finalDoc, await renderEmptyNote());
+  }
+
+  // A running page number across the WHOLE export (unlike the main statement
+  // PDF, which restarts numbering per tenant section) - this document has no
+  // per-tenant sections, it's one continuous bundle of receipts for whoever
+  // requested it, so a single sequential "Seite X von Y" is what's expected.
+  // Pages here have mixed sizes (A4 overview/note pages vs. image pages sized
+  // to their own pixel dimensions), so the footer is drawn per-page rather
+  // than at a page-size-relative position.
+  const totalPages = finalDoc.getPageCount();
+  if (totalPages > 0) {
+    const font = await finalDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 8;
+    finalDoc.getPages().forEach((page, index) => {
+      const text = `Seite ${index + 1} von ${totalPages}`;
+      const textWidth = font.widthOfTextAtSize(text, fontSize);
+      page.drawText(text, {
+        x: page.getWidth() - textWidth - 30,
+        y: 20,
+        size: fontSize,
+        font,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+    });
   }
 
   const bytes = await finalDoc.save();

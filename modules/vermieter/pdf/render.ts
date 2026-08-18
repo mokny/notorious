@@ -46,7 +46,12 @@ export function renderStatementPdf(
   categoryLabels: Record<string, string> = {},
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN });
+    // `bufferPages: true` is required to go back and stamp a per-section
+    // page number ("Seite X von Y") onto already-written pages via
+    // `doc.switchToPage()` after each tenant's section is fully rendered -
+    // without it pdfkit flushes pages to the output stream immediately and
+    // they can no longer be revisited.
+    const doc = new PDFDocument({ size: "A4", margin: PAGE_MARGIN, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -54,9 +59,16 @@ export function renderStatementPdf(
 
     const propertyAddress = `${property.street} ${property.houseNumber}, ${property.postalCode} ${property.city}`;
 
+    // Page numbering is scoped PER TENANT SECTION ("Seite 1 von 2", restarting
+    // at 1 for the next tenant), not a single running count across the whole
+    // combined PDF - each tenant only ever sees their own document's pages.
+    const sectionPageRanges: { start: number; end: number }[] = [];
     tenantSummaries.forEach((summary, index) => {
       if (index > 0) doc.addPage();
+      const start = doc.bufferedPageRange().count - 1;
       renderTenantSection(doc, property, propertyAddress, landlord, statement, lines, summary, tenantSummaries, categoryLabels);
+      const end = doc.bufferedPageRange().count - 1;
+      sectionPageRanges.push({ start, end });
     });
 
     if (tenantSummaries.length === 0) {
@@ -70,6 +82,21 @@ export function renderStatementPdf(
     if (vacancySummaries.length > 0) {
       doc.addPage();
       renderVacancyPage(doc, propertyAddress, statement, vacancySummaries, categoryLabels);
+    }
+
+    // Stamp "Seite X von Y" only on sections that actually span more than one
+    // page - a single-page tenant section doesn't need a "Seite 1 von 1" footer.
+    for (const { start, end } of sectionPageRanges) {
+      const total = end - start + 1;
+      if (total <= 1) continue;
+      for (let pageIndex = start; pageIndex <= end; pageIndex++) {
+        doc.switchToPage(pageIndex);
+        const pageNumber = pageIndex - start + 1;
+        doc
+          .fontSize(8)
+          .fillColor("#666666")
+          .text(`Seite ${pageNumber} von ${total}`, PAGE_MARGIN, doc.page.height - 40, { width: 495, align: "center" });
+      }
     }
 
     doc.end();
