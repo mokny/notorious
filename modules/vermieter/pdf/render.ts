@@ -209,7 +209,7 @@ function renderTenantSection(
   doc.fontSize(9).fillColor("#000000");
   doc.moveTo(PAGE_MARGIN, tableY - 4).lineTo(PAGE_MARGIN + 495, tableY - 4).strokeColor("#cccccc").stroke();
   doc.text("Kostenart", colCategory.x, tableY, { width: colCategory.width });
-  doc.text("Gesamtkosten Objekt", colTotal.x, tableY, { width: colTotal.width, align: "right" });
+  doc.text("Gesamtkosten", colTotal.x, tableY, { width: colTotal.width, align: "right" });
   doc.text("Verteilerschlüssel", colKey.x, tableY, { width: colKey.width });
   doc.text("Ihr Anteil", colShareLabel.x, tableY, { width: colShareLabel.width, align: "right" });
   doc.text("Betrag", colAmount.x, tableY, { width: colAmount.width, align: "right" });
