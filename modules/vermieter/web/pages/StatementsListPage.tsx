@@ -9,6 +9,12 @@ const inputClass = "w-full rounded-md border border-border bg-surface px-2 py-1.
 const labelClass = "block space-y-1 text-sm";
 const labelTextClass = "text-xs font-medium text-ink-muted";
 
+/** Jan 1 / Dec 31 of the calendar year before the current one - a Nebenkostenabrechnung is almost always for the just-finished year, so this is the sensible default for a freshly-opened "Abrechnung erstellen" form rather than leaving the period empty. */
+function defaultPreviousYearPeriod(): { start: string; end: string } {
+  const previousYear = new Date().getFullYear() - 1;
+  return { start: `${previousYear}-01-01`, end: `${previousYear}-12-31` };
+}
+
 /** Liste aller Nebenkostenabrechnungen + "Abrechnung erstellen"-Formular (Immobilie + Zeitraum -> generiert Statement per POST). */
 function StatementsListPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -31,8 +37,8 @@ function StatementsListPage() {
   const [showForm, setShowForm] = useState(false);
   const [propertyId, setPropertyId] = useState("");
   useDefaultSingleSelection(properties, propertyId, setPropertyId);
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState("");
+  const [periodStart, setPeriodStart] = useState(() => defaultPreviousYearPeriod().start);
+  const [periodEnd, setPeriodEnd] = useState(() => defaultPreviousYearPeriod().end);
   const [heatingShare, setHeatingShare] = useState(70);
 
   const generateMutation = useMutation({

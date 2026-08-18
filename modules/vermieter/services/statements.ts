@@ -345,7 +345,15 @@ export function generateStatement(sdk: ModuleSdk, workspaceId: string, actorId: 
       .run(statementId, workspaceId, input.propertyId, input.periodStart, input.periodEnd, input.heatingConsumptionSharePercent ?? 70, actorId, now);
 
     for (const line of lines) {
-      const leaseIdForUnit = leaseSegments.find((s) => s.unitId === line.unitId)?.leaseId ?? null;
+      // A unit with more than one lease segment in the period
+      // (Mieterwechsel) has no single "the" lease for this unit-level line
+      // - attributing it to whichever segment happened to be found first
+      // would be an arbitrary, misleading label (this field isn't consulted
+      // by any per-tenant rendering, which filters by unit_id, not
+      // lease_id, but it's still a stored fact and should say "ambiguous"
+      // rather than pick one tenant over another).
+      const unitSegments = leaseSegments.filter((s) => s.unitId === line.unitId);
+      const leaseIdForUnit = unitSegments.length === 1 ? (unitSegments[0]?.leaseId ?? null) : null;
       sdk.sqlite
         .prepare(
           `INSERT INTO vermieter_statement_lines

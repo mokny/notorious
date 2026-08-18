@@ -3,6 +3,7 @@ import { formatCents } from "@notorious/shared";
 import { getCostCategory } from "../db/costCategories.js";
 import { allocationKeyLabel, STATEMENT_CLOSING_TEXT, ESTIMATED_VALUE_FOOTNOTE } from "./text.de.js";
 import { generateTenantExplanationParagraph } from "./explanationText.js";
+import { proratedLinesForSegment } from "../services/statementCalculation.js";
 import type { StatementDto, StatementLineDto, TenantSummaryDto } from "../services/statements.js";
 import type { PropertyDto } from "../services/properties.js";
 import type { LandlordProfileDto } from "../services/landlordProfile.js";
@@ -47,7 +48,7 @@ export function renderStatementPdf(
 
     tenantSummaries.forEach((summary, index) => {
       if (index > 0) doc.addPage();
-      renderTenantSection(doc, property, propertyAddress, landlord, statement, lines, summary);
+      renderTenantSection(doc, property, propertyAddress, landlord, statement, lines, summary, tenantSummaries);
     });
 
     if (tenantSummaries.length === 0) {
@@ -66,6 +67,7 @@ function renderTenantSection(
   statement: StatementDto,
   allLines: StatementLineDto[],
   summary: TenantSummaryForPdf,
+  allSummaries: TenantSummaryForPdf[],
 ): void {
   doc.fontSize(8).fillColor("#666666").text(
     [landlord.name, landlord.street, `${landlord.postalCode} ${landlord.city}`].filter(Boolean).join(" · "),
@@ -112,8 +114,18 @@ function renderTenantSection(
   tableY += 16;
   doc.moveTo(PAGE_MARGIN, tableY - 4).lineTo(PAGE_MARGIN + 495, tableY - 4).strokeColor("#cccccc").stroke();
 
-  const unitLines = allLines.filter((line) => line.unitId === summary.unitId);
-  let subtotalCents = 0;
+  // A unit covered by more than one lease segment in the period
+  // (Mieterwechsel) has statement lines that carry the WHOLE unit's
+  // full-period amount, shared identically by every one of its tenants -
+  // see statementCalculation.ts::proratedLinesForSegment's doc comment.
+  // Re-derive this specific tenant's own itemized share before rendering
+  // the table/explanation, so they tie out with `summary.totalAllocatedCostCents`
+  // instead of every co-tenant seeing the same full-unit amount.
+  const rawUnitLines = allLines.filter((line) => line.unitId === summary.unitId);
+  const unitSegmentDayRanges = allSummaries
+    .filter((s) => s.unitId === summary.unitId)
+    .map((s) => ({ start: s.segmentStart, end: s.segmentEnd }));
+  const unitLines = proratedLinesForSegment(rawUnitLines, summary.segmentStart, summary.segmentEnd, unitSegmentDayRanges);
   let hasEstimatedLine = false;
   for (const line of unitLines) {
     if (line.unitShareCents === 0 && line.totalPropertyCostCents === 0) continue;
@@ -134,15 +146,21 @@ function renderTenantSection(
     if (line.isEstimated) hasEstimatedLine = true;
     doc.text(amountText, colAmount.x, tableY, { width: colAmount.width, align: "right" });
     tableY += 16;
-    subtotalCents += line.unitShareCents;
   }
 
   tableY += 8;
   doc.moveTo(PAGE_MARGIN + 330, tableY).lineTo(PAGE_MARGIN + 495, tableY).strokeColor("#cccccc").stroke();
   tableY += 8;
 
+  // Deliberately `summary.totalAllocatedCostCents` (the engine's own
+  // day-prorated per-segment total - see computeTenantSummaries), not a sum
+  // of the rendered line amounts above: per-line rounding in
+  // proratedLinesForSegment can drift by a cent or two from the
+  // authoritative total, and the balance below is computed FROM
+  // totalAllocatedCostCents - using anything else here could make "Summe
+  // Kosten" and "Nachzahlung/Guthaben" fail to reconcile on the page.
   doc.fontSize(10).text("Summe Kosten:", PAGE_MARGIN + 330, tableY, { width: 80, align: "right" });
-  doc.text(formatCents(subtotalCents), colAmount.x, tableY, { width: colAmount.width, align: "right" });
+  doc.text(formatCents(summary.totalAllocatedCostCents), colAmount.x, tableY, { width: colAmount.width, align: "right" });
   tableY += 16;
 
   doc.text("Vorauszahlungen geleistet:", PAGE_MARGIN + 260, tableY, { width: 150, align: "right" });

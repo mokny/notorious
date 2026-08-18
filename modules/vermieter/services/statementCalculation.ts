@@ -696,4 +696,47 @@ export function computeTenantSummaries(lines: StatementLineResult[], leaseSegmen
   return summaries;
 }
 
+/**
+ * Re-derives one lease-segment's own view of a unit's statement lines, for
+ * a unit covered by more than one lease segment within the period
+ * (Mieterwechsel). `computeStatementLines` tracks cost per UNIT only, not
+ * per lease-segment - every `StatementLineResult`/`StatementLineDto` for
+ * that unit carries the *whole unit's* full-period `unitShareCents` and
+ * `daysOccupied`, identical for every tenant who occupied it. Rendering
+ * those unit-level numbers verbatim on an individual tenant's statement
+ * page would show every co-tenant of that unit the SAME full-unit amount
+ * and day-count (e.g. both halves of a mid-year Mieterwechsel each seeing
+ * the full year's Kopfteil share), contradicting the correctly
+ * day-prorated total in `computeTenantSummaries`'s
+ * `TenantSummaryResult.totalAllocatedCostCents` - see pdf/render.ts's
+ * per-tenant table and pdf/explanationText.ts's per-tenant paragraph, both
+ * of which call this before rendering so the itemized lines and the
+ * reconciliation total stay mutually consistent for that tenant. Prorates
+ * each line's `unitShareCents` by this segment's own day-count over the
+ * sum of all of the unit's segment day-counts in the period - the same
+ * ratio `computeTenantSummaries` applies to the unit's *aggregate* cost,
+ * just applied per line here so the itemized table/explanation tie out
+ * too. `vacancyShareCents` is zeroed (vacancy is never a tenant's charge)
+ * and `daysOccupied` becomes this segment's own days rather than the
+ * unit's total. A single-segment unit is returned unchanged (ratio is
+ * exactly 1 - no proration needed, and no rounding drift introduced).
+ */
+export function proratedLinesForSegment<T extends { unitShareCents: number; vacancyShareCents: number; daysOccupied: number }>(
+  unitLines: T[],
+  segmentStart: string,
+  segmentEnd: string,
+  allUnitSegmentDayRanges: { start: string; end: string }[],
+): T[] {
+  if (allUnitSegmentDayRanges.length <= 1) return unitLines;
+  const segmentDays = daysBetweenInclusive(segmentStart, segmentEnd);
+  const totalDays = allUnitSegmentDayRanges.reduce((sum, r) => sum + daysBetweenInclusive(r.start, r.end), 0);
+  if (totalDays <= 0) return unitLines;
+  return unitLines.map((line) => ({
+    ...line,
+    unitShareCents: roundCents((line.unitShareCents * segmentDays) / totalDays),
+    vacancyShareCents: 0,
+    daysOccupied: segmentDays,
+  }));
+}
+
 export { daysBetweenInclusive, clampDateRange };
