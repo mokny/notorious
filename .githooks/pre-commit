@@ -7,3 +7,12 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 node "$REPO_ROOT/scripts/bump-version.mjs"
 git add "$REPO_ROOT/package.json"
+
+# Only touch install.sh (let alone stage it) when it's actually part of this
+# commit - unlike package.json above, which is bumped unconditionally on
+# every commit, staging it unconditionally here could sweep in unrelated
+# uncommitted local edits to install.sh that were never meant for this commit.
+if git diff --cached --name-only | grep -qx "scripts/install.sh"; then
+  node "$REPO_ROOT/scripts/bump-installer-version.mjs"
+  git add "$REPO_ROOT/scripts/install.sh"
+fi
