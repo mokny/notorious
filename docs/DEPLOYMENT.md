@@ -174,6 +174,20 @@ npm run migrate
 sudo systemctl restart notorious
 ```
 
+### Uninstalling
+
+```bash
+cd /opt/notorious
+./scripts/uninstall.sh
+```
+
+Stops and removes the systemd service (if `install.sh` set one up), then removes the project
+directory. Asks separately (default: no) whether to keep your data (`data/notorious.db` +
+`data/files/`) - answering yes moves it to `~/notorious-data-backup/` before the project directory is
+deleted, so nothing is lost by an accidental default. Leaves Node.js, any NodeSource apt repo, and
+build tools `install.sh` may have installed untouched, since other software on the machine may depend
+on them.
+
 ### Auto-Update
 
 The admin panel's Update tab (`/admin` -> Update) can also schedule unattended updates: pick a
@@ -209,7 +223,8 @@ Also set `APP_ORIGIN` to the exact public URL you're serving the app on (e.g.
 available - they're off entirely until this is set, with no fallback to `WEB_ORIGIN`/localhost:
 a passkey cryptographically binds to the origin it was registered under, so silently falling back
 to the wrong one would just mean passkeys stop working the moment you move to a real domain.
-Restart the app after setting it.
+Restart the app after setting it. (`install.sh` offers to set this for you if you already know your
+domain at install time; if not, or you skipped it, set it here by hand once HTTPS is live.)
 
 ## Option B: Docker Compose
 

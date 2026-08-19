@@ -74,11 +74,31 @@ fi
 APP_USER="${SUDO_USER:-$(id -un)}"
 
 log() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
+
+# Piped via `curl ... | bash`, this script's own stdin is the pipe carrying
+# the script's source - bash reads ahead from it in chunks, so a `read` here
+# doesn't cleanly see EOF, it can consume upcoming lines of THIS SCRIPT as the
+# "answer" instead of asking anything. That reply essentially never matches
+# ^[Yy]$, so every yes-default prompt silently resolves to "no" instead of
+# actually asking - the script *looks* interactive-ish but isn't. Reading the
+# prompt from /dev/tty instead bypasses the pipe entirely and talks to the
+# real terminal, which is what makes both `./scripts/install.sh` and the
+# one-liner behave identically. Falls back to the default when no TTY exists
+# at all (e.g. driven from a non-interactive CI/build context).
+prompt_read() {
+  local prompt="$1" reply
+  if [ -r /dev/tty ]; then
+    read -r -p "$prompt" reply </dev/tty || reply=""
+  else
+    reply=""
+  fi
+  printf '%s' "$reply"
+}
 ask_yes_no() {
   local prompt="$1" default="${2:-n}" reply
   local hint="y/N"
   [ "$default" = "y" ] && hint="Y/n"
-  read -r -p "$prompt [$hint]: " reply || reply=""
+  reply="$(prompt_read "$prompt [$hint]: ")"
   reply="${reply:-$default}"
   [[ "$reply" =~ ^[Yy]$ ]]
 }
@@ -131,6 +151,11 @@ if [ "$PKG_MANAGER" = "apt" ]; then
     $SUDO apt-get update
     $SUDO apt-get install -y python3 make g++ openssl
   fi
+elif [ "$PKG_MANAGER" = "dnf" ]; then
+  log "System build dependencies"
+  if ask_yes_no "Install build tools (python3, make, gcc-c++) needed if native modules must compile from source?" y; then
+    $SUDO dnf install -y python3 make gcc gcc-c++ openssl
+  fi
 fi
 
 log "Installing npm dependencies"
@@ -165,6 +190,29 @@ if ask_yes_no "Generate a VAPID key pair now for Web Push notifications?" y; the
   echo "VAPID keys written to .env."
 fi
 
+log "Passkeys (WebAuthn)"
+echo "Passkeys need APP_ORIGIN set to the exact public HTTPS URL this instance will be reachable"
+echo "at (e.g. https://notes.example.com) - they stay off with no fallback until it's set, since a"
+echo "passkey cryptographically binds to the origin it was registered under."
+if ask_yes_no "Do you already know the public HTTPS domain you'll serve this instance on?" n; then
+  while :; do
+    APP_ORIGIN_INPUT="$(prompt_read "Public URL (e.g. https://notes.example.com, leave empty to skip): ")"
+    [ -z "$APP_ORIGIN_INPUT" ] && break
+    if [[ "$APP_ORIGIN_INPUT" =~ ^https://[^/]+$ ]]; then
+      sed -i.bak -e "s#^APP_ORIGIN=.*#APP_ORIGIN=$APP_ORIGIN_INPUT#" .env && rm -f .env.bak
+      echo "APP_ORIGIN set to $APP_ORIGIN_INPUT."
+      echo "Passkeys will only actually work once HTTPS is really serving that URL (see docs/NGINX.md)"
+      echo "and you've set COOKIE_SECURE=true in .env and restarted - don't set COOKIE_SECURE yet if"
+      echo "HTTPS isn't live, it'll silently break login."
+      break
+    else
+      echo "That doesn't look like https://a-domain (no path, no trailing slash) - try again or leave empty to skip."
+    fi
+  done
+else
+  echo "Skipping - set APP_ORIGIN in .env yourself later once you have a domain (see docs/DEPLOYMENT.md)."
+fi
+
 log "Building"
 # Bundling mermaid + its diagram-layout dependencies is memory-hungry; V8
 # sometimes auto-detects a conservative heap ceiling (well under 1GB) on
@@ -177,7 +225,15 @@ log "Running database migrations"
 npm run migrate
 
 if ask_yes_no "Create your first user account now?" y; then
-  npm run create-user
+  # Same pipe-vs-tty issue as the prompts above: `npm run create-user`'s own
+  # readline prompts (email/name/password) read process.stdin, which without
+  # this redirect is still the pipe carrying this script's source under
+  # `curl | bash`, not the real terminal.
+  if [ -r /dev/tty ]; then
+    npm run create-user </dev/tty
+  else
+    npm run create-user
+  fi
 fi
 log "Self-registration through /register is disabled by default - run 'npm run enable-registration' any time to let people sign themselves up, or keep using 'npm run create-user' to provision accounts yourself."
 

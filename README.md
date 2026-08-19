@@ -209,6 +209,17 @@ This re-downloads the latest code as a tarball (`.env` and `data/` are untouched
 the download), reinstalls dependencies, rebuilds, runs any pending migrations, and restarts the
 systemd service if `install.sh` set one up (otherwise it tells you to restart manually).
 
+To remove an installation, from inside that directory:
+
+```bash
+./scripts/uninstall.sh
+```
+
+Stops and removes the systemd service, then removes the project directory. Asks separately whether
+to keep your data (`data/notorious.db` + `data/files/`) - if you say yes it's moved to
+`~/notorious-data-backup/` first, so nothing is lost by default. Leaves Node.js and any build tools
+`install.sh` installed untouched.
+
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for what these scripts do under the hood, plus the fully
 manual steps, reverse proxy/HTTPS setup, and backup instructions.
 
