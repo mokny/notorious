@@ -2,7 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import unzipper from "unzipper";
 import { and, eq } from "drizzle-orm";
 import type {
@@ -92,7 +92,7 @@ export async function exportWorkspace(workspaceId: string): Promise<Buffer> {
     manifest.blocks.push(...(await db.select().from(blocks).where(eq(blocks.objectId, object.id))));
   }
 
-  const archive = archiver("zip", { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
   const output = new PassThrough();
   archive.pipe(output);
 
