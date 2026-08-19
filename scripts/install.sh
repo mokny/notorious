@@ -5,7 +5,15 @@
 #
 # Usage: ./scripts/install.sh (after a manual git clone), or as the one-line
 # installer from the README:
-#   curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh)"
+#
+# Deliberately NOT `curl ... | bash`: piping puts the script's own source on
+# bash's stdin, which then competes with this script's interactive prompts
+# for that same stdin (bash reads pipes in lookahead chunks, so a `read`
+# can end up consuming upcoming script text as its "answer" instead of
+# actually prompting). `bash -c "$(...)"` expands the script into a command
+# string via command substitution *before* bash ever starts, so stdin is
+# never touched and stays connected to the real terminal throughout.
 set -euo pipefail
 
 REPO_URL="https://github.com/mokny/notorious"
@@ -75,23 +83,15 @@ APP_USER="${SUDO_USER:-$(id -un)}"
 
 log() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
 
-# Piped via `curl ... | bash`, this script's own stdin is the pipe carrying
-# the script's source - bash reads ahead from it in chunks, so a `read` here
-# doesn't cleanly see EOF, it can consume upcoming lines of THIS SCRIPT as the
-# "answer" instead of asking anything. That reply essentially never matches
-# ^[Yy]$, so every yes-default prompt silently resolves to "no" instead of
-# actually asking - the script *looks* interactive-ish but isn't. Reading the
-# prompt from /dev/tty instead bypasses the pipe entirely and talks to the
-# real terminal, which is what makes both `./scripts/install.sh` and the
-# one-liner behave identically. Falls back to the default when no TTY exists
-# at all (e.g. driven from a non-interactive CI/build context).
+# Reads from the real terminal via stdin - safe because the one-liner this
+# script is meant to be run as (see the header comment) is `bash -c "$(curl
+# ...)"`, not `curl ... | bash`, so stdin is never occupied by the script's
+# own source. Someone piping it in directly anyway (old bookmarked command,
+# copy-pasted from elsewhere) still won't crash: `read` just hits EOF and
+# falls back to the default.
 prompt_read() {
   local prompt="$1" reply
-  if [ -r /dev/tty ]; then
-    read -r -p "$prompt" reply </dev/tty || reply=""
-  else
-    reply=""
-  fi
+  read -r -p "$prompt" reply || reply=""
   printf '%s' "$reply"
 }
 ask_yes_no() {
@@ -225,15 +225,7 @@ log "Running database migrations"
 npm run migrate
 
 if ask_yes_no "Create your first user account now?" y; then
-  # Same pipe-vs-tty issue as the prompts above: `npm run create-user`'s own
-  # readline prompts (email/name/password) read process.stdin, which without
-  # this redirect is still the pipe carrying this script's source under
-  # `curl | bash`, not the real terminal.
-  if [ -r /dev/tty ]; then
-    npm run create-user </dev/tty
-  else
-    npm run create-user
-  fi
+  npm run create-user
 fi
 log "Self-registration through /register is disabled by default - run 'npm run enable-registration' any time to let people sign themselves up, or keep using 'npm run create-user' to provision accounts yourself."
 

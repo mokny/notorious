@@ -22,7 +22,7 @@ rather let people sign themselves up.
 The fastest way to get a running instance: SSH into any Linux server and paste this single command.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh)"
 ```
 
 You don't need git, Node.js, or anything else installed beforehand - the script figures out what's
@@ -183,7 +183,7 @@ npm run generate-vapid-keys --workspace=packages/server
 One line, no git required - downloads the code (via curl/wget) into `./notorious` and installs it:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh)"
 ```
 
 This installs missing system dependencies (Node.js and, on Debian/Ubuntu, the build tools better-

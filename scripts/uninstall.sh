@@ -28,15 +28,12 @@ fi
 
 log() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
 
-# Same curl|bash-vs-real-prompt concern as install.sh: read from the real
-# terminal, not this script's own stdin.
+# See install.sh's header comment: run via `bash -c "$(curl -fsSL ...)"`,
+# not `curl ... | bash`, so stdin stays the real terminal and plain `read`
+# just works.
 prompt_read() {
   local prompt="$1" reply
-  if [ -r /dev/tty ]; then
-    read -r -p "$prompt" reply </dev/tty || reply=""
-  else
-    reply=""
-  fi
+  read -r -p "$prompt" reply || reply=""
   printf '%s' "$reply"
 }
 ask_yes_no() {

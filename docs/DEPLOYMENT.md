@@ -12,7 +12,7 @@ same `.env` file and the same `data/` directory layout.
 ### First-time setup (scripted)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh)"
 ```
 
 No git required - this one-liner downloads the code as a tarball (via curl, falling back to wget) into

@@ -16,7 +16,7 @@ Pick one - both are documented in detail in the [README](../README.md#installing
 
 ```bash
 # Bare-metal (Linux server, no Docker)
-curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh | bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh)"
 
 # Docker
 git clone https://github.com/mokny/notorious.git && cd notorious
