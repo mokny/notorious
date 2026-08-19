@@ -15,6 +15,12 @@ same `.env` file and the same `data/` directory layout.
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh)"
 ```
 
+Run this from a real SSH client (Terminal, iTerm, Warp, PuTTY, ...), not a browser-based
+virtual-machine console (e.g. Proxmox's built-in noVNC console). Those consoles don't reliably pass
+keystrokes/paste through to the shell's TTY, so the installer's interactive prompts (Node.js install,
+first user account, systemd service, ...) can silently skip straight to their defaults without ever
+showing up.
+
 No git required - this one-liner downloads the code as a tarball (via curl, falling back to wget) into
 `./notorious` and runs the installer. It installs the latest published GitHub Release (see
 "Versioning" below); if none has been published yet, it falls back to the tip of `main` and prints a

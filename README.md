@@ -25,6 +25,10 @@ The fastest way to get a running instance: SSH into any Linux server and paste t
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/mokny/notorious/main/scripts/install.sh)"
 ```
 
+Run this from a real SSH client (Terminal, iTerm, Warp, PuTTY, ...), not a browser-based VM console
+(e.g. Proxmox's built-in noVNC console) - those don't reliably pass keystrokes through to the shell,
+so the installer's prompts can silently skip to their defaults instead of waiting for your input.
+
 You don't need git, Node.js, or anything else installed beforehand - the script figures out what's
 missing and takes care of it for you. Concretely, it: downloads the latest release into `./notorious`;
 installs Node.js and any build tools it needs (asking first); runs `npm install`; creates a `.env`
