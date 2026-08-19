@@ -16,7 +16,7 @@
 # never touched and stays connected to the real terminal throughout.
 set -euo pipefail
 
-INSTALLER_VERSION="1.0.0"
+INSTALLER_VERSION="1.1.0"
 
 # Shown once even though this script re-execs itself part-way through (see
 # the bootstrap block below) - the exported guard var survives that exec, so
@@ -209,6 +209,8 @@ fi
 
 log "Installing npm dependencies"
 npm install
+
+SUDO="$SUDO" ./scripts/ensure-sharp-libvips.sh
 
 log "Setting up .env"
 if [ ! -f .env ]; then

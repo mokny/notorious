@@ -164,6 +164,8 @@ fi
 log "Installing dependencies"
 npm install
 
+SUDO="$SUDO" ./scripts/ensure-sharp-libvips.sh
+
 log "Building"
 # Bundling mermaid + its diagram-layout dependencies is memory-hungry; V8
 # sometimes auto-detects a conservative heap ceiling (well under 1GB) on
