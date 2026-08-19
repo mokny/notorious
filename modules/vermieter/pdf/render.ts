@@ -86,16 +86,30 @@ export function renderStatementPdf(
 
     // Stamp "Seite X von Y" only on sections that actually span more than one
     // page - a single-page tenant section doesn't need a "Seite 1 von 1" footer.
+    //
+    // The footer sits at page.height - 40, which is BELOW the page's usable
+    // content area (page.height - margins.bottom, i.e. within the last 50pt
+    // margin). pdfkit's text() still runs its normal auto-pagination check
+    // even with an explicit y - since that y is already past the page's
+    // maxY(), it decides the text "doesn't fit" and silently calls addPage()
+    // itself before writing, appending a blank page at the END OF THE WHOLE
+    // DOCUMENT for every footer stamped this way (this is what produced the
+    // stray blank trailing pages). Fix: zero out the bottom margin just for
+    // this one write so the footer's y is back within pdfkit's idea of the
+    // page bounds, then restore it immediately after.
     for (const { start, end } of sectionPageRanges) {
       const total = end - start + 1;
       if (total <= 1) continue;
       for (let pageIndex = start; pageIndex <= end; pageIndex++) {
         doc.switchToPage(pageIndex);
         const pageNumber = pageIndex - start + 1;
+        const originalBottomMargin = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
         doc
           .fontSize(8)
           .fillColor("#666666")
           .text(`Seite ${pageNumber} von ${total}`, PAGE_MARGIN, doc.page.height - 40, { width: 495, align: "center" });
+        doc.page.margins.bottom = originalBottomMargin;
       }
     }
 
