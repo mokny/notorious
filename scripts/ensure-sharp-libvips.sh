@@ -109,6 +109,14 @@ log "Rebuilding sharp against the local libvips"
 if sharp_loads; then
   echo "sharp now loads correctly."
 else
-  echo "Warning: sharp still fails to load after building libvips from source." >&2
-  echo "Image resizing/thumbnailing will not work. See docs/DEPLOYMENT.md." >&2
+  # Fatal, not a warning: imageResize.ts imports sharp at module load time,
+  # so a broken sharp doesn't just disable resizing - it crashes the whole
+  # server process on startup. Letting this fail silently here previously
+  # let update.sh sail on to `npm run build`, migrate, and restart the
+  # service straight into a crash loop on the new, broken version. Aborting
+  # here instead makes update.sh (`set -euo pipefail`) stop before that
+  # restart, so the still-running old version keeps serving.
+  echo "Error: sharp still fails to load after building libvips from source." >&2
+  echo "Image resizing/thumbnailing would not work - see docs/DEPLOYMENT.md." >&2
+  exit 1
 fi
