@@ -16,6 +16,17 @@
 # never touched and stays connected to the real terminal throughout.
 set -euo pipefail
 
+INSTALLER_VERSION="1.0.0"
+
+# Shown once even though this script re-execs itself part-way through (see
+# the bootstrap block below) - the exported guard var survives that exec, so
+# the on-disk copy doesn't print the banner a second time.
+if [ -z "${NOTORIOUS_INSTALLER_BANNER_SHOWN:-}" ]; then
+  export NOTORIOUS_INSTALLER_BANNER_SHOWN=1
+  printf '\n\033[1;36mNotorious Installer v%s\033[0m\n\n' "$INSTALLER_VERSION"
+  sleep 2
+fi
+
 REPO_URL="https://github.com/mokny/notorious"
 GITHUB_LATEST_RELEASE_API="https://api.github.com/repos/mokny/notorious/releases/latest"
 
@@ -83,6 +94,28 @@ APP_USER="${SUDO_USER:-$(id -un)}"
 
 log() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
 
+# whiptail/dialog draw their box over the terminal via ncurses - that works
+# in essentially any SSH client (it's just cursor-addressed text, not a
+# client-side graphics feature), the real gate is whether the *server* has
+# one of these installed. Neither is installed by this script - only used
+# opportunistically when already present, falling back to the plain
+# read-based prompts below otherwise. Requires a real terminal on both ends
+# (ncurses needs to address the screen), same requirement `bash -c "$(curl
+# ...)"` already guarantees for stdin.
+TUI=""
+if [ -t 0 ] && [ -t 1 ]; then
+  if command -v whiptail >/dev/null 2>&1; then
+    TUI="whiptail"
+  elif command -v dialog >/dev/null 2>&1; then
+    TUI="dialog"
+  fi
+fi
+if [ -n "$TUI" ]; then
+  echo "Using $TUI for interactive prompts."
+else
+  echo "whiptail/dialog not found - using plain text prompts (install either for a dialog-box UI)."
+fi
+
 # Reads from the real terminal via stdin - safe because the one-liner this
 # script is meant to be run as (see the header comment) is `bash -c "$(curl
 # ...)"`, not `curl ... | bash`, so stdin is never occupied by the script's
@@ -91,11 +124,27 @@ log() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
 # falls back to the default.
 prompt_read() {
   local prompt="$1" reply
+  if [ -n "$TUI" ]; then
+    reply="$($TUI --inputbox "$prompt" 10 70 3>&1 1>&2 2>&3)" || reply=""
+    printf '%s' "$reply"
+    return
+  fi
   read -r -p "$prompt" reply || reply=""
   printf '%s' "$reply"
 }
 ask_yes_no() {
   local prompt="$1" default="${2:-n}" reply
+  if [ -n "$TUI" ]; then
+    local defaultno=""
+    [ "$default" = "n" ] && defaultno="--defaultno"
+    # Bare (non-`if`) command would trip `set -e` on a "No" answer (exit 1) -
+    # the if/else keeps that exit status local to this function's return.
+    if $TUI $defaultno --yesno "$prompt" 10 70; then
+      return 0
+    else
+      return 1
+    fi
+  fi
   local hint="y/N"
   [ "$default" = "y" ] && hint="Y/n"
   reply="$(prompt_read "$prompt [$hint]: ")"

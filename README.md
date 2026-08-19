@@ -31,8 +31,9 @@ installs Node.js and any build tools it needs (asking first); runs `npm install`
 file with a freshly generated secret; builds the app and sets up the database; asks whether it should
 create your first login (email/name/password, right there in the terminal); and finally offers to
 install it as a systemd service so it starts automatically on boot and restarts itself if it ever
-crashes. Answer the prompts (or just hit Enter for the defaults) and a few minutes later the app is
-reachable at `http://<your-server>:4000`. The script is safe to re-run, and updating later is the same
+crashes. If `whiptail` or `dialog` is already on the server, prompts render as dialog boxes instead
+of plain text - neither is installed for you, it's opportunistic only. Answer the prompts (or just
+hit Enter for the defaults) and a few minutes later the app is reachable at `http://<your-server>:4000`. The script is safe to re-run, and updating later is the same
 idea with a different script:
 
 ```bash
